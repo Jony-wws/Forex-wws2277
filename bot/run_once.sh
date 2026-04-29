@@ -14,5 +14,5 @@ fi
 
 # Run v22 per-combo bot
 mkdir -p logs
-python deriv_v25_combined.py
+python deriv_v26_filtered.py
 echo "[run_once] tick complete at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
