@@ -22,7 +22,7 @@ from deriv_v15pro_bot import Deriv, get_15m_1h_4h, log_trade, LOG_DIR
 from news_filter import is_blackout_for_pair, upcoming_high_impact
 
 # Load v16 rules
-with open("/home/ubuntu/deriv_bot/v16_rules.json") as f:
+with open("/home/ubuntu/deriv_bot/v19_rules.json") as f:
     rules_data = json.load(f)
 PRIMARY_RULES = rules_data["primary"]
 
