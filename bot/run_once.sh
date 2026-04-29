@@ -12,7 +12,7 @@ if [ -z "$DERIV_DEMO_TOKEN" ]; then
   exit 1
 fi
 
-# Run one tick of the v17 bot
+# Run one tick of the v20 daily-stop bot
 mkdir -p logs
-python deriv_v17_pro.py
+python deriv_v20_daily.py
 echo "[run_once] tick complete at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
