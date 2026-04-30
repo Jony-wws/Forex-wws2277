@@ -43,7 +43,16 @@ FORECASTS_FILE = config.STATE_DIR / "forecasts.json"
 OPEN_FILE = config.STATE_DIR / "open_trades.json"
 CLOSED_FILE = config.STATE_DIR / "closed_trades.json"
 STATS_FILE = config.STATE_DIR / "paper_stats.json"
+BACKTEST_FILE = config.STATE_DIR / "backtest_30d.json"
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader.json"
+
+# Backtest gate: сделка открывается только если:
+#   forecast.probability >= MIN_PROBABILITY И
+#   backtest_30d[pair].win_rate_pct >= BACKTEST_MIN_WR_PCT И
+#   backtest_30d[pair].trades >= BACKTEST_MIN_TRADES.
+# Это и есть «реальный 70% WR», а не теоретическая probability.
+BACKTEST_MIN_WR_PCT = 70.0
+BACKTEST_MIN_TRADES = 5
 
 
 def _load(path: Path, default):
@@ -123,8 +132,27 @@ def _enrich_open_trade(t: dict) -> dict:
     }
 
 
-def _open_new_trades(open_trades: list[dict], snapshot: dict) -> int:
-    """Открыть виртуальные сделки по всем прогнозам ≥70% где ещё нет открытой."""
+def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
+    """Проверить что исторический WR за 30 дней проходит порог."""
+    pairs = (backtest or {}).get("pairs") or {}
+    p = pairs.get(pair)
+    if not p:
+        return False, {"reason": "backtest ещё не запускался"}
+    wr = p.get("win_rate_pct")
+    trades = p.get("trades") or 0
+    if wr is None:
+        return False, {"reason": p.get("note") or "нет истории", "trades": trades}
+    if trades < BACKTEST_MIN_TRADES:
+        return False, {"reason": f"trades<{BACKTEST_MIN_TRADES}", "trades": trades, "win_rate_pct": wr}
+    if wr < BACKTEST_MIN_WR_PCT:
+        return False, {"reason": f"WR<{BACKTEST_MIN_WR_PCT}%", "trades": trades, "win_rate_pct": wr}
+    return True, {"trades": trades, "win_rate_pct": wr}
+
+
+def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict) -> int:
+    """Открыть виртуальные сделки по всем прогнозам, которые проходят:
+      forecast.probability_pct >= 70 И backtest WR за 30д ≥ 70% (на 5+ сделках).
+    """
     rankings = snapshot.get("rankings", [])
     forecasts = snapshot.get("forecasts", {})
     opened = 0
@@ -133,6 +161,13 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict) -> int:
             continue
         pair = r["pair"]
         if _is_open_for_pair(open_trades, pair):
+            continue
+
+        ok, why = _backtest_qualified(pair, backtest)
+        if not ok:
+            log.info(
+                f"SKIP {pair} prob={r['probability_pct']}% — backtest gate: {why}"
+            )
             continue
 
         f = forecasts.get(pair)
@@ -159,6 +194,8 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict) -> int:
             "session_at_open": f.get("session"),
             "agents_for_count": f.get("agents_for_count", 0),
             "agents_against_count": f.get("agents_against_count", 0),
+            "backtest_30d_wr_pct_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("win_rate_pct"),
+            "backtest_30d_trades_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("trades"),
             "status": "open",
         }
         open_trades.append(trade)
@@ -229,11 +266,12 @@ def _refresh_stats(closed: list[dict]) -> dict:
 
 def cycle_once() -> dict:
     snapshot = _load(FORECASTS_FILE, {"forecasts": {}, "rankings": []})
+    backtest = _load(BACKTEST_FILE, {"pairs": {}})
     open_trades = _load(OPEN_FILE, [])
     closed = _load(CLOSED_FILE, [])
 
     settled = _settle_expired(open_trades, closed)
-    opened = _open_new_trades(open_trades, snapshot)
+    opened = _open_new_trades(open_trades, snapshot, backtest)
 
     # обогащаем для UI и сохраняем
     enriched = [_enrich_open_trade(t) for t in open_trades]

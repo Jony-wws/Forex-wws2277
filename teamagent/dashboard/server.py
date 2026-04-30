@@ -57,13 +57,45 @@ def root():
 
 @app.get("/api/forecasts")
 def api_forecasts():
-    """Единый источник: PROGNOZY-28 = мета-голосование (всё в одном)."""
+    """Единый источник: PROGNOZY-28 = мета-голосование (всё в одном).
+
+    Возвращает и rankings (выжимка для таблицы), и forecasts (полный dict),
+    чтобы фронт мог прямо из одного запроса взять agents_for_count/against_count.
+    """
     snap = _load(config.STATE_DIR / "forecasts.json", {"forecasts": {}, "rankings": []})
+    # вся расширенная по-парамная инфа (без больших indicators — их выкачаем лениво через /api/forecast/{pair})
+    forecasts_lite = {}
+    for pair, f in (snap.get("forecasts") or {}).items():
+        forecasts_lite[pair] = {
+            "pair": f.get("pair"),
+            "side": f.get("side"),
+            "probability_pct": f.get("probability_pct"),
+            "score": f.get("score"),
+            "agents_for_count": f.get("agents_for_count", len(f.get("agents_for", []))),
+            "agents_against_count": f.get("agents_against_count", len(f.get("agents_against", []))),
+            "recommended_hours": f.get("recommended_hours"),
+            "as_of": f.get("as_of"),
+        }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
+        "scanned_at": snap.get("scanned_at"),
         "rankings": snap.get("rankings", []),
+        "forecasts": forecasts_lite,
         "total_pairs": len(config.PAIRS),
     })
+
+
+@app.get("/api/backtest")
+def api_backtest():
+    """30-дневный backtest WR по каждой паре.
+
+    Сделка в paper-trader открывается только если:
+      forecast.probability_pct >= 70 И backtest.win_rate_pct >= 70.
+    """
+    return _load(
+        config.STATE_DIR / "backtest_30d.json",
+        {"as_of": None, "pairs": {}, "summary": {}},
+    )
 
 
 @app.get("/api/forecast/{pair}")
@@ -138,6 +170,8 @@ def api_health():
         ("paper_trader", "heartbeat_paper_trader.json"),
         ("orchestrator", "heartbeat_orchestrator.json"),
         ("watchdog", "heartbeat_watchdog.json"),
+        ("backtester", "heartbeat_backtester.json"),
+        ("state_committer", "heartbeat_state_committer.json"),
     ]:
         hb = _load(config.STATE_DIR / fname, None)
         if hb is None:

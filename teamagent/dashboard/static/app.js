@@ -24,7 +24,25 @@ const fmt = {
     const s = sec % 60;
     return `${h}ч ${m.toString().padStart(2, "0")}м ${s.toString().padStart(2, "0")}с`;
   },
+  ago: s => {
+    if (!s) return "—";
+    const sec = Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 1000));
+    if (sec < 60) return `${sec} сек назад`;
+    const m = Math.floor(sec / 60);
+    if (m < 60) return `${m} мин назад`;
+    const h = Math.floor(m / 60);
+    return `${h} ч ${m % 60} мин назад`;
+  },
 };
+
+function freshnessBadge(asOfIso) {
+  if (!asOfIso) return el("span", { class: "muted small" }, "—");
+  const sec = Math.max(0, Math.floor((Date.now() - new Date(asOfIso).getTime()) / 1000));
+  let cls = "fresh-fresh", label = "СВЕЖИЙ";
+  if (sec > 600) { cls = "fresh-stale"; label = "УСТАРЕЛ"; }
+  else if (sec > 300) { cls = "fresh-old"; label = "СТАРЕЕТ"; }
+  return el("span", { class: "fresh-badge " + cls, title: fmt.ago(asOfIso) }, label);
+}
 
 async function api(path) {
   const r = await fetch(path, { cache: "no-store" });
@@ -98,26 +116,44 @@ async function refreshOpenTrades() {
 async function refreshForecasts() {
   try {
     const r = await api("/api/forecasts");
+    const bt = await api("/api/backtest").catch(() => ({ pairs: {} }));
     const tb = document.querySelector("#forecasts-table tbody");
     tb.innerHTML = "";
+    $("forecasts-as-of").textContent = r.scanned_at
+      ? `${fmt.utc(r.scanned_at)} UTC · ${fmt.ago(r.scanned_at)}`
+      : "—";
     let i = 1;
     for (const f of r.rankings) {
       const sideClass = f.side === "BUY" ? "side-buy" : "side-sell";
-      const tr = el("tr", { onclick: () => showForecastDetail(f.pair) },
+      const fdata = (r.forecasts && r.forecasts[f.pair]) || {};
+      const af = fdata.agents_for_count;
+      const ag = fdata.agents_against_count;
+      const btPair = (bt.pairs || {})[f.pair];
+      const btCell = btPair && btPair.win_rate_pct != null
+        ? el("td", { class: btPair.win_rate_pct >= 70 ? "win" : "loss" },
+            `${btPair.win_rate_pct.toFixed(0)}% (${btPair.trades || 0})`)
+        : el("td", { class: "muted small" }, "нет данных");
+      const isFrozen = btPair && btPair.win_rate_pct != null && btPair.win_rate_pct < 70;
+      const rowAttrs = isFrozen
+        ? { onclick: () => showForecastDetail(f.pair), class: "frozen-row" }
+        : { onclick: () => showForecastDetail(f.pair) };
+      const tr = el("tr", rowAttrs,
         el("td", { class: "muted" }, i),
-        el("td", {}, f.pair),
+        el("td", {}, f.pair, isFrozen ? el("span", { class: "frozen-badge", title: "backtest WR < 70%" }, " 🔒") : null),
         el("td", { class: sideClass }, f.side),
         el("td", {}, fmt.pct(f.probability_pct)),
+        btCell,
         el("td", {}, `${f.score}/44`),
         el("td", {}, `${f.recommended_hours}ч`),
-        el("td", { class: "muted" }, "—"),    // заполнит forecast detail
-        el("td", { class: "muted" }, "—"),
+        el("td", { class: af === 0 ? "muted small" : "side-buy" }, af == null ? "—" : af),
+        el("td", { class: ag === 0 ? "muted small" : "side-sell" }, ag == null ? "—" : ag),
+        el("td", {}, freshnessBadge(r.scanned_at)),
       );
       tb.appendChild(tr);
       i++;
     }
     if (r.rankings.length === 0) {
-      tb.appendChild(el("tr", {}, el("td", { colspan: 8, class: "muted" }, "сканер ещё не запущен или нет прогнозов выше нуля")));
+      tb.appendChild(el("tr", {}, el("td", { colspan: 10, class: "muted" }, "сканер ещё не запущен или нет прогнозов выше нуля")));
     }
   } catch (e) { console.error(e); }
 }
@@ -133,13 +169,19 @@ async function showForecastDetail(pair) {
       `сессия ${f.session} · экспирация ${f.recommended_hours}ч · текущая цена ${fmt.price(f.current_price)}`
     ));
 
+    const forList = (f.agents_for && f.agents_for.length)
+      ? f.agents_for.map(n => el("li", {}, n))
+      : [el("li", { class: "muted small" }, "нет правил подтверждающих эту сторону")];
+    const againstList = (f.agents_against && f.agents_against.length)
+      ? f.agents_against.map(n => el("li", {}, n))
+      : [el("li", { class: "muted small" }, "нет правил против этой стороны")];
     const forBox = el("div", { class: "card-inset" },
-      el("strong", { class: "side-buy" }, `За (${f.agents_for_count})`),
-      el("ul", { class: "muted small" }, ...f.agents_for.map(n => el("li", {}, n)))
+      el("strong", { class: "side-buy" }, `За (${f.agents_for_count || 0})`),
+      el("ul", {}, ...forList)
     );
     const againstBox = el("div", { class: "card-inset" },
-      el("strong", { class: "side-sell" }, `Против (${f.agents_against_count})`),
-      el("ul", { class: "muted small" }, ...f.agents_against.map(n => el("li", {}, n)))
+      el("strong", { class: "side-sell" }, `Против (${f.agents_against_count || 0})`),
+      el("ul", {}, ...againstList)
     );
     const wrap = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;" }, forBox, againstBox);
     detail.appendChild(wrap);

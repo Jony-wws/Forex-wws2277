@@ -14,6 +14,19 @@
 </header>
 
 <main>
+
+  <section id="intro-section" class="card intro">
+    <h2>👋 Что я тут вижу?</h2>
+    <ul class="muted small">
+      <li><b>Сводка paper-trader</b> — общая статистика: сколько сделок, WR, PnL.</li>
+      <li><b>Сейчас открыто</b> — активные виртуальные сделки $50/85% (бинарки 1–4ч). Обновляется каждые 30 сек: цена, осталось до экспирации, прогноз PnL.</li>
+      <li><b>PROGNOZY-28</b> — единая таблица прогнозов по 28 парам. Каждые 5 минут scanner пересчитывает score (-44..+44), вероятность (50–92%), за/против. Кликни строку — увидишь breakdown агентов и Стакан.</li>
+      <li><b>Стакан (Volume Profile)</b> — POC/VAH/VAL + крупные игроки 🐋 + прогноз «куда цена не вернётся до 00:00 UTC+5».</li>
+      <li><b>История</b> — все закрытые сделки с реальной ценой Yahoo на момент экспирации.</li>
+      <li><b>60+ агентов</b> — каждый отдельный процесс с heartbeat. Watchdog убивает зависших, orchestrator перезапускает.</li>
+      <li><b>Backtest WR (30d)</b> — реальный win rate на исторических данных за 30 дней. Сделка открывается только если probability ≥ 70% <b>И</b> backtest WR ≥ 70%.</li>
+    </ul>
+  </section>
   <section id="stats-section" class="card">
     <h2>📊 Сводка paper-trader (24/7)</h2>
     <div class="stats-grid" id="stats-grid">
@@ -50,7 +63,7 @@
 
   <section id="forecasts-section" class="card">
     <h2>🎯 PROGNOZY — 28 валютных пар <span class="muted small">(единый источник, обновление каждые 5 минут)</span></h2>
-    <div class="muted">Один источник правды: технический анализ + мета-голосование агентов в одной таблице. Кликни строку — увидишь breakdown.</div>
+    <div class="muted">Один источник правды: технический анализ + мета-голосование агентов в одной таблице. Кликни строку — увидишь breakdown.<br>Снимок сделан: <span id="forecasts-as-of">—</span></div>
     <div class="table-wrap">
       <table id="forecasts-table">
         <thead>
@@ -59,10 +72,12 @@
             <th>Пара</th>
             <th>Сторона</th>
             <th>Вероятность</th>
+            <th>Backtest 30d WR</th>
             <th>Score</th>
             <th>Экспирация</th>
             <th>За</th>
             <th>Против</th>
+            <th>Свежесть</th>
           </tr>
         </thead>
         <tbody></tbody>
