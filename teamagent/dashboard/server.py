@@ -87,13 +87,26 @@ def api_forecasts():
 
 @app.get("/api/backtest")
 def api_backtest():
-    """30-дневный backtest WR по каждой паре.
+    """30-дневный backtest WR по каждой паре (baseline-вариант).
 
-    Сделка в paper-trader открывается только если:
-      forecast.probability_pct >= 70 И backtest.win_rate_pct >= 70.
+    Это baseline-стратегия. Главный gate сейчас — strategy_config (см. ниже).
     """
     return _load(
         config.STATE_DIR / "backtest_30d.json",
+        {"as_of": None, "pairs": {}, "summary": {}},
+    )
+
+
+@app.get("/api/strategy-config")
+def api_strategy_config():
+    """Лучшая стратегия для каждой пары + её WR на 30-дневном бэктесте.
+
+    Это РЕАЛЬНЫЙ gate paper_trader-а:
+      - сделка открывается только если best_variant.win_rate_pct ≥ 70
+      - И текущий сигнал проходит фильтры этого варианта (сессия, |score|, prob).
+    """
+    return _load(
+        config.STATE_DIR / "strategy_config.json",
         {"as_of": None, "pairs": {}, "summary": {}},
     )
 
@@ -172,6 +185,7 @@ def api_health():
         ("watchdog", "heartbeat_watchdog.json"),
         ("backtester", "heartbeat_backtester.json"),
         ("state_committer", "heartbeat_state_committer.json"),
+        ("strategy_search", "heartbeat_strategy_search.json"),
     ]:
         hb = _load(config.STATE_DIR / fname, None)
         if hb is None:

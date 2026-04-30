@@ -9,6 +9,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+import re
+
 import feedparser
 import requests
 
@@ -40,9 +42,10 @@ def _refresh_if_needed() -> None:
         title = entry.get("title", "")
         # ff RSS даёт описание с impact — Red/Orange/Yellow
         descr = entry.get("description", "") or entry.get("summary", "")
+        # whole-word match to avoid false positives (e.g. "red" inside "credit")
         impact = "Yellow"
         for color in ("Red", "Orange", "Yellow"):
-            if color.lower() in descr.lower():
+            if re.search(rf"\b{color}\b", descr, re.IGNORECASE):
                 impact = color
                 break
         # event time

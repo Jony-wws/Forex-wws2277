@@ -93,6 +93,7 @@ def _build_all_children() -> dict[str, ChildProc]:
     out["paper_trader"] = ChildProc("paper_trader", [sys.executable, "-m", "teamagent.paper_trader"])
     out["state_committer"] = ChildProc("state_committer", [sys.executable, "-m", "teamagent.state_committer"])
     out["backtester"] = ChildProc("backtester", [sys.executable, "-m", "teamagent.backtester"])
+    out["strategy_search"] = ChildProc("strategy_search", [sys.executable, "-m", "teamagent.strategy_search", "--loop"])
     for a in all_agents():
         out[a["name"]] = ChildProc(a["name"], _build_agent_cmd(a))
     return out

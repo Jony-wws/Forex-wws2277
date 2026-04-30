@@ -116,33 +116,50 @@ async function refreshOpenTrades() {
 async function refreshForecasts() {
   try {
     const r = await api("/api/forecasts");
-    const bt = await api("/api/backtest").catch(() => ({ pairs: {} }));
+    const sc = await api("/api/strategy-config").catch(() => ({ pairs: {} }));
     const tb = document.querySelector("#forecasts-table tbody");
     tb.innerHTML = "";
     $("forecasts-as-of").textContent = r.scanned_at
       ? `${fmt.utc(r.scanned_at)} UTC · ${fmt.ago(r.scanned_at)}`
       : "—";
+    // Сводка strategy_search
+    const summary = sc.summary || {};
+    const qual = summary.qualified_pairs_70pct || [];
+    const sumNode = $("strategy-summary");
+    if (sumNode) {
+      sumNode.innerHTML = "";
+      sumNode.appendChild(el("div", { class: "muted small" },
+        `Strategy Search: ${qual.length}/${summary.total_pairs || 28} пар достигли ≥70% WR на 30-дневном бэктесте · ${sc.as_of ? fmt.ago(sc.as_of) : "ещё не запускался"}`,
+      ));
+    }
     let i = 1;
     for (const f of r.rankings) {
       const sideClass = f.side === "BUY" ? "side-buy" : "side-sell";
       const fdata = (r.forecasts && r.forecasts[f.pair]) || {};
       const af = fdata.agents_for_count;
       const ag = fdata.agents_against_count;
-      const btPair = (bt.pairs || {})[f.pair];
-      const btCell = btPair && btPair.win_rate_pct != null
-        ? el("td", { class: btPair.win_rate_pct >= 70 ? "win" : "loss" },
-            `${btPair.win_rate_pct.toFixed(0)}% (${btPair.trades || 0})`)
-        : el("td", { class: "muted small" }, "нет данных");
-      const isFrozen = btPair && btPair.win_rate_pct != null && btPair.win_rate_pct < 70;
+      const scPair = (sc.pairs || {})[f.pair];
+      const wr = scPair && scPair.win_rate_pct;
+      const variant = scPair && scPair.best_variant;
+      const qualifies = scPair && scPair.qualifies_70pct;
+      const btCell = wr != null
+        ? el("td", { class: qualifies ? "win" : "loss", title: variant ? `${variant}: ${scPair.best_label}` : "" },
+            `${wr.toFixed(0)}% (${scPair.trades || 0})`)
+        : el("td", { class: "muted small" }, "—");
+      const variantCell = variant
+        ? el("td", { class: "muted small", title: scPair.best_label }, variant.replace(/^v\d+_/, ""))
+        : el("td", { class: "muted small" }, "—");
+      const isFrozen = scPair != null && !qualifies;
       const rowAttrs = isFrozen
         ? { onclick: () => showForecastDetail(f.pair), class: "frozen-row" }
         : { onclick: () => showForecastDetail(f.pair) };
       const tr = el("tr", rowAttrs,
         el("td", { class: "muted" }, i),
-        el("td", {}, f.pair, isFrozen ? el("span", { class: "frozen-badge", title: "backtest WR < 70%" }, " 🔒") : null),
+        el("td", {}, f.pair, isFrozen ? el("span", { class: "frozen-badge", title: `лучшая стратегия даёт ${wr || "?"}% WR — пара заморожена` }, " 🔒") : null),
         el("td", { class: sideClass }, f.side),
         el("td", {}, fmt.pct(f.probability_pct)),
         btCell,
+        variantCell,
         el("td", {}, `${f.score}/44`),
         el("td", {}, `${f.recommended_hours}ч`),
         el("td", { class: af === 0 ? "muted small" : "side-buy" }, af == null ? "—" : af),
@@ -153,7 +170,7 @@ async function refreshForecasts() {
       i++;
     }
     if (r.rankings.length === 0) {
-      tb.appendChild(el("tr", {}, el("td", { colspan: 10, class: "muted" }, "сканер ещё не запущен или нет прогнозов выше нуля")));
+      tb.appendChild(el("tr", {}, el("td", { colspan: 11, class: "muted" }, "сканер ещё не запущен или нет прогнозов выше нуля")));
     }
   } catch (e) { console.error(e); }
 }

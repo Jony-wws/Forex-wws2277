@@ -26,7 +26,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from . import config
+from . import config, strategies
 from .data import yahoo
 
 log = logging.getLogger("paper")
@@ -44,13 +44,17 @@ OPEN_FILE = config.STATE_DIR / "open_trades.json"
 CLOSED_FILE = config.STATE_DIR / "closed_trades.json"
 STATS_FILE = config.STATE_DIR / "paper_stats.json"
 BACKTEST_FILE = config.STATE_DIR / "backtest_30d.json"
+STRATEGY_CONFIG_FILE = config.STATE_DIR / "strategy_config.json"
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader.json"
 
-# Backtest gate: сделка открывается только если:
+# Gate: сделка открывается только если:
 #   forecast.probability >= MIN_PROBABILITY И
-#   backtest_30d[pair].win_rate_pct >= BACKTEST_MIN_WR_PCT И
-#   backtest_30d[pair].trades >= BACKTEST_MIN_TRADES.
-# Это и есть «реальный 70% WR», а не теоретическая probability.
+#   strategy_config[pair].best_variant.win_rate_pct >= MIN_WR_PCT (на этой паре лучшая стратегия даёт ≥7О% WR на 30д) И
+#   forecast сейчас удовлетворяет фильтры этого best_variant (сессия, |score|, prob).
+# Это и есть «реальный 70% WR», а не теоретическая probability прямо из scanner-а.
+MIN_WR_PCT = 70.0
+MIN_TRADES = 5
+# fallback на backtest_30d.json если strategy_config ещё не рассчитан
 BACKTEST_MIN_WR_PCT = 70.0
 BACKTEST_MIN_TRADES = 5
 
@@ -133,7 +137,7 @@ def _enrich_open_trade(t: dict) -> dict:
 
 
 def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
-    """Проверить что исторический WR за 30 дней проходит порог."""
+    """Fallback: проверить backtest_30d.json (baseline-вариант) если strategy_config отсутствует."""
     pairs = (backtest or {}).get("pairs") or {}
     p = pairs.get(pair)
     if not p:
@@ -149,13 +153,92 @@ def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
     return True, {"trades": trades, "win_rate_pct": wr}
 
 
-def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict) -> int:
-    """Открыть виртуальные сделки по всем прогнозам, которые проходят:
-      forecast.probability_pct >= 70 И backtest WR за 30д ≥ 70% (на 5+ сделках).
+def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
+                         baseline_side: str, rsi_1h: float | None,
+                         strategy_cfg: dict) -> tuple[bool, dict]:
+    """Основной гейт: проверяет что для пары есть лучшая стратегия с ≥7О% WR
+    НА 30Д бэктесте И текущий сигнал соответствует фильтрам той стратегии.
+
+    Возвращает в info также recommended `side` (с учётом contrarian/fade_extreme_rsi),
+    которую paper_trader должен использовать вместо baseline-side из forecast_scanner.
+    """
+    pairs = (strategy_cfg or {}).get("pairs") or {}
+    p = pairs.get(pair)
+    if not p:
+        return False, {"reason": "strategy_search ещё не запускался для этой пары"}
+    if not p.get("qualifies_70pct"):
+        return False, {
+            "reason": f"лучшая стратегия даёт всего {p.get('win_rate_pct')}% WR",
+            "win_rate_pct": p.get("win_rate_pct"),
+            "trades": p.get("trades"),
+            "variant": p.get("best_variant"),
+        }
+    trades = p.get("trades") or 0
+    if trades < MIN_TRADES:
+        return False, {"reason": f"trades<{MIN_TRADES}", "trades": trades}
+
+    variants = strategies.variants_by_id()
+    variant = variants.get(p.get("best_variant"))
+    if variant is None:
+        return False, {"reason": f"unknown variant id {p.get('best_variant')}"}
+
+    # Эффективный score (с учётом contrarian / fade_extreme_rsi)
+    effective_score = score
+    if variant.fade_extreme_rsi and rsi_1h is not None and (rsi_1h <= 25 or rsi_1h >= 75):
+        effective_score = -effective_score
+    if variant.contrarian:
+        effective_score = -effective_score
+
+    # 1) session_utc
+    if variant.session_utc is not None:
+        h = ts.hour
+        s, e = variant.session_utc
+        if s <= e:
+            in_window = s <= h < e
+        else:
+            in_window = h >= s or h < e
+        if not in_window:
+            return False, {
+                "reason": f"current hour {h} UTC не попадает в сессию варианта {variant.session_utc}",
+                "variant": variant.id,
+                "win_rate_pct": p.get("win_rate_pct"),
+            }
+    # 2) min_abs_score (на effective_score)
+    if abs(effective_score) < variant.min_abs_score:
+        return False, {
+            "reason": f"|effective_score|={abs(effective_score)} < {variant.min_abs_score}",
+            "variant": variant.id, "win_rate_pct": p.get("win_rate_pct"),
+        }
+    # 3) min_probability (probability — функция от |score|, симметрична)
+    if prob_pct / 100.0 < variant.min_probability:
+        return False, {
+            "reason": f"prob={prob_pct}% < {variant.min_probability * 100}%",
+            "variant": variant.id, "win_rate_pct": p.get("win_rate_pct"),
+        }
+
+    # сторона: variant определяет направление (с учётом флипа)
+    side = "BUY" if effective_score > 0 else "SELL"
+    return True, {
+        "variant": variant.id,
+        "variant_label": variant.label,
+        "win_rate_pct": p.get("win_rate_pct"),
+        "trades": trades,
+        "side": side,
+        "effective_score": effective_score,
+    }
+
+
+def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, strategy_cfg: dict) -> int:
+    """Открыть виртуальные сделки по прогнозам, проходящим все гейты:
+      forecast.probability_pct >= 70
+      Лучшая стратегия пары имеет WR ≥ 70% на 30д (strategy_search)
+      Текущий сигнал удовлетворяет фильтры той стратегии.
     """
     rankings = snapshot.get("rankings", [])
     forecasts = snapshot.get("forecasts", {})
+    has_strategy_cfg = bool((strategy_cfg or {}).get("pairs"))
     opened = 0
+    now_ts = _now()
     for r in rankings:
         if r["probability_pct"] < config.MIN_PROBABILITY * 100.0:
             continue
@@ -163,28 +246,50 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict) ->
         if _is_open_for_pair(open_trades, pair):
             continue
 
-        ok, why = _backtest_qualified(pair, backtest)
-        if not ok:
-            log.info(
-                f"SKIP {pair} prob={r['probability_pct']}% — backtest gate: {why}"
-            )
-            continue
-
         f = forecasts.get(pair)
         if not f:
             continue
+
+        # Главный гейт — strategy_search результат
+        rsi_1h = ((f.get("indicators") or {}).get("1H") or {}).get("rsi14")
+        if has_strategy_cfg:
+            ok, why = _strategy_qualified(
+                pair, now_ts,
+                score=r.get("score", 0),
+                prob_pct=r["probability_pct"],
+                baseline_side=f.get("side", "BUY"),
+                rsi_1h=rsi_1h,
+                strategy_cfg=strategy_cfg,
+            )
+        else:
+            # fallback: старый backtest_30d gate
+            ok, why = _backtest_qualified(pair, backtest)
+        if not ok:
+            log.info(f"SKIP {pair} prob={r['probability_pct']}% — gate: {why}")
+            continue
+
         cp = yahoo.latest_price(pair)
         if cp is None:
             continue
+        # стратегия может развернуть сторону (contrarian / fade_extreme_rsi)
+        trade_side = (why or {}).get("side") or f.get("side")
 
+        # expiry: из best_variant если зафиксирована, иначе из forecast.recommended_hours
         recommended = f.get("recommended_hours", config.DEFAULT_EXPIRY_HOURS)
-        expiry_time = _now() + timedelta(hours=recommended)
+        if has_strategy_cfg:
+            variants = strategies.variants_by_id()
+            v = variants.get((strategy_cfg.get("pairs") or {}).get(pair, {}).get("best_variant"))
+            if v is not None and v.fixed_expiry_h is not None:
+                recommended = v.fixed_expiry_h
+
+        expiry_time = now_ts + timedelta(hours=recommended)
+        per_pair_cfg = (strategy_cfg.get("pairs") or {}).get(pair, {}) if has_strategy_cfg else {}
         trade = {
             "id": str(uuid.uuid4())[:12],
             "pair": pair,
-            "side": f["side"],
+            "side": trade_side,
             "open_price": cp,
-            "open_time": _now().isoformat(),
+            "open_time": now_ts.isoformat(),
             "expiry_time": expiry_time.isoformat(),
             "expiry_hours": recommended,
             "stake_usd": config.STAKE_USD,
@@ -194,13 +299,17 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict) ->
             "session_at_open": f.get("session"),
             "agents_for_count": f.get("agents_for_count", 0),
             "agents_against_count": f.get("agents_against_count", 0),
+            "strategy_variant_at_open": per_pair_cfg.get("best_variant"),
+            "strategy_wr_pct_at_open": per_pair_cfg.get("win_rate_pct"),
             "backtest_30d_wr_pct_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("win_rate_pct"),
             "backtest_30d_trades_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("trades"),
             "status": "open",
         }
         open_trades.append(trade)
         opened += 1
-        log.info(f"OPEN {pair} {f['side']} @ {cp} prob={f['probability_pct']}% expiry={recommended}h")
+        log.info(f"OPEN {pair} {trade_side} @ {cp} prob={f['probability_pct']}% "
+                 f"expiry={recommended}h variant={per_pair_cfg.get('best_variant')} "
+                 f"WR30d={per_pair_cfg.get('win_rate_pct')}%")
     return opened
 
 
@@ -267,11 +376,12 @@ def _refresh_stats(closed: list[dict]) -> dict:
 def cycle_once() -> dict:
     snapshot = _load(FORECASTS_FILE, {"forecasts": {}, "rankings": []})
     backtest = _load(BACKTEST_FILE, {"pairs": {}})
+    strategy_cfg = _load(STRATEGY_CONFIG_FILE, {"pairs": {}})
     open_trades = _load(OPEN_FILE, [])
     closed = _load(CLOSED_FILE, [])
 
     settled = _settle_expired(open_trades, closed)
-    opened = _open_new_trades(open_trades, snapshot, backtest)
+    opened = _open_new_trades(open_trades, snapshot, backtest, strategy_cfg)
 
     # обогащаем для UI и сохраняем
     enriched = [_enrich_open_trade(t) for t in open_trades]

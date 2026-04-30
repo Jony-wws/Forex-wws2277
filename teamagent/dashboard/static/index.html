@@ -24,7 +24,7 @@
       <li><b>Стакан (Volume Profile)</b> — POC/VAH/VAL + крупные игроки 🐋 + прогноз «куда цена не вернётся до 00:00 UTC+5».</li>
       <li><b>История</b> — все закрытые сделки с реальной ценой Yahoo на момент экспирации.</li>
       <li><b>60+ агентов</b> — каждый отдельный процесс с heartbeat. Watchdog убивает зависших, orchestrator перезапускает.</li>
-      <li><b>Backtest WR (30d)</b> — реальный win rate на исторических данных за 30 дней. Сделка открывается только если probability ≥ 70% <b>И</b> backtest WR ≥ 70%.</li>
+      <li><b>WR 30д (лучшая стратегия)</b> — strategy_search перебирает 30+ вариантов (разные пороги score, экспирации, сессии London/NY/Asia, contrarian, full MTF и т.д.) и для каждой пары выбирает лучшую. Сделка открывается ТОЛЬКО если эта лучшая стратегия даёт ≥70% WR на 30-дневном бэктесте <b>И</b> текущий сигнал проходит её фильтры. 🔒 = пара заморожена (даже лучшая стратегия даёт <70%).</li>
     </ul>
   </section>
   <section id="stats-section" class="card">
@@ -64,6 +64,7 @@
   <section id="forecasts-section" class="card">
     <h2>🎯 PROGNOZY — 28 валютных пар <span class="muted small">(единый источник, обновление каждые 5 минут)</span></h2>
     <div class="muted">Один источник правды: технический анализ + мета-голосование агентов в одной таблице. Кликни строку — увидишь breakdown.<br>Снимок сделан: <span id="forecasts-as-of">—</span></div>
+    <div id="strategy-summary" class="muted small" style="margin-top:6px;"></div>
     <div class="table-wrap">
       <table id="forecasts-table">
         <thead>
@@ -72,7 +73,8 @@
             <th>Пара</th>
             <th>Сторона</th>
             <th>Вероятность</th>
-            <th>Backtest 30d WR</th>
+            <th>WR 30д (лучшая стратегия)</th>
+            <th>Стратегия</th>
             <th>Score</th>
             <th>Экспирация</th>
             <th>За</th>
