@@ -43,7 +43,7 @@ FORECASTS_FILE = config.STATE_DIR / "forecasts.json"
 OPEN_FILE = config.STATE_DIR / "open_trades.json"
 CLOSED_FILE = config.STATE_DIR / "closed_trades.json"
 STATS_FILE = config.STATE_DIR / "paper_stats.json"
-HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper.json"
+HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader.json"
 
 
 def _load(path: Path, default):

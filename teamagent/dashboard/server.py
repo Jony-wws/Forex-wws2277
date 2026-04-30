@@ -134,8 +134,8 @@ def api_health():
         "components": {},
     }
     for name, fname in [
-        ("forecast_scanner", "heartbeat_scanner.json"),
-        ("paper_trader", "heartbeat_paper.json"),
+        ("forecast_scanner", "heartbeat_forecast_scanner.json"),
+        ("paper_trader", "heartbeat_paper_trader.json"),
         ("orchestrator", "heartbeat_orchestrator.json"),
         ("watchdog", "heartbeat_watchdog.json"),
     ]:

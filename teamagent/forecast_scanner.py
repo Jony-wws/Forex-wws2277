@@ -35,7 +35,7 @@ logging.basicConfig(
 )
 
 FORECASTS_FILE = config.STATE_DIR / "forecasts.json"
-HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_scanner.json"
+HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_forecast_scanner.json"
 
 
 def _heartbeat() -> None:
