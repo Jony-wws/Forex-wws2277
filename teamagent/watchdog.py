@@ -51,7 +51,7 @@ def _scan() -> dict:
     for p in config.STATE_DIR.glob("heartbeat_*.json"):
         if p.name in ("heartbeat_watchdog.json", "heartbeat_orchestrator.json"):
             # сами себя не убиваем
-            pass
+            continue
         try:
             hb = json.loads(p.read_text())
             ts = datetime.fromisoformat(hb["ts"])

@@ -70,6 +70,9 @@ BB_PERIOD = 20
 BB_STD = 2.0
 MOMENTUM_LOOKBACK = 5
 
+# ───── штрафы / penalties ─────
+NEWS_BLACKOUT_PENALTY = 5  # на сколько уменьшаем abs(score) при high-impact новости ±30 мин
+
 # ───── Volume Profile (Стакан) ─────
 VP_BARS = 720           # 720 1-мин баров = 12 часов
 VP_BUCKETS = 50         # цену делим на 50 уровней

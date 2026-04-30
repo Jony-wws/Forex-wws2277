@@ -166,9 +166,13 @@ def evaluate_pair(pair: str) -> dict | None:
         vote("MTF_full_bear", -3, "все 3 TF ниже EMA")
 
     # ───── PENALTY: news blackout ─────
+    # high-impact новость ±30 мин: снижаем confidence обеих сторон,
+    # уменьшая abs(score) на величину penalty (но не ниже нуля).
     now = datetime.now(timezone.utc)
     if news.is_blackout(pair, now):
-        vote("news_blackout", -5, "high-impact новость ±30 мин — снижаем confidence")
+        penalty = min(config.NEWS_BLACKOUT_PENALTY, abs(score))
+        delta = -penalty if score > 0 else (penalty if score < 0 else 0)
+        vote("news_blackout", delta, f"high-impact новость ±30 мин — снижаем abs(score) на {penalty}")
 
     # ───── итог ─────
     if score == 0:
