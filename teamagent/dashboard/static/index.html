@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TeamAgent — FOREX AI</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">TeamAgent <span class="muted">FOREX AI</span></div>
+  <div class="health" id="health">…</div>
+  <div class="auto-refresh">обновление: <span id="last-refresh">—</span> · <button id="manual-refresh">⟳</button></div>
+</header>
+
+<main>
+  <section id="stats-section" class="card">
+    <h2>📊 Сводка paper-trader (24/7)</h2>
+    <div class="stats-grid" id="stats-grid">
+      <div><div class="big" id="stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="open-trades-section" class="card">
+    <h2>🤖 Сейчас открыто <span class="badge" id="open-count">0</span></h2>
+    <div class="muted">Цена входа · Открыто · Осталось до экспирации · Текущая цена · PnL — обновление каждые 30 сек.</div>
+    <div class="table-wrap">
+      <table id="open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Время открытия (UTC)</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Разница</th>
+            <th>Прогноз PnL</th>
+            <th>Прав?</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="forecasts-section" class="card">
+    <h2>🎯 PROGNOZY — 28 валютных пар <span class="muted small">(единый источник, обновление каждые 5 минут)</span></h2>
+    <div class="muted">Один источник правды: технический анализ + мета-голосование агентов в одной таблице. Кликни строку — увидишь breakdown.</div>
+    <div class="table-wrap">
+      <table id="forecasts-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Вероятность</th>
+            <th>Score</th>
+            <th>Экспирация</th>
+            <th>За</th>
+            <th>Против</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="forecast-detail" class="hidden card-inset"></div>
+  </section>
+
+  <section id="vp-section" class="card">
+    <h2>📊 Стакан (Volume Profile) с прогнозом до 00:00 UTC+5</h2>
+    <div class="vp-controls">
+      <label>Пара:
+        <select id="vp-pair">
+          <option value="EURUSD">EURUSD</option>
+        </select>
+      </label>
+      <button id="vp-refresh">обновить</button>
+    </div>
+    <div id="vp-content" class="muted">Выбери пару…</div>
+  </section>
+
+  <section id="closed-trades-section" class="card">
+    <h2>📜 История закрытых сделок</h2>
+    <div class="table-wrap">
+      <table id="closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="agents-section" class="card">
+    <h2>🎯 60 агентов (heartbeat + auto-restart)</h2>
+    <div id="agents-grid" class="agents-grid muted">Загружаю…</div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
