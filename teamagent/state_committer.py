@@ -47,6 +47,9 @@ PERSISTED_FILES = [
     "teamagent/state/open_trades.json",
     "teamagent/state/closed_trades.json",
     "teamagent/state/paper_stats.json",
+    # Без этих двух новая сессия не пройдёт гейт ≥70% и сделки не откроются:
+    "teamagent/state/backtest_30d.json",
+    "teamagent/state/strategy_config.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин
