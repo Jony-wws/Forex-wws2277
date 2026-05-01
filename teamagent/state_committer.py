@@ -84,6 +84,12 @@ PERSISTED_FILES = [
     "teamagent/state/daily_signals.json",
     "teamagent/state/daily_paused_pairs.json",
     "teamagent/state/daily_last_run.json",
+    # Master Strategy Agent (added 2026-05-01): multi-window 28×4 sweep —
+    # лучший variant по Wilson_lower на 4 окнах (3д/5д/7д/10д). State пишется
+    # каждые 5 ч; persist чтобы дашборд показывал прошлый sweep сразу при
+    # рестарте, не ждал свежего цикла.
+    "teamagent/state/meta_strategy.json",
+    "teamagent/state/meta_strategy_log.jsonl",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин
