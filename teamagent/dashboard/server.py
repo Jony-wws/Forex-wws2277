@@ -27,6 +27,7 @@ from .. import config
 from ..data import yahoo
 from .. import volume_profile as vp_mod
 from .. import paper_trader
+from .. import paper_trader_stakan
 
 log = logging.getLogger("dashboard")
 logging.basicConfig(
@@ -164,6 +165,57 @@ def api_volume_profile(pair: str):
     return vp_mod.build(pair)
 
 
+# ────────── Strategy "Стакан" (parallel system, added 2026-05-01) ──────────
+
+@app.get("/api/stakan/open-trades")
+def api_stakan_open():
+    """Открытые сделки стратегии 'Стакан' с live PnL и таймером."""
+    open_trades = _load(config.STATE_DIR / "stakan_open_trades.json", [])
+    enriched = []
+    for t in open_trades:
+        if t.get("status") != "open":
+            continue
+        enriched.append(paper_trader_stakan._enrich_open_trade(t))
+    return JSONResponse({
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "count": len(enriched),
+        "trades": enriched,
+    })
+
+
+@app.get("/api/stakan/closed-trades")
+def api_stakan_closed(limit: int = 100):
+    closed = _load(config.STATE_DIR / "stakan_closed_trades.json", [])
+    closed = sorted(closed, key=lambda t: t.get("close_time", ""), reverse=True)
+    return JSONResponse({
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "count": len(closed),
+        "trades": closed[:limit],
+    })
+
+
+@app.get("/api/stakan/stats")
+def api_stakan_stats():
+    return _load(config.STATE_DIR / "stakan_stats.json", {
+        "strategy": "stakan",
+        "total": 0, "wins": 0, "losses": 0,
+        "win_rate_pct": 0.0, "total_pnl_usd": 0.0,
+    })
+
+
+@app.get("/api/stakan/signals")
+def api_stakan_signals():
+    """Последний скан с разбором по парам: какие уровни найдены, сколько голосов
+    набрала каждая пара, почему не открыли (если не открыли)."""
+    return _load(config.STATE_DIR / "stakan_signals.json", {
+        "as_of": None,
+        "min_votes_required": 7,
+        "max_votes": 10,
+        "signals": [],
+        "note": "ещё не считали — жди первого tick paper_trader_stakan",
+    })
+
+
 @app.get("/api/market-regime")
 def api_market_regime():
     """Глобальный 365-дневный анализ поведения рынка.
@@ -293,6 +345,7 @@ def api_health():
     for name, fname in [
         ("forecast_scanner", "heartbeat_forecast_scanner.json"),
         ("paper_trader", "heartbeat_paper_trader.json"),
+        ("paper_trader_stakan", "heartbeat_paper_trader_stakan.json"),
         ("orchestrator", "heartbeat_orchestrator.json"),
         ("watchdog", "heartbeat_watchdog.json"),
         ("backtester", "heartbeat_backtester.json"),
@@ -323,6 +376,12 @@ def api_health():
     out["paper_trader_summary"] = {
         "open_count": len(open_trades),
         "closed_count": len(closed),
+    }
+    stakan_open = _load(config.STATE_DIR / "stakan_open_trades.json", [])
+    stakan_closed = _load(config.STATE_DIR / "stakan_closed_trades.json", [])
+    out["stakan_summary"] = {
+        "open_count": len(stakan_open),
+        "closed_count": len(stakan_closed),
     }
     return out
 

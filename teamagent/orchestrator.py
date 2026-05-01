@@ -127,6 +127,11 @@ def _build_all_children() -> dict[str, ChildProc]:
     out: dict[str, ChildProc] = {}
     out["forecast_scanner"] = ChildProc("forecast_scanner", [sys.executable, "-m", "teamagent.forecast_scanner"])
     out["paper_trader"] = ChildProc("paper_trader", [sys.executable, "-m", "teamagent.paper_trader"])
+    # Параллельная стратегия "Стакан" (2026-05-01): отдельный процесс, отдельные state-файлы.
+    out["paper_trader_stakan"] = ChildProc(
+        "paper_trader_stakan",
+        [sys.executable, "-m", "teamagent.paper_trader_stakan"],
+    )
     out["state_committer"] = ChildProc("state_committer", [sys.executable, "-m", "teamagent.state_committer"])
     out["backtester"] = ChildProc("backtester", [sys.executable, "-m", "teamagent.backtester"])
     out["strategy_search"] = ChildProc("strategy_search", [sys.executable, "-m", "teamagent.strategy_search", "--loop"])

@@ -70,6 +70,11 @@ PERSISTED_FILES = [
     # weekly, so persisting saves a fresh API hit at restart.
     "teamagent/state/cot_positioning.json",
     "teamagent/state/agent_analyzer_cot_positioning.json",
+    # Параллельная стратегия "Стакан" (added 2026-05-01): отдельные сделки/история/статы.
+    "teamagent/state/stakan_open_trades.json",
+    "teamagent/state/stakan_closed_trades.json",
+    "teamagent/state/stakan_stats.json",
+    "teamagent/state/stakan_signals.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин
