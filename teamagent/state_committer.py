@@ -75,6 +75,8 @@ PERSISTED_FILES = [
     "teamagent/state/stakan_closed_trades.json",
     "teamagent/state/stakan_stats.json",
     "teamagent/state/stakan_signals.json",
+    # «Военный радар» рынка (added 2026-05-01): 20+ независимых сканеров × 28 пар.
+    "teamagent/state/market_radar.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

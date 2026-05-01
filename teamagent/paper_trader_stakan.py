@@ -88,6 +88,7 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader_stakan.json"
 FUNDAMENTALS_FILE = config.STATE_DIR / "agent_analyzer_fundamental_macro.json"
 COT_FILE = config.STATE_DIR / "agent_analyzer_cot_positioning.json"
 NEWS_FILE = config.STATE_DIR / "news_blackouts.json"
+RADAR_FILE = config.STATE_DIR / "market_radar.json"
 
 # ───── параметры стратегии «Стакан» ─────
 # VP_HISTORY_DAYS: на каком окне строим VP и ищем «институциональные» уровни.
@@ -100,12 +101,24 @@ MIN_LEVEL_DISTANCE_ATR_MULT = 0.8      # уровень должен быть �
 MAX_LEVEL_DISTANCE_ATR_MULT = 8.0      # уровень не должен быть слишком далеко (≤8×ATR), иначе он «не активен»
 APPROACH_BAND_ATR_MULT = 3.0           # «полоса приближения» = ±3×ATR от уровня
 MIN_APPROACH_BARS_PCT = 1.0            # цена была в полосе приближения хотя бы 1% времени за 24h
-MIN_VOTES = 7                          # из 10 голосов ≥7 ЗА → открываем сделку
-MAX_VOTES = 10
+MIN_VOTES = 8                          # из 11 голосов ≥8 ЗА → открываем (≥72%)
+MAX_VOTES = 11                         # 10 базовых + 1 от market_radar
 MIN_EXPIRY_H = 1
 MAX_EXPIRY_H = 20
 EXPIRY_PER_ATR = 1.0                   # 1×ATR расстояния = 1h экспирации
 HIGH_VOL_PRICE_RATIO = 0.005           # ATR/price > 0.005 → высокая волатильность
+
+# ───── 10-минутный pre-trade фильтр (по уточнению пользователя 2026-05-01) ─────
+# «Когда я сказал про 10 минут это не закрыть сделку … я говорил система должна
+# заранее знать что он за 10 минут развернуться к нашу сторону от этом я говорил».
+# → Это НЕ early-close (брокер не поддерживает), а ПРЕДСКАЗАТЕЛЬНЫЙ фильтр:
+# открываем сделку ТОЛЬКО если есть ≥3 из 5 краткосрочных индикаторов того,
+# что цена в ближайшие ~10 мин начнёт двигаться в нашу сторону.
+REVERSAL_LOOKBACK_MIN = 10             # горизонт прогноза: 10 минут вперёд
+REVERSAL_MIN_SIGNS = 3                 # из 5 микро-индикаторов нужно ≥3
+REVERSAL_RSI_OVERSOLD = 30             # RSI на 5m < 30 → перепродано → BUY-разворот
+REVERSAL_RSI_OVERBOUGHT = 70           # RSI на 5m > 70 → перекуплено → SELL-разворот
+REVERSAL_NEAR_LEVEL_ATR_MULT = 0.5     # цена в полосе ±0.5×ATR_15m от микро-уровня
 
 
 def _load(path: Path, default):
@@ -241,7 +254,7 @@ def _votes(pair: str, direction: str, level: dict, current_price: float,
            bars_1h: pd.DataFrame, atr_24h: float, vp_data: dict,
            forecast: dict | None, fundamentals: dict | None,
            cot: dict | None, news_blackouts: dict | None,
-           atr_5d_median: float | None) -> dict:
+           atr_5d_median: float | None, radar: dict | None = None) -> dict:
     """Считает 10 независимых голосов ЗА/ПРОТИВ направления.
 
     Возвращает dict со списком votes и итоговым yes/total.
@@ -337,6 +350,22 @@ def _votes(pair: str, direction: str, level: dict, current_price: float,
         poc_ok = poc_dist >= 0.3 * atr_24h
     votes_list.append({"name": "poc_distance_ok", "yes": poc_ok})
 
+    # vote 11: «военный радар» (20+ независимых сканеров) согласен с направлением.
+    # `radar` приходит из market_radar.json — overall_score [-100..+100].
+    radar_pair = (radar or {}).get("pairs", {}).get(pair) if radar else None
+    radar_yes = False
+    radar_label = "no radar data"
+    if radar_pair:
+        rs = float(radar_pair.get("overall_score") or 0)
+        rd = radar_pair.get("direction", "NEUTRAL")
+        radar_label = f"radar={rs:+.1f} ({rd})"
+        if direction == "BUY" and rs > 5:
+            radar_yes = True
+        elif direction == "SELL" and rs < -5:
+            radar_yes = True
+    votes_list.append({"name": "market_radar_aligned", "yes": radar_yes,
+                       "detail": radar_label})
+
     yes_count = sum(1 for v in votes_list if v["yes"])
     return {
         "votes": votes_list,
@@ -363,7 +392,8 @@ def _auto_expiry_hours(level_distance_pips: float, atr_pips: float,
 # ────────── Поиск сигналов ──────────
 
 def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
-                 cot: dict | None, news_blackouts: dict | None) -> dict | None:
+                 cot: dict | None, news_blackouts: dict | None,
+                 radar: dict | None = None) -> dict | None:
     """Главная функция: для одной пары возвращает сигнал на открытие сделки или None."""
     # 1h-бары — стабильный ATR + EMA для голосов
     bars_1h = yahoo.latest_bars(pair, "1h", 200)
@@ -428,7 +458,7 @@ def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
     forecast = (snapshot.get("forecasts") or {}).get(pair)
     vote_result = _votes(
         pair, direction, best, current_price, bars_1h, atr_1h, vp_data,
-        forecast, fundamentals, cot, news_blackouts, atr_5d_median,
+        forecast, fundamentals, cot, news_blackouts, atr_5d_median, radar,
     )
 
     if vote_result["yes"] < MIN_VOTES:
@@ -438,6 +468,23 @@ def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
             "direction": direction,
             "best_level": best,
             "votes": vote_result,
+            "current_price": current_price,
+        }
+
+    # 10-минутный pre-trade фильтр (брокер не даёт early-close, поэтому делаем
+    # ПРЕДСКАЗАНИЕ перед открытием — есть ли краткосрочные признаки разворота)
+    likely_reversal, reversal_breakdown = _predict_10min_reversal(
+        pair, direction, current_price)
+    if not likely_reversal:
+        return {
+            "pair": pair,
+            "skip_reason": (
+                f"reversal_unlikely_{reversal_breakdown['yes_count']}_of_5"
+            ),
+            "direction": direction,
+            "best_level": best,
+            "votes": vote_result,
+            "reversal_filter": reversal_breakdown,
             "current_price": current_price,
         }
 
@@ -453,6 +500,7 @@ def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
         "atr_pips": round(atr_pips, 1),
         "expiry_hours": expiry_h,
         "votes": vote_result,
+        "reversal_filter": reversal_breakdown,
         "vp": {
             "poc": vp_data.get("poc"),
             "vah": vp_data.get("vah"),
@@ -466,8 +514,9 @@ def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
 
 def _open_new_trades(open_trades: list[dict], snapshot: dict,
                      fundamentals: dict | None, cot: dict | None,
-                     news_blackouts: dict | None) -> tuple[int, list[dict]]:
-    """Сканирует все 28 пар. Открывает сделки по тем, у кого ≥7/10 голосов."""
+                     news_blackouts: dict | None,
+                     radar: dict | None = None) -> tuple[int, list[dict]]:
+    """Сканирует все 28 пар. Открывает сделки по тем, у кого ≥MIN_VOTES голосов."""
     opened = 0
     signals: list[dict] = []
     now_ts = _now()
@@ -476,7 +525,7 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict,
             signals.append({"pair": pair, "skip_reason": "already_open"})
             continue
         try:
-            sig = _find_signal(pair, snapshot, fundamentals, cot, news_blackouts)
+            sig = _find_signal(pair, snapshot, fundamentals, cot, news_blackouts, radar)
         except Exception as e:
             log.exception(f"_find_signal failed for {pair}: {e}")
             signals.append({"pair": pair, "skip_reason": f"error:{type(e).__name__}"})
@@ -520,8 +569,138 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict,
     return opened, signals
 
 
+def _predict_10min_reversal(pair: str, direction: str,
+                            current_price: float) -> tuple[bool, dict]:
+    """ПРЕДСКАЗАТЕЛЬНЫЙ фильтр (pre-trade): есть ли ≥REVERSAL_MIN_SIGNS из 5
+    краткосрочных индикаторов того, что цена в ближайшие 10 мин начнёт
+    двигаться в нашу сторону?
+
+    По уточнению пользователя 2026-05-01: «система должна заранее знать что
+    он за 10 минут развернуться к нашу сторону». Брокер НЕ позволяет
+    закрывать досрочно — поэтому это НЕ exit-rule, а entry-filter.
+
+    Returns (likely_reversal, breakdown).
+    """
+    breakdown = {"signs": {}, "yes_count": 0, "min_required": REVERSAL_MIN_SIGNS}
+    try:
+        # ─── 1) 5-min RSI экстремум в обратную сторону ───
+        bars_5m = yahoo.latest_bars(pair, "5m", 50)
+        if bars_5m is not None and not bars_5m.empty and len(bars_5m) >= 14:
+            rsi5 = ind.rsi(bars_5m["Close"], 14).dropna()
+            if not rsi5.empty:
+                cur_rsi = float(rsi5.iloc[-1])
+                if direction == "BUY":
+                    yes = cur_rsi < REVERSAL_RSI_OVERSOLD
+                else:
+                    yes = cur_rsi > REVERSAL_RSI_OVERBOUGHT
+                breakdown["signs"]["rsi_5m_extreme"] = {
+                    "yes": yes, "value": round(cur_rsi, 1),
+                    "threshold": (REVERSAL_RSI_OVERSOLD if direction == "BUY"
+                                  else REVERSAL_RSI_OVERBOUGHT),
+                }
+            else:
+                breakdown["signs"]["rsi_5m_extreme"] = {"yes": False, "no_data": True}
+        else:
+            breakdown["signs"]["rsi_5m_extreme"] = {"yes": False, "no_data": True}
+
+        # ─── 2) Последние 10 минутных баров: momentum уже разворачивается? ───
+        bars_1m = yahoo.latest_bars(pair, "1m", 11)
+        if bars_1m is not None and not bars_1m.empty and len(bars_1m) >= 5:
+            closes = bars_1m["Close"].to_numpy()
+            # последние 3 vs предыдущие 7 — куда сместился средний?
+            recent = float(closes[-3:].mean())
+            prior = float(closes[:-3].mean())
+            if direction == "BUY":
+                yes = recent > prior  # уже растёт
+            else:
+                yes = recent < prior
+            breakdown["signs"]["short_term_momentum"] = {
+                "yes": yes, "recent_avg": round(recent, 5),
+                "prior_avg": round(prior, 5),
+            }
+        else:
+            breakdown["signs"]["short_term_momentum"] = {"yes": False, "no_data": True}
+
+        # ─── 3) Bollinger %B на 5m: < 0.1 → перепродано → BUY-разворот; > 0.9 → SELL ───
+        if bars_5m is not None and not bars_5m.empty and len(bars_5m) >= 20:
+            bbp = ind.bollinger_pct_b(bars_5m["Close"], 20, 2.0).dropna()
+            if not bbp.empty:
+                cur_bbp = float(bbp.iloc[-1])
+                if direction == "BUY":
+                    yes = cur_bbp < 0.1
+                else:
+                    yes = cur_bbp > 0.9
+                breakdown["signs"]["bb_extreme"] = {
+                    "yes": yes, "value": round(cur_bbp, 3),
+                }
+            else:
+                breakdown["signs"]["bb_extreme"] = {"yes": False, "no_data": True}
+        else:
+            breakdown["signs"]["bb_extreme"] = {"yes": False, "no_data": True}
+
+        # ─── 4) Последний 1m бар — направление в нашу сторону + range > median ───
+        if bars_1m is not None and not bars_1m.empty and len(bars_1m) >= 5:
+            last = bars_1m.iloc[-1]
+            last_dir = float(last["Close"] - last["Open"])
+            ranges = (bars_1m["High"] - bars_1m["Low"]).dropna()
+            med_range = float(ranges.median()) if not ranges.empty else 0
+            cur_range = float(last["High"] - last["Low"])
+            big_bar = cur_range > med_range  # бар крупнее обычного
+            if direction == "BUY":
+                yes = last_dir > 0 and big_bar
+            else:
+                yes = last_dir < 0 and big_bar
+            breakdown["signs"]["last_bar_thrust"] = {
+                "yes": yes, "dir": round(last_dir, 5),
+                "range_vs_median": round(cur_range / med_range, 2) if med_range > 0 else 0,
+            }
+        else:
+            breakdown["signs"]["last_bar_thrust"] = {"yes": False, "no_data": True}
+
+        # ─── 5) Дист. до ближайшего микро-уровня: < 0.5×ATR_15m в нашу сторону ───
+        bars_15m = yahoo.latest_bars(pair, "15m", 50)
+        if bars_15m is not None and not bars_15m.empty and len(bars_15m) >= 14:
+            atr_15 = ind.atr(bars_15m, 14).dropna()
+            if not atr_15.empty:
+                atr_v = float(atr_15.iloc[-1])
+                # «микро-уровень» = последние 50 баров High (для SELL разворота
+                # сверху) или Low (для BUY разворота снизу)
+                if direction == "BUY":
+                    nearest_low = float(bars_15m["Low"].min())
+                    dist = current_price - nearest_low
+                    yes = (dist >= 0) and (dist <= REVERSAL_NEAR_LEVEL_ATR_MULT * atr_v)
+                    breakdown["signs"]["near_micro_level"] = {
+                        "yes": yes, "level": round(nearest_low, 5),
+                        "dist_atr": round(dist / atr_v, 2) if atr_v > 0 else None,
+                    }
+                else:
+                    nearest_high = float(bars_15m["High"].max())
+                    dist = nearest_high - current_price
+                    yes = (dist >= 0) and (dist <= REVERSAL_NEAR_LEVEL_ATR_MULT * atr_v)
+                    breakdown["signs"]["near_micro_level"] = {
+                        "yes": yes, "level": round(nearest_high, 5),
+                        "dist_atr": round(dist / atr_v, 2) if atr_v > 0 else None,
+                    }
+            else:
+                breakdown["signs"]["near_micro_level"] = {"yes": False, "no_data": True}
+        else:
+            breakdown["signs"]["near_micro_level"] = {"yes": False, "no_data": True}
+    except Exception as e:
+        log.warning(f"_predict_10min_reversal {pair}: {type(e).__name__}: {e}")
+
+    yes_count = sum(1 for s in breakdown["signs"].values() if s.get("yes"))
+    breakdown["yes_count"] = yes_count
+    likely = yes_count >= REVERSAL_MIN_SIGNS
+    return likely, breakdown
+
+
 def _settle_expired(open_trades: list[dict], closed_trades: list[dict]) -> int:
-    """Закрывает истёкшие сделки по реальной цене Yahoo (settlement_price)."""
+    """Закрывает истёкшие сделки по реальной цене Yahoo (settlement_price).
+
+    Брокер пользователя НЕ поддерживает досрочное закрытие, поэтому здесь
+    нет early-close. Все сделки идут до своего expiry_time и settle по
+    реальной цене.
+    """
     settled = 0
     still_open = []
     for t in open_trades:
@@ -545,18 +724,19 @@ def _settle_expired(open_trades: list[dict], closed_trades: list[dict]) -> int:
         payout = float(t.get("payout_pct") or config.PAYOUT_PCT)
         pnl = (stake * payout) if win else (-stake)
 
+        result = "WIN" if win else "LOSS"
         t.update({
-            "status": "WIN" if win else "LOSS",
+            "status": result,
             "close_price": close_price,
             "close_time": _now().isoformat(),
-            "result": "WIN" if win else "LOSS",
+            "result": result,
             "pnl_usd": round(pnl, 2),
         })
         closed_trades.append(t)
         settled += 1
         log.info(
             f"CLOSE-STAKAN {t['pair']} {t['side']} open={t['open_price']} "
-            f"close={close_price} → {'WIN' if win else 'LOSS'} pnl={pnl:+.2f}"
+            f"close={close_price} → {result} pnl={pnl:+.2f}"
         )
 
     open_trades[:] = still_open
@@ -621,6 +801,7 @@ def cycle_once() -> dict:
     fundamentals = _load(FUNDAMENTALS_FILE, {})
     cot = _load(COT_FILE, {})
     news_blackouts = _load(NEWS_FILE, {})
+    radar = _load(RADAR_FILE, {})
 
     open_trades = _load(OPEN_FILE, [])
     closed = _load(CLOSED_FILE, [])
@@ -632,7 +813,8 @@ def cycle_once() -> dict:
         log.info(f"paper_trader_stakan: TRADING_HALTED.flag → не открываю (settled={settled})")
         opened, signals = 0, []
     else:
-        opened, signals = _open_new_trades(open_trades, snapshot, fundamentals, cot, news_blackouts)
+        opened, signals = _open_new_trades(
+            open_trades, snapshot, fundamentals, cot, news_blackouts, radar)
 
     enriched = [_enrich_open_trade(t) for t in open_trades]
     _save(OPEN_FILE, open_trades)

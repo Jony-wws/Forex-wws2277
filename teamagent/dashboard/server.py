@@ -216,6 +216,33 @@ def api_stakan_signals():
     })
 
 
+@app.get("/api/market-radar")
+def api_market_radar():
+    """«Военный радар» рынка: 20+ независимых сканеров × 28 пар.
+    Каждая пара получает overall_score [-100..+100] (положительный = BUY-bias),
+    direction (BUY/SELL/NEUTRAL), и breakdown по каждому сканеру."""
+    return _load(
+        config.STATE_DIR / "market_radar.json",
+        {"as_of": None, "pairs": {}, "scanners": [],
+         "scanner_count": 0,
+         "note": "ещё не считали — жди первого tick market_radar"},
+    )
+
+
+@app.get("/api/market-radar/{pair}")
+def api_market_radar_pair(pair: str):
+    pair = pair.upper()
+    full = _load(config.STATE_DIR / "market_radar.json", {"pairs": {}})
+    pair_data = (full.get("pairs") or {}).get(pair)
+    if not pair_data:
+        return JSONResponse({"pair": pair, "error": "no data"}, status_code=404)
+    return JSONResponse({
+        "pair": pair,
+        "as_of": full.get("as_of"),
+        **pair_data,
+    })
+
+
 @app.get("/api/market-regime")
 def api_market_regime():
     """Глобальный 365-дневный анализ поведения рынка.
@@ -346,6 +373,7 @@ def api_health():
         ("forecast_scanner", "heartbeat_forecast_scanner.json"),
         ("paper_trader", "heartbeat_paper_trader.json"),
         ("paper_trader_stakan", "heartbeat_paper_trader_stakan.json"),
+        ("market_radar", "heartbeat_market_radar.json"),
         ("orchestrator", "heartbeat_orchestrator.json"),
         ("watchdog", "heartbeat_watchdog.json"),
         ("backtester", "heartbeat_backtester.json"),

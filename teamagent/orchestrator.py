@@ -132,6 +132,12 @@ def _build_all_children() -> dict[str, ChildProc]:
         "paper_trader_stakan",
         [sys.executable, "-m", "teamagent.paper_trader_stakan"],
     )
+    # «Военный радар» рынка (2026-05-01): 20+ независимых сканеров × 28 пар.
+    # Используется обеими стратегиями как дополнительный источник сигналов.
+    out["market_radar"] = ChildProc(
+        "market_radar",
+        [sys.executable, "-m", "teamagent.market_radar"],
+    )
     out["state_committer"] = ChildProc("state_committer", [sys.executable, "-m", "teamagent.state_committer"])
     out["backtester"] = ChildProc("backtester", [sys.executable, "-m", "teamagent.backtester"])
     out["strategy_search"] = ChildProc("strategy_search", [sys.executable, "-m", "teamagent.strategy_search", "--loop"])
