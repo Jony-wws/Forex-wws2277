@@ -53,7 +53,7 @@ MIN_TRADES_FOR_VALID = 10
 # 180/4 = 45 рабочих часов сессии × ~25% сигналов = ~11 сделок (хватает чтобы
 # больше вариантов проходили MIN_TRADES_FOR_VALID и реже теряли качественные
 # ячейки из-за статистической недосигнальности).
-LOOKBACK_DAYS = 180
+LOOKBACK_DAYS = 90
 
 
 def _precompute(pair: str) -> dict | None:
@@ -281,6 +281,12 @@ def search_pair(pair: str, top: int = 5) -> dict:
 def search_all(top: int = 5) -> dict:
     results = {}
     for i, pair in enumerate(config.PAIRS, 1):
+        # heartbeat per-pair чтобы watchdog не считал процесс мёртвым
+        # во время длинного 30+ мин sweep с 120 вариантами × 180д.
+        try:
+            _heartbeat(tick=i)
+        except Exception:
+            pass
         log.info(f"[{i}/{len(config.PAIRS)}] strategy_search {pair} ...")
         try:
             r = search_pair(pair, top=top)
