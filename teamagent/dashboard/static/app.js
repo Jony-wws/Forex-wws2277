@@ -743,6 +743,90 @@ async function refreshStabilityForecast() {
   } catch (e) { console.error("stability-forecast:", e); }
 }
 
+// ───── ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ СИСТЕМЫ ─────
+function _auditEmojiFor(status) {
+  return status === "green" ? "🟢" : status === "yellow" ? "🟡" : "🔴";
+}
+
+function _auditCard(category) {
+  const cnt = category.summary || {green:0, yellow:0, red:0};
+  const status = cnt.red > 0 ? "red" : cnt.yellow > 0 ? "yellow" : "green";
+  const card = document.createElement("div");
+  card.className = `audit-card audit-${status}`;
+  let inner = `
+    <div class="audit-card-head">
+      <span class="audit-emoji">${_auditEmojiFor(status)}</span>
+      <span class="audit-label">${category.label_ru}</span>
+      <span class="audit-counts muted small">
+        ${cnt.green ? `<span class="ac-g">${cnt.green}🟢</span>` : ""}
+        ${cnt.yellow ? `<span class="ac-y">${cnt.yellow}🟡</span>` : ""}
+        ${cnt.red ? `<span class="ac-r">${cnt.red}🔴</span>` : ""}
+      </span>
+    </div>
+    <div class="audit-checks">`;
+  for (const chk of category.checks || []) {
+    const e = _auditEmojiFor(chk.status);
+    const lbl = chk.ru_label || chk.name;
+    const msg = chk.message_ru || "";
+    inner += `
+      <div class="audit-check audit-check-${chk.status}">
+        <span class="audit-check-e">${e}</span>
+        <span class="audit-check-lbl">${lbl}</span>
+        <span class="audit-check-msg muted small">${msg}</span>
+      </div>`;
+  }
+  inner += "</div>";
+  card.innerHTML = inner;
+  return card;
+}
+
+async function refreshAudit() {
+  try {
+    const grid = $("audit-grid");
+    if (!grid) return;
+    const r = await api("/api/system-audit");
+    if (!r) return;
+
+    const overall = r.overall_status || "red";
+    const sumEl = $("audit-summary");
+    const emojiEl = $("audit-emoji");
+    const badgeEl = $("audit-overall-badge");
+    const verdictEl = $("audit-verdict");
+    const sec = $("audit-section");
+
+    if (emojiEl) emojiEl.textContent = _auditEmojiFor(overall);
+    if (sec) {
+      sec.classList.remove("audit-overall-green","audit-overall-yellow","audit-overall-red");
+      sec.classList.add(`audit-overall-${overall}`);
+    }
+    const s = r.summary || {green:0, yellow:0, red:0, total:0};
+    if (sumEl) {
+      sumEl.innerHTML =
+        `<b>${s.green}/${s.total}</b> проверок 🟢` +
+        (s.yellow > 0 ? ` · <b>${s.yellow}</b> 🟡` : "") +
+        (s.red > 0 ? ` · <b>${s.red}</b> 🔴` : "") +
+        ` · <span class="muted">${new Date(r.as_of_utc).toLocaleTimeString()}</span>`;
+    }
+    if (badgeEl) {
+      badgeEl.textContent =
+        overall === "green" ? "✅ единый организм" :
+        overall === "yellow" ? "⚠️ предупреждения" :
+        "❌ есть противоречия";
+      badgeEl.className = `badge-stable badge-audit-${overall}`;
+    }
+
+    grid.innerHTML = "";
+    for (const cat of (r.categories || [])) {
+      grid.appendChild(_auditCard(cat));
+    }
+    if (verdictEl) {
+      verdictEl.innerHTML = `<b>Вердикт:</b> ${r.verdict_ru || ""}`;
+    }
+  } catch (e) {
+    console.error("system-audit:", e);
+  }
+}
+
 function tick() {
   $("last-refresh").textContent = new Date().toLocaleTimeString();
   refreshStats();
@@ -763,6 +847,7 @@ function tick() {
   refreshStability();
   refreshMarketStatus();
   refreshStabilityForecast();
+  refreshAudit();
 }
 
 // ───── ОБЩАЯ ОЦЕНКА + ГАРАНТИИ СТАБИЛЬНОСТИ (50+ метрик) ─────

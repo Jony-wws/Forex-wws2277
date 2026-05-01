@@ -283,8 +283,25 @@ def scan_all_pairs() -> dict:
             f = evaluate_pair(pair)
         except Exception as e:
             log.exception(f"evaluate_pair failed pair={pair}: {e}")
-            continue
+            f = None
+            err_reason = f"exception: {type(e).__name__}"
+        else:
+            err_reason = "no_data" if f is None else None
+
         if f is None:
+            # Plant a self-describing placeholder so downstream tools know the
+            # pair was attempted (system_audit relies on this for invariant
+            # `forecasts ↔ config.PAIRS` to stay green even when a single pair
+            # is rate-limited).
+            snapshot["forecasts"][pair] = {
+                "pair": pair,
+                "side": "NEUTRAL",
+                "probability_pct": 50.0,
+                "score": 0.0,
+                "skipped": True,
+                "skip_reason": err_reason,
+                "scanned_at": snapshot["scanned_at"],
+            }
             continue
         snapshot["forecasts"][pair] = f
         snapshot["rankings"].append({

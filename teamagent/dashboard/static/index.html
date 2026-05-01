@@ -58,6 +58,28 @@
     </div>
   </section>
 
+  <!-- ═══ ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ САМОЙ СИСТЕМЫ ═══ -->
+  <section id="audit-section" class="card glass premium-card hero-card audit-hero">
+    <h2 class="hero-title">
+      <span id="audit-emoji" class="ms-emoji">🟢</span>
+      ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ СИСТЕМЫ
+      <span class="live-pulse" title="система проверяет сама себя"></span>
+      <span id="audit-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      Это <b>мета-проверки</b>: можно ли верить тому, что система сама про
+      себя говорит. paper_stats ↔ closed_trades, forecasts ↔ config.PAIRS,
+      market_hours ↔ session, schema-валидация state-файлов, code health
+      (импорты + синтаксис), кросс-модульные инварианты. Если хоть одна 🔴 —
+      система противоречит сама себе и данным верить нельзя.
+    </div>
+    <div id="audit-summary" class="audit-summary muted small">Запускаю проверки…</div>
+    <div id="audit-grid" class="audit-grid">
+      <div class="muted">Загружаю аудит…</div>
+    </div>
+    <div id="audit-verdict" class="audit-verdict muted small"></div>
+  </section>
+
   <section id="forecast-stability-section" class="card glass premium-card stability-hero">
     <h2 class="hero-title">
       <span class="icon-shield">🔮</span>

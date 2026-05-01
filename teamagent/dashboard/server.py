@@ -611,6 +611,30 @@ def api_stability_forecast(hours_ahead: int = 24):
     return sf.forecast_window(hours_ahead=hours_ahead)
 
 
+@app.get("/api/system-audit")
+def api_system_audit():
+    """Доказательства корректности системы.
+
+    Запускает 15+ проверок самосогласованности (paper_stats vs closed_trades,
+    forecasts ↔ config.PAIRS, market_hours ↔ session, expiry формула,
+    schema-валидация, code health, freshness, кросс-модульные инварианты)
+    и возвращает агрегированный отчёт. Если все 🟢 — данным системы можно
+    верить; если хоть одна 🔴 — система противоречит сама себе.
+    """
+    try:
+        from .. import system_audit as sa
+    except ImportError:
+        from teamagent import system_audit as sa
+    try:
+        return sa.run_audit()
+    except Exception as e:
+        log.exception(f"api_system_audit failed: {e}")
+        return JSONResponse(
+            {"error": f"{type(e).__name__}: {e}", "overall_status": "red"},
+            status_code=500,
+        )
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""
