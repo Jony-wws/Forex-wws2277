@@ -606,6 +606,7 @@ def cycle_once(force: bool = False) -> dict:
     paused = _refresh_paused(paused, closed)
 
     halt = config.STATE_DIR / "TRADING_HALTED.flag"
+    swept = False
     if halt.exists():
         log.info("paper_trader_daily: TRADING_HALTED — пропускаю sweep")
         opened, signals = 0, []
@@ -614,19 +615,23 @@ def cycle_once(force: bool = False) -> dict:
         last_run = {"ts": _now().isoformat(), "opened": opened,
                     "scanned_pairs": len(config.PAIRS)}
         _save(LAST_RUN_FILE, last_run)
+        swept = True
     else:
         opened, signals = 0, []
 
     _save(OPEN_FILE, open_trades)
     _save(CLOSED_FILE, closed)
     _save(PAUSED_FILE, paused)
-    _save(SIGNALS_FILE, {
-        "as_of": _now().isoformat(),
-        "min_confidence": MIN_CONFIDENCE_FOR_TRADE,
-        "weights": WEIGHTS,
-        "next_run_hour_utc": DAILY_RUN_HOUR_UTC,
-        "signals": signals,
-    })
+    # Only OVERWRITE signals snapshot when we actually swept;
+    # otherwise keep last day's scan visible to user (don't blank the UI).
+    if swept:
+        _save(SIGNALS_FILE, {
+            "as_of": _now().isoformat(),
+            "min_confidence": MIN_CONFIDENCE_FOR_TRADE,
+            "weights": WEIGHTS,
+            "next_run_hour_utc": DAILY_RUN_HOUR_UTC,
+            "signals": signals,
+        })
     stats = _compute_stats(closed)
     _save(STATS_FILE, stats)
 
