@@ -392,6 +392,130 @@ VARIANTS: list[Strategy] = [
              "strong vol + full MTF + |score|>=12",
              require_strong_volume=True, require_full_mtf_alignment=True,
              min_abs_score=12),
+
+    # ─── v61–v90: дополнительные варианты для weak-session покрытия ───
+    # (добавлены чтобы Asia/NY имели шанс достигать ≥70% WR — пробуем больше
+    # фильтров: ультра-строгие пороги, фокус на структуре, краткие экспирации)
+
+    # ультра-строгие пороги (score≥20+)
+    Strategy("v61_ultra_strict",
+             "ULTRA: |score|>=22 + prob>=82% + full MTF",
+             min_abs_score=22, min_probability=0.82,
+             require_full_mtf_alignment=True),
+    Strategy("v62_ultra_score24",
+             "ULTRA: |score|>=24 (very rare, very confident)",
+             min_abs_score=24),
+    Strategy("v63_score20_prob80",
+             "|score|>=20 + prob>=80%",
+             min_abs_score=20, min_probability=0.80),
+    Strategy("v64_score18_prob78",
+             "|score|>=18 + prob>=78%",
+             min_abs_score=18, min_probability=0.78),
+
+    # short expiry + very strict (для intraday скальпинга)
+    Strategy("v65_exp1h_score18", "1ч + |score|>=18",
+             fixed_expiry_h=1, min_abs_score=18),
+    Strategy("v66_exp2h_score18", "2ч + |score|>=18",
+             fixed_expiry_h=2, min_abs_score=18),
+    Strategy("v67_exp1h_full_mtf_score14",
+             "1ч + full MTF + |score|>=14",
+             fixed_expiry_h=1, require_full_mtf_alignment=True,
+             min_abs_score=14),
+
+    # Asia-фокус (range mean-reversion)
+    Strategy("v68_asia_contra_score14",
+             "Asia + contrarian + |score|>=14 (range fade)",
+             session_utc=(0, 7), contrarian=True, min_abs_score=14),
+    Strategy("v69_asia_fade_rsi_score12",
+             "Asia + fade RSI extremes + |score|>=12",
+             session_utc=(0, 7), fade_extreme_rsi=True, min_abs_score=12),
+    Strategy("v70_asia_strict_full_mtf",
+             "Asia + |score|>=18 + full MTF",
+             session_utc=(0, 7), min_abs_score=18,
+             require_full_mtf_alignment=True),
+    Strategy("v71_asia_emph_struct",
+             "Asia + emphasis structure (A,H x2) + |score|>=14",
+             session_utc=(0, 7), weight_block_a=2.0, weight_block_h=2.0,
+             min_abs_score=14),
+
+    # NY-фокус (trend / news)
+    Strategy("v72_ny_full_mtf_score16",
+             "NY + full MTF + |score|>=16",
+             session_utc=(17, 22), require_full_mtf_alignment=True,
+             min_abs_score=16),
+    Strategy("v73_ny_emph_trend",
+             "NY + emphasis trend (A x2) + |score|>=18",
+             session_utc=(17, 22), weight_block_a=2.0, min_abs_score=18),
+    Strategy("v74_ny_emph_momentum",
+             "NY + emphasis momentum (D,E x2) + |score|>=18",
+             session_utc=(17, 22), weight_block_d=2.0, weight_block_e=2.0,
+             min_abs_score=18),
+    Strategy("v75_ny_score20",
+             "NY + |score|>=20",
+             session_utc=(17, 22), min_abs_score=20),
+
+    # Lon-overlap focus (12-17 UTC) — самая ликвидная зона
+    Strategy("v76_overlap_score20_full_mtf",
+             "Overlap + |score|>=20 + full MTF",
+             session_utc=(13, 17), min_abs_score=20,
+             require_full_mtf_alignment=True),
+    Strategy("v77_overlap_emph_momentum",
+             "Overlap + emphasis momentum (D,E x2) + |score|>=16",
+             session_utc=(13, 17), weight_block_d=2.0, weight_block_e=2.0,
+             min_abs_score=16),
+
+    # London focus (7-13 UTC)
+    Strategy("v78_london_score18_full_mtf",
+             "London + |score|>=18 + full MTF",
+             session_utc=(7, 13), min_abs_score=18,
+             require_full_mtf_alignment=True),
+    Strategy("v79_london_emph_trend",
+             "London + emphasis trend (A x2) + |score|>=16",
+             session_utc=(7, 13), weight_block_a=2.0, min_abs_score=16),
+
+    # MTF + emphasis combos — без сессий, для всех
+    Strategy("v80_full_mtf_emph_struct",
+             "full MTF + emphasis structure (A,H x2) + |score|>=14",
+             require_full_mtf_alignment=True,
+             weight_block_a=2.0, weight_block_h=2.0, min_abs_score=14),
+    Strategy("v81_full_mtf_emph_volat",
+             "full MTF + emphasis volatility (C,G x2) + |score|>=14",
+             require_full_mtf_alignment=True,
+             weight_block_c=2.0, weight_block_g=2.0, min_abs_score=14),
+    Strategy("v82_full_mtf_emph_meanrev",
+             "full MTF + emphasis mean-reversion (B,C x2) + |score|>=14",
+             require_full_mtf_alignment=True,
+             weight_block_b=2.0, weight_block_c=2.0, min_abs_score=14),
+
+    # Contrarian high-conviction
+    Strategy("v83_contra_score20",
+             "contrarian + |score|>=20 (extreme reversal)",
+             contrarian=True, min_abs_score=20),
+    Strategy("v84_contra_full_mtf_score14",
+             "contrarian + full MTF + |score|>=14",
+             contrarian=True, require_full_mtf_alignment=True,
+             min_abs_score=14),
+    Strategy("v85_contra_prob78",
+             "contrarian + prob>=78%",
+             contrarian=True, min_probability=0.78),
+
+    # fade RSI + strict
+    Strategy("v86_fade_rsi_score18",
+             "fade RSI + |score|>=18",
+             fade_extreme_rsi=True, min_abs_score=18),
+    Strategy("v87_fade_rsi_full_mtf_score16",
+             "fade RSI + full MTF + |score|>=16",
+             fade_extreme_rsi=True, require_full_mtf_alignment=True,
+             min_abs_score=16),
+
+    # micro-tweak: prob ≥ 75/76 + score 14/16
+    Strategy("v88_prob75_score14",
+             "prob>=75% + |score|>=14", min_probability=0.75, min_abs_score=14),
+    Strategy("v89_prob76_score16",
+             "prob>=76% + |score|>=16", min_probability=0.76, min_abs_score=16),
+    Strategy("v90_prob78_full_mtf",
+             "prob>=78% + full MTF", min_probability=0.78,
+             require_full_mtf_alignment=True),
 ]
 
 
