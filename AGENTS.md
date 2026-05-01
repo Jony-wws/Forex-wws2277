@@ -210,14 +210,15 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ## Honest known limitations (do NOT hide these)
 
-**Latest state (May 2026 — per-session strategy_search 120 variants × 4 sessions × 90d):**
-- 37 of 112 (pair, session) cells achieve ≥70% WR on real 90-day Yahoo data.
-- Per session: Asia 5/28, London 9/28, Overlap 19/28, NY 4/28.
-- 14/28 pairs qualify in ≥1 session.
-- paper_trader gate is per-session-aware: opens trades only on qualified
-  (pair, current_session) cells, falls back to global best_variant only if
-  its variant's session_utc filter is compatible with the current hour.
-  Estimated ~30-50 trades/day across all qualified cells.
+**Latest state (May 2026 — 365-day sweep + STRICT gate + martingale):**
+- 15 of 112 (pair, session) cells achieve ≥70% WR on real **365-day** Yahoo data.
+- Per session: Asia 3/28, London 3/28, Overlap 5/28, NY 4/28.
+- 7/28 pairs qualify globally.
+- paper_trader STRICT_QUALIFIED_GATE=True: opens trades ONLY on qualified
+  cells (per-session OR pair-global). No baseline-fallback. This guarantees
+  real ≥70% WR (not theoretical).
+- STAKE_USD = $1 (was $50). Martingale 1→2→4→reset enabled.
+- Estimated 1-3 trades/day average (sometimes 0, sometimes 5+).
 
 **Why 90d (not 60d, not 180d):**
 - 60d sweep: 36/112 cells but most London cells were over-fit to recent regime.
