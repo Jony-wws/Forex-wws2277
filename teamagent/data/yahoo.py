@@ -120,7 +120,14 @@ def settlement_price(pair: str, expiry_utc: datetime) -> float | None:
     """Цена закрытия 1-мин бара ровно на момент expiry_utc.
 
     Используется paper_trader для честного закрытия бинарного опциона.
-    Возвращает None если данных ещё нет (бар будущий).
+
+    Логика:
+      - Если бар точно на expiry_utc есть (±5 мин) — берём его (онлайн торговля).
+      - Если expiry попал на закрытый рынок (Friday 22:00 UTC – Sunday 22:00 UTC)
+        и ближайший бар в прошлом ≤ 3 дней назад — settle по этому бару (как
+        делает реальный broker для weekend-expired binary options).
+      - Возвращаем None только если данных нет совсем или expiry — будущий бар
+        в АКТИВНЫЕ торговые часы.
     """
     df = fetch(pair, interval="1m", period="5d")
     if df.empty:
@@ -131,7 +138,17 @@ def settlement_price(pair: str, expiry_utc: datetime) -> float | None:
     if len(idx) == 0:
         return None
     last = idx[-1]
-    if (target - last) > timedelta(minutes=5):
-        # данных ещё нет на это время
-        return None
-    return float(df.loc[last, "Close"])
+    gap = target - last
+    if gap <= timedelta(minutes=5):
+        # обычный случай — бар прямо на expiry или почти
+        return float(df.loc[last, "Close"])
+    # expiry дальше чем 5 мин от последнего бара — рынок мог закрыться на выходные.
+    # Если разрыв ≤ 3 суток — это нормальный weekend-gap (Fri 22:00 → Mon 00:00 ≈ 50ч)
+    # и broker settle по последней цене перед закрытием. Если больше — данных нет.
+    if gap <= timedelta(days=3):
+        log.info(
+            f"settlement_price {pair} expiry={target.isoformat()} settle@{last.isoformat()} "
+            f"(weekend/closed-market gap={gap})"
+        )
+        return float(df.loc[last, "Close"])
+    return None
