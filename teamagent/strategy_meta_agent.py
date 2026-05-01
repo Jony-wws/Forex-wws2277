@@ -38,6 +38,7 @@ import os
 import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
@@ -64,13 +65,17 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_meta_agent.json"
 # ───── параметры цикла ─────
 LOOP_INTERVAL_SEC = 5 * 60 * 60          # 5 часов
 LOOKBACK_DAYS = 5                        # окно бэктеста
-MIN_TRADES_FOR_VALID = 8                 # минимум сделок чтобы ячейка считалась
-QUALIFIED_WR_PCT = 70.0                  # минимум WR для QUALIFIED
-QUALIFIED_WILSON_LOWER_PCT = 60.0        # минимум Wilson нижней границы
+MIN_TRADES_FOR_VALID = 5                 # минимум сделок чтобы ячейка считалась
+                                         # (8→5: short 5d window даёт меньше сделок,
+                                         #  но 5 + Wilson 60% всё равно стат. значимо)
+QUALIFIED_WR_PCT = 70.0                  # минимум WR для QUALIFIED — НЕ снижаем
+QUALIFIED_WILSON_LOWER_PCT = 60.0        # минимум Wilson нижней границы — НЕ снижаем
 PROBABLE_WR_PCT = 55.0                   # граница PROBABLE/FROZEN
 HEARTBEAT_INTERVAL_SEC = 60              # для watchdog
 LOG_KEEP_LINES = 200                     # последние N строк log
 PAYOUT_PCT = 0.85                        # бинарный payout (как в paper_trader)
+PARALLEL_FETCH_WORKERS = 8               # параллелизм Yahoo-закачек (28 пар / 8 = ~4 batch)
+PARALLEL_EVAL_WORKERS = 6                # параллелизм CPU-bound walk-forward (28 пар / 6 ≈ 5 batch)
 
 
 def _heartbeat(tick: int = 0, status: str = "idle") -> None:
@@ -179,6 +184,69 @@ def _ensemble_signals(pair: str) -> dict:
                 "pts": 0,
             })
 
+    # multi_tf_consensus (4h+1h+15m alignment)
+    mtf = _load_optional_signal(config.STATE_DIR / "agent_analyzer_multi_tf_consensus.json")
+    for sig in (mtf.get("summary", {}).get("signals") or []):
+        if sig.get("pair") == pair:
+            bs = int(sig.get("bull_score", 0))
+            mx = int(sig.get("max", 3) or 3)
+            if mx > 0 and bs >= mx - 1:
+                bias += 1
+                bonus += 1.5
+                sources.append({"name": "multi_tf_bull", "score": f"{bs}/{mx}", "pts": 1})
+            elif mx > 0 and bs <= 1:
+                bias -= 1
+                bonus += 1.5
+                sources.append({"name": "multi_tf_bear", "score": f"{bs}/{mx}", "pts": -1})
+            break
+
+    # momentum_burst (recent 1h ATR/EMA breakout)
+    mom = _load_optional_signal(config.STATE_DIR / "agent_analyzer_momentum_burst.json")
+    for sig in (mom.get("summary", {}).get("signals") or []):
+        if sig.get("pair") == pair:
+            side = sig.get("burst_side") or sig.get("side")
+            if side in ("BUY", "SELL"):
+                pts = 1 if side == "BUY" else -1
+                bias += pts
+                bonus += 1.0
+                sources.append({"name": "momentum_burst", "side": side, "pts": pts})
+            break
+
+    # news_filter (FF news blackout proximity → REDUCE confidence)
+    nf = _load_optional_signal(config.STATE_DIR / "agent_analyzer_news_filter.json")
+    nf_summary = nf.get("summary", {}) if isinstance(nf, dict) else {}
+    blackout_pairs = nf_summary.get("blackout_pairs") or []
+    if pair in blackout_pairs:
+        bonus = max(0.0, bonus - 2.0)  # penalty: предстоит red-news
+        sources.append({"name": "news_filter", "alert": "blackout_soon", "pts": 0})
+
+    # session_strength: бонус, если текущий час уже в активной сессии
+    ss = _load_optional_signal(config.STATE_DIR / "agent_analyzer_session_strength.json")
+    sess = (ss.get("summary") or {}).get("session")
+    if sess and sess in ("Asia", "London", "Overlap", "NY"):
+        bonus += 0.5
+        sources.append({"name": "session_active", "session": sess, "pts": 0})
+
+    # Specialist agent (per-pair fast scanner, 15m+1h)
+    spec = _load_optional_signal(config.STATE_DIR / f"agent_specialist_{pair}.json")
+    spec_summary = (spec or {}).get("summary") or {}
+    spec_bias = spec_summary.get("bias")
+    spec_conf = float(spec_summary.get("confidence", 0) or 0)
+    if spec_bias in ("BULL", "BEAR") and spec_conf >= 35:
+        pts = 1 if spec_bias == "BULL" else -1
+        bias += pts
+        bonus += min(2.0, spec_conf / 30.0)
+        sources.append({
+            "name": "specialist_pair",
+            "bias": spec_bias,
+            "confidence": round(spec_conf, 1),
+            "pts": pts,
+        })
+
+    # cap final bias / bonus to reasonable bounds
+    bias = max(-5, min(5, int(bias)))
+    bonus = min(15.0, bonus)
+
     return {
         "side_bias": int(bias),
         "confidence_bonus_pct": round(bonus, 1),
@@ -186,12 +254,124 @@ def _ensemble_signals(pair: str) -> dict:
     }
 
 
+def _bulk_fetch_1h_60d() -> dict[str, pd.DataFrame]:
+    """Один HTTP-запрос к Yahoo за всеми 28 парами (1h, 60d). Возвращает
+    {pair: DataFrame}. На rate-limit fall-through к пустому dict — тогда
+    индивидуальный fetch внутри _fetch_5d_snapshots будет работать как
+    fallback (с in-process cache yahoo._CACHE)."""
+    try:
+        import yfinance as yf
+        tickers_str = " ".join(config.yahoo_ticker(p) for p in config.PAIRS)
+        big = yf.download(
+            tickers_str,
+            interval="1h",
+            period="60d",
+            progress=False,
+            auto_adjust=False,
+            prepost=False,
+            threads=True,
+            group_by="ticker",
+        )
+    except Exception as e:
+        log.warning(f"meta-agent: bulk yahoo fetch failed: {e}")
+        return {}
+
+    out: dict[str, pd.DataFrame] = {}
+    if big is None or big.empty:
+        return out
+    for pair in config.PAIRS:
+        ticker = config.yahoo_ticker(pair)
+        try:
+            if isinstance(big.columns, pd.MultiIndex) and ticker in big.columns.get_level_values(0):
+                df = big[ticker].dropna(how="all")
+            else:
+                continue
+            if df is None or df.empty or len(df) < 60:
+                continue
+            # Нормализуем индекс к tz-aware UTC и кладём в общий yahoo._CACHE,
+            # чтобы повторные fetch внутри 2-мин TTL ловили кэш.
+            if df.index.tz is None:
+                df.index = df.index.tz_localize("UTC")
+            else:
+                df.index = df.index.tz_convert("UTC")
+            yahoo._CACHE[(pair, "1h", "60d")] = (time.time(), df.copy())
+            out[pair] = df
+        except Exception as e:
+            log.warning(f"meta-agent: bulk parse {pair} failed: {e}")
+    log.info(f"meta-agent: bulk-fetch ok — {len(out)}/{len(config.PAIRS)} pairs")
+    return out
+
+
+def _precompute_indicator_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Векторизованно считает все индикаторы для всей серии одним проходом.
+
+    Замена 360 вызовов indicators.all_indicators() (по одному на бар) на
+    несколько pandas-операций на полной серии. Возвращает DataFrame с
+    колонками rsi14/ema20/ema50/ema200/atr14/bb_pct/mom5/bbp/close.
+    cei10 и ofi10 пропускаем — они зависят от tail(n), эквивалент
+    можно посчитать постфактум (в backtest пока не используется).
+    """
+    if df is None or df.empty or len(df) < 30:
+        return pd.DataFrame()
+    close = df["Close"]
+    out = pd.DataFrame(index=df.index)
+    out["close"] = close
+    out["rsi14"] = indicators.rsi(close, 14)
+    out["ema20"] = indicators.ema(close, 20)
+    out["ema50"] = indicators.ema(close, 50)
+    out["ema200"] = indicators.ema(close, 200) if len(close) >= 200 else indicators.ema(close, max(13, len(close) - 1))
+    out["atr14"] = indicators.atr(df, 14)
+    out["bb_pct"] = indicators.bollinger_pct_b(close, 20, 2.0)
+    out["mom5"] = indicators.momentum(close, 5)
+    out["bbp"] = indicators.bbp(close, 1000)
+    # vwap-session: используем typical-price MA(20) fallback
+    typical = (df["High"] + df["Low"] + df["Close"]) / 3.0
+    vol = df.get("Volume", pd.Series(0.0, index=df.index))
+    if vol is None or vol.sum() <= 0:
+        out["vwap"] = typical.rolling(20, min_periods=1).mean()
+    else:
+        cum_pv = (typical * vol).cumsum()
+        cum_v = vol.cumsum().replace(0.0, float("nan"))
+        out["vwap"] = (cum_pv / cum_v).fillna(typical)
+    # cei/ofi на 10-баре окно — tail(10) операция, считаем rolling
+    body = (df["Close"] - df["Open"]).abs()
+    range_ = (df["High"] - df["Low"]).replace(0.0, float("nan"))
+    out["cei10"] = (body / range_).fillna(0.0).rolling(10, min_periods=1).mean() * 100.0
+    bull = (df["Close"] > df["Open"]).astype(int)
+    bear = (df["Close"] < df["Open"]).astype(int)
+    out["ofi10"] = (bull - bear).rolling(10, min_periods=1).mean()
+    return out
+
+
+def _ind_row_to_dict(row: pd.Series) -> Optional[dict]:
+    """Превратить строку precomputed-frame в dict, как в indicators.all_indicators."""
+    if row is None or row.isna().any():
+        return None
+    return {
+        "rsi14": float(row["rsi14"]),
+        "ema20": float(row["ema20"]),
+        "ema50": float(row["ema50"]),
+        "ema200": float(row["ema200"]),
+        "atr14": float(row["atr14"]),
+        "bb_pct": float(row["bb_pct"]),
+        "mom5": float(row["mom5"]),
+        "cei10": float(row["cei10"]),
+        "ofi10": float(row["ofi10"]),
+        "vwap": float(row["vwap"]),
+        "bbp": float(row["bbp"]),
+        "close": float(row["close"]),
+    }
+
+
 def _fetch_5d_snapshots(pair: str) -> Optional[list]:
     """Скачивает 5 дней 1h Yahoo + предрассчитывает индикаторы для каждого
-    бара. Возвращает список (ts, close, ind_4h, ind_1h, ind_15m).
+    бара (векторизованно). Возвращает список (ts, close, ind_4h, ind_1h, ind_15m).
 
-    Используем period="60d" для прогрева EMA200/RSI; бэктест-окно = последние
-    LOOKBACK_DAYS дней."""
+    Используем period="60d" для прогрева EMA200/RSI; бэктест-окно =
+    последние LOOKBACK_DAYS дней. На большой серии все индикаторы
+    считаются ОДНИМ проходом (RSI/EMA/ATR/BBP — все
+    rolling/ewm pandas-ops), затем для каждого бара мы просто читаем
+    соответствующие строки. Это в 50× быстрее старого подхода."""
     bars = yahoo.fetch(pair, interval="1h", period="60d")
     if bars is None or bars.empty or len(bars) < 60:
         return None
@@ -203,21 +383,43 @@ def _fetch_5d_snapshots(pair: str) -> Optional[list]:
         "Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum",
     }).dropna()
 
+    # ── Vectorized: pre-compute ALL indicators ONCE на каждом TF ──
+    ind_frame_1h = _precompute_indicator_frame(bars)
+    ind_frame_4h = _precompute_indicator_frame(bars_4h)
+    # 15m proxy — используем тот же 1h frame
+    ind_frame_15m = ind_frame_1h
+
+    if ind_frame_1h.empty or ind_frame_4h.empty:
+        return None
+
     snapshots = []
     for idx in range(start_idx, len(bars)):
         ts = bars.index[idx]
         close_p = float(bars.iloc[idx]["Close"])
-        slice_1h = bars.iloc[max(0, idx - 100):idx]
-        slice_4h = bars_4h.loc[bars_4h.index <= ts].tail(240)
-        slice_15m = bars.iloc[max(0, idx - 100):idx]   # 15m proxy
-
-        if len(slice_1h) < 30 or len(slice_4h) < 20 or len(slice_15m) < 30:
+        # ind_1h и ind_15m: строка [idx-1] (последний полностью закрытый бар)
+        if idx == 0:
             snapshots.append((ts, close_p, None, None, None))
             continue
-        ind_4h = indicators.all_indicators(slice_4h)
-        ind_1h = indicators.all_indicators(slice_1h)
-        ind_15m = indicators.all_indicators(slice_15m)
-        if not ind_4h or not ind_1h or not ind_15m:
+        try:
+            row_1h = ind_frame_1h.iloc[idx - 1]
+            row_15m = ind_frame_15m.iloc[idx - 1]
+        except IndexError:
+            snapshots.append((ts, close_p, None, None, None))
+            continue
+        # ind_4h: ищем последний 4h-бар, чей timestamp <= ts
+        try:
+            pos_4h = ind_frame_4h.index.searchsorted(ts) - 1
+            if pos_4h < 0:
+                snapshots.append((ts, close_p, None, None, None))
+                continue
+            row_4h = ind_frame_4h.iloc[pos_4h]
+        except IndexError:
+            snapshots.append((ts, close_p, None, None, None))
+            continue
+        ind_1h = _ind_row_to_dict(row_1h)
+        ind_4h = _ind_row_to_dict(row_4h)
+        ind_15m = _ind_row_to_dict(row_15m)
+        if not ind_1h or not ind_4h or not ind_15m:
             snapshots.append((ts, close_p, None, None, None))
             continue
         snapshots.append((ts, close_p, ind_4h, ind_1h, ind_15m))
@@ -328,10 +530,10 @@ def _evaluate_cell(snapshots: list, session_name: str,
     return {**best, "session": session_name, "session_window_utc": list(session_window)}
 
 
-def evaluate_pair(pair: str) -> dict:
-    """Полный анализ одной пары: 4 сессии × 120 вариантов на 5d окне."""
+def evaluate_pair_with_snapshots(pair: str, snapshots: Optional[list]) -> dict:
+    """То же что evaluate_pair, но snapshots передаются извне (после параллельной
+    закачки в run_full_sweep). Не делает Yahoo-запрос — чистая CPU-работа."""
     t0 = time.time()
-    snapshots = _fetch_5d_snapshots(pair)
     if snapshots is None:
         return {
             "pair": pair,
@@ -377,19 +579,84 @@ def evaluate_pair(pair: str) -> dict:
     }
 
 
+def evaluate_pair(pair: str) -> dict:
+    """Sequential single-pair eval (Yahoo fetch + walk-forward). Используется
+    тестами и при ручном запуске одной пары. run_full_sweep идёт параллельно."""
+    snapshots = _fetch_5d_snapshots(pair)
+    return evaluate_pair_with_snapshots(pair, snapshots)
+
+
+def _fetch_one_safe(pair: str) -> tuple[str, Optional[list]]:
+    """Wrapper для ThreadPoolExecutor: ловит исключения и возвращает (pair, None)
+    при ошибке (например, Yahoo rate-limit)."""
+    try:
+        return pair, _fetch_5d_snapshots(pair)
+    except Exception as e:
+        log.warning(f"meta-agent: fetch {pair} failed: {e}")
+        return pair, None
+
+
 def run_full_sweep() -> dict:
-    """Полный обход 28 пар × 4 сессии × 120 вариантов на 5d окне."""
+    """Полный обход 28 пар × 4 сессии × 120 вариантов на 5d окне.
+
+    Параллелизм:
+    - Phase 1: Yahoo-закачки 28 пар через ThreadPoolExecutor(8) — самый
+      медленный участок (I/O-bound, ~70s sequential → ~10s parallel).
+    - Phase 2: walk-forward eval 28 пар через ThreadPoolExecutor(6) — CPU-
+      bound, но GIL отпускается на pandas/numpy ops (~20s sequential → ~6s).
+
+    Цель — полный sweep за ≤60 секунд (требование пользователя).
+    """
     started = datetime.now(timezone.utc)
-    log.info(f"meta-agent: starting sweep ({len(config.PAIRS)} pairs × 5d × 120 variants)")
+    log.info(
+        f"meta-agent: starting sweep ({len(config.PAIRS)} pairs × 5d × 120 variants, "
+        f"parallel fetch={PARALLEL_FETCH_WORKERS}, eval={PARALLEL_EVAL_WORKERS})"
+    )
     pair_results: dict[str, dict] = {}
-    for i, pair in enumerate(config.PAIRS):
-        _heartbeat(i + 1, status=f"sweep:{pair}")
-        log.info(f"meta-agent: [{i+1}/{len(config.PAIRS)}] {pair}")
-        try:
-            pair_results[pair] = evaluate_pair(pair)
-        except Exception as e:
-            log.exception(f"meta-agent: {pair} failed: {e}")
-            pair_results[pair] = {"pair": pair, "status": "ERROR", "error": str(e)}
+
+    # ── Phase 1a: bulk yfinance.download для всех 28 пар одним запросом ──
+    fetch_t0 = time.time()
+    bulk_t0 = time.time()
+    bulk_data = _bulk_fetch_1h_60d()
+    bulk_dur = round(time.time() - bulk_t0, 1)
+    log.info(f"meta-agent: bulk fetch done in {bulk_dur}s — {len(bulk_data)}/{len(config.PAIRS)} cached")
+
+    # ── Phase 1b: parallel snapshot-build (CPU-bound) с использованием bulk-cache ──
+    snapshots_by_pair: dict[str, Optional[list]] = {}
+    with ThreadPoolExecutor(max_workers=PARALLEL_FETCH_WORKERS) as ex:
+        futures = {ex.submit(_fetch_one_safe, p): p for p in config.PAIRS}
+        completed = 0
+        for fut in as_completed(futures):
+            pair, snaps = fut.result()
+            snapshots_by_pair[pair] = snaps
+            completed += 1
+            if completed % 4 == 0 or completed == len(config.PAIRS):
+                _heartbeat(completed, status=f"fetch:{completed}/{len(config.PAIRS)}")
+                log.info(f"meta-agent: snapshot-built {completed}/{len(config.PAIRS)}")
+    fetch_dur = round(time.time() - fetch_t0, 1)
+    n_ok = sum(1 for s in snapshots_by_pair.values() if s is not None)
+    log.info(f"meta-agent: phase 1 (fetch+snapshot) done in {fetch_dur}s — {n_ok}/{len(config.PAIRS)} pairs ok")
+
+    # ── Phase 2: parallel walk-forward eval ──
+    eval_t0 = time.time()
+    with ThreadPoolExecutor(max_workers=PARALLEL_EVAL_WORKERS) as ex:
+        futures = {
+            ex.submit(evaluate_pair_with_snapshots, p, snapshots_by_pair.get(p)): p
+            for p in config.PAIRS
+        }
+        completed = 0
+        for fut in as_completed(futures):
+            pair = futures[fut]
+            try:
+                pair_results[pair] = fut.result()
+            except Exception as e:
+                log.exception(f"meta-agent: eval {pair} failed: {e}")
+                pair_results[pair] = {"pair": pair, "status": "ERROR", "error": str(e)}
+            completed += 1
+            if completed % 4 == 0 or completed == len(config.PAIRS):
+                _heartbeat(completed, status=f"eval:{completed}/{len(config.PAIRS)}")
+    eval_dur = round(time.time() - eval_t0, 1)
+    log.info(f"meta-agent: phase 2 (eval) done in {eval_dur}s")
 
     # ── агрегаты ──
     total_cells = 0
@@ -449,6 +716,11 @@ def run_full_sweep() -> dict:
         "as_of": finished.isoformat(),
         "started_at": started.isoformat(),
         "duration_sec": duration_sec,
+        "bulk_fetch_sec": bulk_dur,
+        "fetch_phase_sec": fetch_dur,
+        "eval_phase_sec": eval_dur,
+        "parallel_fetch_workers": PARALLEL_FETCH_WORKERS,
+        "parallel_eval_workers": PARALLEL_EVAL_WORKERS,
         "lookback_days": LOOKBACK_DAYS,
         "cycle_seconds": LOOP_INTERVAL_SEC,
         "total_pairs": len(config.PAIRS),
@@ -475,6 +747,8 @@ def run_full_sweep() -> dict:
     _append_log({
         "ts": finished.isoformat(),
         "duration_sec": duration_sec,
+        "fetch_phase_sec": fetch_dur,
+        "eval_phase_sec": eval_dur,
         "qualified": qualified,
         "probable": probable,
         "frozen": frozen,

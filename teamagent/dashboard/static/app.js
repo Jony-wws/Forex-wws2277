@@ -889,6 +889,8 @@ async function refreshMetaStrategy() {
     const noData = summary.no_data_cells || 0;
     const expected = summary.expected_overall_wr_pct;
     const dur = summary.duration_sec;
+    const fetchSec = summary.fetch_phase_sec;
+    const evalSec = summary.eval_phase_sec;
     const lookback = summary.lookback_days || 5;
     const cycle = (summary.cycle_seconds || 18000) / 3600;
 
@@ -907,7 +909,10 @@ async function refreshMetaStrategy() {
       <div class="meta-cell"><div class="big">${lookback}d</div><div class="muted small">окно</div></div>
       <div class="meta-cell"><div class="big">${cycle}ч</div><div class="muted small">цикл</div></div>
       <div class="meta-cell" style="grid-column: 1 / -1;">
-        <div class="muted small">обновлено: ${_formatTs(r.as_of)}</div>
+        <div class="muted small">
+          обновлено: ${_formatTs(r.as_of)}
+          ${fetchSec != null ? ` · fetch ${fetchSec}s + eval ${evalSec}s` : ""}
+        </div>
       </div>
     `;
 
