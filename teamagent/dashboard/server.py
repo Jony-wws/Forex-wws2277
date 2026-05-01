@@ -575,6 +575,42 @@ def api_calibration():
     }
 
 
+@app.get("/api/market-status")
+def api_market_status():
+    """Статус Forex рынка + обратный отсчёт до закрытия/открытия.
+
+    Forex открыт Sun 22:00 — Fri 22:00 UTC.
+    Возвращает:
+      is_open, status_emoji, status_text (ОТКРЫТ/ЗАКРЫТ)
+      session (Asia/London/Overlap/NY/Closed)
+      seconds_until_close, seconds_until_open
+      next_event_utc — ISO timestamp следующего события
+      max_safe_expiry_h — максимальная безопасная экспирация СЕЙЧАС
+    """
+    try:
+        from .. import market_hours as mh
+    except ImportError:
+        from teamagent import market_hours as mh
+    return mh.market_status()
+
+
+@app.get("/api/stability-forecast")
+def api_stability_forecast(hours_ahead: int = 24):
+    """Pre-emptive прогноз стабильности на следующие N часов.
+
+    Это НЕ зависит от количества закрытых сделок — расчёт идёт по
+    качеству strategy_config × сессиям × market_hours × news.
+    Возвращает ожидаемый WR с CI, активные qualified пары, eligible
+    forecasts, готовность системы (0..100), диагноз и рекомендации.
+    """
+    try:
+        from .. import stability_forecast as sf
+    except ImportError:
+        from teamagent import stability_forecast as sf
+    hours_ahead = max(1, min(168, int(hours_ahead)))  # 1h..7d
+    return sf.forecast_window(hours_ahead=hours_ahead)
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""

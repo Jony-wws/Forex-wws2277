@@ -614,6 +614,135 @@ async function refreshStakanClosed() {
   } catch (e) { console.error("stakan closed:", e); }
 }
 
+// ───── MARKET STATUS + PRE-EMPTIVE STABILITY FORECAST ─────
+// Получаем market_status снапшот раз в 60s, но каждую секунду
+// тикаем секундомер локально по nextEventUtc — чтобы не нагружать
+// сервер запросами.
+let _msState = null;   // {is_open, next_event, next_event_utc, status_text, ...}
+
+function _fmtCountdown(secs) {
+  if (secs <= 0) return "00:00:00";
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (d > 0) return `${d}д ${h}ч ${String(m).padStart(2,"0")}м ${String(s).padStart(2,"0")}с`;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+function _tickCountdown() {
+  if (!_msState || !_msState.next_event_utc) return;
+  const now = Date.now();
+  const nextMs = new Date(_msState.next_event_utc).getTime();
+  const secs = Math.max(0, Math.floor((nextMs - now) / 1000));
+  const cd = $("ms-countdown");
+  if (cd) cd.textContent = _fmtCountdown(secs);
+  // user time UTC+5
+  const ut = new Date(now + 5 * 3600 * 1000);
+  const ust = $("ms-user-time");
+  if (ust) ust.textContent = ut.toISOString().replace("T"," ").slice(0,19) + " UTC+5";
+  const utt = $("ms-utc-time");
+  if (utt) utt.textContent = "UTC: " + new Date(now).toISOString().slice(11,19);
+  // если событие наступило — рефрешим из API
+  if (secs === 0) refreshMarketStatus();
+}
+
+async function refreshMarketStatus() {
+  try {
+    const ms = await api("/api/market-status");
+    _msState = ms;
+    const sec = $("market-status-section");
+    if (!sec) return;
+    sec.classList.toggle("market-closed", !ms.is_open);
+    $("ms-emoji").textContent = ms.status_emoji || (ms.is_open ? "🟢" : "🔴");
+    $("ms-status").textContent = ms.status_text || (ms.is_open ? "ОТКРЫТ" : "ЗАКРЫТ");
+    $("ms-session-badge").textContent = "сессия: " + (ms.session || "—");
+    $("ms-countdown-label").textContent = ms.is_open ? "до закрытия" : "до открытия";
+    $("ms-next-event").textContent = "событие UTC: " + (ms.next_event_utc || "").replace("T"," ").slice(0,16);
+    const maxh = ms.max_safe_expiry_h || 0;
+    $("ms-max-expiry").textContent = maxh > 0 ? `${maxh}ч` : "0 — стоп";
+    _tickCountdown();
+  } catch (e) { console.error("market-status:", e); }
+}
+
+function _fwCard(grid, key, hours, label, fw) {
+  const wr = fw.weighted_expected_wr_pct;
+  const lo = fw.wilson_lower_pct_95;
+  const up = fw.wilson_upper_pct_95;
+  const ready = fw.readiness_score_0_100 || 0;
+  const verdict = fw.verdict || {};
+  const closedH = fw.closed_hours_in_window || 0;
+  const activeH = fw.active_hours_in_window || 0;
+  const eligible = fw.forecasts_eligible_now || 0;
+  const qualified = fw.active_qualified_pairs_count || 0;
+
+  let cls = "fw-card";
+  if (lo >= 65 && wr >= 70) cls += " fw-card-best";
+  else if (wr < 60 || lo < 50) cls += " fw-card-warn";
+
+  // обновляем in-place если уже есть
+  let card = grid.querySelector(`[data-fwkey="${key}"]`);
+  if (!card) {
+    card = document.createElement("div");
+    card.setAttribute("data-fwkey", key);
+    card.innerHTML = `
+      <div class="fw-title"></div>
+      <div class="fw-wr"></div>
+      <div class="fw-ci"></div>
+      <div class="fw-readiness">
+        <span class="fw-r-label">готовность</span>
+        <div class="fw-readiness-bar"><div class="fill"></div></div>
+        <span class="fw-r-value"></span>
+      </div>
+      <div class="fw-meta"></div>`;
+    grid.appendChild(card);
+  }
+  card.className = cls;
+  card.querySelector(".fw-title").textContent = label;
+  card.querySelector(".fw-wr").textContent = `${wr.toFixed(1)}% ${verdict.emoji || ""}`;
+  card.querySelector(".fw-ci").textContent = `95% CI [${lo.toFixed(1)}% ; ${up.toFixed(1)}%]`;
+  card.querySelector(".fw-readiness-bar > .fill").style.width = `${Math.max(0, Math.min(100, ready))}%`;
+  card.querySelector(".fw-r-value").textContent = `${ready.toFixed(0)}/100`;
+  const meta = card.querySelector(".fw-meta");
+  meta.innerHTML = `
+    <span>qualified <b>${qualified}</b>/28</span>
+    <span>eligible <b>${eligible}</b></span>
+    <span>активно <b>${activeH.toFixed(1)}ч</b></span>
+    ${closedH > 0 ? `<span>закрыто <b>${closedH.toFixed(1)}ч</b></span>` : ""}
+  `;
+}
+
+async function refreshStabilityForecast() {
+  try {
+    const grid = $("forecast-windows");
+    const diag = $("forecast-diag");
+    if (!grid) return;
+    // Получаем 3 окна параллельно
+    const [r1, r6, r24] = await Promise.all([
+      api("/api/stability-forecast?hours_ahead=1"),
+      api("/api/stability-forecast?hours_ahead=6"),
+      api("/api/stability-forecast?hours_ahead=24"),
+    ]);
+    if (grid.querySelector(".muted")) grid.innerHTML = "";
+    _fwCard(grid, "1h",  1,  "следующий 1 час",  r1);
+    _fwCard(grid, "6h",  6,  "следующие 6 часов", r6);
+    _fwCard(grid, "24h", 24, "следующие 24 часа", r24);
+
+    if (diag) {
+      const lines = [];
+      const fw = r24;
+      lines.push(`<b>Прогноз на 24ч:</b> ${fw.verdict?.text_ru || ""}`);
+      for (const d of (fw.diagnosis_ru || [])) {
+        lines.push(`<span class="diag-line">• ${d}</span>`);
+      }
+      for (const r of (fw.recommendations_ru || [])) {
+        lines.push(`<span class="diag-line diag-rec">→ ${r}</span>`);
+      }
+      diag.innerHTML = lines.join("");
+    }
+  } catch (e) { console.error("stability-forecast:", e); }
+}
+
 function tick() {
   $("last-refresh").textContent = new Date().toLocaleTimeString();
   refreshStats();
@@ -632,6 +761,8 @@ function tick() {
   refreshDailyClosed();
   refreshMarketRadar();
   refreshStability();
+  refreshMarketStatus();
+  refreshStabilityForecast();
 }
 
 // ───── ОБЩАЯ ОЦЕНКА + ГАРАНТИИ СТАБИЛЬНОСТИ (50+ метрик) ─────
@@ -1603,6 +1734,8 @@ function tickClock() {
   else if (h < 22) sess = "NY (17–22 UTC)";
   else sess = "off-hours (22–24 UTC)";
   $("clock-session").textContent = "сессия: " + sess;
+  // Live countdown тикается каждую секунду по cached _msState
+  _tickCountdown();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

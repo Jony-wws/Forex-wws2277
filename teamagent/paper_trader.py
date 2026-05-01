@@ -27,7 +27,17 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from . import config, strategies
+from . import market_hours as mh
 from .data import yahoo
+
+# Адаптивный диапазон экспирации (по требованию пользователя 2026-05-01):
+# обе основные стратегии открывают сделки с экспирацией от 1 до 5 часов.
+# Конкретное значение в этом диапазоне выбирается стратегией (best_variant.fixed_expiry_h
+# или forecast.recommended_hours), но клампится в [MIN, MAX] и **обрезается
+# до закрытия рынка** через market_hours.clip_expiry_hours.
+ADAPTIVE_MIN_EXPIRY_H = 1
+ADAPTIVE_MAX_EXPIRY_H = 5
+MARKET_CLOSE_BUFFER_MIN = 15  # не открывать сделку если до закрытия < 1ч 15мин
 
 log = logging.getLogger("paper")
 logging.basicConfig(
@@ -347,6 +357,20 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
     closed_trades = closed_trades or []
     opened = 0
     now_ts = _now()
+
+    # Market hours gate: не открывать новые сделки если рынок закрыт
+    # или закроется через < (1h + buffer). Уже открытые сделки продолжают
+    # жить — _settle_expired их закроет когда придёт expiry.
+    if not mh.is_market_open(now_ts):
+        log.info("MARKET CLOSED — пропускаю открытие новых сделок (Forex Sun22:00 UTC → Fri22:00 UTC)")
+        return 0
+    safe_cap_h = mh.max_safe_expiry_hours(now_ts, MARKET_CLOSE_BUFFER_MIN)
+    if safe_cap_h < ADAPTIVE_MIN_EXPIRY_H:
+        secs = mh.seconds_until_close(now_ts)
+        log.info(f"MARKET CLOSING — до закрытия {secs}s, минимальный safe expiry "
+                 f"меньше {ADAPTIVE_MIN_EXPIRY_H}h, пропускаю открытие")
+        return 0
+
     for r in rankings:
         if r["probability_pct"] < config.MIN_PROBABILITY * 100.0:
             continue
@@ -395,6 +419,18 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
             v = variants.get(chosen_variant_id)
             if v is not None and v.fixed_expiry_h is not None:
                 recommended = v.fixed_expiry_h
+
+        # Кламп в [1..5h] — обе основные стратегии теперь работают в этом
+        # диапазоне (замечание пользователя 2026-05-01).
+        recommended = max(ADAPTIVE_MIN_EXPIRY_H,
+                          min(ADAPTIVE_MAX_EXPIRY_H, int(recommended)))
+        # Сжатие до закрытия рынка (защита от выхода в выходные)
+        recommended = mh.clip_expiry_hours(recommended, now_ts,
+                                           MARKET_CLOSE_BUFFER_MIN)
+        if recommended <= 0:
+            log.info(f"SKIP {pair} — после market_hours clip expiry=0h "
+                     f"(рынок закрывается слишком скоро)")
+            continue
 
         expiry_time = now_ts + timedelta(hours=recommended)
         per_pair_cfg = (strategy_cfg.get("pairs") or {}).get(pair, {}) if has_strategy_cfg else {}

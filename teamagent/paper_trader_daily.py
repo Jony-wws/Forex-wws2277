@@ -41,6 +41,11 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from . import config, indicators as ind
+from . import market_hours as mh
+
+# market hours buffer — daily-trades могут идти долго (до 18ч), поэтому
+# буфер чуть больше: 30 мин до закрытия рынка.
+MARKET_CLOSE_BUFFER_MIN = 30
 from .data import yahoo
 try:
     from . import fundamentals as fund_mod  # для pair_macro_tilt(pair)
@@ -467,6 +472,15 @@ def _daily_sweep(open_trades: list[dict], paused: dict) -> tuple[int, list[dict]
     signals: list[dict] = []
     now_ts = _now()
 
+    # Market hours gate
+    if not mh.is_market_open(now_ts):
+        log.info("MARKET CLOSED — пропускаю открытие daily-сделок")
+        return 0, signals
+    safe_cap_h = mh.max_safe_expiry_hours(now_ts, MARKET_CLOSE_BUFFER_MIN)
+    if safe_cap_h < 1:
+        log.info(f"MARKET CLOSING — safe_cap={safe_cap_h}h, daily-trades пропуск")
+        return 0, signals
+
     for pair in config.PAIRS:
         if pair in paused:
             until = paused[pair].get("until", "")
@@ -521,6 +535,14 @@ def _daily_sweep(open_trades: list[dict], paused: dict) -> tuple[int, list[dict]
         except Exception as e:
             log.warning(f"auto_expiry failed {pair}: {e}")
             expiry_h = 18
+
+        # Clip до закрытия рынка
+        expiry_h = mh.clip_expiry_hours(expiry_h, now_ts,
+                                          MARKET_CLOSE_BUFFER_MIN)
+        if expiry_h <= 0:
+            signal_entry["skip_reason"] = "market_closing"
+            signals.append(signal_entry)
+            continue
 
         expiry_time = now_ts + timedelta(hours=expiry_h)
         trade = {

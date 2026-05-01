@@ -31,6 +31,51 @@
 
 <main>
 
+  <!-- ═══ FOREX MARKET COUNTDOWN + PRE-EMPTIVE STABILITY FORECAST ═══ -->
+  <section id="market-status-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span id="ms-emoji" class="ms-emoji">🟢</span>
+      <span>FOREX <span id="ms-status">…</span></span>
+      <span class="live-pulse" title="обновляется каждую секунду"></span>
+      <span id="ms-session-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="ms-grid">
+      <div class="ms-cell ms-countdown">
+        <div class="ms-cell-label" id="ms-countdown-label">до закрытия</div>
+        <div class="ms-cell-value big-number" id="ms-countdown">—</div>
+        <div class="ms-cell-sub" id="ms-next-event">—</div>
+      </div>
+      <div class="ms-cell">
+        <div class="ms-cell-label">время пользователя (UTC+5)</div>
+        <div class="ms-cell-value" id="ms-user-time">—</div>
+        <div class="ms-cell-sub" id="ms-utc-time">UTC: —</div>
+      </div>
+      <div class="ms-cell">
+        <div class="ms-cell-label">безопасный max expiry</div>
+        <div class="ms-cell-value" id="ms-max-expiry">—</div>
+        <div class="ms-cell-sub">обе стратегии 1–5h</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="forecast-stability-section" class="card glass premium-card stability-hero">
+    <h2 class="hero-title">
+      <span class="icon-shield">🔮</span>
+      ПРЕДВАРИТЕЛЬНЫЙ ПРОГНОЗ СТАБИЛЬНОСТИ
+      <span class="live-pulse" title="расчёт без зависимости от закрытых сделок"></span>
+      <span class="badge-stable">не зависит от # сделок</span>
+    </h2>
+    <div class="muted small">
+      Это <b>заранее</b> предсказанный WR на следующие N часов — расчёт идёт по
+      strategy_config × сессиям × market_hours × news. <b>Не зависит</b> от
+      количества закрытых сделок: ответ есть, даже если сделок ещё нет.
+    </div>
+    <div class="forecast-windows" id="forecast-windows">
+      <div class="muted">Загружаю прогноз на 1ч / 6ч / 24ч…</div>
+    </div>
+    <div id="forecast-diag" class="forecast-diag muted small"></div>
+  </section>
+
   <!-- ═══ ГЛАВНАЯ КАРТОЧКА: ОБЩАЯ ОЦЕНКА + ПРОГНОЗ + ГАРАНТИИ ═══ -->
   <section id="assessment-section" class="card glass premium-card hero-card">
     <h2 class="hero-title"><span class="dot dot-pulse"></span> ОБЩАЯ ОЦЕНКА СИСТЕМЫ <span class="live-pulse" title="данные в реальном времени"></span></h2>

@@ -757,3 +757,167 @@ button.primary {
 #stability-section,
 #assessment-section,
 .card { contain: content; }
+
+/* ═══ MARKET STATUS + STABILITY FORECAST (новые секции 2026-05-01) ═══ */
+
+#market-status-section .ms-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+@media (max-width: 720px) {
+  #market-status-section .ms-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ms-cell {
+  background: rgba(167, 139, 250, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ms-cell.ms-countdown {
+  background: linear-gradient(135deg,
+              rgba(167, 139, 250, 0.18),
+              rgba(139, 92, 246, 0.10));
+  border: 1px solid var(--border-2);
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.14) inset;
+}
+.ms-cell-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.72);
+}
+.ms-cell-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--acc-3);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.ms-cell-value.big-number {
+  font-size: 38px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 18px rgba(167, 139, 250, 0.45);
+}
+.ms-cell-sub {
+  font-size: 12px;
+  color: rgba(196, 181, 253, 0.55);
+}
+.ms-emoji {
+  font-size: 28px;
+  margin-right: 4px;
+  filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.7));
+}
+
+#market-status-section.market-closed .ms-cell.ms-countdown {
+  background: linear-gradient(135deg,
+              rgba(248, 113, 113, 0.18),
+              rgba(220, 38, 38, 0.08));
+  border-color: rgba(248, 113, 113, 0.45);
+  box-shadow: 0 0 24px rgba(248, 113, 113, 0.18) inset;
+}
+#market-status-section.market-closed .ms-cell-value.big-number {
+  text-shadow: 0 0 18px rgba(248, 113, 113, 0.55);
+  color: #fca5a5;
+}
+
+/* forecast windows */
+.forecast-windows {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+@media (max-width: 720px) {
+  .forecast-windows { grid-template-columns: 1fr; }
+}
+.fw-card {
+  background: rgba(167, 139, 250, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.fw-card.fw-card-best {
+  background: linear-gradient(135deg,
+              rgba(34, 197, 94, 0.10),
+              rgba(167, 139, 250, 0.06));
+  border-color: rgba(74, 222, 128, 0.35);
+}
+.fw-card.fw-card-warn {
+  background: linear-gradient(135deg,
+              rgba(248, 113, 113, 0.10),
+              rgba(167, 139, 250, 0.04));
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.fw-title {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.7);
+}
+.fw-wr {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--acc-3);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 14px rgba(167, 139, 250, 0.35);
+}
+.fw-ci {
+  font-size: 13px;
+  color: rgba(196, 181, 253, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+.fw-readiness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(196, 181, 253, 0.9);
+}
+.fw-readiness .fw-readiness-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 6px;
+  background: rgba(167, 139, 250, 0.10);
+  overflow: hidden;
+  position: relative;
+}
+.fw-readiness .fw-readiness-bar > .fill {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--acc), var(--acc-3));
+  width: 0%;
+  border-radius: 6px;
+  transition: width 800ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.fw-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: rgba(196, 181, 253, 0.65);
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.fw-meta span b { color: var(--acc-3); }
+
+.forecast-diag {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(167, 139, 250, 0.04);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  line-height: 1.5;
+}
+.forecast-diag .diag-line { display: block; margin: 2px 0; }
+.forecast-diag .diag-rec  { color: var(--acc-3); }
