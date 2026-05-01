@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-04-30T23:53:18.477471+00:00",
+  "as_of": "2026-05-01T04:22:21.864485+00:00",
   "summary": {
     "runs": 840,
     "qualified_pairs_70pct": [
@@ -73,10 +73,10 @@
       },
       {
         "variant": "v14_asia",
-        "mean_wr_pct": 65.4,
-        "aggregated_wr_pct": 65.0,
+        "mean_wr_pct": 65.7,
+        "aggregated_wr_pct": 65.7,
         "pairs_with_data": 7,
-        "total_trades": 183
+        "total_trades": 178
       },
       {
         "variant": "v01_baseline",
@@ -87,10 +87,10 @@
       },
       {
         "variant": "v27_pro_slow",
-        "mean_wr_pct": 63.2,
-        "aggregated_wr_pct": 61.1,
-        "pairs_with_data": 8,
-        "total_trades": 144
+        "mean_wr_pct": 64.1,
+        "aggregated_wr_pct": 61.8,
+        "pairs_with_data": 7,
+        "total_trades": 123
       }
     ]
   },
@@ -118,38 +118,38 @@
         {
           "variant": "v02_score12",
           "label": "|score|>=12",
-          "trades": 35,
-          "wins": 20,
+          "trades": 36,
+          "wins": 21,
           "losses": 15,
-          "pnl_usd": 100.0,
-          "win_rate_pct": 57.1
+          "pnl_usd": 142.5,
+          "win_rate_pct": 58.3
         },
         {
           "variant": "v17_full_mtf_high",
           "label": "full MTF + |score|>=12",
-          "trades": 35,
-          "wins": 20,
+          "trades": 36,
+          "wins": 21,
           "losses": 15,
-          "pnl_usd": 100.0,
-          "win_rate_pct": 57.1
-        },
-        {
-          "variant": "v24_only_mtf",
-          "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 72,
-          "wins": 40,
-          "losses": 32,
-          "pnl_usd": 100.0,
-          "win_rate_pct": 55.6
+          "pnl_usd": 142.5,
+          "win_rate_pct": 58.3
         },
         {
           "variant": "v04_prob75",
           "label": "prob>=75%",
-          "trades": 27,
-          "wins": 15,
+          "trades": 28,
+          "wins": 16,
           "losses": 12,
-          "pnl_usd": 37.5,
-          "win_rate_pct": 55.6
+          "pnl_usd": 80.0,
+          "win_rate_pct": 57.1
+        },
+        {
+          "variant": "v07_high_conv",
+          "label": "|score|>=12 + prob>=75",
+          "trades": 28,
+          "wins": 16,
+          "losses": 12,
+          "pnl_usd": 80.0,
+          "win_rate_pct": 57.1
         }
       ]
     },
@@ -174,40 +174,40 @@
           "win_rate_pct": 70.0
         },
         {
-          "variant": "v14_asia",
-          "label": "Asia 00-08 UTC",
-          "trades": 19,
-          "wins": 12,
-          "losses": 7,
-          "pnl_usd": 160.0,
-          "win_rate_pct": 63.2
-        },
-        {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
-          "trades": 50,
-          "wins": 31,
+          "trades": 51,
+          "wins": 32,
           "losses": 19,
-          "pnl_usd": 367.5,
-          "win_rate_pct": 62.0
+          "pnl_usd": 410.0,
+          "win_rate_pct": 62.7
+        },
+        {
+          "variant": "v14_asia",
+          "label": "Asia 00-08 UTC",
+          "trades": 21,
+          "wins": 13,
+          "losses": 8,
+          "pnl_usd": 152.5,
+          "win_rate_pct": 61.9
         },
         {
           "variant": "v24_only_mtf",
           "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 68,
-          "wins": 41,
-          "losses": 27,
-          "pnl_usd": 392.5,
-          "win_rate_pct": 60.3
+          "trades": 70,
+          "wins": 42,
+          "losses": 28,
+          "pnl_usd": 385.0,
+          "win_rate_pct": 60.0
         },
         {
-          "variant": "v27_pro_slow",
-          "label": "PRO: London/NY + |score|>=12 + exp=4ч + prob>=75",
-          "trades": 21,
-          "wins": 12,
-          "losses": 9,
-          "pnl_usd": 60.0,
-          "win_rate_pct": 57.1
+          "variant": "v10_exp2h",
+          "label": "expiry=2ч",
+          "trades": 93,
+          "wins": 54,
+          "losses": 39,
+          "pnl_usd": 345.0,
+          "win_rate_pct": 58.1
         }
       ]
     },
@@ -241,15 +241,6 @@
           "win_rate_pct": 60.5
         },
         {
-          "variant": "v19_contrarian",
-          "label": "contrarian (флип всех)",
-          "trades": 36,
-          "wins": 21,
-          "losses": 15,
-          "pnl_usd": 142.5,
-          "win_rate_pct": 58.3
-        },
-        {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
           "trades": 64,
@@ -266,32 +257,41 @@
           "losses": 31,
           "pnl_usd": 107.5,
           "win_rate_pct": 55.7
+        },
+        {
+          "variant": "v23_emph_meanrev",
+          "label": "emphasis: mean-reversion (B x2 + C x2)",
+          "trades": 72,
+          "wins": 40,
+          "losses": 32,
+          "pnl_usd": 100.0,
+          "win_rate_pct": 55.6
         }
       ]
     },
     "USDCHF": {
       "pair": "USDCHF",
-      "best_variant": "v25_pro_trend",
-      "best_label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
-      "win_rate_pct": 64.0,
-      "trades": 25,
-      "wins": 16,
+      "best_variant": "v28_pro_fade",
+      "best_label": "PRO: fade RSI + London/NY + |score|>=12 + exp=2ч",
+      "win_rate_pct": 65.4,
+      "trades": 26,
+      "wins": 17,
       "losses": 9,
-      "pnl_usd": 230.0,
+      "pnl_usd": 272.5,
       "qualifies_70pct": false,
       "all_variants": [
         {
-          "variant": "v25_pro_trend",
-          "label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
-          "trades": 25,
-          "wins": 16,
-          "losses": 9,
-          "pnl_usd": 230.0,
-          "win_rate_pct": 64.0
-        },
-        {
           "variant": "v28_pro_fade",
           "label": "PRO: fade RSI + London/NY + |score|>=12 + exp=2ч",
+          "trades": 26,
+          "wins": 17,
+          "losses": 9,
+          "pnl_usd": 272.5,
+          "win_rate_pct": 65.4
+        },
+        {
+          "variant": "v25_pro_trend",
+          "label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
           "trades": 25,
           "wins": 16,
           "losses": 9,
@@ -366,17 +366,17 @@
           "win_rate_pct": 57.1
         },
         {
-          "variant": "v13_ny",
-          "label": "NY 13-22 UTC",
-          "trades": 41,
-          "wins": 23,
-          "losses": 18,
-          "pnl_usd": 77.5,
-          "win_rate_pct": 56.1
-        },
-        {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
+          "trades": 64,
+          "wins": 35,
+          "losses": 29,
+          "pnl_usd": 37.5,
+          "win_rate_pct": 54.7
+        },
+        {
+          "variant": "v02_score12",
+          "label": "|score|>=12",
           "trades": 63,
           "wins": 34,
           "losses": 29,
@@ -464,15 +464,6 @@
           "win_rate_pct": 80.0
         },
         {
-          "variant": "v13_ny",
-          "label": "NY 13-22 UTC",
-          "trades": 28,
-          "wins": 16,
-          "losses": 12,
-          "pnl_usd": 80.0,
-          "win_rate_pct": 57.1
-        },
-        {
           "variant": "v15_overlap",
           "label": "London/NY overlap 13-15 UTC",
           "trades": 9,
@@ -480,6 +471,15 @@
           "losses": 4,
           "pnl_usd": 12.5,
           "win_rate_pct": 55.6
+        },
+        {
+          "variant": "v13_ny",
+          "label": "NY 13-22 UTC",
+          "trades": 29,
+          "wins": 16,
+          "losses": 13,
+          "pnl_usd": 30.0,
+          "win_rate_pct": 55.2
         },
         {
           "variant": "v25_pro_trend",
@@ -524,38 +524,38 @@
         {
           "variant": "v24_only_mtf",
           "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 40,
+          "trades": 39,
           "wins": 22,
-          "losses": 18,
-          "pnl_usd": 35.0,
-          "win_rate_pct": 55.0
+          "losses": 17,
+          "pnl_usd": 85.0,
+          "win_rate_pct": 56.4
         },
         {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
-          "trades": 33,
+          "trades": 32,
           "wins": 18,
-          "losses": 15,
-          "pnl_usd": 15.0,
-          "win_rate_pct": 54.5
+          "losses": 14,
+          "pnl_usd": 65.0,
+          "win_rate_pct": 56.2
+        },
+        {
+          "variant": "v18_fade_rsi",
+          "label": "fade RSI extremes",
+          "trades": 44,
+          "wins": 23,
+          "losses": 21,
+          "pnl_usd": -72.5,
+          "win_rate_pct": 52.3
         },
         {
           "variant": "v02_score12",
           "label": "|score|>=12",
-          "trades": 28,
+          "trades": 27,
           "wins": 14,
-          "losses": 14,
-          "pnl_usd": -105.0,
-          "win_rate_pct": 50.0
-        },
-        {
-          "variant": "v17_full_mtf_high",
-          "label": "full MTF + |score|>=12",
-          "trades": 28,
-          "wins": 14,
-          "losses": 14,
-          "pnl_usd": -105.0,
-          "win_rate_pct": 50.0
+          "losses": 13,
+          "pnl_usd": -55.0,
+          "win_rate_pct": 51.9
         }
       ]
     },
@@ -580,6 +580,15 @@
           "win_rate_pct": 72.7
         },
         {
+          "variant": "v23_emph_meanrev",
+          "label": "emphasis: mean-reversion (B x2 + C x2)",
+          "trades": 84,
+          "wins": 48,
+          "losses": 36,
+          "pnl_usd": 240.0,
+          "win_rate_pct": 57.1
+        },
+        {
           "variant": "v28_pro_fade",
           "label": "PRO: fade RSI + London/NY + |score|>=12 + exp=2ч",
           "trades": 67,
@@ -587,15 +596,6 @@
           "losses": 29,
           "pnl_usd": 165.0,
           "win_rate_pct": 56.7
-        },
-        {
-          "variant": "v23_emph_meanrev",
-          "label": "emphasis: mean-reversion (B x2 + C x2)",
-          "trades": 85,
-          "wins": 48,
-          "losses": 37,
-          "pnl_usd": 190.0,
-          "win_rate_pct": 56.5
         },
         {
           "variant": "v25_pro_trend",
@@ -638,6 +638,15 @@
           "win_rate_pct": 57.7
         },
         {
+          "variant": "v23_emph_meanrev",
+          "label": "emphasis: mean-reversion (B x2 + C x2)",
+          "trades": 72,
+          "wins": 39,
+          "losses": 33,
+          "pnl_usd": 7.5,
+          "win_rate_pct": 54.2
+        },
+        {
           "variant": "v25_pro_trend",
           "label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
           "trades": 52,
@@ -654,15 +663,6 @@
           "losses": 24,
           "pnl_usd": -10.0,
           "win_rate_pct": 53.8
-        },
-        {
-          "variant": "v23_emph_meanrev",
-          "label": "emphasis: mean-reversion (B x2 + C x2)",
-          "trades": 73,
-          "wins": 39,
-          "losses": 34,
-          "pnl_usd": -42.5,
-          "win_rate_pct": 53.4
         },
         {
           "variant": "v18_fade_rsi",
@@ -737,30 +737,30 @@
       "pair": "EURCAD",
       "best_variant": "v14_asia",
       "best_label": "Asia 00-08 UTC",
-      "win_rate_pct": 65.0,
-      "trades": 20,
-      "wins": 13,
-      "losses": 7,
-      "pnl_usd": 202.5,
+      "win_rate_pct": 66.7,
+      "trades": 18,
+      "wins": 12,
+      "losses": 6,
+      "pnl_usd": 210.0,
       "qualifies_70pct": false,
       "all_variants": [
         {
           "variant": "v14_asia",
           "label": "Asia 00-08 UTC",
-          "trades": 20,
-          "wins": 13,
-          "losses": 7,
-          "pnl_usd": 202.5,
-          "win_rate_pct": 65.0
+          "trades": 18,
+          "wins": 12,
+          "losses": 6,
+          "pnl_usd": 210.0,
+          "win_rate_pct": 66.7
         },
         {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
-          "trades": 42,
+          "trades": 41,
           "wins": 27,
-          "losses": 15,
-          "pnl_usd": 397.5,
-          "win_rate_pct": 64.3
+          "losses": 14,
+          "pnl_usd": 447.5,
+          "win_rate_pct": 65.9
         },
         {
           "variant": "v27_pro_slow",
@@ -772,22 +772,22 @@
           "win_rate_pct": 56.5
         },
         {
-          "variant": "v18_fade_rsi",
-          "label": "fade RSI extremes",
-          "trades": 48,
-          "wins": 27,
-          "losses": 21,
-          "pnl_usd": 97.5,
-          "win_rate_pct": 56.2
-        },
-        {
           "variant": "v21_emph_mtf",
           "label": "emphasis: MTF (block A x2 + H x2)",
-          "trades": 46,
+          "trades": 45,
           "wins": 25,
+          "losses": 20,
+          "pnl_usd": 62.5,
+          "win_rate_pct": 55.6
+        },
+        {
+          "variant": "v18_fade_rsi",
+          "label": "fade RSI extremes",
+          "trades": 47,
+          "wins": 26,
           "losses": 21,
-          "pnl_usd": 12.5,
-          "win_rate_pct": 54.3
+          "pnl_usd": 55.0,
+          "win_rate_pct": 55.3
         }
       ]
     },
@@ -830,15 +830,6 @@
           "win_rate_pct": 80.0
         },
         {
-          "variant": "v14_asia",
-          "label": "Asia 00-08 UTC",
-          "trades": 22,
-          "wins": 15,
-          "losses": 7,
-          "pnl_usd": 287.5,
-          "win_rate_pct": 68.2
-        },
-        {
           "variant": "v25_pro_trend",
           "label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
           "trades": 26,
@@ -846,6 +837,15 @@
           "losses": 9,
           "pnl_usd": 272.5,
           "win_rate_pct": 65.4
+        },
+        {
+          "variant": "v14_asia",
+          "label": "Asia 00-08 UTC",
+          "trades": 20,
+          "wins": 13,
+          "losses": 7,
+          "pnl_usd": 202.5,
+          "win_rate_pct": 65.0
         }
       ]
     },
@@ -1027,57 +1027,57 @@
       "pair": "GBPCAD",
       "best_variant": "v21_emph_mtf",
       "best_label": "emphasis: MTF (block A x2 + H x2)",
-      "win_rate_pct": 55.6,
-      "trades": 54,
+      "win_rate_pct": 54.5,
+      "trades": 55,
       "wins": 30,
-      "losses": 24,
-      "pnl_usd": 75.0,
+      "losses": 25,
+      "pnl_usd": 25.0,
       "qualifies_70pct": false,
       "all_variants": [
         {
           "variant": "v21_emph_mtf",
           "label": "emphasis: MTF (block A x2 + H x2)",
-          "trades": 54,
+          "trades": 55,
           "wins": 30,
-          "losses": 24,
-          "pnl_usd": 75.0,
-          "win_rate_pct": 55.6
+          "losses": 25,
+          "pnl_usd": 25.0,
+          "win_rate_pct": 54.5
         },
         {
           "variant": "v10_exp2h",
           "label": "expiry=2ч",
-          "trades": 77,
-          "wins": 41,
-          "losses": 36,
-          "pnl_usd": -57.5,
-          "win_rate_pct": 53.2
+          "trades": 80,
+          "wins": 43,
+          "losses": 37,
+          "pnl_usd": -22.5,
+          "win_rate_pct": 53.8
         },
         {
-          "variant": "v09_exp1h",
-          "label": "expiry=1ч",
-          "trades": 132,
-          "wins": 70,
-          "losses": 62,
-          "pnl_usd": -125.0,
-          "win_rate_pct": 53.0
+          "variant": "v13_ny",
+          "label": "NY 13-22 UTC",
+          "trades": 28,
+          "wins": 15,
+          "losses": 13,
+          "pnl_usd": -12.5,
+          "win_rate_pct": 53.6
         },
         {
           "variant": "v24_only_mtf",
           "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 51,
-          "wins": 27,
-          "losses": 24,
-          "pnl_usd": -52.5,
-          "win_rate_pct": 52.9
+          "trades": 53,
+          "wins": 28,
+          "losses": 25,
+          "pnl_usd": -60.0,
+          "win_rate_pct": 52.8
         },
         {
-          "variant": "v28_pro_fade",
-          "label": "PRO: fade RSI + London/NY + |score|>=12 + exp=2ч",
-          "trades": 34,
-          "wins": 18,
-          "losses": 16,
-          "pnl_usd": -35.0,
-          "win_rate_pct": 52.9
+          "variant": "v09_exp1h",
+          "label": "expiry=1ч",
+          "trades": 140,
+          "wins": 73,
+          "losses": 67,
+          "pnl_usd": -247.5,
+          "win_rate_pct": 52.1
         }
       ]
     },
@@ -1220,11 +1220,11 @@
         {
           "variant": "v19_contrarian",
           "label": "contrarian (флип всех)",
-          "trades": 22,
-          "wins": 13,
+          "trades": 21,
+          "wins": 12,
           "losses": 9,
-          "pnl_usd": 102.5,
-          "win_rate_pct": 59.1
+          "pnl_usd": 60.0,
+          "win_rate_pct": 57.1
         },
         {
           "variant": "v23_emph_meanrev",
@@ -1336,11 +1336,11 @@
         {
           "variant": "v23_emph_meanrev",
           "label": "emphasis: mean-reversion (B x2 + C x2)",
-          "trades": 59,
+          "trades": 60,
           "wins": 37,
-          "losses": 22,
-          "pnl_usd": 472.5,
-          "win_rate_pct": 62.7
+          "losses": 23,
+          "pnl_usd": 422.5,
+          "win_rate_pct": 61.7
         },
         {
           "variant": "v14_asia",
@@ -1403,29 +1403,29 @@
         {
           "variant": "v09_exp1h",
           "label": "expiry=1ч",
-          "trades": 196,
-          "wins": 100,
-          "losses": 96,
-          "pnl_usd": -550.0,
-          "win_rate_pct": 51.0
+          "trades": 192,
+          "wins": 99,
+          "losses": 93,
+          "pnl_usd": -442.5,
+          "win_rate_pct": 51.6
         },
         {
-          "variant": "v13_ny",
-          "label": "NY 13-22 UTC",
-          "trades": 40,
-          "wins": 20,
-          "losses": 20,
-          "pnl_usd": -150.0,
+          "variant": "v02_score12",
+          "label": "|score|>=12",
+          "trades": 58,
+          "wins": 29,
+          "losses": 29,
+          "pnl_usd": -217.5,
           "win_rate_pct": 50.0
         },
         {
-          "variant": "v04_prob75",
-          "label": "prob>=75%",
-          "trades": 47,
-          "wins": 23,
-          "losses": 24,
-          "pnl_usd": -222.5,
-          "win_rate_pct": 48.9
+          "variant": "v17_full_mtf_high",
+          "label": "full MTF + |score|>=12",
+          "trades": 58,
+          "wins": 29,
+          "losses": 29,
+          "pnl_usd": -217.5,
+          "win_rate_pct": 50.0
         }
       ]
     },
@@ -1450,6 +1450,15 @@
           "win_rate_pct": 62.5
         },
         {
+          "variant": "v14_asia",
+          "label": "Asia 00-08 UTC",
+          "trades": 36,
+          "wins": 22,
+          "losses": 14,
+          "pnl_usd": 235.0,
+          "win_rate_pct": 61.1
+        },
+        {
           "variant": "v19_contrarian",
           "label": "contrarian (флип всех)",
           "trades": 15,
@@ -1459,31 +1468,22 @@
           "win_rate_pct": 60.0
         },
         {
-          "variant": "v14_asia",
-          "label": "Asia 00-08 UTC",
-          "trades": 38,
-          "wins": 22,
-          "losses": 16,
-          "pnl_usd": 135.0,
-          "win_rate_pct": 57.9
-        },
-        {
           "variant": "v23_emph_meanrev",
           "label": "emphasis: mean-reversion (B x2 + C x2)",
-          "trades": 71,
-          "wins": 40,
+          "trades": 70,
+          "wins": 39,
           "losses": 31,
-          "pnl_usd": 150.0,
-          "win_rate_pct": 56.3
+          "pnl_usd": 107.5,
+          "win_rate_pct": 55.7
         },
         {
-          "variant": "v25_pro_trend",
-          "label": "PRO: London/NY + full MTF + |score|>=12 + exp=2ч",
-          "trades": 57,
-          "wins": 31,
-          "losses": 26,
-          "pnl_usd": 17.5,
-          "win_rate_pct": 54.4
+          "variant": "v22_emph_momentum",
+          "label": "emphasis: Momentum (block D x2 + E x2)",
+          "trades": 93,
+          "wins": 51,
+          "losses": 42,
+          "pnl_usd": 67.5,
+          "win_rate_pct": 54.8
         }
       ]
     },
@@ -1491,21 +1491,21 @@
       "pair": "AUDNZD",
       "best_variant": "v14_asia",
       "best_label": "Asia 00-08 UTC",
-      "win_rate_pct": 70.0,
-      "trades": 40,
+      "win_rate_pct": 71.8,
+      "trades": 39,
       "wins": 28,
-      "losses": 12,
-      "pnl_usd": 590.0,
+      "losses": 11,
+      "pnl_usd": 640.0,
       "qualifies_70pct": true,
       "all_variants": [
         {
           "variant": "v14_asia",
           "label": "Asia 00-08 UTC",
-          "trades": 40,
+          "trades": 39,
           "wins": 28,
-          "losses": 12,
-          "pnl_usd": 590.0,
-          "win_rate_pct": 70.0
+          "losses": 11,
+          "pnl_usd": 640.0,
+          "win_rate_pct": 71.8
         },
         {
           "variant": "v15_overlap",
@@ -1517,15 +1517,6 @@
           "win_rate_pct": 70.0
         },
         {
-          "variant": "v24_only_mtf",
-          "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 90,
-          "wins": 57,
-          "losses": 33,
-          "pnl_usd": 772.5,
-          "win_rate_pct": 63.3
-        },
-        {
           "variant": "v12_london",
           "label": "London 07-15 UTC",
           "trades": 38,
@@ -1533,6 +1524,15 @@
           "losses": 14,
           "pnl_usd": 320.0,
           "win_rate_pct": 63.2
+        },
+        {
+          "variant": "v24_only_mtf",
+          "label": "only structure (A,H weight x3, остальное x0)",
+          "trades": 89,
+          "wins": 56,
+          "losses": 33,
+          "pnl_usd": 730.0,
+          "win_rate_pct": 62.9
         },
         {
           "variant": "v21_emph_mtf",
@@ -1607,21 +1607,21 @@
       "pair": "NZDCAD",
       "best_variant": "v09_exp1h",
       "best_label": "expiry=1ч",
-      "win_rate_pct": 59.3,
-      "trades": 118,
+      "win_rate_pct": 59.8,
+      "trades": 117,
       "wins": 70,
-      "losses": 48,
-      "pnl_usd": 575.0,
+      "losses": 47,
+      "pnl_usd": 625.0,
       "qualifies_70pct": false,
       "all_variants": [
         {
           "variant": "v09_exp1h",
           "label": "expiry=1ч",
-          "trades": 118,
+          "trades": 117,
           "wins": 70,
-          "losses": 48,
-          "pnl_usd": 575.0,
-          "win_rate_pct": 59.3
+          "losses": 47,
+          "pnl_usd": 625.0,
+          "win_rate_pct": 59.8
         },
         {
           "variant": "v27_pro_slow",
@@ -1644,20 +1644,20 @@
         {
           "variant": "v11_exp4h",
           "label": "expiry=4ч",
-          "trades": 40,
+          "trades": 39,
           "wins": 21,
-          "losses": 19,
-          "pnl_usd": -57.5,
-          "win_rate_pct": 52.5
+          "losses": 18,
+          "pnl_usd": -7.5,
+          "win_rate_pct": 53.8
         },
         {
           "variant": "v24_only_mtf",
           "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 52,
+          "trades": 51,
           "wins": 26,
-          "losses": 26,
-          "pnl_usd": -195.0,
-          "win_rate_pct": 50.0
+          "losses": 25,
+          "pnl_usd": -145.0,
+          "win_rate_pct": 51.0
         }
       ]
     },
@@ -1700,17 +1700,17 @@
           "win_rate_pct": 66.7
         },
         {
-          "variant": "v04_prob75",
-          "label": "prob>=75%",
-          "trades": 38,
-          "wins": 24,
-          "losses": 14,
-          "pnl_usd": 320.0,
-          "win_rate_pct": 63.2
+          "variant": "v23_emph_meanrev",
+          "label": "emphasis: mean-reversion (B x2 + C x2)",
+          "trades": 53,
+          "wins": 34,
+          "losses": 19,
+          "pnl_usd": 495.0,
+          "win_rate_pct": 64.2
         },
         {
-          "variant": "v07_high_conv",
-          "label": "|score|>=12 + prob>=75",
+          "variant": "v04_prob75",
+          "label": "prob>=75%",
           "trades": 38,
           "wins": 24,
           "losses": 14,
