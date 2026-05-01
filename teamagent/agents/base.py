@@ -102,9 +102,19 @@ class Agent(abc.ABC):
                 self.logger.exception(f"tick failed: {e}")
                 self.heartbeat("error", {"error": str(e)})
             self.heartbeat("ok")
-            for _ in range(self.interval_sec):
-                if stop["flag"]:
-                    break
-                time.sleep(1)
+            # ВАЖНО: heartbeat нужно обновлять КАЖДУЮ минуту во время сна,
+            # иначе watchdog убъёт агента с длинным interval_sec (>10 мин).
+            # Раньше героев типа analyzer_fundamental_macro (6 ч) или
+            # learner_weekly_loss_review (12 ч) убивало каждые 11 мин,
+            # и orchestrator перезапускал — пустая работа + потеря tick_count.
+            HEARTBEAT_REFRESH_SEC = 60
+            elapsed = 0
+            while elapsed < self.interval_sec and not stop["flag"]:
+                step = min(HEARTBEAT_REFRESH_SEC, self.interval_sec - elapsed)
+                time.sleep(step)
+                elapsed += step
+                # обновляем heartbeat раз в минуту, чтобы watchdog видел
+                # что мы живы (даже если до следующего tick ещё 6+ часов)
+                self.heartbeat("idle")
         self.heartbeat("stopped")
         self.logger.info(f"{self.name} exit")
