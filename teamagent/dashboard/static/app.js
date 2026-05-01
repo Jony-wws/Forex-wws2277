@@ -44,8 +44,15 @@ function freshnessBadge(asOfIso) {
   return el("span", { class: "fresh-badge " + cls, title: fmt.ago(asOfIso) }, label);
 }
 
+// Build fetch URL using location.origin (which never contains userinfo).
+// If the page was opened via an auto-login URL like
+// https://user:pass@host/, relative fetch() URLs inherit the credentials and
+// modern browsers throw: "Request cannot be constructed from a URL that
+// includes credentials". Using location.origin strips the credentials while
+// the browser still sends the cached HTTP Basic Authorization header.
 async function api(path) {
-  const r = await fetch(path, { cache: "no-store" });
+  const url = location.origin + path;
+  const r = await fetch(url, { cache: "no-store", credentials: "same-origin" });
   if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
   return await r.json();
 }
