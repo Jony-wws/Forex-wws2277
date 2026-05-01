@@ -282,6 +282,18 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     except Exception:
         pass
 
+    # 2026-05-01 user explicit request: STRICT mode — НЕ открывать сделки если
+    # нет qualified variant для этой (pair, session). Это значит «торгуем
+    # только в ячейках где система ДОКАЗАЛА ≥70% WR на 365d real Yahoo».
+    if getattr(config, "STRICT_QUALIFIED_GATE", False):
+        return False, {
+            "reason": (
+                f"STRICT gate: ни один (pair={pair}, session={sess_name}) "
+                f"variant не показал ≥70% WR на 365д Yahoo. Не открываю."
+            ),
+            "session": sess_name,
+        }
+
     return True, {
         "variant": None,
         "variant_label": "free-gate (no qualified variant — using baseline forecast)",
@@ -295,7 +307,35 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     }
 
 
-def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, strategy_cfg: dict) -> int:
+def _martingale_stake_for_pair(pair: str, closed_trades: list[dict]) -> tuple[float, int]:
+    """Возвращает (stake_usd, current_loss_streak) для пары.
+
+    Логика мартингейла (user request 2026-05-01):
+      - смотрим самые свежие сделки этой пары (после последней WIN)
+      - count подряд LOSS = streak (0..MAX_STREAK)
+      - stake = STAKE_USD * (MULT ** streak)
+      - cap на MARTINGALE_MAX_STREAK: после N подряд LOSS возвращаем
+        к базовой ставке независимо от исхода (защита от разгона)
+    """
+    if not getattr(config, "MARTINGALE_ENABLED", False):
+        return float(config.STAKE_USD), 0
+    streak = 0
+    for t in reversed(closed_trades):
+        if t.get("pair") != pair:
+            continue
+        if t.get("status") == "WIN":
+            break
+        if t.get("status") == "LOSS":
+            streak += 1
+            if streak >= config.MARTINGALE_MAX_STREAK:
+                streak = 0   # cap → reset
+                break
+    stake = float(config.STAKE_USD) * (float(config.MARTINGALE_MULT) ** streak)
+    return round(stake, 2), streak
+
+
+def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
+                     strategy_cfg: dict, closed_trades: list[dict] | None = None) -> int:
     """Открыть виртуальные сделки по прогнозам, проходящим все гейты:
       forecast.probability_pct >= 70
       Лучшая стратегия пары имеет WR ≥ 70% на 30д (strategy_search)
@@ -304,6 +344,7 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
     rankings = snapshot.get("rankings", [])
     forecasts = snapshot.get("forecasts", {})
     has_strategy_cfg = bool((strategy_cfg or {}).get("pairs"))   # для per_pair_cfg ниже
+    closed_trades = closed_trades or []
     opened = 0
     now_ts = _now()
     for r in rankings:
@@ -357,6 +398,10 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
 
         expiry_time = now_ts + timedelta(hours=recommended)
         per_pair_cfg = (strategy_cfg.get("pairs") or {}).get(pair, {}) if has_strategy_cfg else {}
+
+        # Martingale: ставка зависит от текущего LOSS-стрика на этой паре
+        stake_usd, mart_streak = _martingale_stake_for_pair(pair, closed_trades)
+
         trade = {
             "id": str(uuid.uuid4())[:12],
             "pair": pair,
@@ -365,7 +410,8 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
             "open_time": now_ts.isoformat(),
             "expiry_time": expiry_time.isoformat(),
             "expiry_hours": recommended,
-            "stake_usd": config.STAKE_USD,
+            "stake_usd": stake_usd,
+            "martingale_streak": mart_streak,
             "payout_pct": config.PAYOUT_PCT,
             "probability_pct_at_open": f["probability_pct"],
             "score_at_open": f["score"],
@@ -410,10 +456,13 @@ def _settle_expired(open_trades: list[dict], closed_trades: list[dict]) -> int:
             win = close_price > t["open_price"]
         else:
             win = close_price < t["open_price"]
-        pnl = (config.STAKE_USD * config.PAYOUT_PCT) if win else (-config.STAKE_USD)
+        # Use the trade's actual stake (may differ from default due to martingale)
+        stake = float(t.get("stake_usd") or config.STAKE_USD)
+        payout = float(t.get("payout_pct") or config.PAYOUT_PCT)
+        pnl = (stake * payout) if win else (-stake)
 
         t.update({
-            "status": "closed",
+            "status": "WIN" if win else "LOSS",
             "close_price": close_price,
             "close_time": _now().isoformat(),
             "result": "WIN" if win else "LOSS",
@@ -464,7 +513,18 @@ def cycle_once() -> dict:
     closed = _load(CLOSED_FILE, [])
 
     settled = _settle_expired(open_trades, closed)
-    opened = _open_new_trades(open_trades, snapshot, backtest, strategy_cfg)
+
+    # ─── HALT switch (added 2026-05-01 per user explicit request to stop
+    # opening trades until 365-day sweep finishes and locked baseline is
+    # active). When teamagent/state/TRADING_HALTED.flag exists, paper_trader
+    # still settles expired trades, but does NOT open new ones. Removing
+    # the file resumes trading immediately on next cycle.
+    halt_flag = config.STATE_DIR / "TRADING_HALTED.flag"
+    if halt_flag.exists():
+        log.info(f"paper_trader: TRADING_HALTED.flag present → НЕ открываю новые сделки (settled={settled})")
+        opened = 0
+    else:
+        opened = _open_new_trades(open_trades, snapshot, backtest, strategy_cfg, closed_trades=closed)
 
     # обогащаем для UI и сохраняем
     enriched = [_enrich_open_trade(t) for t in open_trades]

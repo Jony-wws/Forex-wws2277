@@ -45,10 +45,27 @@ SESSIONS: dict[str, tuple[int, int]] = {
 }
 
 # ───── параметры paper-trader ─────
-STAKE_USD = 50.0
-PAYOUT_PCT = 0.85          # WIN +$42.50, LOSS -$50
+# 2026-05-01: пользователь явно попросил мартингейл-стратегию с шагом
+# $1 → $2 → $4. STAKE_USD теперь = базовая ставка ($1). Реальный размер
+# открываемой сделки определяет mart_engine ниже (после loss-стрика).
+STAKE_USD = 1.0
+PAYOUT_PCT = 0.85          # WIN +$0.85 на $1, LOSS -$1
 MIN_PROBABILITY = 0.70     # открываем только если ≥70%
 MAX_PROBABILITY = 0.92     # кэп — никогда не показываем 100%
+
+# Мартингейл (2026-05-01 user request): после N подряд LOSS на ОДНОЙ паре
+# следующая ставка умножается на MARTINGALE_MULT^streak. Сбрасывается
+# после первой WIN. Cap = MARTINGALE_MAX_STREAK чтобы не разогнаться.
+MARTINGALE_ENABLED = True
+MARTINGALE_MULT = 2.0
+MARTINGALE_MAX_STREAK = 3       # 1$ → 2$ → 4$, дальше — резет к 1$ независимо от исхода
+
+# 2026-05-01 user request: STRICT-режим — открываем сделки ТОЛЬКО когда
+# (pair, current_session) попадает в список qualified cells (≥70% WR на
+# 365д бэктесте). Baseline-fallback ОТКЛЮЧЁН. Цель: выдержать ≥70% WR на
+# каждой реальной сделке. Если ни одной qualified ячейки в текущий момент
+# нет — paper_trader просто не откроет сделку (ждём следующего часа).
+STRICT_QUALIFIED_GATE = True
 DEFAULT_EXPIRY_HOURS = 2   # если recommended_hours не указан
 MIN_EXPIRY_HOURS = 1
 MAX_EXPIRY_HOURS = 4
