@@ -36,10 +36,16 @@ Multi-agent paper-trading system for **28 forex pairs**.
   Do NOT introduce a second meta-voting endpoint.
   `agents_for` / `agents_against` are integrated INSIDE each forecast row.
 - **Probability is capped**: 50% min, 92% max. NEVER show 100%.
-- **Real WR gate**: paper-trader opens a trade ONLY when both
-  `forecast.probability_pct ≥ 70` AND `backtest_30d[pair].win_rate_pct ≥ 70`
-  with `trades ≥ 5`. This was added because the user explicitly asked for
-  "real 70% WR, not theoretical".
+- **Free 70% gate (current, since 2026-05-01)**: paper-trader opens a trade as soon
+  as `forecast.probability_pct ≥ 70` — independent of session and independent of
+  per-(pair, session) backtest WR. The user explicitly requested this on 2026-05-01:
+  *"минимум 70% есть он должен открыться не важно сколько там есть … не нужно 70%
+  на каждом валюте на каждом сессии"*. The per-session strategy_search results are
+  STILL computed hourly and STILL used to enrich the chosen variant (side flip via
+  contrarian/fade-RSI rules + fixed_expiry_h) when a qualified variant exists, but
+  they no longer block the trade. The earlier strict gate (`backtest WR ≥ 70` AND
+  per-session WR ≥ 70 with ≥ 10 trades) is preserved in git history if you ever
+  need to revert.
 
 ## Quick start (after fresh clone)
 
@@ -106,9 +112,14 @@ Stop everything: `bash scripts/stop_all.sh`.
 6. **Watchdog `_scan()` MUST `continue`** on `heartbeat_watchdog.json` and
    `heartbeat_orchestrator.json` — never `pass` (that bug killed the whole
    orchestrator).
-7. **Real 70% WR gate**: paper_trader requires backtest WR ≥ 70% with ≥ 5
-   trades on the pair before opening. Don't bypass this without explicit user
-   request.
+7. **Free 70% gate (since 2026-05-01)**: paper_trader opens trades when
+   `forecast.probability_pct ≥ 70` — period. Per-session backtest WR is NOT a
+   blocker; it's used only to enrich the chosen variant (side flip / fixed expiry).
+   This is the user's explicit override of the earlier strict gate. Do NOT
+   reintroduce the strict gate without an equally explicit user request.
+8. **strategy_search runs hourly**: `LOOP_INTERVAL_SEC = 3600` (was 86400 / 24h).
+   Each hour the system re-evaluates 120 variants × 4 sessions × 90-day Yahoo
+   history per pair so the chosen variant adapts to the current regime.
 
 ## Optional API keys (env vars)
 
