@@ -97,6 +97,7 @@ Stop everything: `bash scripts/stop_all.sh`.
 | `paper_trader.py` | binary $50/85% trades, 1-4h expiry, settles on real Yahoo close. Gated by backtest WR. |
 | `backtester.py` | hourly 30-day walk-forward backtest per pair, writes `state/backtest_30d.json` |
 | `strategy_search.py` | (run on demand) tries 30+ scoring/expiry/session variants to find ≥70% WR config |
+| `strategy_meta_agent.py` | **NEW (2026-05-01)** — Master Strategy Agent. Каждые 5 часов делает sweep 28 × 4 × 120 на 5d Yahoo + ансамбль (COT/Fundamentals/Regime/Radar). Маркирует ячейки QUALIFIED/PROBABLE/FROZEN, пишет `state/meta_strategy.json`. forecast_scanner подмешивает её как +/-3 score-голос. |
 | `orchestrator.py` | spawns ALL child processes (scanner / paper / backtester / state_committer / 64 agents) |
 | `watchdog.py` | heartbeat-level health check, kills stale agents, MUST `continue` (not `pass`) on heartbeat_watchdog/orchestrator |
 | `state_committer.py` | every 15 min: `git add+commit+push` of state/*.json so trade history survives across sessions |
@@ -116,6 +117,8 @@ Stop everything: `bash scripts/stop_all.sh`.
 | `paper_stats.json` | total/wins/losses/WR/PnL | YES |
 | `backtest_30d.json` | hourly per-pair real-data backtest | YES |
 | `strategy_config.json` | selected config per pair+session (output of strategy_search) | YES |
+| `meta_strategy.json` | **NEW** — output of strategy_meta_agent: per-cell status / variant / WR / Wilson_lower / side_bias / ensemble sources (~140 KB after sweep) | YES |
+| `meta_strategy_log.jsonl` | **NEW** — последние 200 прогонов meta-agent (1 строка/sweep): qualified/probable/frozen counts, expected_wr, duration | YES |
 | `agents.json` | orchestrator's view of 60 processes | NO (volatile) |
 | `heartbeat_*.json` | per-agent pulse | NO (volatile) |
 | `recommended_restart.json` | watchdog's diagnostic dump | NO |
@@ -216,9 +219,9 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 ## Where to find the user's data
 
 - Live dashboard (current Devin session, dies when session ends):
-  `https://082b75f2888a-tunnel-v9e3vq29.devinapps.com/`
-  user / 887aa255f3ab82c2c39d73f3e1702037
-  (auto-login URL: `https://user:887aa255f3ab82c2c39d73f3e1702037@082b75f2888a-tunnel-v9e3vq29.devinapps.com/`)
+  `https://38434218f4a3-tunnel-nlihedc8.devinapps.com/`
+  user / 60014e7a88095ca1c2aa79fc27ae9f97
+  (auto-login URL: `https://user:60014e7a88095ca1c2aa79fc27ae9f97@38434218f4a3-tunnel-nlihedc8.devinapps.com/`)
   NOTE: this URL changes every Devin session. The current value is updated by
   the agent at the start of each "продолжай"/"continue" session and committed
   to this file so the user always has the latest.
@@ -257,6 +260,33 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 - **Do NOT lower the 70% gate to fake compliance** — the system is honest
   about which cells qualify and which don't. The user explicitly required
   "real 70% WR, not theoretical".
+
+**Master Strategy Agent (`strategy_meta_agent.py`, 2026-05-01):**
+Тактический мета-агент с 5-часовым циклом. Дополняет 5-дневный
+strategy_search (не заменяет!). Каждые 5 часов:
+1. Тянет последние 5 дней 1h Yahoo по 28 парам (~73 сек на полный sweep).
+2. Прогоняет ВСЕ 120 strategies.VARIANTS на свежем 5d окне × 4 сессии.
+3. Подмешивает ансамбль: COT contrarian (CFTC), fundamental tilt (FRED),
+   market_regime (365d), market_radar.
+4. Маркирует ячейку: QUALIFIED (WR ≥ 70% AND Wilson_lower ≥ 60% AND
+   trades ≥ 8) / PROBABLE (55–70%) / FROZEN.
+5. Пишет `state/meta_strategy.json` (полный отчёт ~140 KB) и
+   `state/meta_strategy_log.jsonl` (history последних 200 прогонов).
+6. forecast_scanner подмешивает QUALIFIED-ячейки как +/-3 score-голос
+   (PROBABLE — +/-2). Locked 365d-baseline остаётся эталоном.
+
+API на дашборде:
+- `GET /api/meta-strategy` — summary + cells (per-(pair, session))
+- `GET /api/meta-strategy/log?limit=N` — лог прогонов
+- `GET /api/meta-strategy/{pair}` — per-pair срез
+UI: hero-секция «MASTER STRATEGY AGENT» вверху (после прогноза стабильности),
+с tab-ами «Ячейки 28×4 / Live-лог / Источники ансамбля».
+
+Первый запущенный sweep (2026-05-01): 2/112 QUALIFIED, 29/112 PROBABLE,
+81/112 FROZEN, средняя WR=50.6%. Это short-window-result; результат на 5d
+окне ниже 365d sweep-а как и ожидалось — мета-агент это «свежий
+тактический слой», не «лучше». Цель — реактивный +score boost для тех
+ячеек, где недавняя 5d-история совпадает с 365d edge.
 
 **Operational:**
 - The first session (before commit discipline) lost 5000+ lines. Always commit.

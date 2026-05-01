@@ -31,8 +31,9 @@ Multi-agent paper-trading платформа для **28 валютных пар
 
 - 60 субпроцессов-агентов (28 specialist + 14 analyzer + 10 learner + 5 health
   + 3 LLM)
-- 7 ядерных процессов: `forecast_scanner` · `paper_trader` · `backtester` ·
-  `strategy_search` · `state_committer` · `orchestrator` · `watchdog`
+- 8 ядерных процессов: `forecast_scanner` · `paper_trader` · `backtester` ·
+  `strategy_search` · **`strategy_meta_agent`** (NEW 2026-05-01, 5h cycle) ·
+  `state_committer` · `orchestrator` · `watchdog`
 - FastAPI dashboard на `:8080`
 
 **Источники данных только реальные:**

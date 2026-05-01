@@ -848,7 +848,153 @@ function tick() {
   refreshMarketStatus();
   refreshStabilityForecast();
   refreshAudit();
+  refreshMetaStrategy();
 }
+
+// ───── MASTER STRATEGY AGENT (5h cycle) ─────
+function _metaStatusColor(s) {
+  if (s === "QUALIFIED") return "green";
+  if (s === "PROBABLE") return "yellow";
+  if (s === "FROZEN") return "orange";
+  return "muted";
+}
+
+function _formatTs(iso) {
+  if (!iso) return "—";
+  try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
+}
+
+async function refreshMetaStrategy() {
+  try {
+    const r = await fetch("/api/meta-strategy").then((x) => x.json());
+    const summary = r.summary || {};
+    const cells = r.cells || {};
+    const grid = document.getElementById("meta-summary-grid");
+    const badge = document.getElementById("meta-status-badge");
+    if (!grid) return;
+
+    if (!r.as_of) {
+      grid.innerHTML = `<div class="muted">
+        Первый прогон ещё не выполнен. Агент запускается в составе orchestrator-а
+        и сделает первый sweep сразу после старта (~5–10 мин на 28 пар × 4 сессии × 120 вариантов).
+      </div>`;
+      if (badge) { badge.textContent = "ждёт первый sweep"; badge.className = "badge-stable muted"; }
+      return;
+    }
+
+    const total = summary.total_cells || 0;
+    const qual = summary.qualified || 0;
+    const prob = summary.probable || 0;
+    const frozen = summary.frozen || 0;
+    const noData = summary.no_data_cells || 0;
+    const expected = summary.expected_overall_wr_pct;
+    const dur = summary.duration_sec;
+    const lookback = summary.lookback_days || 5;
+    const cycle = (summary.cycle_seconds || 18000) / 3600;
+
+    if (badge) {
+      badge.textContent = `${qual}/${total} ≥70%`;
+      badge.className = "badge-stable " + (qual > 0 ? "green" : "muted");
+    }
+
+    grid.innerHTML = `
+      <div class="meta-cell"><div class="big">${qual}</div><div class="muted small">QUALIFIED</div></div>
+      <div class="meta-cell"><div class="big yellow">${prob}</div><div class="muted small">PROBABLE</div></div>
+      <div class="meta-cell"><div class="big orange">${frozen}</div><div class="muted small">FROZEN</div></div>
+      <div class="meta-cell"><div class="big">${noData}</div><div class="muted small">no-data</div></div>
+      <div class="meta-cell"><div class="big">${expected != null ? expected + "%" : "—"}</div><div class="muted small">средняя WR</div></div>
+      <div class="meta-cell"><div class="big">${dur ? dur.toFixed(0) + "s" : "—"}</div><div class="muted small">длительность</div></div>
+      <div class="meta-cell"><div class="big">${lookback}d</div><div class="muted small">окно</div></div>
+      <div class="meta-cell"><div class="big">${cycle}ч</div><div class="muted small">цикл</div></div>
+      <div class="meta-cell" style="grid-column: 1 / -1;">
+        <div class="muted small">обновлено: ${_formatTs(r.as_of)}</div>
+      </div>
+    `;
+
+    // Cells table
+    const tbody = document.querySelector("#meta-cells-table tbody");
+    if (tbody) {
+      const cellArr = Object.values(cells);
+      // sort: QUALIFIED first by wilson_adjusted desc, then PROBABLE, then FROZEN
+      const order = { "QUALIFIED": 0, "PROBABLE": 1, "FROZEN": 2 };
+      cellArr.sort((a, b) => {
+        const oa = order[a.status] != null ? order[a.status] : 3;
+        const ob = order[b.status] != null ? order[b.status] : 3;
+        if (oa !== ob) return oa - ob;
+        return (b.wilson_adjusted_pct || 0) - (a.wilson_adjusted_pct || 0);
+      });
+      if (cellArr.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="muted">пока нет ячеек</td></tr>';
+      } else {
+        tbody.innerHTML = cellArr
+          .slice(0, 60)
+          .map((c) => {
+            const sources = (c.ensemble_sources || [])
+              .map((s) => s.name + (s.pts ? ` (${s.pts > 0 ? "+" : ""}${s.pts})` : ""))
+              .join(", ") || "—";
+            const colorCls = _metaStatusColor(c.status);
+            const biasStr = c.side_bias > 0 ? "BUY +" + c.side_bias
+              : c.side_bias < 0 ? "SELL " + c.side_bias
+              : "NEUT";
+            return `<tr>
+              <td><b>${c.pair}</b></td>
+              <td>${c.session}</td>
+              <td class="${colorCls}">${c.status}</td>
+              <td>${c.win_rate_pct != null ? c.win_rate_pct + "%" : "—"}</td>
+              <td>${c.wilson_lower_pct != null ? c.wilson_lower_pct + "%" : "—"}</td>
+              <td>${c.trades || 0}</td>
+              <td><span class="muted small">${c.variant || "—"}</span></td>
+              <td>${biasStr}</td>
+              <td><span class="muted small">${sources}</span></td>
+            </tr>`;
+          })
+          .join("");
+      }
+    }
+  } catch (e) {
+    console.error("meta-strategy:", e);
+  }
+
+  // log tab
+  try {
+    const lr = await fetch("/api/meta-strategy/log?limit=20").then((x) => x.json());
+    const el = document.getElementById("meta-log-content");
+    if (!el) return;
+    const entries = lr.entries || [];
+    if (entries.length === 0) {
+      el.innerHTML = `<div class="muted">пока нет завершённых прогонов — лог появится после первого sweep</div>`;
+      return;
+    }
+    el.innerHTML = entries
+      .slice()
+      .reverse()
+      .map((e) => `
+        <div class="meta-log-row">
+          <span class="muted small">${_formatTs(e.ts)}</span>
+          <span> · qual=${e.qualified || 0}</span>
+          <span> · prob=${e.probable || 0}</span>
+          <span> · frozen=${e.frozen || 0}</span>
+          <span> · WR=${e.expected_overall_wr_pct != null ? e.expected_overall_wr_pct + "%" : "—"}</span>
+          <span class="muted small"> · ${e.duration_sec ? e.duration_sec.toFixed(0) + "s" : "—"}</span>
+        </div>
+      `)
+      .join("");
+  } catch (e) {
+    console.error("meta-strategy log:", e);
+  }
+}
+
+// Tab switcher
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".meta-tab-btn");
+  if (!btn) return;
+  const tabId = btn.getAttribute("data-meta-tab");
+  document.querySelectorAll(".meta-tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  document.querySelectorAll(".meta-tab-content").forEach((c) => {
+    const wantHide = c.id !== "meta-tab-" + tabId;
+    c.classList.toggle("hidden", wantHide);
+  });
+});
 
 // ───── ОБЩАЯ ОЦЕНКА + ГАРАНТИИ СТАБИЛЬНОСТИ (50+ метрик) ─────
 function _verdictColor(score) {

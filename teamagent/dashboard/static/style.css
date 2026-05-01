@@ -1090,3 +1090,59 @@ button#manual-refresh:hover {
   .audit-card.audit-yellow,
   .audit-card.audit-red { box-shadow: none !important; }
 }
+
+/* ───── Master Strategy Agent panel ───── */
+.meta-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 900px) {
+  .meta-summary-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 600px) {
+  .meta-summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.meta-cell {
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border-2, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+.meta-cell .big {
+  font-size: 1.4em;
+  font-weight: 700;
+}
+.meta-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.meta-tab-btn {
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border-2, rgba(255,255,255,0.08));
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #e6edf3;
+  font-size: 0.9em;
+}
+.meta-tab-btn.active {
+  background: rgba(167, 139, 250, 0.16);
+  border-color: rgba(167, 139, 250, 0.4);
+}
+.meta-tab-btn:hover { background: rgba(167, 139, 250, 0.1); }
+.meta-tab-content.hidden { display: none; }
+.meta-log { max-height: 380px; overflow-y: auto; }
+.meta-log-row {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-2, rgba(255,255,255,0.06));
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+}
+#meta-cells-table { width: 100%; }
+#meta-cells-table th, #meta-cells-table td { padding: 6px 8px; }

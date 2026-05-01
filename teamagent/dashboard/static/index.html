@@ -98,6 +98,55 @@
     <div id="forecast-diag" class="forecast-diag muted small"></div>
   </section>
 
+  <!-- ═══ MASTER STRATEGY AGENT (5h cycle) ═══ -->
+  <section id="meta-strategy-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span id="meta-emoji" class="ms-emoji">🧠</span>
+      MASTER STRATEGY AGENT
+      <span class="live-pulse" title="каждые 5 часов делает sweep всех валют + сессий"></span>
+      <span id="meta-status-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      Тактический мета-агент. Каждые <b>5 часов</b> прогоняет 28 пар × 4 сессии × 120 вариантов
+      на свежем 5-дневном Yahoo-окне и подмешивает ансамбль (COT · Fundamentals · Regime · Radar).
+      Для каждой ячейки выбирает лучший variant и присваивает статус
+      <b>QUALIFIED</b> (WR ≥ 70% + Wilson_lower ≥ 60%) /
+      <b>PROBABLE</b> (55–70%) / <b>FROZEN</b> (нет edge).
+      <br>QUALIFIED-ячейки добавляют <b>+/-3 score</b>-голос в forecast_scanner-е,
+      PROBABLE — <b>+/-2</b>. Locked 365d-baseline остаётся эталоном — мета-агент его не перезаписывает.
+    </div>
+    <div class="meta-summary-grid" id="meta-summary-grid">
+      <div class="muted">Загружаю последний прогон…</div>
+    </div>
+    <div class="meta-tabs">
+      <button class="meta-tab-btn active" data-meta-tab="cells">Ячейки 28×4</button>
+      <button class="meta-tab-btn" data-meta-tab="log">Live-лог прогонов</button>
+      <button class="meta-tab-btn" data-meta-tab="ensemble">Источники ансамбля</button>
+    </div>
+    <div id="meta-tab-cells" class="meta-tab-content">
+      <div class="table-wrapper">
+        <table id="meta-cells-table">
+          <thead><tr>
+            <th>Пара</th><th>Сессия</th><th>Status</th><th>WR</th><th>Wilson↓</th>
+            <th>Trades</th><th>Variant</th><th>Bias</th><th>Sources</th>
+          </tr></thead>
+          <tbody><tr><td colspan="9" class="muted">Загружаю…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="meta-tab-log" class="meta-tab-content hidden">
+      <div class="meta-log" id="meta-log-content">
+        <div class="muted">Загружаю log прогонов…</div>
+      </div>
+    </div>
+    <div id="meta-tab-ensemble" class="meta-tab-content hidden">
+      <div id="meta-ensemble-content" class="muted small">
+        Здесь после первого прогона будут источники ансамбля для каждой пары
+        (COT contrarian, fundamental tilt, market_radar, market_regime).
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ ГЛАВНАЯ КАРТОЧКА: ОБЩАЯ ОЦЕНКА + ПРОГНОЗ + ГАРАНТИИ ═══ -->
   <section id="assessment-section" class="card glass premium-card hero-card">
     <h2 class="hero-title"><span class="dot dot-pulse"></span> ОБЩАЯ ОЦЕНКА СИСТЕМЫ <span class="live-pulse" title="данные в реальном времени"></span></h2>
