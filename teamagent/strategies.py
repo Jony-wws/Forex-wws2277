@@ -282,8 +282,138 @@ VARIANTS: list[Strategy] = [
              session_utc=(7, 22),
              fixed_expiry_h=2,
              min_probability=0.80),
+
+    # ─── ДОПОЛНИТЕЛЬНЫЕ варианты для более глубокого поиска ───
+    # Цель: чтобы strategy_search per-session (Asia / London / Overlap / NY)
+    # имел больше "кандидатов" найти ≥70% WR в КАЖДОЙ сессии для КАЖДОЙ пары.
+    # Эти варианты НЕ имеют session_utc — strategy_search per-session навешивает
+    # сессию извне. Любые варианты с session_utc применяются дополнительно.
+
+    # тонкая шкала score
+    Strategy("v31_score10", "|score|>=10", min_abs_score=10),
+    Strategy("v32_score14", "|score|>=14", min_abs_score=14),
+    Strategy("v33_score18", "|score|>=18", min_abs_score=18),
+    Strategy("v34_score20", "|score|>=20", min_abs_score=20),
+
+    # высокая уверенность в комбо
+    Strategy("v35_score10_prob78", "|score|>=10 + prob>=78%",
+             min_abs_score=10, min_probability=0.78),
+    Strategy("v36_score14_prob82", "|score|>=14 + prob>=82%",
+             min_abs_score=14, min_probability=0.82),
+    Strategy("v37_score18_prob85", "|score|>=18 + prob>=85%",
+             min_abs_score=18, min_probability=0.85),
+
+    # full MTF + разные пороги
+    Strategy("v38_full_mtf_score14", "full MTF + |score|>=14",
+             require_full_mtf_alignment=True, min_abs_score=14),
+    Strategy("v39_full_mtf_score18", "full MTF + |score|>=18",
+             require_full_mtf_alignment=True, min_abs_score=18),
+    Strategy("v40_full_mtf_prob80", "full MTF + prob>=80%",
+             require_full_mtf_alignment=True, min_probability=0.80),
+    Strategy("v41_full_mtf_prob85", "full MTF + prob>=85%",
+             require_full_mtf_alignment=True, min_probability=0.85),
+
+    # full MTF + emphasis комбо
+    Strategy("v42_full_mtf_trend",
+             "full MTF + structure x2 + |score|>=14",
+             require_full_mtf_alignment=True,
+             weight_block_a=2.0, weight_block_h=2.0,
+             min_abs_score=14),
+    Strategy("v43_full_mtf_momentum",
+             "full MTF + momentum x2 + |score|>=14",
+             require_full_mtf_alignment=True,
+             weight_block_d=2.0, weight_block_e=2.0,
+             min_abs_score=14),
+
+    # пары экспирация × score
+    Strategy("v44_exp1h_score14", "exp=1ч + |score|>=14",
+             fixed_expiry_h=1, min_abs_score=14),
+    Strategy("v45_exp2h_score14", "exp=2ч + |score|>=14",
+             fixed_expiry_h=2, min_abs_score=14),
+    Strategy("v46_exp3h_score14", "exp=3ч + |score|>=14",
+             fixed_expiry_h=3, min_abs_score=14),
+    Strategy("v47_exp4h_score14", "exp=4ч + |score|>=14",
+             fixed_expiry_h=4, min_abs_score=14),
+    Strategy("v48_exp4h_score18_prob80",
+             "exp=4ч + |score|>=18 + prob>=80%",
+             fixed_expiry_h=4, min_abs_score=18, min_probability=0.80),
+
+    # contrarian + высокая уверенность
+    Strategy("v49_contra_score14", "contrarian + |score|>=14",
+             contrarian=True, min_abs_score=14),
+    Strategy("v50_contra_score18_prob80",
+             "contrarian + |score|>=18 + prob>=80%",
+             contrarian=True, min_abs_score=18, min_probability=0.80),
+
+    # mean-reversion emphasis × score
+    Strategy("v51_meanrev_score12",
+             "mean-reversion (B,C x2) + |score|>=12",
+             weight_block_b=2.0, weight_block_c=2.0, min_abs_score=12),
+    Strategy("v52_meanrev_score16",
+             "mean-reversion (B,C x2) + |score|>=16",
+             weight_block_b=2.0, weight_block_c=2.0, min_abs_score=16),
+
+    # only-structure × score
+    Strategy("v53_only_struct_score10",
+             "only structure (A,H x3) + |score|>=10",
+             weight_block_a=3.0, weight_block_h=3.0,
+             weight_block_b=0.0, weight_block_c=0.0, weight_block_d=0.0,
+             weight_block_e=0.0, weight_block_f=0.0, weight_block_g=0.0,
+             min_abs_score=10),
+    Strategy("v54_only_struct_score14",
+             "only structure (A,H x3) + |score|>=14",
+             weight_block_a=3.0, weight_block_h=3.0,
+             weight_block_b=0.0, weight_block_c=0.0, weight_block_d=0.0,
+             weight_block_e=0.0, weight_block_f=0.0, weight_block_g=0.0,
+             min_abs_score=14),
+
+    # max conviction
+    Strategy("v55_max_strict",
+             "MAX: full MTF + |score|>=20 + prob>=85%",
+             require_full_mtf_alignment=True,
+             min_abs_score=20, min_probability=0.85),
+    Strategy("v56_extreme",
+             "EXTREME: full MTF + |score|>=24 + prob>=88%",
+             require_full_mtf_alignment=True,
+             min_abs_score=24, min_probability=0.88),
+
+    # fade RSI extremes комбо
+    Strategy("v57_fade_score14", "fade RSI + |score|>=14",
+             fade_extreme_rsi=True, min_abs_score=14),
+    Strategy("v58_fade_full_mtf",
+             "fade RSI + full MTF + |score|>=12",
+             fade_extreme_rsi=True, require_full_mtf_alignment=True,
+             min_abs_score=12),
+
+    # volume + score (требует наличие volume в данных Yahoo, может быть no-op)
+    Strategy("v59_vol_score14", "strong vol + |score|>=14",
+             require_strong_volume=True, min_abs_score=14),
+    Strategy("v60_vol_full_mtf",
+             "strong vol + full MTF + |score|>=12",
+             require_strong_volume=True, require_full_mtf_alignment=True,
+             min_abs_score=12),
 ]
 
 
 def variants_by_id() -> dict[str, Strategy]:
     return {s.id: s for s in VARIANTS}
+
+
+# ─── Канонические торговые сессии (UTC) для per-session strategy_search ───
+# Не пересекаются: каждый час UTC попадает ровно в одну сессию (или Off).
+# strategy_search прогоняет ВСЕ VARIANTS отдельно по каждой сессии и выбирает
+# лучшую стратегию для каждой пары × каждой сессии.
+SESSION_WINDOWS: dict[str, tuple[int, int]] = {
+    "Asia":    (0,  7),   # 00:00–06:59 UTC (Tokyo / Sydney активность)
+    "London":  (7,  13),  # 07:00–12:59 UTC (London open до открытия NY)
+    "Overlap": (13, 17),  # 13:00–16:59 UTC (London/NY overlap, самая высокая ликвидность)
+    "NY":      (17, 22),  # 17:00–21:59 UTC (NY после закрытия Лондона)
+}
+
+
+def detect_session(hour_utc: int) -> str | None:
+    """Какая сессия соответствует данному часу UTC. None если час 22:00–23:59."""
+    for name, (s, e) in SESSION_WINDOWS.items():
+        if s <= hour_utc < e:
+            return name
+    return None  # off-hours (22-23 UTC) — не торгуем

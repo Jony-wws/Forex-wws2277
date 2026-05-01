@@ -156,31 +156,66 @@ def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
 def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
                          baseline_side: str, rsi_1h: float | None,
                          strategy_cfg: dict) -> tuple[bool, dict]:
-    """Основной гейт: проверяет что для пары есть лучшая стратегия с ≥7О% WR
-    НА 30Д бэктесте И текущий сигнал соответствует фильтрам той стратегии.
+    """Основной гейт: проверяет что для пары есть лучшая стратегия с ≥70% WR
+    в ТЕКУЩЕЙ сессии (Asia/London/Overlap/NY) на 30д бэктесте, И текущий сигнал
+    соответствует фильтрам той стратегии.
+
+    Логика выбора стратегии:
+    1. Определяем текущую сессию по `ts.hour` (`strategies.detect_session`).
+    2. Если `strategy_cfg.pairs[pair].by_session[session].qualifies_70pct=True` —
+       берём её best_variant.
+    3. Иначе — фолбэк на общий best_variant (`strategy_cfg.pairs[pair]`),
+       но ТОЛЬКО если он сам qualifies_70pct.
+    4. Иначе — пропускаем (пара/сессия заморожена).
 
     Возвращает в info также recommended `side` (с учётом contrarian/fade_extreme_rsi),
-    которую paper_trader должен использовать вместо baseline-side из forecast_scanner.
+    `session`, `variant`, `win_rate_pct`.
     """
     pairs = (strategy_cfg or {}).get("pairs") or {}
     p = pairs.get(pair)
     if not p:
         return False, {"reason": "strategy_search ещё не запускался для этой пары"}
-    if not p.get("qualifies_70pct"):
+
+    # шаг 1 — текущая сессия
+    sess_name = strategies.detect_session(ts.hour)
+    if sess_name is None:
         return False, {
-            "reason": f"лучшая стратегия даёт всего {p.get('win_rate_pct')}% WR",
+            "reason": f"вне канонических сессий (час {ts.hour} UTC = 22-23 off-hours)",
             "win_rate_pct": p.get("win_rate_pct"),
-            "trades": p.get("trades"),
-            "variant": p.get("best_variant"),
         }
-    trades = p.get("trades") or 0
-    if trades < MIN_TRADES:
-        return False, {"reason": f"trades<{MIN_TRADES}", "trades": trades}
+
+    # шаг 2 — per-session best
+    by_session = p.get("by_session") or {}
+    session_cfg = by_session.get(sess_name) or {}
+    chosen_source = "by_session"
+    chosen = None
+    if session_cfg.get("qualifies_70pct") and (session_cfg.get("trades") or 0) >= MIN_TRADES:
+        chosen = session_cfg
+    elif p.get("qualifies_70pct") and (p.get("trades") or 0) >= MIN_TRADES:
+        # шаг 3 — фолбэк на общий best_variant (без session фильтра)
+        chosen = p
+        chosen_source = "global_best"
+    else:
+        # шаг 4 — заморожено
+        return False, {
+            "reason": (
+                f"в сессии {sess_name} лучшая стратегия даёт "
+                f"{session_cfg.get('win_rate_pct')}% WR (trades={session_cfg.get('trades')}); "
+                f"общий best — {p.get('win_rate_pct')}% (trades={p.get('trades')})"
+            ),
+            "session": sess_name,
+            "win_rate_pct_session": session_cfg.get("win_rate_pct"),
+            "trades_session": session_cfg.get("trades"),
+            "win_rate_pct_global": p.get("win_rate_pct"),
+            "trades_global": p.get("trades"),
+            "variant_session": session_cfg.get("best_variant"),
+            "variant_global": p.get("best_variant"),
+        }
 
     variants = strategies.variants_by_id()
-    variant = variants.get(p.get("best_variant"))
+    variant = variants.get(chosen.get("best_variant"))
     if variant is None:
-        return False, {"reason": f"unknown variant id {p.get('best_variant')}"}
+        return False, {"reason": f"unknown variant id {chosen.get('best_variant')}"}
 
     # Эффективный score (с учётом contrarian / fade_extreme_rsi)
     effective_score = score
@@ -189,7 +224,9 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     if variant.contrarian:
         effective_score = -effective_score
 
-    # 1) session_utc
+    # 1) variant.session_utc — если у варианта есть СВОЙ session filter,
+    #    он применяется поверх (на практике редко конфликтует с per-session search,
+    #    поскольку per-session search фильтрует часы извне).
     if variant.session_utc is not None:
         h = ts.hour
         s, e = variant.session_utc
@@ -199,21 +236,24 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
             in_window = h >= s or h < e
         if not in_window:
             return False, {
-                "reason": f"current hour {h} UTC не попадает в сессию варианта {variant.session_utc}",
+                "reason": f"current hour {h} UTC не попадает в session_utc варианта {variant.session_utc}",
                 "variant": variant.id,
-                "win_rate_pct": p.get("win_rate_pct"),
+                "win_rate_pct": chosen.get("win_rate_pct"),
+                "session": sess_name,
             }
     # 2) min_abs_score (на effective_score)
     if abs(effective_score) < variant.min_abs_score:
         return False, {
             "reason": f"|effective_score|={abs(effective_score)} < {variant.min_abs_score}",
-            "variant": variant.id, "win_rate_pct": p.get("win_rate_pct"),
+            "variant": variant.id, "win_rate_pct": chosen.get("win_rate_pct"),
+            "session": sess_name,
         }
     # 3) min_probability (probability — функция от |score|, симметрична)
     if prob_pct / 100.0 < variant.min_probability:
         return False, {
             "reason": f"prob={prob_pct}% < {variant.min_probability * 100}%",
-            "variant": variant.id, "win_rate_pct": p.get("win_rate_pct"),
+            "variant": variant.id, "win_rate_pct": chosen.get("win_rate_pct"),
+            "session": sess_name,
         }
 
     # сторона: variant определяет направление (с учётом флипа)
@@ -221,10 +261,12 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     return True, {
         "variant": variant.id,
         "variant_label": variant.label,
-        "win_rate_pct": p.get("win_rate_pct"),
-        "trades": trades,
+        "win_rate_pct": chosen.get("win_rate_pct"),
+        "trades": chosen.get("trades"),
         "side": side,
         "effective_score": effective_score,
+        "session": sess_name,
+        "chosen_source": chosen_source,  # "by_session" или "global_best"
     }
 
 
@@ -274,11 +316,18 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
         # стратегия может развернуть сторону (contrarian / fade_extreme_rsi)
         trade_side = (why or {}).get("side") or f.get("side")
 
-        # expiry: из best_variant если зафиксирована, иначе из forecast.recommended_hours
+        # выбранный вариант может прийти из by_session или global; берём из `why`
+        chosen_variant_id = (why or {}).get("variant")
+        chosen_session = (why or {}).get("session")
+        chosen_source = (why or {}).get("chosen_source")
+        chosen_wr = (why or {}).get("win_rate_pct")
+        chosen_trades = (why or {}).get("trades")
+
+        # expiry: из выбранного variant если зафиксирована, иначе из forecast.recommended_hours
         recommended = f.get("recommended_hours", config.DEFAULT_EXPIRY_HOURS)
-        if has_strategy_cfg:
+        if chosen_variant_id:
             variants = strategies.variants_by_id()
-            v = variants.get((strategy_cfg.get("pairs") or {}).get(pair, {}).get("best_variant"))
+            v = variants.get(chosen_variant_id)
             if v is not None and v.fixed_expiry_h is not None:
                 recommended = v.fixed_expiry_h
 
@@ -296,11 +345,13 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
             "payout_pct": config.PAYOUT_PCT,
             "probability_pct_at_open": f["probability_pct"],
             "score_at_open": f["score"],
-            "session_at_open": f.get("session"),
+            "session_at_open": chosen_session or f.get("session"),
             "agents_for_count": f.get("agents_for_count", 0),
             "agents_against_count": f.get("agents_against_count", 0),
-            "strategy_variant_at_open": per_pair_cfg.get("best_variant"),
-            "strategy_wr_pct_at_open": per_pair_cfg.get("win_rate_pct"),
+            "strategy_variant_at_open": chosen_variant_id or per_pair_cfg.get("best_variant"),
+            "strategy_wr_pct_at_open": chosen_wr if chosen_wr is not None else per_pair_cfg.get("win_rate_pct"),
+            "strategy_trades_at_open": chosen_trades,
+            "strategy_source_at_open": chosen_source,  # "by_session" или "global_best"
             "backtest_30d_wr_pct_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("win_rate_pct"),
             "backtest_30d_trades_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("trades"),
             "status": "open",
@@ -308,8 +359,8 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
         open_trades.append(trade)
         opened += 1
         log.info(f"OPEN {pair} {trade_side} @ {cp} prob={f['probability_pct']}% "
-                 f"expiry={recommended}h variant={per_pair_cfg.get('best_variant')} "
-                 f"WR30d={per_pair_cfg.get('win_rate_pct')}%")
+                 f"expiry={recommended}h variant={chosen_variant_id} "
+                 f"session={chosen_session} src={chosen_source} WR30d={chosen_wr}%")
     return opened
 
 

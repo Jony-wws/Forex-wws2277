@@ -364,6 +364,67 @@ function tick() {
 
 function tickForecasts() {
   refreshForecasts();
+  refreshStrategyMatrix();
+}
+
+// ───── per-session strategy matrix (Asia / London / Overlap / NY × 28 пар) ─────
+async function refreshStrategyMatrix() {
+  try {
+    const sc = await api("/api/strategy-config").catch(() => ({ pairs: {} }));
+    const tb = document.querySelector("#strategy-matrix-table tbody");
+    if (!tb) return;
+    tb.innerHTML = "";
+    const sessNames = ["Asia", "London", "Overlap", "NY"];
+    const pairs = sc.pairs || {};
+    const summary = sc.summary || {};
+    const sumNode = $("strategy-matrix-summary");
+    if (sumNode) {
+      sumNode.innerHTML = "";
+      const bs = summary.by_session || {};
+      const parts = sessNames.map(s => {
+        const d = bs[s] || {};
+        const q = d.qualified_count != null ? d.qualified_count : "?";
+        const tp = d.total_pairs_with_data != null ? d.total_pairs_with_data : "?";
+        return `${s}: ${q}/${tp}`;
+      });
+      sumNode.appendChild(el("div", {},
+        `Пар достигают ≥70% WR per-session: ${parts.join(" · ")} · оценка ~${summary.est_trades_per_day_via_session_gate || 0} сделок/день через session-gate · ${sc.as_of ? "обновлено " + fmt.ago(sc.as_of) : "ещё не запускался"}`,
+      ));
+    }
+    const pairKeys = Object.keys(pairs).sort();
+    if (pairKeys.length === 0) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 6, class: "muted" },
+        "strategy_search ещё не закончил первый прогон (~10 минут после старта)")));
+      return;
+    }
+    for (const pair of pairKeys) {
+      const p = pairs[pair];
+      const by = p.by_session || {};
+      const cells = sessNames.map(s => {
+        const d = by[s] || {};
+        const wr = d.win_rate_pct;
+        const tr = d.trades || 0;
+        const variant = d.best_variant;
+        if (wr == null) {
+          return el("td", { class: "muted small", title: d.note || "no data" }, "—");
+        }
+        const cls = d.qualifies_70pct ? "win" : "loss";
+        const label = d.best_label || "";
+        const title = `${variant || "?"}: ${label}\n${tr} сделок · WR ${wr}%`;
+        return el("td", { class: cls, title }, `${wr.toFixed(0)}% (${tr})`);
+      });
+      const qualCount = sessNames.filter(s => (by[s] || {}).qualifies_70pct).length;
+      const qualCell = el("td",
+        { class: qualCount === 4 ? "win" : qualCount > 0 ? "" : "muted" },
+        `${qualCount}/4`);
+      const tr = el("tr", {},
+        el("td", {}, pair),
+        ...cells,
+        qualCell,
+      );
+      tb.appendChild(tr);
+    }
+  } catch (e) { console.error("refreshStrategyMatrix:", e); }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

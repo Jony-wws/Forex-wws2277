@@ -88,6 +88,30 @@
     <div id="forecast-detail" class="hidden card-inset"></div>
   </section>
 
+  <section id="strategy-matrix-section" class="card">
+    <h2>📅 WR по сессиям (28 пар × 4 сессии)</h2>
+    <div class="muted small">
+      Per-session strategy_search: лучший вариант стратегии и его 30-дневный WR
+      ОТДЕЛЬНО для каждой сессии. <span class="win">Зелёный ≥70%</span> — paper-trader откроет сделку в эту сессию по этой паре. <span class="loss">Красный &lt;70%</span> — заморожено. «—» — нет валидной выборки. Сессии UTC: Asia 0–7, London 7–13, Overlap 13–17, NY 17–22.
+    </div>
+    <div id="strategy-matrix-summary" class="muted small" style="margin-top:6px;"></div>
+    <div class="table-wrap">
+      <table id="strategy-matrix-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Asia</th>
+            <th>London</th>
+            <th>Overlap</th>
+            <th>NY</th>
+            <th>Σ qual</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="vp-section" class="card">
     <h2>📊 Стакан (Volume Profile) с прогнозом до 00:00 UTC+5</h2>
     <div class="vp-controls">

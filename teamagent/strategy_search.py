@@ -42,13 +42,23 @@ logging.basicConfig(
 OUTPUT_FILE = config.STATE_DIR / "strategy_config.json"
 STAKE_USD = 50.0
 PAYOUT_PCT = 0.85
-MIN_TRADES_FOR_VALID = 5
-LOOKBACK_DAYS = 30
+# Минимум сделок для того чтобы вариант считался "валидным" (статистически значимым).
+# 5 сделок дают шум (4 win из 5 = 80%, но лотерея). 10+ — более стабильная оценка.
+# В сегментации per-session это особенно важно: при 4 сессиях у каждой сессии
+# в среднем 1/4 сделок от общего числа.
+MIN_TRADES_FOR_VALID = 10
+# История для бэктеста. Yahoo 1H держит ~730 дней. 60 дней — компромисс между
+# repeatability (тренды могут меняться) и статистической стабильностью.
+LOOKBACK_DAYS = 60
 
 
 def _precompute(pair: str) -> dict | None:
-    """Вычислить (ts, close, ind_4h, ind_1h, ind_15m) для каждого валидного idx."""
-    bars = yahoo.fetch(pair, interval="1h", period="3mo")
+    """Вычислить (ts, close, ind_4h, ind_1h, ind_15m) для каждого валидного idx.
+
+    Yahoo 1H interval поддерживает period до 2y. Используем 6mo чтобы иметь
+    запас данных для индикаторов И LOOKBACK_DAYS=60 окна.
+    """
+    bars = yahoo.fetch(pair, interval="1h", period="6mo")
     if bars is None or bars.empty or len(bars) < 200:
         return None
     cutoff = bars.index[-1] - timedelta(days=LOOKBACK_DAYS)
@@ -83,8 +93,17 @@ def _precompute(pair: str) -> dict | None:
     return {"snapshots": snapshots}
 
 
-def _walk_with_precomputed(snapshots: list, strategy: strategies.Strategy) -> tuple[int, int, int, float]:
-    """Прогоняет стратегию по уже посчитанным снимкам."""
+def _walk_with_precomputed(
+    snapshots: list,
+    strategy: strategies.Strategy,
+    session_window: tuple[int, int] | None = None,
+) -> tuple[int, int, int, float]:
+    """Прогоняет стратегию по уже посчитанным снимкам.
+
+    session_window=(start_h, end_h) — если задан, открываем НОВЫЕ сделки
+    только когда ts.hour ∈ [start, end). Закрытие истёкших сделок происходит
+    в любой час (даже вне сессии — это просто settle на реальной цене Yahoo).
+    """
     open_trades: list[dict] = []
     wins = 0
     losses = 0
@@ -114,6 +133,13 @@ def _walk_with_precomputed(snapshots: list, strategy: strategies.Strategy) -> tu
         if ind_4h is None:
             continue
 
+        # session filter (per-session strategy_search)
+        if session_window is not None:
+            s, e = session_window
+            h = ts.hour
+            if not (s <= h < e):
+                continue
+
         out = strategies.evaluate(strategy, ts, ind_4h, ind_1h, ind_15m)
         if out is None:
             continue
@@ -129,23 +155,17 @@ def _walk_with_precomputed(snapshots: list, strategy: strategies.Strategy) -> tu
     return total, wins, losses, pnl
 
 
-def search_pair(pair: str, top: int = 5) -> dict:
-    pre = _precompute(pair)
-    if pre is None:
-        return {
-            "pair": pair,
-            "best_variant": None,
-            "best_label": None,
-            "win_rate_pct": None,
-            "trades": 0, "wins": 0, "losses": 0,
-            "qualifies_70pct": False,
-            "all_variants": [],
-            "note": "insufficient history",
-        }
+def _eval_all_variants(snapshots: list, session_window: tuple[int, int] | None = None,
+                        top: int = 5) -> tuple[dict | None, list[dict]]:
+    """Прогоняет ВСЕ VARIANTS по snapshots (опционально с session filter).
 
+    Возвращает (best_qualified_or_top, all_rows_sorted) где
+    best — лучший вариант с trades≥MIN_TRADES_FOR_VALID и WR≥70 если есть,
+           иначе вариант с лучшим WR (как best-effort), иначе None.
+    """
     rows = []
     for v in strategies.VARIANTS:
-        trades, wins, losses, pnl = _walk_with_precomputed(pre["snapshots"], v)
+        trades, wins, losses, pnl = _walk_with_precomputed(snapshots, v, session_window=session_window)
         wr = (wins / trades * 100.0) if trades > 0 else None
         rows.append({
             "variant": v.id,
@@ -158,9 +178,21 @@ def search_pair(pair: str, top: int = 5) -> dict:
         })
 
     valid = [r for r in rows if r["trades"] >= MIN_TRADES_FOR_VALID and r["win_rate_pct"] is not None]
-    valid.sort(key=lambda r: (-(r["win_rate_pct"] or 0), -r["trades"]))
+    # сортировка: ПЕРВЫЙ приоритет — WR ≥ 70, потом trades, потом WR
+    valid.sort(key=lambda r: (
+        0 if (r["win_rate_pct"] or 0) >= 70.0 else 1,   # qualifies first
+        -(r["win_rate_pct"] or 0),                       # then highest WR
+        -r["trades"],                                    # then most trades
+    ))
 
     if not valid:
+        return None, rows
+    return valid[0], valid[:top]
+
+
+def search_pair(pair: str, top: int = 5) -> dict:
+    pre = _precompute(pair)
+    if pre is None:
         return {
             "pair": pair,
             "best_variant": None,
@@ -168,11 +200,61 @@ def search_pair(pair: str, top: int = 5) -> dict:
             "win_rate_pct": None,
             "trades": 0, "wins": 0, "losses": 0,
             "qualifies_70pct": False,
-            "all_variants": rows,
+            "all_variants": [],
+            "by_session": {},
+            "note": "insufficient history",
+        }
+
+    snapshots = pre["snapshots"]
+
+    # 1) Лучшая стратегия по ВСЕЙ истории (как было раньше — для совместимости и фолбэка)
+    best, valid_top = _eval_all_variants(snapshots, session_window=None, top=top)
+
+    # 2) Лучшая стратегия для КАЖДОЙ из 4 канонических сессий
+    by_session: dict[str, dict] = {}
+    for sess_name, sess_window in strategies.SESSION_WINDOWS.items():
+        sb, sb_top = _eval_all_variants(snapshots, session_window=sess_window, top=top)
+        if sb is None:
+            by_session[sess_name] = {
+                "session": sess_name,
+                "window_utc": list(sess_window),
+                "best_variant": None,
+                "best_label": None,
+                "win_rate_pct": None,
+                "trades": 0, "wins": 0, "losses": 0,
+                "qualifies_70pct": False,
+                "top_variants": [],
+                "note": "no variant produced ≥5 trades in this session",
+            }
+        else:
+            by_session[sess_name] = {
+                "session": sess_name,
+                "window_utc": list(sess_window),
+                "best_variant": sb["variant"],
+                "best_label": sb["label"],
+                "win_rate_pct": sb["win_rate_pct"],
+                "trades": sb["trades"],
+                "wins": sb["wins"],
+                "losses": sb["losses"],
+                "pnl_usd": sb["pnl_usd"],
+                "qualifies_70pct": (sb["win_rate_pct"] or 0) >= 70.0,
+                "top_variants": sb_top,
+            }
+
+    if best is None:
+        return {
+            "pair": pair,
+            "best_variant": None,
+            "best_label": None,
+            "win_rate_pct": None,
+            "trades": 0, "wins": 0, "losses": 0,
+            "qualifies_70pct": False,
+            "all_variants": valid_top,
+            "by_session": by_session,
             "note": "no variant produced ≥5 trades",
         }
 
-    best = valid[0]
+    sessions_qualified = [s for s, d in by_session.items() if d.get("qualifies_70pct")]
     return {
         "pair": pair,
         "best_variant": best["variant"],
@@ -182,8 +264,11 @@ def search_pair(pair: str, top: int = 5) -> dict:
         "wins": best["wins"],
         "losses": best["losses"],
         "pnl_usd": best["pnl_usd"],
-        "qualifies_70pct": best["win_rate_pct"] >= 70.0,
-        "all_variants": valid[:top],
+        "qualifies_70pct": (best["win_rate_pct"] or 0) >= 70.0,
+        "all_variants": valid_top,
+        "by_session": by_session,
+        "sessions_qualified_70pct": sessions_qualified,
+        "sessions_qualified_count": len(sessions_qualified),
     }
 
 
@@ -198,21 +283,28 @@ def search_all(top: int = 5) -> dict:
             r = {
                 "pair": pair, "best_variant": None, "best_label": None,
                 "win_rate_pct": None, "trades": 0, "wins": 0, "losses": 0,
-                "qualifies_70pct": False, "all_variants": [], "note": f"error: {e}",
+                "qualifies_70pct": False, "all_variants": [],
+                "by_session": {}, "note": f"error: {e}",
             }
         results[pair] = r
         if r.get("best_variant"):
-            log.info(f"  → best={r['best_variant']} WR={r['win_rate_pct']}% "
-                     f"trades={r['trades']} qual70={r['qualifies_70pct']}")
+            sess_q = r.get("sessions_qualified_70pct", [])
+            log.info(
+                f"  → best={r['best_variant']} WR={r['win_rate_pct']}% "
+                f"trades={r['trades']} qual70={r['qualifies_70pct']} "
+                f"sessions_qual({len(sess_q)}/4)={sess_q}"
+            )
         else:
             log.info(f"  → no valid variant ({r.get('note', '')})")
 
     qualified = [p for p, r in results.items() if r.get("qualifies_70pct")]
     summary = {
         "runs": len(config.PAIRS) * len(strategies.VARIANTS),
+        "runs_per_session": len(config.PAIRS) * len(strategies.VARIANTS) * len(strategies.SESSION_WINDOWS),
         "qualified_pairs_70pct": qualified,
         "qualified_count": len(qualified),
         "total_pairs": len(config.PAIRS),
+        "session_windows_utc": {k: list(v) for k, v in strategies.SESSION_WINDOWS.items()},
     }
 
     by_variant: dict[str, list[float]] = {}
@@ -239,6 +331,45 @@ def search_all(top: int = 5) -> dict:
             })
     global_means.sort(key=lambda x: -x["aggregated_wr_pct"])
     summary["best_global_top10"] = global_means[:10]
+
+    # ─── per-session summary ───
+    session_summary: dict[str, dict] = {}
+    for sess_name in strategies.SESSION_WINDOWS:
+        qual_pairs = []
+        total_pairs_with_data = 0
+        wr_values: list[float] = []
+        trades_total = 0
+        wins_total = 0
+        for pair, r in results.items():
+            sd = (r.get("by_session") or {}).get(sess_name) or {}
+            wr = sd.get("win_rate_pct")
+            if wr is None:
+                continue
+            total_pairs_with_data += 1
+            wr_values.append(wr)
+            trades_total += sd.get("trades") or 0
+            wins_total += sd.get("wins") or 0
+            if sd.get("qualifies_70pct"):
+                qual_pairs.append(pair)
+        agg_wr = (wins_total / trades_total * 100.0) if trades_total else None
+        session_summary[sess_name] = {
+            "session": sess_name,
+            "window_utc": list(strategies.SESSION_WINDOWS[sess_name]),
+            "qualified_pairs_70pct": qual_pairs,
+            "qualified_count": len(qual_pairs),
+            "total_pairs_with_data": total_pairs_with_data,
+            "mean_wr_pct": round(sum(wr_values) / len(wr_values), 1) if wr_values else None,
+            "aggregated_wr_pct": round(agg_wr, 1) if agg_wr is not None else None,
+            "trades_total": trades_total,
+            "wins_total": wins_total,
+        }
+    summary["by_session"] = session_summary
+
+    # сколько в среднем сделок проходит per-session гейт за день (грубая оценка)
+    avg_trades_per_day_session = sum(
+        (s["trades_total"] / 30.0) for s in session_summary.values() if s["trades_total"]
+    )
+    summary["est_trades_per_day_via_session_gate"] = round(avg_trades_per_day_session, 1)
 
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
