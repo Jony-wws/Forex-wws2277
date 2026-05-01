@@ -251,6 +251,9 @@ def scan_all_pairs() -> dict:
             "probability_pct": f["probability_pct"],
             "score": f["score"],
             "recommended_hours": f["recommended_hours"],
+            # vote breakdown в выжимке тоже — иначе на дашборде пары показывают 0/0
+            "agents_for_count": f.get("agents_for_count", 0),
+            "agents_against_count": f.get("agents_against_count", 0),
         })
     snapshot["rankings"].sort(key=lambda x: x["probability_pct"], reverse=True)
     FORECASTS_FILE.write_text(json.dumps(snapshot, indent=2))
