@@ -542,6 +542,255 @@ function tick() {
   refreshDailyPaused();
   refreshDailyClosed();
   refreshMarketRadar();
+  refreshStability();
+}
+
+// ───── ОБЩАЯ ОЦЕНКА + ГАРАНТИИ СТАБИЛЬНОСТИ (50+ метрик) ─────
+function _verdictColor(score) {
+  if (score >= 80) return "green";
+  if (score >= 65) return "green";
+  if (score >= 50) return "yellow";
+  if (score >= 35) return "orange";
+  return "red";
+}
+
+function _stabCell(label, value, hint, color, bar) {
+  const div = el("div", { class: "stab-cell" + (color ? " " + color : "") });
+  div.appendChild(el("div", { class: "label" }, label));
+  div.appendChild(el("div", { class: "value" + (color ? " " + color : "") }, value));
+  if (hint) div.appendChild(el("div", { class: "hint" }, hint));
+  if (typeof bar === "number") {
+    const t = el("div", { class: "stab-bar" });
+    const f = el("div", { class: "fill" });
+    f.style.width = Math.max(0, Math.min(100, bar)) + "%";
+    t.appendChild(f);
+    div.appendChild(t);
+  }
+  // mouse-tracked glow
+  div.addEventListener("mousemove", (e) => {
+    const rect = div.getBoundingClientRect();
+    div.style.setProperty("--mx", ((e.clientX - rect.left) / rect.width * 100) + "%");
+    div.style.setProperty("--my", ((e.clientY - rect.top) / rect.height * 100) + "%");
+  });
+  return div;
+}
+
+async function refreshStability() {
+  try {
+    const data = await api("/api/stability");
+    if (!data || data.error) return;
+    renderAssessment(data.assessment, data.report);
+    renderStabilityGrid(data.report, data.min_guarantee);
+  } catch (e) { console.error("stability:", e); }
+}
+
+function renderAssessment(a, r) {
+  const wrap = $("assessment-content");
+  if (!wrap || !a) return;
+  wrap.innerHTML = "";
+  const cls = a.color || _verdictColor(a.score_0_100 || 0);
+
+  const head = el("div", { class: "assessment-headline " + cls },
+    el("span", {}, a.emoji || "🔮"),
+    el("span", {}, (a.headline || "—").replace(/^[🟢🟡🟠🔴⚪️]?\s*/, "").replace(/\(.*\)$/, "").trim()),
+    el("span", { class: "score" }, ((a.score_0_100 ?? 0).toFixed(1)) + " / 100  ·  " + (a.verdict || "—"))
+  );
+  wrap.appendChild(head);
+
+  const diag = el("div", { class: "assessment-block" },
+    el("h3", {}, "📊 Диагноз системы")
+  );
+  const ul1 = el("ul");
+  for (const line of (a.diagnosis || [])) ul1.appendChild(el("li", {}, line));
+  diag.appendChild(ul1);
+  wrap.appendChild(diag);
+
+  const fc = el("div", { class: "assessment-block" },
+    el("h3", {}, "🎯 Прогноз стабильности (НЕ предсказание цены)")
+  );
+  const ul2 = el("ul");
+  for (const line of (a.forecast || [])) ul2.appendChild(el("li", {}, line));
+  fc.appendChild(ul2);
+  wrap.appendChild(fc);
+
+  const recCls = (a.recommendations || []).some(x => x.startsWith("⚠")) ? "" : "green";
+  const rec = el("div", { class: "assessment-block recom-block " + recCls },
+    el("h3", {}, "💡 Рекомендации")
+  );
+  const ul3 = el("ul");
+  for (const line of (a.recommendations || [])) ul3.appendChild(el("li", {}, line));
+  rec.appendChild(ul3);
+  wrap.appendChild(rec);
+}
+
+function renderStabilityGrid(r, mg) {
+  const grid = $("stability-grid");
+  if (!grid || !r) return;
+  grid.innerHTML = "";
+
+  const score = r.stability_score_0_100 ?? 0;
+  const wrLo = r.wilson_wr_lower_95 ?? 0;
+  const wrUp = r.wilson_wr_upper_95 ?? 0;
+  const sharpe = r.sharpe_ratio ?? 0;
+  const sortino = r.sortino_ratio ?? 0;
+  const mdd = r.max_drawdown_pct ?? 0;
+  const pf = r.profit_factor;
+  const exp_ = r.expectancy_per_trade ?? 0;
+  const var95 = r.var_95 ?? 0;
+  const cvar95 = r.cvar_95 ?? 0;
+  const kelly = r.kelly_fraction_half ?? 0;
+  const skew = r.skew ?? 0;
+  const kurt = r.kurtosis ?? 0;
+  const pnlMean = r.bootstrap_pnl_mean ?? 0;
+  const pnlP5 = r.bootstrap_pnl_p5 ?? 0;
+  const pnlP95 = r.bootstrap_pnl_p95 ?? 0;
+  const brier = r.brier_score;
+  const ll = r.log_loss;
+  const winS = r.longest_win_streak ?? 0;
+  const lossS = r.longest_loss_streak ?? 0;
+  const curS = r.current_streak ?? 0;
+  const curK = r.current_streak_kind || "—";
+  const breakEven = r.break_even_probability ?? 54.1;
+  const slipThr = r.slippage_threshold_probability ?? 54.1;
+  const qPairs = r.qualified_pairs_count ?? 0;
+  const qCells = r.qualified_cells_total ?? 0;
+  const byS = r.qualified_by_session || {};
+  const n = r.n_closed_trades ?? 0;
+
+  // Категория А: нижняя граница WR / WR
+  grid.appendChild(_stabCell("⚖ Stability score", `${score.toFixed(1)} / 100`,
+    "Сводный индекс стабильности (взвешенно из 7 компонентов)",
+    _verdictColor(score), score));
+  grid.appendChild(_stabCell("📐 Wilson WR (нижняя 95%)", wrLo.toFixed(1) + "%",
+    "Худший правдоподобный WR на текущей выборке (математическая гарантия)",
+    wrLo >= 70 ? "green" : wrLo >= 55 ? "yellow" : "red", wrLo));
+  grid.appendChild(_stabCell("📐 Wilson WR (верхняя 95%)", wrUp.toFixed(1) + "%",
+    "Лучший правдоподобный WR (та же мат. граница, верх)",
+    wrUp >= 70 ? "green" : "blue", wrUp));
+  grid.appendChild(_stabCell("🎯 Break-even WR", breakEven.toFixed(1) + "%",
+    "Минимум для выхода в ноль при payout 85% — все цифры выше = реальный + ",
+    "blue"));
+  grid.appendChild(_stabCell("🛡 С учётом slippage", slipThr.toFixed(1) + "%",
+    "Минимум WR с поправкой на 0.1% slippage (реальный execution)",
+    "blue"));
+
+  // Категория B: распределение PnL (bootstrap + risk metrics)
+  grid.appendChild(_stabCell("💰 Mean PnL/trade (bootstrap)", "$" + pnlMean.toFixed(3),
+    "Среднее PnL/сделку по 2000 bootstrap-итераций реальных закрытых",
+    pnlMean >= 0 ? "green" : "red"));
+  grid.appendChild(_stabCell("📉 Bootstrap p5 PnL", "$" + pnlP5.toFixed(3),
+    "Худший 5%-квантиль ожидаемого среднего — гарантированный «низ»",
+    pnlP5 >= 0 ? "green" : "red"));
+  grid.appendChild(_stabCell("📈 Bootstrap p95 PnL", "$" + pnlP95.toFixed(3),
+    "Лучший 95%-квантиль ожидаемого среднего",
+    pnlP95 >= 0 ? "green" : "yellow"));
+  grid.appendChild(_stabCell("⚠ VaR 95%", "$" + var95.toFixed(3),
+    "Худшая 5% потеря на сделку (historical VaR)",
+    var95 < -0.5 ? "red" : "yellow"));
+  grid.appendChild(_stabCell("⚠ CVaR 95% (хвост)", "$" + cvar95.toFixed(3),
+    "Среднее тех 5% худших — хвостовой риск (Expected Shortfall)",
+    cvar95 < -0.5 ? "red" : "yellow"));
+  grid.appendChild(_stabCell("📊 Sharpe ratio (annualized)", sharpe.toFixed(2),
+    ">1 хорошо, >2 отлично, <0 хуже risk-free",
+    sharpe >= 1 ? "green" : sharpe >= 0 ? "yellow" : "red"));
+  grid.appendChild(_stabCell("📊 Sortino ratio", sortino.toFixed(2),
+    "Sharpe но штрафует только за downside-волатильность",
+    sortino >= 1 ? "green" : sortino >= 0 ? "yellow" : "red"));
+  grid.appendChild(_stabCell("📉 Max Drawdown", mdd.toFixed(2) + "%",
+    "Худший пик-впадина по реальной equity curve",
+    mdd > -5 ? "green" : mdd > -15 ? "yellow" : "red"));
+  grid.appendChild(_stabCell("⚖ Profit Factor", (pf === "inf" ? "∞" : (pf || 0).toFixed(2)),
+    "Сумма выигрышей / сумма потерь — >1.5 устойчиво",
+    pf === "inf" ? "green" : (pf || 0) >= 1.5 ? "green" : (pf || 0) >= 1 ? "yellow" : "red"));
+  grid.appendChild(_stabCell("💵 Expectancy/trade", "$" + exp_.toFixed(3),
+    "Средняя ценность одной сделки (фактическая, не теория)",
+    exp_ >= 0 ? "green" : "red"));
+  grid.appendChild(_stabCell("🎲 Kelly half", (kelly * 100).toFixed(1) + "%",
+    "Оптимальная доля капитала на сделку (Kelly/2 — стандартная практика)",
+    "blue"));
+
+  // Категория C: распределение
+  grid.appendChild(_stabCell("📐 Skew", skew.toFixed(2),
+    "Асимметрия: <0 левый хвост (худшие потери), >0 правый (большие выигрыши)",
+    Math.abs(skew) < 1 ? "blue" : skew > 0 ? "green" : "yellow"));
+  grid.appendChild(_stabCell("📐 Kurtosis (excess)", kurt.toFixed(2),
+    "Толщина хвостов: 0 = норм. распределение, >3 = «жирные хвосты»",
+    Math.abs(kurt) < 3 ? "blue" : "yellow"));
+
+  // Категория D: качество прогнозов
+  if (brier !== null && brier !== undefined) {
+    grid.appendChild(_stabCell("🎯 Brier score", brier.toFixed(4),
+      "Точность вероятностного прогноза (0=идеально, 1=плохо)",
+      brier < 0.20 ? "green" : brier < 0.30 ? "yellow" : "red"));
+  }
+  if (ll !== null && ll !== undefined) {
+    grid.appendChild(_stabCell("🎯 Log loss", ll.toFixed(4),
+      "Логистический штраф за ошибочную вероятность",
+      ll < 0.5 ? "green" : ll < 0.7 ? "yellow" : "red"));
+  }
+
+  // Категория E: серии
+  grid.appendChild(_stabCell("🔥 Самая длинная серия побед", winS + " подряд",
+    "Реальная история по closed_trades.json", "green", winS * 10));
+  grid.appendChild(_stabCell("❄ Самая длинная серия убытков", lossS + " подряд",
+    "Помогает понять риск martingale", lossS >= 5 ? "red" : "yellow", lossS * 10));
+  grid.appendChild(_stabCell(`🌀 Текущая серия (${curK})`, curS + "",
+    curK === "WIN" ? "Удача на стороне системы" : curK === "LOSS" ? "Снижай stake / дай sweep refresh" : "—",
+    curK === "WIN" ? "green" : curK === "LOSS" ? "red" : "blue"));
+
+  // Категория F: качество стратегии (per-cell)
+  grid.appendChild(_stabCell("🌐 Qualified пар (≥70% WR)", `${qPairs} / 28`,
+    "Пары глобально проходят 70%-гейт на 365д истории",
+    qPairs >= 10 ? "green" : qPairs >= 5 ? "yellow" : "red", qPairs * 100 / 28));
+  grid.appendChild(_stabCell("🌐 Qualified ячеек (всего)", `${qCells} / 112`,
+    "Из 28 пар × 4 сессии — какая доля «реально» ≥70%",
+    qCells >= 30 ? "green" : qCells >= 15 ? "yellow" : "red", qCells * 100 / 112));
+  for (const sess of ["Asia", "London", "Overlap", "NY"]) {
+    const v = byS[sess] || 0;
+    grid.appendChild(_stabCell(`🕐 Qualified ${sess}`, `${v} / 28`,
+      `Сколько пар проходят 70%-гейт в сессию ${sess}`,
+      v >= 7 ? "green" : v >= 3 ? "yellow" : "red", v * 100 / 28));
+  }
+
+  // Категория G: гарантия PnL/сделку
+  if (mg) {
+    grid.appendChild(_stabCell("🛡 Гарант. min PnL/trade", "$" + (mg.expected_pnl_lower_per_trade ?? 0).toFixed(3),
+      "Wilson lower × payout − (1−lower) × stake — нижняя граница PnL",
+      (mg.expected_pnl_lower_per_trade || 0) >= 0 ? "green" : "red"));
+    grid.appendChild(_stabCell("📏 Mean гарант. PnL/trade", "$" + (mg.expected_pnl_mean_per_trade ?? 0).toFixed(3),
+      "Текущая средняя ценность сделки (точечная оценка)",
+      (mg.expected_pnl_mean_per_trade || 0) >= 0 ? "green" : "yellow"));
+    grid.appendChild(_stabCell("📈 Upper гарант. PnL/trade", "$" + (mg.expected_pnl_upper_per_trade ?? 0).toFixed(3),
+      "Лучшая правдоподобная оценка PnL/trade",
+      (mg.expected_pnl_upper_per_trade || 0) >= 0 ? "green" : "yellow"));
+  }
+
+  // Сводка
+  grid.appendChild(_stabCell("📦 Закрытых сделок", n + "",
+    n >= 30 ? "Достаточно для надёжной нижней границы" : `Маленькая выборка — нужно ≥30 для жёсткого доверия`,
+    n >= 30 ? "green" : "yellow", Math.min(100, n * 100 / 30)));
+
+  // Calibration block (если есть)
+  if (Array.isArray(r.calibration_bins) && r.calibration_bins.length) {
+    const calibCard = el("div", { class: "stab-cell blue", style: "grid-column: 1 / -1;" });
+    calibCard.appendChild(el("div", { class: "label" }, "🎯 КАЛИБРОВКА: предсказанная вероятность vs фактическая WR"));
+    calibCard.appendChild(el("div", { class: "hint" },
+      "Если система говорит «70%» — то факт должен быть около 70%. Сравнение по бинам:"));
+    for (const b of r.calibration_bins) {
+      const pred = ((b.predicted_mean ?? 0) * 100).toFixed(1);
+      const actual = ((b.actual_wr ?? 0) * 100).toFixed(1);
+      const row = el("div", { class: "calib-bar" },
+        el("div", {}, `[${(b.bin[0] * 100).toFixed(0)}–${(b.bin[1] * 100).toFixed(0)}]%`),
+        el("div", { class: "calib-track" },
+          el("div", { class: "calib-pred",   style: `width: ${pred}%;` }),
+          el("div", { class: "calib-actual", style: `width: ${actual}%;` })),
+        el("div", {}, `n=${b.n}`)
+      );
+      row.title = `Предсказано ${pred}% (синий), фактически ${actual}% (зелёный)`;
+      calibCard.appendChild(row);
+    }
+    grid.appendChild(calibCard);
+  }
 }
 
 // ───── Daily Best Pick (3-я стратегия) ─────

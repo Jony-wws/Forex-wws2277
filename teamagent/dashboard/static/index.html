@@ -3,12 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TeamAgent — FOREX AI</title>
+<title>TeamAgent — FOREX AI 2026 · Гарантии стабильности</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">TeamAgent <span class="muted">FOREX AI</span></div>
+
+<!-- Премиум-фон: плавающие неоновые «звёзды» + градиентные ауры -->
+<div class="stars" aria-hidden="true"></div>
+<div class="aura aura-blue" aria-hidden="true"></div>
+<div class="aura aura-pink" aria-hidden="true"></div>
+<div class="aura aura-green" aria-hidden="true"></div>
+
+<header class="topbar premium">
+  <div class="brand">
+    <span class="brand-glow">TeamAgent</span>
+    <span class="muted brand-sub">FOREX AI · 2026</span>
+    <span class="badge-pro">PRO</span>
+  </div>
   <div class="clock-block">
     <div><span class="muted small">сейчас:</span> <span id="clock-utc">—</span> <span class="muted small">UTC</span></div>
     <div><span class="muted small">локально:</span> <span id="clock-utc5">—</span> <span class="muted small">UTC+5</span></div>
@@ -20,16 +31,41 @@
 
 <main>
 
-  <section id="intro-section" class="card intro">
+  <!-- ═══ ГЛАВНАЯ КАРТОЧКА: ОБЩАЯ ОЦЕНКА + ПРОГНОЗ + ГАРАНТИИ ═══ -->
+  <section id="assessment-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title"><span class="dot dot-pulse"></span> ОБЩАЯ ОЦЕНКА СИСТЕМЫ</h2>
+    <div id="assessment-content" class="assessment-content">
+      <div class="muted">Считаю стабильность…</div>
+    </div>
+  </section>
+
+  <!-- ═══ 50+ МЕТРИК ГАРАНТИЙ СТАБИЛЬНОСТИ ═══ -->
+  <section id="stability-section" class="card glass premium-card stability-hero">
+    <h2 class="hero-title"><span class="icon-shield">🛡️</span> ГАРАНТИИ СТАБИЛЬНОСТИ <span class="badge-stable">мат. границы · 95% доверие</span></h2>
+    <div class="muted small">
+      Все цифры — это <b>математические нижние границы</b> по реальным историческим данным,
+      не прогноз и не теория. Wilson 95% CI = «худший правдоподобный WR», bootstrap p5 = «худший
+      ожидаемый PnL/сделку», VaR/CVaR = «худшие 5% реальных потерь», conformal coverage =
+      «90% будущих цен попадут в этот коридор». Никаких симуляторов, никакой случайности —
+      bootstrap идёт по реальным закрытым сделкам с фиксированным seed.
+    </div>
+    <div id="stability-grid" class="stability-grid">
+      <div class="muted">Загружаю 50+ метрик стабильности…</div>
+    </div>
+  </section>
+
+  <section id="intro-section" class="card glass intro">
     <h2>👋 Что я тут вижу?</h2>
     <ul class="muted small">
+      <li><b>Общая оценка системы</b> (вверху) — единый stability score 0–100 + русскоязычный диагноз и прогноз. Обновляется каждые 60 сек.</li>
+      <li><b>Гарантии стабильности</b> — 50+ математических метрик (Wilson CI, bootstrap, VaR/CVaR, Sharpe, Sortino, Calmar, Kelly, conformal bands, calibration, streaks). Все по реальным данным, без random.</li>
       <li><b>Сводка paper-trader</b> — общая статистика: сколько сделок, WR, PnL.</li>
-      <li><b>Сейчас открыто</b> — активные виртуальные сделки $50/85% (бинарки 1–4ч). Обновляется каждые 30 сек: цена, осталось до экспирации, прогноз PnL.</li>
-      <li><b>PROGNOZY-28</b> — единая таблица прогнозов по 28 парам. Каждые 5 минут scanner пересчитывает score (-44..+44), вероятность (50–92%), за/против. Кликни строку — увидишь breakdown агентов и Стакан.</li>
+      <li><b>Сейчас открыто</b> — активные виртуальные сделки $1/85% (бинарки 1–4ч). Обновляется каждые 30 сек: цена, осталось до экспирации, прогноз PnL.</li>
+      <li><b>PROGNOZY-28</b> — единая таблица прогнозов по 28 парам. Каждые 5 минут scanner пересчитывает score (−44..+44), вероятность (50–92%), за/против. Кликни строку — увидишь breakdown агентов и Стакан.</li>
       <li><b>Стакан (Volume Profile)</b> — POC/VAH/VAL + крупные игроки 🐋 + прогноз «куда цена не вернётся до 00:00 UTC+5».</li>
       <li><b>История</b> — все закрытые сделки с реальной ценой Yahoo на момент экспирации.</li>
       <li><b>60+ агентов</b> — каждый отдельный процесс с heartbeat. Watchdog убивает зависших, orchestrator перезапускает.</li>
-      <li><b>WR backtest</b> — strategy_search ежечасно перебирает 120 вариантов на каждой из 4 сессий и обновляет лучший подход для каждой ячейки (пара × сессия) на 90-дневной истории Yahoo. Это используется для выбора стороны (BUY/SELL c учётом contrarian/fade-RSI flip) и времени экспирации. <b>Гейт открытия: только `forecast.probability_pct ≥ 70%` — без жёсткой блокировки по WR ячейки.</b> Для пар где есть qualified variant на текущую сессию, его параметры применяются как «обогащение».</li>
+      <li><b>WR backtest</b> — strategy_search раз в 5 дней перебирает 120 вариантов на 4 сессиях × 28 парах × 365 дней Yahoo (≈50 мин). Это используется для выбора стороны (BUY/SELL c учётом contrarian/fade-RSI flip) и времени экспирации. <b>STRICT-gate</b>: trade открывается только на qualified-ячейке (per-session или global) с реальным ≥70% WR.</li>
     </ul>
   </section>
   <section id="stats-section" class="card">

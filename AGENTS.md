@@ -216,9 +216,9 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 ## Where to find the user's data
 
 - Live dashboard (current Devin session, dies when session ends):
-  `https://8b14ed6c3cae-tunnel-pchp0vd8.devinapps.com/`
-  user / bfb871a7d9c5bc32830e1df7d8956536
-  (auto-login URL: `https://user:bfb871a7d9c5bc32830e1df7d8956536@8b14ed6c3cae-tunnel-pchp0vd8.devinapps.com/`)
+  `https://082b75f2888a-tunnel-v9e3vq29.devinapps.com/`
+  user / 887aa255f3ab82c2c39d73f3e1702037
+  (auto-login URL: `https://user:887aa255f3ab82c2c39d73f3e1702037@082b75f2888a-tunnel-v9e3vq29.devinapps.com/`)
   NOTE: this URL changes every Devin session. The current value is updated by
   the agent at the start of each "продолжай"/"continue" session and committed
   to this file so the user always has the latest.

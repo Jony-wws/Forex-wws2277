@@ -449,6 +449,132 @@ def api_fundamentals():
     return summary
 
 
+@app.get("/api/stability")
+def api_stability():
+    """Главный отчёт стабильности системы (50+ метрик).
+
+    Берёт данные ИСКЛЮЧИТЕЛЬНО из реальных state-файлов + Yahoo:
+      - paper_stats / closed_trades / strategy_config / forecasts
+      - 365-дневная Yahoo для conformal / VaR / vol метрик
+
+    Никаких симуляторов, никакого random — bootstrap идёт по РЕАЛЬНЫМ
+    наблюдениям (resampling), seed зафиксирован.
+    """
+    try:
+        from .. import stability_engine as se
+        from .. import resume_ru as ru
+    except ImportError:
+        from teamagent import stability_engine as se
+        from teamagent import resume_ru as ru
+    try:
+        report = se.system_stability_report()
+        assessment = ru.general_assessment()
+        mg = se.min_guarantee_per_trade(stake_usd=1.0, payout_pct=0.85)
+        return {
+            "as_of": report.get("as_of"),
+            "report": report,
+            "assessment": assessment,
+            "min_guarantee": mg,
+        }
+    except Exception as e:
+        log.exception(f"api_stability failed: {e}")
+        return JSONResponse(
+            {"error": f"{type(e).__name__}: {e}"},
+            status_code=500,
+        )
+
+
+@app.get("/api/stability/{pair}")
+def api_stability_pair(pair: str):
+    """Per-pair детальный отчёт стабильности."""
+    try:
+        from .. import resume_ru as ru
+    except ImportError:
+        from teamagent import resume_ru as ru
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    try:
+        return ru.per_pair_summary(pair)
+    except Exception as e:
+        log.exception(f"api_stability_pair({pair}) failed: {e}")
+        return JSONResponse(
+            {"error": f"{type(e).__name__}: {e}"},
+            status_code=500,
+        )
+
+
+@app.get("/api/min-guarantee")
+def api_min_guarantee():
+    """Гарантированный (95% доверие) ожидаемый PnL на сделку."""
+    try:
+        from .. import stability_engine as se
+    except ImportError:
+        from teamagent import stability_engine as se
+    return se.min_guarantee_per_trade(stake_usd=1.0, payout_pct=0.85)
+
+
+@app.get("/api/conformal/{pair}")
+def api_conformal(pair: str, horizon_hours: int = 4, confidence: float = 0.90):
+    """Conformal prediction band для цены через N часов."""
+    try:
+        from .. import stability_engine as se
+    except ImportError:
+        from teamagent import stability_engine as se
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    return se.conformal_price_band(pair, horizon_hours, confidence, 90)
+
+
+@app.get("/api/risk-metrics")
+def api_risk_metrics():
+    """VaR, CVaR, Sharpe, Sortino, MDD, Calmar, Kelly, Profit Factor по реальным закрытым сделкам."""
+    try:
+        from .. import stability_engine as se
+    except ImportError:
+        from teamagent import stability_engine as se
+    rep = se.system_stability_report()
+    rets = se.closed_trades_returns()
+    return {
+        "as_of": rep.get("as_of"),
+        "var_95": rep.get("var_95"),
+        "cvar_95": rep.get("cvar_95"),
+        "sharpe_ratio": rep.get("sharpe_ratio"),
+        "sortino_ratio": rep.get("sortino_ratio"),
+        "max_drawdown_pct": rep.get("max_drawdown_pct"),
+        "profit_factor": rep.get("profit_factor"),
+        "expectancy_per_trade": rep.get("expectancy_per_trade"),
+        "kelly_fraction_half": rep.get("kelly_fraction_half"),
+        "skew": rep.get("skew"),
+        "kurtosis": rep.get("kurtosis"),
+        "n_trades": rets.get("total"),
+        "longest_win_streak": rep.get("longest_win_streak"),
+        "longest_loss_streak": rep.get("longest_loss_streak"),
+        "current_streak": rep.get("current_streak"),
+        "current_streak_kind": rep.get("current_streak_kind"),
+        "break_even_probability": rep.get("break_even_probability"),
+        "slippage_threshold_probability": rep.get("slippage_threshold_probability"),
+    }
+
+
+@app.get("/api/calibration")
+def api_calibration():
+    """Brier score + log loss + per-bin calibration (predicted prob vs actual WR)."""
+    try:
+        from .. import stability_engine as se
+    except ImportError:
+        from teamagent import stability_engine as se
+    rep = se.system_stability_report()
+    return {
+        "as_of": rep.get("as_of"),
+        "brier_score": rep.get("brier_score"),
+        "log_loss": rep.get("log_loss"),
+        "calibration_bins": rep.get("calibration_bins"),
+        "n_trades": rep.get("n_closed_trades"),
+    }
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""
