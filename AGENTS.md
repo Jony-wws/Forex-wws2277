@@ -6,8 +6,23 @@ how to continue work without re-asking the user.
 
 ## How to start a NEW session (зачем оно)
 
-If the user just writes "продолжай" / "continue" — read the latest commits,
-run `bash scripts/start_all.sh`, open the dashboard, and ask what to work on.
+If the user just writes "продолжай" / "continue" — DO ALL OF THIS:
+
+1. Read the latest commits: `git log --oneline -20`.
+2. Install deps if needed: `pip install -q -r teamagent/requirements.txt`.
+3. Start the system: `bash scripts/start_all.sh` (it auto-installs deps too).
+4. Wait ~5 sec, then verify: `curl -s http://127.0.0.1:8080/api/health`.
+5. Expose externally with the Devin `deploy expose port=8080` tool — you'll
+   get a URL like `https://<ID>-tunnel-<TOKEN>.devinapps.com/` with HTTP Basic
+   Auth (`user` / `<token>`).
+6. Update the "Where to find the user's data" section below with the NEW URL
+   + login + password, commit and push to this branch
+   (`devin/1777586006-teamagent-rebuild`) so it lands in PR #1. This is how
+   the next session in any account will know the live URL without asking.
+7. Send the URL + login + password to the user as the FIRST message after
+   start. The user is on Android Chrome — use the auto-login URL form
+   `https://user:<password>@<host>/` so they can just tap and open it.
+
 **Do NOT** re-create the project from scratch. Everything is already built.
 
 ## Project: FOREX AI 2026 — TeamAgent
@@ -146,9 +161,14 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 ## Where to find the user's data
 
 - Live dashboard (current Devin session, dies when session ends):
-  `https://aaa722b1109e-tunnel-8apkrjro.devinapps.com/`
-  user / 6d20d672089e9b3c96ae7ef57e8c05fd
-- Permanent dashboard (fly.io if deployed): see latest commit body for URL
+  `https://59b8755c28a6-tunnel-ypdtvz8d.devinapps.com/`
+  user / 750a8301e1ac3b0f174f666a0800b3f8
+  (auto-login URL: `https://user:750a8301e1ac3b0f174f666a0800b3f8@59b8755c28a6-tunnel-ypdtvz8d.devinapps.com/`)
+  NOTE: this URL changes every Devin session. The current value is updated by
+  the agent at the start of each "продолжай"/"continue" session and committed
+  to this file so the user always has the latest.
+- Permanent dashboard (fly.io if deployed): see `infra/fly/` and the latest
+  commit body for the URL. Recommended for 24/7 uptime without burning ACU.
 - PR #1: `https://github.com/Jony-wws/Forex-wws2277/pull/1`
 - All commits + state history:
   `https://github.com/Jony-wws/Forex-wws2277/commits/devin/1777586006-teamagent-rebuild`
