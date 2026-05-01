@@ -47,9 +47,13 @@ PAYOUT_PCT = 0.85
 # В сегментации per-session это особенно важно: при 4 сессиях у каждой сессии
 # в среднем 1/4 сделок от общего числа.
 MIN_TRADES_FOR_VALID = 10
-# История для бэктеста. Yahoo 1H держит ~730 дней. 60 дней — компромисс между
-# repeatability (тренды могут меняться) и статистической стабильностью.
-LOOKBACK_DAYS = 60
+# История для бэктеста. Yahoo 1H держит ~730 дней. 180 дней (≈6 месяцев) —
+# компромисс между repeatability (тренды могут меняться) и статистической
+# стабильностью. С 180д на каждую (пара, сессия) ячейку приходится в среднем
+# 180/4 = 45 рабочих часов сессии × ~25% сигналов = ~11 сделок (хватает чтобы
+# больше вариантов проходили MIN_TRADES_FOR_VALID и реже теряли качественные
+# ячейки из-за статистической недосигнальности).
+LOOKBACK_DAYS = 180
 
 
 def _precompute(pair: str) -> dict | None:
@@ -58,7 +62,9 @@ def _precompute(pair: str) -> dict | None:
     Yahoo 1H interval поддерживает period до 2y. Используем 6mo чтобы иметь
     запас данных для индикаторов И LOOKBACK_DAYS=60 окна.
     """
-    bars = yahoo.fetch(pair, interval="1h", period="6mo")
+    # 1y даёт ~365 дней 1H баров — нужно для LOOKBACK_DAYS=180 + ~30 дней
+    # запаса для индикаторов (EMA, RSI, etc.).
+    bars = yahoo.fetch(pair, interval="1h", period="1y")
     if bars is None or bars.empty or len(bars) < 200:
         return None
     cutoff = bars.index[-1] - timedelta(days=LOOKBACK_DAYS)
