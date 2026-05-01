@@ -187,21 +187,43 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     # шаг 2 — per-session best
     by_session = p.get("by_session") or {}
     session_cfg = by_session.get(sess_name) or {}
+    variants_map = strategies.variants_by_id()
     chosen_source = "by_session"
     chosen = None
+
+    def _variant_compatible_with_hour(var_id: str | None, h: int) -> bool:
+        """True если у варианта нет своего session_utc, либо текущий час в окне."""
+        if not var_id:
+            return False
+        v = variants_map.get(var_id)
+        if v is None:
+            return False
+        if v.session_utc is None:
+            return True
+        s, e = v.session_utc
+        if s <= e:
+            return s <= h < e
+        return h >= s or h < e
+
     if session_cfg.get("qualifies_70pct") and (session_cfg.get("trades") or 0) >= MIN_TRADES:
         chosen = session_cfg
-    elif p.get("qualifies_70pct") and (p.get("trades") or 0) >= MIN_TRADES:
-        # шаг 3 — фолбэк на общий best_variant (без session фильтра)
+    elif (
+        p.get("qualifies_70pct")
+        and (p.get("trades") or 0) >= MIN_TRADES
+        and _variant_compatible_with_hour(p.get("best_variant"), ts.hour)
+    ):
+        # шаг 3 — фолбэк на общий best_variant (если его session_utc совместим)
         chosen = p
         chosen_source = "global_best"
     else:
-        # шаг 4 — заморожено
+        # шаг 4 — заморожено (per-session не qualified ИЛИ
+        # global qualified но его variant имеет session_utc вне текущего часа)
         return False, {
             "reason": (
                 f"в сессии {sess_name} лучшая стратегия даёт "
                 f"{session_cfg.get('win_rate_pct')}% WR (trades={session_cfg.get('trades')}); "
-                f"общий best — {p.get('win_rate_pct')}% (trades={p.get('trades')})"
+                f"общий best — {p.get('win_rate_pct')}% (trades={p.get('trades')}, "
+                f"variant={p.get('best_variant')})"
             ),
             "session": sess_name,
             "win_rate_pct_session": session_cfg.get("win_rate_pct"),
@@ -212,8 +234,7 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
             "variant_global": p.get("best_variant"),
         }
 
-    variants = strategies.variants_by_id()
-    variant = variants.get(chosen.get("best_variant"))
+    variant = variants_map.get(chosen.get("best_variant"))
     if variant is None:
         return False, {"reason": f"unknown variant id {chosen.get('best_variant')}"}
 
