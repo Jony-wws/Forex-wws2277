@@ -53,6 +53,13 @@ PERSISTED_FILES = [
     # 365-дневный анализ поведения рынка (per pair × hour × dow × session) —
     # дорогой пересчёт (~15с по всем 28 парам), поэтому переносим между сессиями.
     "teamagent/state/market_regime_365d.json",
+    # Locked baseline: snapshot strategy_config.json после первого валидного
+    # 365-day sweep. Используется как fallback если очередной sweep дал хуже.
+    "teamagent/state/strategy_config_locked.json",
+    # WR floor monitor + weekly loss review — между сессиями полезно сохранять
+    # чтобы дашборд сразу показывал состояние, не ждал первого tick (5 мин).
+    "teamagent/state/agent_learner_wr_floor_monitor.json",
+    "teamagent/state/agent_learner_weekly_loss_review.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

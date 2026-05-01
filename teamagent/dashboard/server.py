@@ -201,6 +201,37 @@ def api_agents():
     return agents_state
 
 
+def _unwrap_agent_state(data: dict, fallback_note: str) -> dict:
+    """Агенты пишут tick output в `state["summary"]`. Дашборду удобнее видеть
+    summary как корневой объект + as_of сверху. Если файла ещё нет — note."""
+    if not data or "summary" not in data:
+        return {"note": fallback_note}
+    out = dict(data["summary"]) if isinstance(data["summary"], dict) else {"value": data["summary"]}
+    if "as_of" in data and "as_of" not in out:
+        out["as_of"] = data["as_of"]
+    return out
+
+
+@app.get("/api/wr-floor")
+def api_wr_floor():
+    """Состояние WR floor monitor (rolling 50 trades vs 70% floor)."""
+    raw = _load(config.STATE_DIR / "agent_learner_wr_floor_monitor.json", {})
+    return _unwrap_agent_state(
+        raw,
+        "не считал ещё — жди первого tick (5 мин) от learner_wr_floor_monitor",
+    )
+
+
+@app.get("/api/weekly-loss-review")
+def api_weekly_loss():
+    """Сводка минусов за последние 7 дней (weekly loss analyzer)."""
+    raw = _load(config.STATE_DIR / "agent_learner_weekly_loss_review.json", {})
+    return _unwrap_agent_state(
+        raw,
+        "не считал ещё — жди первого tick (6 ч) от learner_weekly_loss_review",
+    )
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""

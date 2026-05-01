@@ -187,3 +187,127 @@ class PnLCurveLearner(Agent):
                 "result": t.get("result"),
             })
         return {"points": curve, "final_cum_pnl": round(cum, 2)}
+
+
+# ───────── Floor / weekly review (added 2026-05-01 per user request) ─────────
+
+class WRFloorMonitor(Agent):
+    """Считает rolling WR за последние 50 сделок и пишет alert если WR < 70%.
+
+    НЕ блокирует открытие сделок — это просто индикатор «стратегия начала
+    устаревать, пора триггернуть strategy_search». Free 70% gate сам по себе
+    фильтр входа.
+    """
+    name = "learner_wr_floor_monitor"
+    category = "learner"
+    interval_sec = 300
+
+    FLOOR_PCT = 70.0
+    WINDOW_TRADES = 50
+
+    def tick(self):
+        closed = sorted(_load_closed(), key=lambda t: t.get("close_time", ""))
+        recent = closed[-self.WINDOW_TRADES:]
+        n = len(recent)
+        if n == 0:
+            return {"window": 0, "wr_pct": None, "floor_pct": self.FLOOR_PCT,
+                    "below_floor": False, "alert": "no closed trades yet"}
+        wins = sum(1 for t in recent if t.get("result") == "WIN")
+        wr = round(wins / n * 100, 1)
+        below = wr < self.FLOOR_PCT
+        # все-время WR (для контекста)
+        n_all = len(closed)
+        wins_all = sum(1 for t in closed if t.get("result") == "WIN")
+        wr_all = round(wins_all / n_all * 100, 1) if n_all else None
+        return {
+            "window": n,
+            "wr_pct": wr,
+            "wr_pct_all_time": wr_all,
+            "floor_pct": self.FLOOR_PCT,
+            "below_floor": below,
+            "alert": (
+                f"⚠️ rolling WR {wr}% < floor {self.FLOOR_PCT}% — "
+                "стратегия деградирует, нужен новый strategy_search sweep"
+            ) if below else "OK",
+        }
+
+
+class WeeklyLossReview(Agent):
+    """Каждые ~7 дней (но tick каждые 6h, чтобы не пропустить переход) делает
+    разбор минусов из closed_trades.json: какие пары/сессии/часы UTC/направления
+    проигрывали чаще остальных. Помогает увидеть «слепые пятна» стратегии.
+    """
+    name = "learner_weekly_loss_review"
+    category = "learner"
+    interval_sec = 6 * 60 * 60   # 6 часов между tick'ами; внутри сам решает обновить ли
+
+    def tick(self):
+        closed = _load_closed()
+        if not closed:
+            return {"note": "no closed trades yet"}
+        # окно: последние 7 дней
+        try:
+            from datetime import timedelta
+            now = datetime.now(timezone.utc)
+            week_ago = now - timedelta(days=7)
+            recent = [
+                t for t in closed
+                if t.get("close_time")
+                and datetime.fromisoformat(t["close_time"]).astimezone(timezone.utc) >= week_ago
+            ]
+        except Exception:
+            recent = closed[-50:]   # fallback
+
+        losses = [t for t in recent if t.get("result") == "LOSS"]
+        wins = [t for t in recent if t.get("result") == "WIN"]
+        n_total = len(recent)
+        n_loss = len(losses)
+        if n_total == 0:
+            return {"window_days": 7, "n_total": 0, "note": "no closed trades in last 7d"}
+
+        # минусы по парам
+        loss_by_pair = Counter(t["pair"] for t in losses)
+        # минусы по сессиям
+        loss_by_session = Counter(t.get("session_at_open") or "Off" for t in losses)
+        # минусы по часу UTC
+        loss_by_hour = Counter()
+        for t in losses:
+            try:
+                h = datetime.fromisoformat(t["open_time"]).astimezone(timezone.utc).hour
+                loss_by_hour[h] += 1
+            except Exception:
+                pass
+        # минусы по направлению
+        loss_by_side = Counter(t.get("side") for t in losses)
+        # худшие пары: WR ≤ 40% при ≥ 3 сделках
+        wr_by_pair: dict[str, dict] = {}
+        all_by_pair: dict[str, list] = defaultdict(list)
+        for t in recent:
+            all_by_pair[t["pair"]].append(1 if t.get("result") == "WIN" else 0)
+        for p, vs in all_by_pair.items():
+            if len(vs) >= 3:
+                wr = round(sum(vs) / len(vs) * 100, 1)
+                wr_by_pair[p] = {"n": len(vs), "wr_pct": wr}
+        worst_pairs = sorted(
+            [(p, d["wr_pct"], d["n"]) for p, d in wr_by_pair.items() if d["wr_pct"] <= 40.0],
+            key=lambda x: (x[1], -x[2]),
+        )
+
+        return {
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "window_days": 7,
+            "n_total": n_total,
+            "n_wins": len(wins),
+            "n_losses": n_loss,
+            "wr_pct": round(len(wins) / n_total * 100, 1) if n_total else 0.0,
+            "loss_by_pair_top5": loss_by_pair.most_common(5),
+            "loss_by_session": dict(loss_by_session),
+            "loss_by_hour_utc_top5": loss_by_hour.most_common(5),
+            "loss_by_side": dict(loss_by_side),
+            "worst_pairs_wr_le_40pct": worst_pairs,
+            "advice": (
+                f"за неделю {n_loss} минусов из {n_total} сделок. "
+                + ("проблемные пары: " + ", ".join(p for p, _, _ in worst_pairs[:3]) if worst_pairs
+                   else "пары со стабильно низким WR в этом окне отсутствуют.")
+            ),
+        }

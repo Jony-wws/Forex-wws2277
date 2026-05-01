@@ -410,6 +410,81 @@ function tickForecasts() {
   refreshForecasts();
   refreshStrategyMatrix();
   refreshMarketRegime();
+  refreshWRFloor();
+  refreshWeeklyLoss();
+}
+
+// ───── WR floor monitor (rolling 50 trades vs 70%) ─────
+async function refreshWRFloor() {
+  const node = $("wr-floor-content");
+  if (!node) return;
+  try {
+    const r = await api("/api/wr-floor");
+    node.innerHTML = "";
+    if (!r || r.note) {
+      node.appendChild(el("div", {}, r && r.note ? r.note : "пусто"));
+      return;
+    }
+    const cls = r.below_floor ? "warn" : "ok";
+    const wrTxt = r.wr_pct == null ? "—" : `${r.wr_pct}%`;
+    const allTxt = r.wr_pct_all_time == null ? "—" : `${r.wr_pct_all_time}%`;
+    node.appendChild(el("div", { class: cls === "ok" ? "" : "loss" },
+      el("strong", {}, `${cls === "ok" ? "✓" : "⚠️"} rolling WR (${r.window} сделок): `),
+      wrTxt,
+      el("span", { class: "muted" }, ` · floor ${r.floor_pct}% · all-time ${allTxt}`)));
+    node.appendChild(el("div", { class: "muted small", style: "margin-top:4px;" },
+      r.alert || ""));
+  } catch (e) {
+    node.textContent = "ошибка: " + (e.message || e);
+  }
+}
+
+// ───── Weekly loss review ─────
+async function refreshWeeklyLoss() {
+  const node = $("weekly-loss-content");
+  if (!node) return;
+  try {
+    const r = await api("/api/weekly-loss-review");
+    node.innerHTML = "";
+    if (!r || r.note) {
+      node.appendChild(el("div", {}, r && r.note ? r.note : "пусто"));
+      return;
+    }
+    const head = el("div", {},
+      el("strong", {}, `За 7 дней: ${r.n_total} сделок · ${r.n_wins} WIN / ${r.n_losses} LOSS · WR ${r.wr_pct}%`));
+    node.appendChild(head);
+
+    if (r.loss_by_pair_top5 && r.loss_by_pair_top5.length) {
+      const txt = r.loss_by_pair_top5.map(([p, n]) => `${p} (${n})`).join(" · ");
+      node.appendChild(el("div", {}, el("strong", {}, "Минусы по парам (топ-5): "), txt));
+    }
+    if (r.loss_by_session && Object.keys(r.loss_by_session).length) {
+      const txt = Object.entries(r.loss_by_session).map(([s, n]) => `${s} (${n})`).join(" · ");
+      node.appendChild(el("div", {}, el("strong", {}, "Минусы по сессиям: "), txt));
+    }
+    if (r.loss_by_hour_utc_top5 && r.loss_by_hour_utc_top5.length) {
+      const txt = r.loss_by_hour_utc_top5.map(([h, n]) => `${String(h).padStart(2, "0")}:00 (${n})`).join(" · ");
+      node.appendChild(el("div", {}, el("strong", {}, "Минусы по часам UTC (топ-5): "), txt));
+    }
+    if (r.loss_by_side && Object.keys(r.loss_by_side).length) {
+      const txt = Object.entries(r.loss_by_side).map(([s, n]) => `${s} (${n})`).join(" · ");
+      node.appendChild(el("div", {}, el("strong", {}, "Минусы по направлению: "), txt));
+    }
+    if (r.worst_pairs_wr_le_40pct && r.worst_pairs_wr_le_40pct.length) {
+      const txt = r.worst_pairs_wr_le_40pct.slice(0, 5)
+        .map(([p, wr, n]) => `${p} ${wr}% (${n})`).join(" · ");
+      node.appendChild(el("div", { class: "loss" }, el("strong", {}, "⚠️ Худшие пары (WR≤40%, ≥3 сделок): "), txt));
+    }
+    if (r.advice) {
+      node.appendChild(el("div", { class: "muted small", style: "margin-top:6px;" }, r.advice));
+    }
+    if (r.as_of) {
+      node.appendChild(el("div", { class: "muted small" },
+        `Обновлено: ${fmt.ago(r.as_of)}`));
+    }
+  } catch (e) {
+    node.textContent = "ошибка: " + (e.message || e);
+  }
 }
 
 // ───── 365-day market regime ─────

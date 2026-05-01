@@ -45,6 +45,10 @@ CLOSED_FILE = config.STATE_DIR / "closed_trades.json"
 STATS_FILE = config.STATE_DIR / "paper_stats.json"
 BACKTEST_FILE = config.STATE_DIR / "backtest_30d.json"
 STRATEGY_CONFIG_FILE = config.STATE_DIR / "strategy_config.json"
+# Snapshot первого валидного 365-day sweep — fallback если основной cfg пуст или
+# был пересчитан в худшую сторону. Пересоздаётся явно: `python -m
+# teamagent.strategy_search --relock`.
+STRATEGY_LOCKED_FILE = config.STATE_DIR / "strategy_config_locked.json"
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader.json"
 
 # Gate: сделка открывается только если:
@@ -404,6 +408,14 @@ def cycle_once() -> dict:
     snapshot = _load(FORECASTS_FILE, {"forecasts": {}, "rankings": []})
     backtest = _load(BACKTEST_FILE, {"pairs": {}})
     strategy_cfg = _load(STRATEGY_CONFIG_FILE, {"pairs": {}})
+    # Если активный cfg пустой (новая сессия / прерван sweep) — используем
+    # locked baseline. Это «закреплённая стратегия ≥70%», на которой система
+    # уже доказала WR; не даём упасть в baseline-без-варианта пока ждём sweep.
+    if not (strategy_cfg or {}).get("pairs"):
+        locked = _load(STRATEGY_LOCKED_FILE, {})
+        if (locked or {}).get("pairs"):
+            log.info("paper_trader: strategy_config.json пуст — использую strategy_config_locked.json")
+            strategy_cfg = locked
     open_trades = _load(OPEN_FILE, [])
     closed = _load(CLOSED_FILE, [])
 

@@ -124,8 +124,30 @@
       Анализ ~6000 1H баров на пару. Hot hours UTC = когда рынок реально движется
       сильнее всего (NFP/FOMC/ECB/CPI окна эмерджентно попадают сюда без парсинга
       календаря). Кластеры (dow × hour) с долей high-vol ≥ 25% — сезонные «реакции».
+      <br>strategy_search пересчитывает variant'ы каждые <b>5 дней</b> (~4 раза в месяц)
+      на свежих 365 днях — экономим ACU, не даём стратегии устареть.
     </div>
     <div id="market-regime-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="wr-floor-section" class="card">
+    <h2>🛡️ WR floor monitor <span class="muted small">(rolling 50 trades · floor 70%)</span></h2>
+    <div class="muted small">
+      Если средний WR за последние 50 закрытых сделок опустится ниже 70% — здесь
+      появится alert. Сам гейт открытия сделок не блокируется, это индикатор
+      «пора триггернуть свежий strategy_search sweep».
+    </div>
+    <div id="wr-floor-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="weekly-loss-section" class="card">
+    <h2>📉 Минусы за последние 7 дней <span class="muted small">(weekly loss review)</span></h2>
+    <div class="muted small">
+      Где система проигрывала на этой неделе: пары / сессии / часы UTC / направления.
+      Помогает увидеть «слепые пятна» стратегии и понять что чинить в следующем
+      strategy_search sweep'е.
+    </div>
+    <div id="weekly-loss-content" class="muted small">Загружаю…</div>
   </section>
 
   <section id="vp-section" class="card">
@@ -163,7 +185,7 @@
   </section>
 
   <section id="agents-section" class="card">
-    <h2>🎯 60 агентов (heartbeat + auto-restart)</h2>
+    <h2>🎯 62 агента (heartbeat + auto-restart)</h2>
     <div id="agents-grid" class="agents-grid muted">Загружаю…</div>
   </section>
 </main>

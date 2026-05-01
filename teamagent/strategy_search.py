@@ -389,12 +389,13 @@ def search_all(top: int = 5) -> dict:
 
 
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_search.json"
-# 365-дневный sweep × 120 вариантов × 4 сессий × 28 пар = ~50 мин. Часовой
-# шедулер бы убивал sweep до завершения, поэтому LOOP = 24h. Если на старте
-# `strategy_config.json` уже свежий (моложе 23h) — sweep пропускается, просто
-# heartbeat. Это позволяет hourly schedule перезапускать систему дёшево.
-LOOP_INTERVAL_SEC = 24 * 60 * 60
-SKIP_IF_FRESHER_THAN_SEC = 23 * 60 * 60
+# 365-дневный sweep × 120 вариантов × 4 сессий × 28 пар = ~50 мин (тратит много
+# Yahoo-вызовов и ACU). Пользователь явно попросил «каждые 5 дней, 4 раза в
+# месяц» — этого хватит чтобы стратегия не устаревала, но не палить ACU. Если
+# на старте `strategy_config.json` уже свежий (моложе ~5d) — sweep пропускается,
+# просто heartbeat. Между sweeps торгуем по уже найденному best variant.
+LOOP_INTERVAL_SEC = 5 * 24 * 60 * 60         # 5 дней
+SKIP_IF_FRESHER_THAN_SEC = 5 * 24 * 60 * 60 - 60 * 60   # 5d - 1h (буфер)
 HEARTBEAT_INTERVAL_SEC = 60        # каждую минуту, чтобы watchdog видел
 
 
@@ -417,12 +418,38 @@ def _on_sig(signum, frame):
     log.info("strategy_search: SIGTERM/SIGINT — stopping")
 
 
+LOCKED_FILE = config.STATE_DIR / "strategy_config_locked.json"
+
+
+def _maybe_lock_baseline(out: dict) -> None:
+    """После каждого sweep'а: если locked-snapshot ещё нет — закрепляем
+    текущий результат как baseline. Если уже есть — НЕ перетираем (locked
+    остаётся «эталоном», который пользователь явно подтвердил выше 70%).
+
+    Чтобы пере-закрепить вручную (например после новой просадки и нового
+    sweep'а): `python -m teamagent.strategy_search --relock`.
+    """
+    if LOCKED_FILE.exists():
+        return
+    qualified = out.get("summary", {}).get("qualified_count", 0)
+    if qualified == 0:
+        log.info("strategy_search: 0 qualified cells — НЕ закрепляю baseline (нечего закреплять)")
+        return
+    snapshot = dict(out)
+    snapshot["_locked_at"] = datetime.now(timezone.utc).isoformat()
+    snapshot["_locked_qualified_count"] = qualified
+    snapshot["_locked_reason"] = "first valid 365-day sweep"
+    LOCKED_FILE.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False))
+    log.info(f"strategy_search: closed {qualified} qualified cells locked as baseline → {LOCKED_FILE}")
+
+
 def _do_one_run(top: int = 5) -> dict:
     log.info("strategy_search: starting full sweep")
     out = search_all(top=top)
     OUTPUT_FILE.write_text(json.dumps(out, indent=2, ensure_ascii=False))
     log.info(f"strategy_search done — wrote {OUTPUT_FILE} "
              f"(qualified={out['summary']['qualified_count']}/{out['summary']['total_pairs']})")
+    _maybe_lock_baseline(out)
     return out
 
 
@@ -469,12 +496,34 @@ def run_loop(top: int = 5) -> None:
     log.info("strategy_search loop exit")
 
 
+def _relock() -> None:
+    """Принудительно перезаписывает strategy_config_locked.json текущим
+    strategy_config.json. Использовать когда новый sweep дал лучший результат
+    и пользователь явно хочет «закрепить новую базу»."""
+    if not OUTPUT_FILE.exists():
+        log.error(f"strategy_config.json не найден ({OUTPUT_FILE}) — нечего перезакреплять.")
+        return
+    cfg = json.loads(OUTPUT_FILE.read_text())
+    qualified = cfg.get("summary", {}).get("qualified_count", 0)
+    cfg["_locked_at"] = datetime.now(timezone.utc).isoformat()
+    cfg["_locked_qualified_count"] = qualified
+    cfg["_locked_reason"] = "manual --relock"
+    LOCKED_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
+    log.info(f"strategy_search: re-locked baseline ({qualified} qualified cells) → {LOCKED_FILE}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--top", type=int, default=5, help="how many top variants to keep per pair")
-    ap.add_argument("--loop", action="store_true", help="run as a daemon (refresh every 24h)")
+    ap.add_argument("--loop", action="store_true",
+                    help="run as a daemon (refresh every LOOP_INTERVAL_SEC = 5 days)")
+    ap.add_argument("--relock", action="store_true",
+                    help="force re-locking strategy_config_locked.json from current strategy_config.json")
     args = ap.parse_args()
 
+    if args.relock:
+        _relock()
+        return
     if args.loop:
         run_loop(top=args.top)
     else:

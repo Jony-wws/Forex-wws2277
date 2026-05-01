@@ -82,7 +82,7 @@ Stop everything: `bash scripts/stop_all.sh`.
 | `state_committer.py` | every 15 min: `git add+commit+push` of state/*.json so trade history survives across sessions |
 | `dashboard/server.py` | FastAPI: `/api/forecasts`, `/api/forecast/{pair}`, `/api/open-trades`, `/api/closed-trades`, `/api/stats`, `/api/volume-profile/{pair}`, `/api/health`, `/api/agents`, `/api/backtest` |
 | `dashboard/static/` | vanilla JS frontend, auto-refresh every 30 sec |
-| `agents/` | 60 subprocess agents: 28 specialists + 14 analyzers + 10 learners + 5 health + 3 LLM |
+| `agents/` | 62 subprocess agents: 28 specialists + 14 analyzers + 12 learners (incl. WR floor monitor + weekly loss review) + 5 health + 3 LLM |
 
 ## State files (in `teamagent/state/`)
 
@@ -117,9 +117,31 @@ Stop everything: `bash scripts/stop_all.sh`.
    blocker; it's used only to enrich the chosen variant (side flip / fixed expiry).
    This is the user's explicit override of the earlier strict gate. Do NOT
    reintroduce the strict gate without an equally explicit user request.
-8. **strategy_search runs hourly**: `LOOP_INTERVAL_SEC = 3600` (was 86400 / 24h).
-   Each hour the system re-evaluates 120 variants × 4 sessions × 90-day Yahoo
-   history per pair so the chosen variant adapts to the current regime.
+8. **strategy_search re-trains every 5 days** (since 2026-05-01, per user request
+   to save ACU): `LOOP_INTERVAL_SEC = 5 * 24 * 3600`. Each sweep re-evaluates 120
+   variants × 4 sessions × **365-day** Yahoo history per pair (≈50 min). Between
+   sweeps the system trades on the most recent strategy_config.json. Use
+   `python -m teamagent.strategy_search --relock` to manually re-lock the
+   baseline if a new sweep beats the locked one.
+
+9. **Locked baseline strategy**: after the first valid 365-day sweep,
+   strategy_search auto-snapshots `strategy_config.json` →
+   `strategy_config_locked.json`. paper_trader uses the locked file as a
+   fallback whenever the live strategy_config is empty (e.g. sweep in progress
+   on a fresh session). Locked file is committed by state_committer so it
+   survives across sessions. Re-lock manually with `--relock` after a new
+   confirmed-better sweep.
+
+10. **WR floor monitor (alert, NOT a gate)**: `learner_wr_floor_monitor` agent
+    computes rolling WR over last 50 closed trades every 5 min. If it drops
+    below 70%, dashboard shows ⚠️ alert. Trade-open gate is unchanged (still
+    free 70% on probability). Floor monitor is purely diagnostic — "time to
+    trigger fresh sweep".
+
+11. **Weekly loss review**: `learner_weekly_loss_review` agent runs every 6h,
+    summarizes losses from the last 7 days by pair / session / hour UTC /
+    direction, identifies pairs with WR ≤ 40% (≥3 trades). Surfaces the
+    "blind spots" of the current strategy on the dashboard.
 
 ## Optional API keys (env vars)
 

@@ -53,7 +53,7 @@ def all_agents() -> list[dict]:
             "init_args": {},
         })
 
-    # ─── 10 learners ───
+    # ─── 12 learners (10 + 2 added 2026-05-01: WR floor monitor + weekly loss review) ───
     learner_specs = [
         ("agent_score_calibration", "ScoreCalibrationLearner"),
         ("session_winrate",         "SessionWinrateLearner"),
@@ -65,6 +65,8 @@ def all_agents() -> list[dict]:
         ("news_impact_learner",     "NewsImpactLearner"),
         ("dxy_validity",            "DXYValidityLearner"),
         ("pnl_curve_tracker",       "PnLCurveLearner"),
+        ("wr_floor_monitor",        "WRFloorMonitor"),
+        ("weekly_loss_review",      "WeeklyLossReview"),
     ]
     for name, cls in learner_specs:
         agents.append({
@@ -107,5 +109,5 @@ def all_agents() -> list[dict]:
             "init_args": {},
         })
 
-    assert len(agents) == 60, f"expected 60 agents, got {len(agents)}"
+    assert len(agents) == 62, f"expected 62 agents, got {len(agents)}"
     return agents
