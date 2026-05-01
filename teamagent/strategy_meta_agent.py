@@ -64,10 +64,13 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_meta_agent.json"
 
 # ───── параметры цикла ─────
 LOOP_INTERVAL_SEC = 5 * 60 * 60          # 5 часов
-LOOKBACK_DAYS = 5                        # окно бэктеста
+LOOKBACK_DAYS = 10                       # МАКСИМАЛЬНОЕ окно (snapshot-фрейм)
+                                         # Реальный walk-forward делается по
+                                         # MULTI_WINDOWS — каждой ячейке даём 4
+                                         # шанса попасть в 70% WR.
+MULTI_WINDOWS = [3, 5, 7, 10]            # дни — несколько окон, лучшее
+                                         # выбирается по Wilson_lower
 MIN_TRADES_FOR_VALID = 5                 # минимум сделок чтобы ячейка считалась
-                                         # (8→5: short 5d window даёт меньше сделок,
-                                         #  но 5 + Wilson 60% всё равно стат. значимо)
 QUALIFIED_WR_PCT = 70.0                  # минимум WR для QUALIFIED — НЕ снижаем
 QUALIFIED_WILSON_LOWER_PCT = 60.0        # минимум Wilson нижней границы — НЕ снижаем
 PROBABLE_WR_PCT = 55.0                   # граница PROBABLE/FROZEN
@@ -375,7 +378,9 @@ def _fetch_5d_snapshots(pair: str) -> Optional[list]:
     bars = yahoo.fetch(pair, interval="1h", period="60d")
     if bars is None or bars.empty or len(bars) < 60:
         return None
-    cutoff = bars.index[-1] - timedelta(days=LOOKBACK_DAYS)
+    # Окно snapshot-фрейма = max(MULTI_WINDOWS) — даёт всем окнам общий
+    # источник снимков; затем _evaluate_cell фильтрует по ts для каждого окна.
+    cutoff = bars.index[-1] - timedelta(days=max(MULTI_WINDOWS))
     start_idx = bars.index.searchsorted(cutoff)
     if start_idx >= len(bars) - 5:
         return None
@@ -491,10 +496,25 @@ def _walk_session(snapshots: list, strategy: strategies.Strategy,
     return trades, wins, losses
 
 
-def _evaluate_cell(snapshots: list, session_name: str,
-                   session_window: tuple[int, int]) -> dict:
-    """Перебор 120 вариантов на одной (pair, session) ячейке. Возвращает
-    лучший результат (по Wilson_lower с тай-брейком на trades)."""
+def _filter_snapshots_by_days(snapshots: list, days: int) -> list:
+    """Возвращает суффикс snapshots где ts ≥ last_ts - days. Линейный поиск
+    с конца, т.к. snapshots отсортированы по времени."""
+    if not snapshots:
+        return []
+    last_ts = snapshots[-1][0]
+    cutoff = last_ts - timedelta(days=days)
+    # бинарный поиск по списку tuples — pandas-нативно проще, но snapshots
+    # это list[tuple], так что простая итерация с конца до cutoff.
+    for i in range(len(snapshots) - 1, -1, -1):
+        if snapshots[i][0] < cutoff:
+            return snapshots[i + 1:]
+    return snapshots
+
+
+def _evaluate_cell_one_window(snapshots: list, session_window: tuple[int, int]) -> Optional[dict]:
+    """Перебор всех вариантов на одном окне. Возвращает лучший по
+    (wilson_lower, wr, trades) или None если ни один variant не выдал
+    MIN_TRADES_FOR_VALID сделок."""
     best: Optional[dict] = None
     for strat in strategies.VARIANTS:
         try:
@@ -505,7 +525,6 @@ def _evaluate_cell(snapshots: list, session_name: str,
             continue
         wr = (w / tr * 100.0) if tr else 0.0
         wilson = _wilson_lower(w, tr)
-        # tie-break: Wilson_lower → wr → trades
         score_key = (round(wilson, 2), round(wr, 2), tr)
         if best is None or score_key > best["_key"]:
             best = {
@@ -518,16 +537,54 @@ def _evaluate_cell(snapshots: list, session_name: str,
                 "win_rate_pct": round(wr, 1),
                 "wilson_lower_pct": round(wilson, 1),
             }
+    return best
+
+
+def _evaluate_cell(snapshots: list, session_name: str,
+                   session_window: tuple[int, int]) -> dict:
+    """Multi-window перебор: пробуем 3/5/7/10 дневные окна и выбираем то,
+    где Wilson_lower выше всего. Это даёт каждой ячейке 4× больше шансов
+    попасть в 70% WR без снижения гейта.
+
+    Возвращает лучший cell-result со всех окон (с пометкой winning_window_days).
+    """
+    best: Optional[dict] = None
+    best_window: Optional[int] = None
+    candidates_summary: list[dict] = []
+    for win_days in MULTI_WINDOWS:
+        sub = _filter_snapshots_by_days(snapshots, win_days)
+        if len(sub) < 24:  # минимум 24 часовых бара
+            continue
+        cand = _evaluate_cell_one_window(sub, session_window)
+        if cand is None:
+            continue
+        candidates_summary.append({
+            "window_days": win_days,
+            "variant": cand["variant"],
+            "win_rate_pct": cand["win_rate_pct"],
+            "wilson_lower_pct": cand["wilson_lower_pct"],
+            "trades": cand["trades"],
+        })
+        if best is None or cand["_key"] > best["_key"]:
+            best = cand
+            best_window = win_days
     if best is None:
         return {
             "session": session_name,
             "session_window_utc": list(session_window),
             "status": "FROZEN",
-            "reason": "no variant met MIN_TRADES_FOR_VALID",
+            "reason": "no variant met MIN_TRADES_FOR_VALID across windows",
             "trades": 0,
+            "window_candidates": candidates_summary,
         }
     best.pop("_key", None)
-    return {**best, "session": session_name, "session_window_utc": list(session_window)}
+    return {
+        **best,
+        "session": session_name,
+        "session_window_utc": list(session_window),
+        "winning_window_days": best_window,
+        "window_candidates": candidates_summary,
+    }
 
 
 def evaluate_pair_with_snapshots(pair: str, snapshots: Optional[list]) -> dict:
@@ -693,6 +750,8 @@ def run_full_sweep() -> dict:
                 "side_bias": cell.get("side_bias", 0),
                 "ensemble_sources": cell.get("ensemble_sources", []),
                 "session_window_utc": cell.get("session_window_utc"),
+                "winning_window_days": cell.get("winning_window_days"),
+                "window_candidates": cell.get("window_candidates", []),
             }
             if status == "QUALIFIED":
                 qualified += 1

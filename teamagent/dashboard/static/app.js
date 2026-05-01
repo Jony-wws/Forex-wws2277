@@ -875,10 +875,10 @@ async function refreshMetaStrategy() {
 
     if (!r.as_of) {
       grid.innerHTML = `<div class="muted">
-        Первый прогон ещё не выполнен. Агент запускается в составе orchestrator-а
-        и сделает первый sweep сразу после старта (~5–10 мин на 28 пар × 4 сессии × 120 вариантов).
+        Первый прогон ещё не выполнен. Агент запущен и сделает
+        первый полный sweep в ближайшие ~10 секунд.
       </div>`;
-      if (badge) { badge.textContent = "ждёт первый sweep"; badge.className = "badge-stable muted"; }
+      if (badge) { badge.textContent = "ждёт первый прогон"; badge.className = "badge-stable muted"; }
       return;
     }
 
@@ -895,23 +895,23 @@ async function refreshMetaStrategy() {
     const cycle = (summary.cycle_seconds || 18000) / 3600;
 
     if (badge) {
-      badge.textContent = `${qual}/${total} ≥70%`;
+      badge.textContent = `${qual}/${total} ≥70% WR`;
       badge.className = "badge-stable " + (qual > 0 ? "green" : "muted");
     }
 
     grid.innerHTML = `
-      <div class="meta-cell"><div class="big">${qual}</div><div class="muted small">QUALIFIED</div></div>
-      <div class="meta-cell"><div class="big yellow">${prob}</div><div class="muted small">PROBABLE</div></div>
-      <div class="meta-cell"><div class="big orange">${frozen}</div><div class="muted small">FROZEN</div></div>
-      <div class="meta-cell"><div class="big">${noData}</div><div class="muted small">no-data</div></div>
+      <div class="meta-cell"><div class="big green">${qual}</div><div class="muted small">КАЧЕСТВЕННЫЕ</div></div>
+      <div class="meta-cell"><div class="big yellow">${prob}</div><div class="muted small">ВЕРОЯТНЫЕ</div></div>
+      <div class="meta-cell"><div class="big orange">${frozen}</div><div class="muted small">ЗАМОРОЖЕНЫ</div></div>
+      <div class="meta-cell"><div class="big">${noData}</div><div class="muted small">нет данных</div></div>
       <div class="meta-cell"><div class="big">${expected != null ? expected + "%" : "—"}</div><div class="muted small">средняя WR</div></div>
-      <div class="meta-cell"><div class="big">${dur ? dur.toFixed(0) + "s" : "—"}</div><div class="muted small">длительность</div></div>
-      <div class="meta-cell"><div class="big">${lookback}d</div><div class="muted small">окно</div></div>
+      <div class="meta-cell"><div class="big">${dur ? dur.toFixed(0) + "с" : "—"}</div><div class="muted small">длительность</div></div>
+      <div class="meta-cell"><div class="big">3-10д</div><div class="muted small">multi-window</div></div>
       <div class="meta-cell"><div class="big">${cycle}ч</div><div class="muted small">цикл</div></div>
       <div class="meta-cell" style="grid-column: 1 / -1;">
         <div class="muted small">
           обновлено: ${_formatTs(r.as_of)}
-          ${fetchSec != null ? ` · fetch ${fetchSec}s + eval ${evalSec}s` : ""}
+          ${fetchSec != null ? ` · загрузка ${fetchSec}с + расчёт ${evalSec}с` : ""}
         </div>
       </div>
     `;
@@ -929,8 +929,13 @@ async function refreshMetaStrategy() {
         return (b.wilson_adjusted_pct || 0) - (a.wilson_adjusted_pct || 0);
       });
       if (cellArr.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="muted">пока нет ячеек</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="muted">пока нет ячеек</td></tr>';
       } else {
+        const STATUS_RU = {
+          "QUALIFIED": "КАЧЕСТВЕННАЯ",
+          "PROBABLE":  "ВЕРОЯТНАЯ",
+          "FROZEN":    "ЗАМОРОЖЕНА",
+        };
         tbody.innerHTML = cellArr
           .slice(0, 60)
           .map((c) => {
@@ -938,16 +943,19 @@ async function refreshMetaStrategy() {
               .map((s) => s.name + (s.pts ? ` (${s.pts > 0 ? "+" : ""}${s.pts})` : ""))
               .join(", ") || "—";
             const colorCls = _metaStatusColor(c.status);
+            const statusRu = STATUS_RU[c.status] || c.status;
             const biasStr = c.side_bias > 0 ? "BUY +" + c.side_bias
               : c.side_bias < 0 ? "SELL " + c.side_bias
-              : "NEUT";
+              : "НЕЙТР.";
+            const winDays = c.winning_window_days != null ? c.winning_window_days + "д" : "—";
             return `<tr>
               <td><b>${c.pair}</b></td>
               <td>${c.session}</td>
-              <td class="${colorCls}">${c.status}</td>
+              <td class="${colorCls}">${statusRu}</td>
               <td>${c.win_rate_pct != null ? c.win_rate_pct + "%" : "—"}</td>
               <td>${c.wilson_lower_pct != null ? c.wilson_lower_pct + "%" : "—"}</td>
               <td>${c.trades || 0}</td>
+              <td>${winDays}</td>
               <td><span class="muted small">${c.variant || "—"}</span></td>
               <td>${biasStr}</td>
               <td><span class="muted small">${sources}</span></td>
