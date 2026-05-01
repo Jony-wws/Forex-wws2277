@@ -430,6 +430,43 @@
     </div>
   </section>
 
+  <!-- ───── PRO: «Что происходит ВНУТРИ рынка» (microstructure) ───── -->
+  <section id="microstructure-section" class="card pro-card">
+    <h2>🔬 Что происходит ВНУТРИ рынка <span class="badge pro-badge">PRO</span></h2>
+    <div class="muted small">
+      Микроструктура рынка: Wyckoff Stage (Accumulation/Markup/Distribution/Markdown),
+      Cumulative Delta (куда уходят деньги), Smart Money Concepts (Order Blocks,
+      Fair Value Gaps, Liquidity Sweeps), Whale activity, Hurst exponent (тренд vs
+      mean-reversion). <b>Внутренний факт</b> — что показывает order flow прямо сейчас.
+      <b>Внешний вид</b> — структурный режим / стадия / магниты для цены.
+    </div>
+    <div class="muted small">
+      ⚠️ Загрузка ~30-40 сек (28 пар × ~1 сек на пару). Кнопка ниже — обновить вручную.
+    </div>
+    <div style="margin: 8px 0;">
+      <button id="microstructure-refresh-btn" style="padding: 6px 14px; background: #58a6ff; color: #0d1117; border: 0; border-radius: 4px; font-weight: 700; cursor: pointer;">
+        🔄 Обновить microstructure
+      </button>
+      <span id="microstructure-status" class="muted small" style="margin-left: 10px;"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="microstructure-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Wyckoff Stage</th>
+            <th>Δ Delta</th>
+            <th>Hurst</th>
+            <th>SMC (OB · FVG · Sweep · Whale)</th>
+            <th>Внутренний факт</th>
+            <th>Внешний вид</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="7" class="muted">нажми «Обновить microstructure» чтобы посчитать всё внутри 28 пар</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="agents-section" class="card">
     <h2>🎯 62 агента (heartbeat + auto-restart)</h2>
     <div id="agents-grid" class="agents-grid muted">Загружаю…</div>

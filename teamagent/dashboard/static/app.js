@@ -681,6 +681,66 @@ async function refreshDailyClosed() {
   } catch (e) { console.error("daily closed:", e); }
 }
 
+// ───── PRO microstructure («что внутри рынка») ─────
+async function refreshMicrostructure() {
+  const btn = $("microstructure-refresh-btn");
+  const status = $("microstructure-status");
+  if (!btn) return;
+  btn.disabled = true;
+  status.textContent = "считаем 28 пар (~30-40 сек)...";
+  try {
+    const t0 = Date.now();
+    const r = await api("/api/microstructure");
+    const took = ((Date.now() - t0) / 1000).toFixed(1);
+    const tb = document.querySelector("#microstructure-table tbody");
+    tb.innerHTML = "";
+    const pairs = r.pairs || {};
+    const keys = Object.keys(pairs).sort();
+    if (!keys.length) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 7, class: "muted" }, "пусто")));
+      status.textContent = "пусто";
+      return;
+    }
+    for (const pair of keys) {
+      const p = pairs[pair];
+      if (p.error) {
+        tb.appendChild(el("tr", {},
+          el("td", { class: "mono" }, pair),
+          el("td", { colspan: 6, class: "muted" }, "ошибка: " + p.error)));
+        continue;
+      }
+      const stage = p.wyckoff_stage || "UNKNOWN";
+      const stagePill = el("span", { class: "wyckoff-pill " + stage }, stage);
+      const dCls = p.delta_bias === "BUY" ? "green" : (p.delta_bias === "SELL" ? "red" : "muted");
+      const deltaTxt = p.delta_norm_pct == null ? "—" : ((p.delta_norm_pct >= 0 ? "+" : "") + p.delta_norm_pct.toFixed(0) + "%");
+      const hurst = p.hurst_H == null ? "—" : `${p.hurst_H} (${p.hurst_regime})`;
+      const smc = `${p.n_order_blocks ?? 0} · ${p.n_fvgs ?? 0} · ${p.n_sweeps ?? 0} · ${p.n_whales ?? 0}`;
+      const innerLines = (p.inner_facts || []).join(" · ") || "—";
+      const outerLines = (p.outer_view || []).join(" · ") || "—";
+      const row = el("tr", {},
+        el("td", { class: "mono" }, pair),
+        el("td", {}, stagePill),
+        el("td", { class: dCls + " mono" }, deltaTxt),
+        el("td", { class: "mono small" }, hurst),
+        el("td", { class: "mono" }, smc),
+        el("td", { class: "small" }, innerLines),
+        el("td", { class: "small" }, outerLines),
+      );
+      tb.appendChild(row);
+    }
+    status.textContent = `обновлено за ${took}s`;
+  } catch (e) {
+    console.error("microstructure:", e);
+    status.textContent = "ошибка: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("microstructure-refresh-btn");
+  if (btn) btn.addEventListener("click", refreshMicrostructure);
+});
+
 // ───── Market Radar (20 scanners × 28 pairs) ─────
 async function refreshMarketRadar() {
   try {

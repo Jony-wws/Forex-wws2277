@@ -252,6 +252,57 @@ def api_daily_paused():
     return _load(config.STATE_DIR / "daily_paused_pairs.json", {})
 
 
+@app.get("/api/microstructure/{pair}")
+def api_microstructure(pair: str):
+    """PRO-уровень: «что происходит ВНУТРИ рынка» по конкретной паре.
+    Возвращает: cumulative_delta, footprint grid, SMC (order_blocks/FVG/liquidity_sweeps),
+    Wyckoff stage, whale activity, Hurst exponent + summary (inner_facts/outer_view).
+    Считается онлайн (тяжёлый запрос — ~1-3 сек), не кэшируется в state."""
+    try:
+        from .. import market_microstructure as _ms  # noqa
+    except ImportError:
+        from teamagent import market_microstructure as _ms
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        return {"error": f"unknown pair {pair}", "valid_pairs": config.PAIRS}
+    try:
+        return _ms.analyze(pair) or {"error": "no data"}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
+@app.get("/api/microstructure")
+def api_microstructure_all():
+    """Краткая сводка microstructure по всем 28 парам (для overview таблицы).
+    Считает только Wyckoff stage + cumulative_delta bias + Hurst regime
+    (быстрая часть payload, ~1 сек на пару)."""
+    try:
+        from teamagent import market_microstructure as _ms
+    except ImportError:
+        return {"error": "microstructure module not available"}
+    out = {}
+    for pair in config.PAIRS:
+        try:
+            r = _ms.analyze(pair) or {}
+            out[pair] = {
+                "wyckoff_stage": (r.get("wyckoff") or {}).get("stage"),
+                "wyckoff_confidence": (r.get("wyckoff") or {}).get("confidence"),
+                "delta_bias": (r.get("cumulative_delta") or {}).get("bias"),
+                "delta_norm_pct": (r.get("cumulative_delta") or {}).get("norm_pct"),
+                "hurst_H": (r.get("hurst") or {}).get("H"),
+                "hurst_regime": (r.get("hurst") or {}).get("regime"),
+                "n_order_blocks": len(r.get("order_blocks") or []),
+                "n_fvgs": len(r.get("fair_value_gaps") or []),
+                "n_sweeps": len(r.get("liquidity_sweeps") or []),
+                "n_whales": len(r.get("whales") or []),
+                "inner_facts": (r.get("summary") or {}).get("inner_facts") or [],
+                "outer_view": (r.get("summary") or {}).get("outer_view") or [],
+            }
+        except Exception as e:
+            out[pair] = {"error": f"{type(e).__name__}: {e}"}
+    return {"as_of": datetime.now(timezone.utc).isoformat(), "pairs": out}
+
+
 @app.get("/api/market-radar")
 def api_market_radar():
     """«Военный радар» рынка: 20+ независимых сканеров × 28 пар.
