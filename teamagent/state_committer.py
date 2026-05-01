@@ -108,7 +108,9 @@ def _commit_once() -> str:
     if not files:
         return "no state files yet"
 
-    rc, out = _git("add", "--", *files)
+    # -f нужен потому что некоторые state-файлы в .gitignore (agent_*.json) —
+    # но мы сами хотим их хранить чтобы дашборд видел их сразу при рестарте.
+    rc, out = _git("add", "-f", "--", *files)
     if rc != 0:
         return f"git add failed: {out[:200]}"
 
