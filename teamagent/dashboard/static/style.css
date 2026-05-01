@@ -502,3 +502,258 @@ button.primary {
   .stars, .aura, .premium-card::before, .stab-bar > .fill,
   .dot-pulse, .card { animation: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PURPLE SEO-AI THEME (2026-05-01)
+   ═══════════════════════════════════════════════════════════════════════
+   Перекрашивает дашборд в фиолетовый акцент (#a78bfa) с глубоким
+   тёмным фоном (#0a0612) — как на SEO-AI лендинге.
+   Применяется поверх существующих стилей. */
+
+:root {
+  --acc:        #a78bfa;   /* SEO-AI primary purple */
+  --acc-2:      #8b5cf6;   /* violet  */
+  --acc-3:      #c4b5fd;   /* light lavender for highlights */
+  --acc-glow:   rgba(167, 139, 250, 0.45);
+  --acc-soft:   rgba(167, 139, 250, 0.10);
+  --bg-deep:    #0a0612;   /* almost-black with violet undertone */
+  --bg-card:    #100a1f;   /* card surface */
+  --bg-card-2:  #1a1130;   /* card hover */
+  --border:     rgba(167, 139, 250, 0.18);
+  --border-2:   rgba(167, 139, 250, 0.35);
+}
+
+/* перекрашиваем глобальный фон — без огромных аур и без blur */
+html, body { background: var(--bg-deep); }
+body {
+  background:
+    radial-gradient(900px 600px at 90% -10%, rgba(167,139,250,0.18), transparent 55%),
+    radial-gradient(700px 500px at -10% 110%, rgba(139,92,246,0.10), transparent 55%),
+    var(--bg-deep);
+  background-attachment: fixed;
+}
+
+/* старые ауры выключаем (они перерисовывают огромные blurry-области) */
+.aura { display: none !important; }
+
+/* «звёзды» оставляем как статичный декоративный слой, выключаем drift */
+.stars { animation: none; opacity: 0.35; }
+
+/* topbar — flat без backdrop-filter */
+.topbar.premium {
+  background: rgba(16, 10, 31, 0.92);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+}
+.brand-glow {
+  background: linear-gradient(90deg, var(--acc-3), var(--acc) 50%, var(--acc-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 0 14px var(--acc-glow);
+}
+.badge-pro {
+  background: linear-gradient(120deg, var(--acc), var(--acc-2));
+  color: #0a0612;
+  box-shadow: 0 0 10px var(--acc-glow);
+}
+
+/* cards — flat (без backdrop-filter, без heavy box-shadow) */
+.card.glass {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+}
+
+.premium-card {
+  border: 1px solid var(--border-2);
+  background: linear-gradient(180deg, #150d28, #0d0820);
+}
+
+/* Premium border — мягкое сияние без вращения (раньше был conic-rotate
+   создававший «лучи»; убрали в пользу плавного градиент-pulse для глаза) */
+.premium-card::before {
+  background: linear-gradient(120deg,
+    var(--acc), var(--acc-2), var(--acc-3), var(--acc-2), var(--acc));
+  background-size: 300% 300%;
+  animation: premiumGradient 14s ease-in-out infinite;
+  opacity: 0.55;
+}
+@keyframes premiumGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes premiumBorder { 0%, 100% { background-position: 0% 50%; } } /* override старого */
+
+.hero-title {
+  background: linear-gradient(90deg, var(--acc-3), var(--acc));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.icon-shield { filter: drop-shadow(0 0 8px var(--acc-glow)); }
+.dot {
+  background: var(--acc);
+  box-shadow: 0 0 10px var(--acc), 0 0 20px var(--acc-glow);
+}
+.badge-stable {
+  background: var(--acc-soft); color: var(--acc-3);
+  border: 1px solid var(--border-2);
+  box-shadow: 0 0 8px var(--acc-glow);
+}
+
+/* assessment hero — переходит на purple */
+.assessment-headline {
+  background: rgba(20, 13, 38, 0.85);
+  border: 1px solid var(--border-2);
+  box-shadow: 0 0 20px rgba(167,139,250,0.18);
+}
+.assessment-block {
+  background: rgba(13, 8, 26, 0.55);
+  border: 1px solid var(--border);
+}
+
+/* stability grid cells — flat purple */
+.stab-cell {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  /* CSS containment — браузер пропустит layout вне cell */
+  contain: layout paint;
+}
+.stab-cell .value.blue { color: var(--acc-3); text-shadow: 0 0 8px var(--acc-glow); }
+.stab-cell.blue { border-color: var(--border-2); box-shadow: 0 0 10px rgba(167,139,250,0.18); }
+
+/* progress bar gradient — фиолетовый */
+.stab-bar > .fill {
+  background: linear-gradient(90deg, var(--acc), var(--acc-3));
+  box-shadow: 0 0 8px var(--acc-glow);
+}
+
+/* mini sparkline (NEW) — лёгкий SVG-график как на SEO-AI референсе */
+.spark {
+  width: 100%; height: 28px; margin-top: 8px; display: block;
+  overflow: visible;
+}
+.spark path.line {
+  fill: none; stroke: var(--acc); stroke-width: 1.5;
+  filter: drop-shadow(0 0 4px var(--acc-glow));
+}
+.spark path.area {
+  fill: url(#spark-grad);
+}
+.spark .dot-end {
+  fill: var(--acc-3); filter: drop-shadow(0 0 6px var(--acc-glow));
+}
+
+/* анимация смены значения числа (count-up инициируется в JS) */
+.stab-cell .value, .assessment-headline .score {
+  transition: color 0.3s ease;
+}
+.stab-cell.flash .value {
+  animation: flashPulse 0.6s ease;
+}
+@keyframes flashPulse {
+  0%   { text-shadow: 0 0 4px var(--acc-glow); }
+  50%  { text-shadow: 0 0 18px var(--acc), 0 0 30px var(--acc-glow); }
+  100% { text-shadow: 0 0 4px var(--acc-glow); }
+}
+
+/* live indicator (NEW) — пульсирует у hero-title когда данные обновляются */
+.live-pulse {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #3fb950; box-shadow: 0 0 8px #3fb950;
+  margin-left: 6px;
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* кнопки — фиолетовые */
+button, .auto-refresh button {
+  background: linear-gradient(180deg, rgba(167,139,250,0.18), rgba(167,139,250,0.06));
+  border: 1px solid var(--border-2);
+  color: #e6edf3;
+}
+button:hover {
+  border-color: var(--acc);
+  box-shadow: 0 0 14px var(--acc-glow), 0 4px 10px rgba(0,0,0,0.35);
+}
+button.primary {
+  background: linear-gradient(120deg, var(--acc), var(--acc-2));
+  color: #0d1117; border-color: transparent;
+  box-shadow: 0 0 14px var(--acc-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE-FIRST PERFORMANCE OVERRIDES (Android Chrome не лагает)
+   ═══════════════════════════════════════════════════════════════════════
+   На любом устройстве без hover (= touch) ИЛИ узком экране (<= 900px)
+   убираем ВСЕ дорогие эффекты композитинга. */
+
+@media (hover: none), (max-width: 900px) {
+  /* No blur anywhere on mobile — это самое тяжёлое для Android Chrome */
+  .topbar.premium, .card.glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Большие декоративные слои выключаем полностью */
+  .stars { display: none !important; }
+  .aura  { display: none !important; }
+
+  /* Анимированную обводку premium-карточек выключаем (rotate большого слоя
+     создаёт промежуточный compositor-layer на каждый кадр). */
+  .premium-card::before { animation: none !important; opacity: 0.35; }
+
+  /* Shimmer и pulse — дёшево, оставляем pulse, но shimmer убираем (filter: brightness)
+     filter — самое тяжёлое */
+  .stab-bar > .fill { animation: none !important; }
+  .icon-shield { filter: none !important; }
+
+  /* Карточкам — упрощённый shadow */
+  .card.glass { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .premium-card { box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
+
+  /* hover-эффекты touch-устройствам не нужны и вызывают лаги */
+  .card.glass:hover, .stab-cell:hover {
+    transform: none !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  }
+  .stab-cell::after { display: none !important; }
+
+  /* Уменьшаем количество text-shadow слоёв */
+  .stab-cell .value.green,
+  .stab-cell .value.yellow,
+  .stab-cell .value.red,
+  .stab-cell .value.blue,
+  .brand-glow,
+  .dot { text-shadow: none !important; box-shadow: none !important; }
+
+  /* На узком экране делаем сетку 2 колонки (не 3-4) */
+  .stability-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .stab-cell .value { font-size: 1.2rem; }
+  .stab-cell .label { font-size: 0.7rem; }
+  .stab-cell .hint { display: none; } /* hint занимает много места на узком экране */
+
+  /* Slide-in анимация card на mobile — отключаем */
+  .card { animation: none !important; }
+}
+
+/* очень узкий экран (старые телефоны) — 1 колонка */
+@media (max-width: 480px) {
+  .stability-grid { grid-template-columns: 1fr !important; }
+  .stab-cell .hint { display: block; }
+  main { padding: 12px; gap: 12px; }
+  .topbar.premium { padding: 10px 12px; flex-wrap: wrap; gap: 8px; }
+  .clock-block { min-width: 0; padding: 4px 8px; }
+}
+
+/* CSS containment на длинные секции — скроллится в разы быстрее */
+#stability-section,
+#assessment-section,
+.card { contain: content; }

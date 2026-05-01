@@ -79,6 +79,95 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
+// ─── Mobile / touch detection (для отключения тяжёлых эффектов) ───
+const IS_TOUCH = window.matchMedia("(hover: none)").matches;
+const IS_MOBILE = window.matchMedia("(max-width: 900px)").matches;
+const IS_REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ANIMATE_NUMBERS = !IS_REDUCED;
+
+// ─── Count-up tween: плавно подкручивает число от current → target ───
+// Реализация на requestAnimationFrame — НЕ setInterval (не лагает на mobile)
+const _tweenState = new WeakMap();
+function tweenNumber(node, target, fmt, duration = 600) {
+  if (!node) return;
+  // если ANIMATE_NUMBERS=false — мгновенно
+  if (!ANIMATE_NUMBERS) {
+    node.textContent = fmt(target);
+    _tweenState.set(node, { value: target });
+    return;
+  }
+  const prev = _tweenState.get(node);
+  const start = (prev && typeof prev.value === "number") ? prev.value : target;
+  if (Math.abs(start - target) < 1e-9) {
+    node.textContent = fmt(target);
+    _tweenState.set(node, { value: target });
+    return;
+  }
+  // отменяем предыдущий tween на этой ноде
+  if (prev && prev.raf) cancelAnimationFrame(prev.raf);
+  const t0 = performance.now();
+  const ease = (t) => 1 - Math.pow(1 - t, 3); // easeOutCubic
+  const state = { value: start, raf: 0 };
+  _tweenState.set(node, state);
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / duration);
+    const v = start + (target - start) * ease(t);
+    state.value = v;
+    node.textContent = fmt(v);
+    if (t < 1) state.raf = requestAnimationFrame(step);
+    else state.value = target;
+  };
+  state.raf = requestAnimationFrame(step);
+
+  // визуальный flash на родительской карточке
+  const cell = node.closest(".stab-cell");
+  if (cell) {
+    cell.classList.remove("flash");
+    void cell.offsetWidth; // restart animation
+    cell.classList.add("flash");
+  }
+}
+
+// ─── Sparkline: тонкий SVG-график, показывает динамику метрики во времени ───
+// Хранит последние N значений per-key в памяти, рисует SVG path.
+const _sparkHistory = new Map();
+const SPARK_MAX = 40;
+function pushSparkValue(key, value) {
+  if (!_sparkHistory.has(key)) _sparkHistory.set(key, []);
+  const arr = _sparkHistory.get(key);
+  if (arr.length === 0 || arr[arr.length - 1] !== value) {
+    arr.push(value);
+    if (arr.length > SPARK_MAX) arr.shift();
+  }
+}
+function buildSpark(key, color) {
+  const arr = _sparkHistory.get(key) || [];
+  if (arr.length < 2) return null;
+  const w = 100, h = 28;
+  const min = Math.min(...arr), max = Math.max(...arr);
+  const range = (max - min) || 1;
+  const xs = arr.map((_, i) => (i / (arr.length - 1)) * w);
+  const ys = arr.map(v => h - ((v - min) / range) * (h - 4) - 2);
+  const line = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)},${ys[i].toFixed(2)}`).join(" ");
+  const area = line + ` L${w},${h} L0,${h} Z`;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "spark");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="spark-grad-${key}" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%"   stop-color="${color || "#a78bfa"}" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="${color || "#a78bfa"}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path class="area" d="${area}" fill="url(#spark-grad-${key})"/>
+    <path class="line" d="${line}" stroke="${color || "#a78bfa"}"/>
+    <circle class="dot-end" cx="${xs[xs.length - 1].toFixed(2)}" cy="${ys[ys.length - 1].toFixed(2)}" r="2"/>
+  `;
+  return svg;
+}
+
 // ───── stats ─────
 async function refreshStats() {
   try {
@@ -554,24 +643,71 @@ function _verdictColor(score) {
   return "red";
 }
 
-function _stabCell(label, value, hint, color, bar) {
-  const div = el("div", { class: "stab-cell" + (color ? " " + color : "") });
-  div.appendChild(el("div", { class: "label" }, label));
-  div.appendChild(el("div", { class: "value" + (color ? " " + color : "") }, value));
-  if (hint) div.appendChild(el("div", { class: "hint" }, hint));
-  if (typeof bar === "number") {
-    const t = el("div", { class: "stab-bar" });
-    const f = el("div", { class: "fill" });
-    f.style.width = Math.max(0, Math.min(100, bar)) + "%";
-    t.appendChild(f);
-    div.appendChild(t);
+// _stabCell теперь либо обновляет существующую карточку (если key совпал
+// и она уже в DOM), либо создаёт новую. Это позволяет count-up tween
+// сохранять состояние между обновлениями.
+//
+// signature: _stabCell(grid, key, label, value, hint, color, bar, fmt, sparkKey)
+//   grid       — родительский элемент (#stability-grid)
+//   key        — стабильный идентификатор карточки (например "wilson_lower")
+//   value      — числовое значение для tween (если undefined → не tween-аем,
+//                просто пишем как textContent)
+//   bar        — число 0..100 для progress-fill, либо undefined
+//   fmt        — функция форматирования для tween: (v: number) => string
+//   sparkKey   — если задан, под значением рисуем sparkline по истории key
+function _stabCell(grid, key, label, value, hint, color, bar, fmtFn, sparkKey) {
+  let div = grid.querySelector(`[data-key="${key}"]`);
+  const isNew = !div;
+  if (isNew) {
+    div = el("div", { class: "stab-cell" + (color ? " " + color : "") });
+    div.setAttribute("data-key", key);
+    div.appendChild(el("div", { class: "label" }, label));
+    div.appendChild(el("div", { class: "value" + (color ? " " + color : "") }, ""));
+    if (hint) div.appendChild(el("div", { class: "hint" }, hint));
+    if (typeof bar === "number") {
+      const t = el("div", { class: "stab-bar" });
+      t.appendChild(el("div", { class: "fill" }));
+      div.appendChild(t);
+    }
+    if (sparkKey) {
+      const sparkSlot = el("div", { class: "spark-slot" });
+      div.appendChild(sparkSlot);
+    }
+    grid.appendChild(div);
+  } else {
+    // обновляем класс цвета (могла поменяться после нового значения)
+    div.className = "stab-cell" + (color ? " " + color : "");
+    const valueNode = div.querySelector(".value");
+    if (valueNode) valueNode.className = "value" + (color ? " " + color : "");
   }
-  // mouse-tracked glow
-  div.addEventListener("mousemove", (e) => {
-    const rect = div.getBoundingClientRect();
-    div.style.setProperty("--mx", ((e.clientX - rect.left) / rect.width * 100) + "%");
-    div.style.setProperty("--my", ((e.clientY - rect.top) / rect.height * 100) + "%");
-  });
+  // value
+  const valueNode = div.querySelector(".value");
+  if (valueNode) {
+    if (typeof value === "number" && fmtFn) {
+      tweenNumber(valueNode, value, fmtFn, 700);
+    } else {
+      valueNode.textContent = String(value);
+    }
+  }
+  // bar
+  if (typeof bar === "number") {
+    const fill = div.querySelector(".stab-bar > .fill");
+    if (fill) fill.style.width = Math.max(0, Math.min(100, bar)) + "%";
+  }
+  // sparkline
+  if (sparkKey && typeof value === "number") {
+    pushSparkValue(sparkKey, value);
+    const slot = div.querySelector(".spark-slot");
+    if (slot) {
+      slot.innerHTML = "";
+      const sp = buildSpark(sparkKey,
+        color === "green"  ? "#3fb950" :
+        color === "red"    ? "#f85149" :
+        color === "yellow" ? "#d29922" :
+        "#a78bfa");
+      if (sp) slot.appendChild(sp);
+    }
+  }
   return div;
 }
 
@@ -579,8 +715,17 @@ async function refreshStability() {
   try {
     const data = await api("/api/stability");
     if (!data || data.error) return;
+    // Очистить placeholder при первом рендере (но НЕ карточки stab-cell)
+    const grid = $("stability-grid");
+    if (grid && !grid.querySelector(".stab-cell")) grid.innerHTML = "";
     renderAssessment(data.assessment, data.report);
     renderStabilityGrid(data.report, data.min_guarantee);
+    // Live-pulse у hero-title когда обновление пришло
+    document.querySelectorAll(".live-pulse").forEach(el => {
+      el.style.animation = "none";
+      void el.offsetWidth;
+      el.style.animation = "";
+    });
   } catch (e) { console.error("stability:", e); }
 }
 
@@ -626,7 +771,9 @@ function renderAssessment(a, r) {
 function renderStabilityGrid(r, mg) {
   const grid = $("stability-grid");
   if (!grid || !r) return;
-  grid.innerHTML = "";
+
+  // НЕ wipe-аем grid — обновляем карточки in-place чтобы tween и spark
+  // сохранили состояние между обновлениями.
 
   const score = r.stability_score_0_100 ?? 0;
   const wrLo = r.wilson_wr_lower_95 ?? 0;
@@ -657,123 +804,154 @@ function renderStabilityGrid(r, mg) {
   const byS = r.qualified_by_session || {};
   const n = r.n_closed_trades ?? 0;
 
-  // Категория А: нижняя граница WR / WR
-  grid.appendChild(_stabCell("⚖ Stability score", `${score.toFixed(1)} / 100`,
-    "Сводный индекс стабильности (взвешенно из 7 компонентов)",
-    _verdictColor(score), score));
-  grid.appendChild(_stabCell("📐 Wilson WR (нижняя 95%)", wrLo.toFixed(1) + "%",
-    "Худший правдоподобный WR на текущей выборке (математическая гарантия)",
-    wrLo >= 70 ? "green" : wrLo >= 55 ? "yellow" : "red", wrLo));
-  grid.appendChild(_stabCell("📐 Wilson WR (верхняя 95%)", wrUp.toFixed(1) + "%",
-    "Лучший правдоподобный WR (та же мат. граница, верх)",
-    wrUp >= 70 ? "green" : "blue", wrUp));
-  grid.appendChild(_stabCell("🎯 Break-even WR", breakEven.toFixed(1) + "%",
-    "Минимум для выхода в ноль при payout 85% — все цифры выше = реальный + ",
-    "blue"));
-  grid.appendChild(_stabCell("🛡 С учётом slippage", slipThr.toFixed(1) + "%",
-    "Минимум WR с поправкой на 0.1% slippage (реальный execution)",
-    "blue"));
+  const fmtPct = v => v.toFixed(1) + "%";
+  const fmtPctScore = v => v.toFixed(1);
+  const fmtUSD = v => "$" + v.toFixed(3);
+  const fmtRatio = v => v.toFixed(2);
+  const fmtPctMul100 = v => (v * 100).toFixed(1) + "%";
+  const fmtCount = v => Math.round(v).toString();
 
-  // Категория B: распределение PnL (bootstrap + risk metrics)
-  grid.appendChild(_stabCell("💰 Mean PnL/trade (bootstrap)", "$" + pnlMean.toFixed(3),
-    "Среднее PnL/сделку по 2000 bootstrap-итераций реальных закрытых",
-    pnlMean >= 0 ? "green" : "red"));
-  grid.appendChild(_stabCell("📉 Bootstrap p5 PnL", "$" + pnlP5.toFixed(3),
+  // Категория А: WR (включая sparkline для нижней границы)
+  _stabCell(grid, "stability_score", "⚖ Stability score", score,
+    "Сводный индекс стабильности (взвешенно из 7 компонентов)",
+    _verdictColor(score), score, v => v.toFixed(1) + " / 100", "stability_score");
+  _stabCell(grid, "wilson_lower", "📐 Wilson WR (нижняя 95%)", wrLo,
+    "Худший правдоподобный WR на текущей выборке (математическая гарантия)",
+    wrLo >= 70 ? "green" : wrLo >= 55 ? "yellow" : "red", wrLo, fmtPct, "wilson_lower");
+  _stabCell(grid, "wilson_upper", "📐 Wilson WR (верхняя 95%)", wrUp,
+    "Лучший правдоподобный WR (та же мат. граница, верх)",
+    wrUp >= 70 ? "green" : "blue", wrUp, fmtPct, "wilson_upper");
+  _stabCell(grid, "break_even", "🎯 Break-even WR", breakEven,
+    "Минимум для выхода в ноль при payout 85% — всё выше = реальный +",
+    "blue", undefined, fmtPct);
+  _stabCell(grid, "slippage_thr", "🛡 С учётом slippage", slipThr,
+    "Минимум WR с поправкой на 0.1% slippage (реальный execution)",
+    "blue", undefined, fmtPct);
+
+  // Категория B: PnL distribution + risk metrics (со sparklines на ключевых)
+  _stabCell(grid, "pnl_mean", "💰 Mean PnL/trade (bootstrap)", pnlMean,
+    "Среднее PnL/сделку по 2000 bootstrap-итераций",
+    pnlMean >= 0 ? "green" : "red", undefined, fmtUSD, "pnl_mean");
+  _stabCell(grid, "pnl_p5", "📉 Bootstrap p5 PnL", pnlP5,
     "Худший 5%-квантиль ожидаемого среднего — гарантированный «низ»",
-    pnlP5 >= 0 ? "green" : "red"));
-  grid.appendChild(_stabCell("📈 Bootstrap p95 PnL", "$" + pnlP95.toFixed(3),
+    pnlP5 >= 0 ? "green" : "red", undefined, fmtUSD, "pnl_p5");
+  _stabCell(grid, "pnl_p95", "📈 Bootstrap p95 PnL", pnlP95,
     "Лучший 95%-квантиль ожидаемого среднего",
-    pnlP95 >= 0 ? "green" : "yellow"));
-  grid.appendChild(_stabCell("⚠ VaR 95%", "$" + var95.toFixed(3),
+    pnlP95 >= 0 ? "green" : "yellow", undefined, fmtUSD, "pnl_p95");
+  _stabCell(grid, "var_95", "⚠ VaR 95%", var95,
     "Худшая 5% потеря на сделку (historical VaR)",
-    var95 < -0.5 ? "red" : "yellow"));
-  grid.appendChild(_stabCell("⚠ CVaR 95% (хвост)", "$" + cvar95.toFixed(3),
+    var95 < -0.5 ? "red" : "yellow", undefined, fmtUSD);
+  _stabCell(grid, "cvar_95", "⚠ CVaR 95% (хвост)", cvar95,
     "Среднее тех 5% худших — хвостовой риск (Expected Shortfall)",
-    cvar95 < -0.5 ? "red" : "yellow"));
-  grid.appendChild(_stabCell("📊 Sharpe ratio (annualized)", sharpe.toFixed(2),
+    cvar95 < -0.5 ? "red" : "yellow", undefined, fmtUSD);
+  _stabCell(grid, "sharpe", "📊 Sharpe ratio (annualized)", sharpe,
     ">1 хорошо, >2 отлично, <0 хуже risk-free",
-    sharpe >= 1 ? "green" : sharpe >= 0 ? "yellow" : "red"));
-  grid.appendChild(_stabCell("📊 Sortino ratio", sortino.toFixed(2),
+    sharpe >= 1 ? "green" : sharpe >= 0 ? "yellow" : "red", undefined, fmtRatio, "sharpe");
+  _stabCell(grid, "sortino", "📊 Sortino ratio", sortino,
     "Sharpe но штрафует только за downside-волатильность",
-    sortino >= 1 ? "green" : sortino >= 0 ? "yellow" : "red"));
-  grid.appendChild(_stabCell("📉 Max Drawdown", mdd.toFixed(2) + "%",
+    sortino >= 1 ? "green" : sortino >= 0 ? "yellow" : "red", undefined, fmtRatio);
+  _stabCell(grid, "mdd", "📉 Max Drawdown", mdd,
     "Худший пик-впадина по реальной equity curve",
-    mdd > -5 ? "green" : mdd > -15 ? "yellow" : "red"));
-  grid.appendChild(_stabCell("⚖ Profit Factor", (pf === "inf" ? "∞" : (pf || 0).toFixed(2)),
+    mdd > -5 ? "green" : mdd > -15 ? "yellow" : "red", undefined, fmtPct);
+  const pfNum = pf === "inf" ? Infinity : (pf || 0);
+  _stabCell(grid, "pf", "⚖ Profit Factor",
+    pfNum === Infinity ? "∞" : pfNum,
     "Сумма выигрышей / сумма потерь — >1.5 устойчиво",
-    pf === "inf" ? "green" : (pf || 0) >= 1.5 ? "green" : (pf || 0) >= 1 ? "yellow" : "red"));
-  grid.appendChild(_stabCell("💵 Expectancy/trade", "$" + exp_.toFixed(3),
+    pfNum === Infinity ? "green" : pfNum >= 1.5 ? "green" : pfNum >= 1 ? "yellow" : "red",
+    undefined, pfNum === Infinity ? undefined : fmtRatio);
+  _stabCell(grid, "expectancy", "💵 Expectancy/trade", exp_,
     "Средняя ценность одной сделки (фактическая, не теория)",
-    exp_ >= 0 ? "green" : "red"));
-  grid.appendChild(_stabCell("🎲 Kelly half", (kelly * 100).toFixed(1) + "%",
+    exp_ >= 0 ? "green" : "red", undefined, fmtUSD);
+  _stabCell(grid, "kelly", "🎲 Kelly half", kelly,
     "Оптимальная доля капитала на сделку (Kelly/2 — стандартная практика)",
-    "blue"));
+    "blue", undefined, fmtPctMul100);
 
   // Категория C: распределение
-  grid.appendChild(_stabCell("📐 Skew", skew.toFixed(2),
+  _stabCell(grid, "skew", "📐 Skew", skew,
     "Асимметрия: <0 левый хвост (худшие потери), >0 правый (большие выигрыши)",
-    Math.abs(skew) < 1 ? "blue" : skew > 0 ? "green" : "yellow"));
-  grid.appendChild(_stabCell("📐 Kurtosis (excess)", kurt.toFixed(2),
+    Math.abs(skew) < 1 ? "blue" : skew > 0 ? "green" : "yellow", undefined, fmtRatio);
+  _stabCell(grid, "kurt", "📐 Kurtosis (excess)", kurt,
     "Толщина хвостов: 0 = норм. распределение, >3 = «жирные хвосты»",
-    Math.abs(kurt) < 3 ? "blue" : "yellow"));
+    Math.abs(kurt) < 3 ? "blue" : "yellow", undefined, fmtRatio);
 
   // Категория D: качество прогнозов
   if (brier !== null && brier !== undefined) {
-    grid.appendChild(_stabCell("🎯 Brier score", brier.toFixed(4),
+    _stabCell(grid, "brier", "🎯 Brier score", brier,
       "Точность вероятностного прогноза (0=идеально, 1=плохо)",
-      brier < 0.20 ? "green" : brier < 0.30 ? "yellow" : "red"));
+      brier < 0.20 ? "green" : brier < 0.30 ? "yellow" : "red", undefined,
+      v => v.toFixed(4), "brier");
   }
   if (ll !== null && ll !== undefined) {
-    grid.appendChild(_stabCell("🎯 Log loss", ll.toFixed(4),
+    _stabCell(grid, "log_loss", "🎯 Log loss", ll,
       "Логистический штраф за ошибочную вероятность",
-      ll < 0.5 ? "green" : ll < 0.7 ? "yellow" : "red"));
+      ll < 0.5 ? "green" : ll < 0.7 ? "yellow" : "red", undefined,
+      v => v.toFixed(4));
   }
 
   // Категория E: серии
-  grid.appendChild(_stabCell("🔥 Самая длинная серия побед", winS + " подряд",
-    "Реальная история по closed_trades.json", "green", winS * 10));
-  grid.appendChild(_stabCell("❄ Самая длинная серия убытков", lossS + " подряд",
-    "Помогает понять риск martingale", lossS >= 5 ? "red" : "yellow", lossS * 10));
-  grid.appendChild(_stabCell(`🌀 Текущая серия (${curK})`, curS + "",
-    curK === "WIN" ? "Удача на стороне системы" : curK === "LOSS" ? "Снижай stake / дай sweep refresh" : "—",
-    curK === "WIN" ? "green" : curK === "LOSS" ? "red" : "blue"));
+  _stabCell(grid, "win_streak", "🔥 Самая длинная серия побед", winS,
+    "Реальная история по closed_trades.json",
+    "green", winS * 10, v => Math.round(v) + " подряд");
+  _stabCell(grid, "loss_streak", "❄ Самая длинная серия убытков", lossS,
+    "Помогает понять риск martingale",
+    lossS >= 5 ? "red" : "yellow", lossS * 10, v => Math.round(v) + " подряд");
+  _stabCell(grid, "current_streak", `🌀 Текущая серия (${curK})`, curS,
+    curK === "WIN" ? "Удача на стороне системы" :
+      curK === "LOSS" ? "Снижай stake / дай sweep refresh" : "—",
+    curK === "WIN" ? "green" : curK === "LOSS" ? "red" : "blue",
+    undefined, fmtCount);
 
-  // Категория F: качество стратегии (per-cell)
-  grid.appendChild(_stabCell("🌐 Qualified пар (≥70% WR)", `${qPairs} / 28`,
+  // Категория F: качество стратегии
+  _stabCell(grid, "qual_pairs", "🌐 Qualified пар (≥70% WR)", qPairs,
     "Пары глобально проходят 70%-гейт на 365д истории",
-    qPairs >= 10 ? "green" : qPairs >= 5 ? "yellow" : "red", qPairs * 100 / 28));
-  grid.appendChild(_stabCell("🌐 Qualified ячеек (всего)", `${qCells} / 112`,
+    qPairs >= 10 ? "green" : qPairs >= 5 ? "yellow" : "red",
+    qPairs * 100 / 28, v => Math.round(v) + " / 28", "qual_pairs");
+  _stabCell(grid, "qual_cells", "🌐 Qualified ячеек (всего)", qCells,
     "Из 28 пар × 4 сессии — какая доля «реально» ≥70%",
-    qCells >= 30 ? "green" : qCells >= 15 ? "yellow" : "red", qCells * 100 / 112));
+    qCells >= 30 ? "green" : qCells >= 15 ? "yellow" : "red",
+    qCells * 100 / 112, v => Math.round(v) + " / 112", "qual_cells");
   for (const sess of ["Asia", "London", "Overlap", "NY"]) {
     const v = byS[sess] || 0;
-    grid.appendChild(_stabCell(`🕐 Qualified ${sess}`, `${v} / 28`,
+    _stabCell(grid, `qual_${sess}`, `🕐 Qualified ${sess}`, v,
       `Сколько пар проходят 70%-гейт в сессию ${sess}`,
-      v >= 7 ? "green" : v >= 3 ? "yellow" : "red", v * 100 / 28));
+      v >= 7 ? "green" : v >= 3 ? "yellow" : "red",
+      v * 100 / 28, vv => Math.round(vv) + " / 28");
   }
 
   // Категория G: гарантия PnL/сделку
   if (mg) {
-    grid.appendChild(_stabCell("🛡 Гарант. min PnL/trade", "$" + (mg.expected_pnl_lower_per_trade ?? 0).toFixed(3),
+    const lo = mg.expected_pnl_lower_per_trade ?? 0;
+    const me = mg.expected_pnl_mean_per_trade ?? 0;
+    const up = mg.expected_pnl_upper_per_trade ?? 0;
+    _stabCell(grid, "guar_lower", "🛡 Гарант. min PnL/trade", lo,
       "Wilson lower × payout − (1−lower) × stake — нижняя граница PnL",
-      (mg.expected_pnl_lower_per_trade || 0) >= 0 ? "green" : "red"));
-    grid.appendChild(_stabCell("📏 Mean гарант. PnL/trade", "$" + (mg.expected_pnl_mean_per_trade ?? 0).toFixed(3),
+      lo >= 0 ? "green" : "red", undefined, fmtUSD, "guar_lower");
+    _stabCell(grid, "guar_mean", "📏 Mean гарант. PnL/trade", me,
       "Текущая средняя ценность сделки (точечная оценка)",
-      (mg.expected_pnl_mean_per_trade || 0) >= 0 ? "green" : "yellow"));
-    grid.appendChild(_stabCell("📈 Upper гарант. PnL/trade", "$" + (mg.expected_pnl_upper_per_trade ?? 0).toFixed(3),
+      me >= 0 ? "green" : "yellow", undefined, fmtUSD, "guar_mean");
+    _stabCell(grid, "guar_upper", "📈 Upper гарант. PnL/trade", up,
       "Лучшая правдоподобная оценка PnL/trade",
-      (mg.expected_pnl_upper_per_trade || 0) >= 0 ? "green" : "yellow"));
+      up >= 0 ? "green" : "yellow", undefined, fmtUSD);
   }
 
   // Сводка
-  grid.appendChild(_stabCell("📦 Закрытых сделок", n + "",
-    n >= 30 ? "Достаточно для надёжной нижней границы" : `Маленькая выборка — нужно ≥30 для жёсткого доверия`,
-    n >= 30 ? "green" : "yellow", Math.min(100, n * 100 / 30)));
+  _stabCell(grid, "n_closed", "📦 Закрытых сделок", n,
+    n >= 30 ? "Достаточно для надёжной нижней границы" :
+      "Маленькая выборка — нужно ≥30 для жёсткого доверия",
+    n >= 30 ? "green" : "yellow",
+    Math.min(100, n * 100 / 30), fmtCount, "n_closed");
 
-  // Calibration block (если есть)
+  // Calibration block — replaceable spec'd block
+  let calibCard = grid.querySelector('[data-key="calib_block"]');
   if (Array.isArray(r.calibration_bins) && r.calibration_bins.length) {
-    const calibCard = el("div", { class: "stab-cell blue", style: "grid-column: 1 / -1;" });
-    calibCard.appendChild(el("div", { class: "label" }, "🎯 КАЛИБРОВКА: предсказанная вероятность vs фактическая WR"));
+    if (!calibCard) {
+      calibCard = el("div", { class: "stab-cell blue", style: "grid-column: 1 / -1;" });
+      calibCard.setAttribute("data-key", "calib_block");
+      grid.appendChild(calibCard);
+    }
+    calibCard.innerHTML = "";
+    calibCard.appendChild(el("div", { class: "label" },
+      "🎯 КАЛИБРОВКА: предсказанная вероятность vs фактическая WR"));
     calibCard.appendChild(el("div", { class: "hint" },
       "Если система говорит «70%» — то факт должен быть около 70%. Сравнение по бинам:"));
     for (const b of r.calibration_bins) {
@@ -786,10 +964,9 @@ function renderStabilityGrid(r, mg) {
           el("div", { class: "calib-actual", style: `width: ${actual}%;` })),
         el("div", {}, `n=${b.n}`)
       );
-      row.title = `Предсказано ${pred}% (синий), фактически ${actual}% (зелёный)`;
+      row.title = `Предсказано ${pred}% (фиолетовый), фактически ${actual}% (зелёный)`;
       calibCard.appendChild(row);
     }
-    grid.appendChild(calibCard);
   }
 }
 
