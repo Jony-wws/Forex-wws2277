@@ -397,6 +397,134 @@ async function refreshAgents() {
   } catch (e) { console.error(e); }
 }
 
+// ───── Стакан-стратегия (параллельная система) ─────
+
+async function refreshStakanStats() {
+  try {
+    const s = await api("/api/stakan/stats");
+    $("stakan-stat-total").textContent = s.total ?? 0;
+    $("stakan-stat-wins").textContent = s.wins ?? 0;
+    $("stakan-stat-losses").textContent = s.losses ?? 0;
+    $("stakan-stat-wr").textContent = ((s.win_rate_pct ?? 0)).toFixed(1) + "%";
+    const pnl = s.total_pnl_usd ?? 0;
+    $("stakan-stat-pnl").textContent = (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toFixed(2);
+    $("stakan-stat-pnl").className = "big " + (pnl >= 0 ? "green" : "red");
+  } catch (e) { console.error("stakan stats:", e); }
+}
+
+function votesPill(yes, total) {
+  const cls = yes >= 7 ? "pass" : (yes >= 5 ? "almost" : "fail");
+  return el("span", { class: "votes-pill " + cls }, `${yes}/${total}`);
+}
+
+async function refreshStakanOpen() {
+  try {
+    const r = await api("/api/stakan/open-trades");
+    $("stakan-open-count").textContent = r.count ?? 0;
+    const tb = document.querySelector("#stakan-open-table tbody");
+    tb.innerHTML = "";
+    for (const t of r.trades) {
+      const live = t.live || {};
+      const sideClass = t.side === "BUY" ? "side-buy" : "side-sell";
+      const inMoney = live.in_money_now;
+      const projPayout = live.projected_payout;
+      const pipsClass = live.pips == null ? "muted" : (live.pips >= 0 ? "win" : "loss");
+      const lvl = t.level_at_open || {};
+      const v = t.votes_at_open || {};
+      tb.appendChild(el("tr", {},
+        el("td", {}, t.pair),
+        el("td", { class: sideClass }, t.side),
+        el("td", {}, fmt.price(t.open_price)),
+        el("td", {}, fmt.price(lvl.price)),
+        el("td", {}, (t.level_distance_pips_at_open ?? 0).toFixed(1) + " pips"),
+        el("td", { class: "muted small" }, fmt.utc5(t.open_time)),
+        el("td", {}, fmt.countdown(live.time_remaining_sec)),
+        el("td", {}, fmt.price(live.current_price)),
+        el("td", { class: pipsClass }, fmt.pips(live.pips)),
+        el("td", { class: inMoney ? "win" : (inMoney === false ? "loss" : "muted") },
+          fmt.pnl(projPayout)),
+        el("td", {}, votesPill(v.yes ?? 0, v.total ?? 10)),
+      ));
+    }
+    if (r.count === 0) {
+      tb.appendChild(el("tr", {},
+        el("td", { colspan: 11, class: "muted" }, "Сейчас открытых стакан-сделок нет — ждём сигнал ≥7/10")));
+    }
+  } catch (e) { console.error("stakan open:", e); }
+}
+
+async function refreshStakanSignals() {
+  try {
+    const r = await api("/api/stakan/signals");
+    const tb = document.querySelector("#stakan-signals-table tbody");
+    tb.innerHTML = "";
+    const sigs = r.signals || [];
+    if (sigs.length === 0) {
+      tb.appendChild(el("tr", {},
+        el("td", { colspan: 8, class: "muted" }, "ещё не считали — ждём первый tick paper_trader_stakan (60 сек)")));
+      return;
+    }
+    // отсортируем: сначала открытые, потом по убыванию голосов
+    sigs.sort((a, b) => {
+      const sa = a.skip_reason ? 0 : 2;
+      const sb = b.skip_reason ? 0 : 2;
+      if (sa !== sb) return sb - sa;
+      const va = (a.votes && a.votes.yes) || 0;
+      const vb = (b.votes && b.votes.yes) || 0;
+      return vb - va;
+    });
+    for (const s of sigs) {
+      const opened = !s.skip_reason;
+      const lvl = s.best_level || (s.sample_levels && s.sample_levels[0]) || {};
+      const v = s.votes;
+      const status = opened ? el("span", { class: "win" }, "OPEN")
+        : (s.skip_reason === "already_open" ? el("span", { class: "muted" }, "уже открыт")
+          : (s.skip_reason === "no_valid_avoidance_level" ? el("span", { class: "muted" }, "нет валидного уровня")
+            : el("span", { class: "muted" }, "ждёт голосов")));
+      const direction = opened ? s.direction : (s.direction || lvl.trade_direction || "—");
+      const sideClass = direction === "BUY" ? "side-buy" : direction === "SELL" ? "side-sell" : "muted";
+      tb.appendChild(el("tr", {},
+        el("td", {}, s.pair),
+        el("td", {}, status),
+        el("td", { class: sideClass }, direction || "—"),
+        el("td", {}, lvl.price != null ? fmt.price(lvl.price) : "—"),
+        el("td", {}, lvl.level_distance_pips != null ? lvl.level_distance_pips.toFixed(1) : "—"),
+        el("td", {}, lvl.avoidance_distance_pips != null ? lvl.avoidance_distance_pips.toFixed(1) : "—"),
+        el("td", {}, v ? votesPill(v.yes, v.total) : "—"),
+        el("td", { class: "muted small" }, s.skip_reason || ""),
+      ));
+    }
+  } catch (e) { console.error("stakan signals:", e); }
+}
+
+async function refreshStakanClosed() {
+  try {
+    const r = await api("/api/stakan/closed-trades");
+    const tb = document.querySelector("#stakan-closed-table tbody");
+    tb.innerHTML = "";
+    for (const t of r.trades) {
+      const sideClass = t.side === "BUY" ? "side-buy" : "side-sell";
+      const resultClass = t.result === "WIN" ? "win" : "loss";
+      const lvl = t.level_at_open || {};
+      tb.appendChild(el("tr", {},
+        el("td", {}, t.pair),
+        el("td", { class: sideClass }, t.side),
+        el("td", {}, fmt.price(t.open_price)),
+        el("td", {}, fmt.price(t.close_price)),
+        el("td", {}, lvl.price != null ? fmt.price(lvl.price) : "—"),
+        el("td", { class: "muted" }, fmt.utc(t.open_time)),
+        el("td", { class: "muted" }, fmt.utc(t.close_time)),
+        el("td", { class: resultClass }, t.result),
+        el("td", { class: resultClass }, fmt.pnl(t.pnl_usd)),
+      ));
+    }
+    if (r.count === 0) {
+      tb.appendChild(el("tr", {},
+        el("td", { colspan: 9, class: "muted" }, "ещё ни одна стакан-сделка не закрыта")));
+    }
+  } catch (e) { console.error("stakan closed:", e); }
+}
+
 function tick() {
   $("last-refresh").textContent = new Date().toLocaleTimeString();
   refreshStats();
@@ -404,6 +532,10 @@ function tick() {
   refreshHealth();
   refreshAgents();
   refreshClosed();
+  refreshStakanStats();
+  refreshStakanOpen();
+  refreshStakanSignals();
+  refreshStakanClosed();
 }
 
 function tickForecasts() {

@@ -190,7 +190,7 @@
   </section>
 
   <section id="closed-trades-section" class="card">
-    <h2>📜 История закрытых сделок</h2>
+    <h2>📜 История закрытых сделок (основная стратегия)</h2>
     <div class="table-wrap">
       <table id="closed-table">
         <thead>
@@ -199,6 +199,96 @@
             <th>Сторона</th>
             <th>Цена входа</th>
             <th>Цена закрытия</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── PARALLEL STRATEGY: «Стакан» ───── -->
+  <section id="stakan-stats-section" class="card stakan-card">
+    <h2>📐 Сводка СТАКАН-стратегии (параллельная) <span class="badge stakan-badge">2-я система</span></h2>
+    <div class="muted small">
+      Открывает сделку только если найден <b>уровень от которого цена уходит</b>
+      (24h цена не приближалась ближе чем 0.6×ATR от 7-day big-player уровня)
+      <b>И</b> ≥7 из 10 агентов согласны с направлением «от уровня». Экспирация
+      1–20 ч авто-выбирается из расстояния до уровня.
+    </div>
+    <div class="stats-grid" id="stakan-stats-grid">
+      <div><div class="big" id="stakan-stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="stakan-stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="stakan-stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="stakan-stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="stakan-stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="stakan-open-section" class="card stakan-card">
+    <h2>🎯 Стакан — сейчас открыто <span class="badge" id="stakan-open-count">0</span></h2>
+    <div class="muted small">Live PnL · обновление 30 сек.</div>
+    <div class="table-wrap">
+      <table id="stakan-open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Уровень</th>
+            <th>Дист. до уровня</th>
+            <th>Открыто</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Pips</th>
+            <th>Прогноз PnL</th>
+            <th>Голоса</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="stakan-signals-section" class="card stakan-card">
+    <h2>🧮 Стакан — последний скан 28 пар</h2>
+    <div class="muted small">
+      Каждые 60 сек paper_trader_stakan сканирует все 28 пар. Здесь видно: какие
+      нашли валидные уровни, сколько голосов набрала пара, почему не открыли.
+    </div>
+    <div class="table-wrap">
+      <table id="stakan-signals-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Статус</th>
+            <th>Сторона</th>
+            <th>Уровень</th>
+            <th>Дист. (pips)</th>
+            <th>Avoid (pips)</th>
+            <th>Голоса</th>
+            <th>Причина пропуска</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="stakan-closed-section" class="card stakan-card">
+    <h2>📚 Стакан — история закрытых сделок</h2>
+    <div class="table-wrap">
+      <table id="stakan-closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Уровень</th>
             <th>Время открытия</th>
             <th>Время закрытия</th>
             <th>Результат</th>
