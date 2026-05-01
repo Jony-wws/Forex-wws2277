@@ -50,7 +50,7 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def _score_to_probability(score: int, max_score: int = 44) -> float:
+def _score_to_probability(score: int, max_score: int = 49) -> float:
     """Score -44..+44 → probability 0..1, абсолютная.
     Score>0 → BUY вероятность; <0 → SELL вероятность.
     """
@@ -165,6 +165,27 @@ def evaluate_pair(pair: str) -> dict | None:
     elif bull_count == 0:
         vote("MTF_full_bear", -3, "все 3 TF ниже EMA")
 
+    # ───── BLOCK I — Fundamental macro tilt (FRED rates / yields / CPI) ─────
+    # Source: teamagent.fundamentals (FRED 24h cache, no API key).
+    # Cap ±5 contribution so tech signals dominate; fundamentals are a slow-
+    # moving bias on top of the technical engine.
+    try:
+        from . import fundamentals as fund
+        tilt = fund.pair_macro_tilt(pair)
+        score_pts = round(tilt.get("tilt_score", 0) / 16.0, 1)  # ±5 cap below
+        score_pts = max(-5, min(5, score_pts))
+        if abs(score_pts) >= 1:
+            sign = "+" if score_pts > 0 else ""
+            vote(
+                "fundamental_macro_tilt",
+                int(round(score_pts)),
+                f"{tilt['side']} (rate_diff={tilt.get('rate_diff_pct')} "
+                f"yield_diff={tilt.get('yield_diff_pct')} "
+                f"cpi_diff={tilt.get('cpi_diff_pct')}, conf={tilt.get('confidence_pct')}%)",
+            )
+    except Exception as e:
+        log.warning(f"forecast_scanner: fundamental tilt failed for {pair}: {e}")
+
     # ───── PENALTY: news blackout ─────
     # high-impact новость ±30 мин: снижаем confidence обеих сторон,
     # уменьшая abs(score) на величину penalty (но не ниже нуля).
@@ -179,7 +200,7 @@ def evaluate_pair(pair: str) -> dict | None:
         return None  # нейтрально, не показываем
 
     side = "BUY" if score > 0 else "SELL"
-    p_raw = _score_to_probability(abs(score), 44)
+    p_raw = _score_to_probability(abs(score), 49)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
@@ -201,7 +222,7 @@ def evaluate_pair(pair: str) -> dict | None:
         "probability": round(p, 4),
         "probability_pct": round(p * 100.0, 1),
         "score": score,
-        "max_score": 44,
+        "max_score": 49,
         "recommended_hours": recommended_hours,
         "current_price": ind_15m["close"],
         "indicators": {

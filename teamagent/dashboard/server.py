@@ -232,6 +232,33 @@ def api_weekly_loss():
     )
 
 
+@app.get("/api/fundamentals")
+def api_fundamentals():
+    """Per-currency macro snapshot (FRED) + per-pair tilt scores. Updates
+    every ~6h via analyzer_fundamental_macro; underlying CSVs cached 24h."""
+    raw = _load(config.STATE_DIR / "agent_analyzer_fundamental_macro.json", {})
+    summary = _unwrap_agent_state(
+        raw,
+        "FRED данные ещё не загружены — жди первого tick analyzer_fundamental_macro",
+    )
+    # Also expose the raw fundamentals.json so frontend can show all 28 pair tilts
+    fund_raw = _load(config.STATE_DIR / "fundamentals.json", {})
+    if fund_raw:
+        summary["fundamentals_raw"] = {
+            "as_of": fund_raw.get("as_of"),
+            "currencies": fund_raw.get("currencies", {}),
+            "source": fund_raw.get("source"),
+        }
+    # And all 28 pair tilts (compute on demand if cache exists)
+    try:
+        from .. import fundamentals as fmod
+        if fund_raw:
+            summary["all_pair_tilts"] = fmod.all_pair_tilts().get("tilts", {})
+    except Exception as e:
+        summary["all_pair_tilts_error"] = str(e)
+    return summary
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""

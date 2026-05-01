@@ -412,6 +412,7 @@ function tickForecasts() {
   refreshMarketRegime();
   refreshWRFloor();
   refreshWeeklyLoss();
+  refreshFundamentals();
 }
 
 // ───── WR floor monitor (rolling 50 trades vs 70%) ─────
@@ -485,6 +486,110 @@ async function refreshWeeklyLoss() {
   } catch (e) {
     node.textContent = "ошибка: " + (e.message || e);
   }
+}
+
+// ───── Fundamental macro (FRED rates / yields / CPI) ─────
+async function refreshFundamentals() {
+  const node = $("fundamentals-content");
+  if (!node) return;
+  try {
+    const r = await api("/api/fundamentals");
+    node.innerHTML = "";
+    if (!r || r.note) {
+      node.appendChild(el("div", {}, r && r.note ? r.note : "пусто"));
+      return;
+    }
+    // 1) Per-currency rates table
+    const ccy = (r.currencies || (r.fundamentals_raw || {}).currencies || {});
+    const ccyTable = el("table", { class: "trades-table compact" });
+    const head = el("tr", {},
+      el("th", {}, "CCY"),
+      el("th", {}, "policy rate %"),
+      el("th", {}, "10y yield %"),
+      el("th", {}, "CPI YoY %"),
+    );
+    ccyTable.appendChild(head);
+    for (const code of ["USD","EUR","GBP","JPY","CHF","AUD","CAD","NZD"]) {
+      const v = ccy[code] || {};
+      const pr = v.policy_rate ?? (v.policy_rate?.value);
+      const yy = v["10y_yield"] ?? (v["10y_yield"]?.value);
+      const cp = v.cpi_yoy_pct ?? (v.cpi?.yoy_pct);
+      ccyTable.appendChild(el("tr", {},
+        el("td", {}, el("strong", {}, code)),
+        el("td", {}, fmtNum(pr)),
+        el("td", {}, fmtNum(yy)),
+        el("td", {}, fmtNum(cp)),
+      ));
+    }
+    node.appendChild(ccyTable);
+
+    // 2) Top biased pairs (highest |tilt_score|)
+    const top = r.top_bias_pairs || [];
+    if (top.length) {
+      node.appendChild(el("div", { class: "muted small", style: "margin-top:10px;" },
+        "Top‑10 пар с самым сильным fundamental bias:"));
+      const ul = el("ul", { class: "compact" });
+      for (const t of top.slice(0, 10)) {
+        const cls = t.side === "BUY" ? "win" : (t.side === "SELL" ? "loss" : "muted");
+        ul.appendChild(el("li", {},
+          el("strong", { class: cls }, `${t.pair} ${t.side}`),
+          " · score ",
+          fmtNum(t.tilt_score),
+          ` · conf ${fmtNum(t.confidence_pct)}%`,
+        ));
+      }
+      node.appendChild(ul);
+    }
+
+    // 3) All 28 pair tilts table (collapsed by default)
+    const tilts = r.all_pair_tilts || {};
+    const npairs = Object.keys(tilts).length;
+    if (npairs) {
+      const det = el("details", { style: "margin-top:8px;" });
+      det.appendChild(el("summary", { class: "muted small" },
+        `все ${npairs} пар — раскрыть`));
+      const tt = el("table", { class: "trades-table compact" });
+      tt.appendChild(el("tr", {},
+        el("th", {}, "pair"),
+        el("th", {}, "side"),
+        el("th", {}, "tilt"),
+        el("th", {}, "rate Δ%"),
+        el("th", {}, "10y Δ%"),
+        el("th", {}, "cpi Δ%"),
+        el("th", {}, "conf%"),
+      ));
+      const arr = Object.entries(tilts).sort((a,b) => Math.abs(b[1].tilt_score||0) - Math.abs(a[1].tilt_score||0));
+      for (const [p, v] of arr) {
+        const cls = v.side === "BUY" ? "win" : (v.side === "SELL" ? "loss" : "muted");
+        tt.appendChild(el("tr", {},
+          el("td", {}, p),
+          el("td", {}, el("span", { class: cls }, v.side || "?")),
+          el("td", {}, fmtNum(v.tilt_score)),
+          el("td", {}, fmtNum(v.rate_diff_pct)),
+          el("td", {}, fmtNum(v.yield_diff_pct)),
+          el("td", {}, fmtNum(v.cpi_diff_pct)),
+          el("td", {}, fmtNum(v.confidence_pct)),
+        ));
+      }
+      det.appendChild(tt);
+      node.appendChild(det);
+    }
+
+    // 4) source attribution
+    if (r.source) {
+      node.appendChild(el("div", { class: "muted small", style: "margin-top:6px;" }, r.source));
+    }
+  } catch (e) {
+    node.textContent = "ошибка: " + (e.message || e);
+  }
+}
+
+function fmtNum(v) {
+  if (v === undefined || v === null || (typeof v === "number" && !isFinite(v))) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  const n = Number(v);
+  if (!isFinite(n)) return String(v);
+  return Math.abs(n) >= 100 ? n.toFixed(1) : n.toFixed(2);
 }
 
 // ───── 365-day market regime ─────

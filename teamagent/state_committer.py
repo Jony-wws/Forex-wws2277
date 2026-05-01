@@ -60,6 +60,11 @@ PERSISTED_FILES = [
     # чтобы дашборд сразу показывал состояние, не ждал первого tick (5 мин).
     "teamagent/state/agent_learner_wr_floor_monitor.json",
     "teamagent/state/agent_learner_weekly_loss_review.json",
+    # FRED fundamentals (added 2026-05-01 per user request to add macro
+    # signals): rates / 10y yields / CPI YoY per 8 currencies. CSV refresh
+    # is 24h-cached so checking these in saves Yahoo/FRED calls on restart.
+    "teamagent/state/fundamentals.json",
+    "teamagent/state/agent_analyzer_fundamental_macro.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

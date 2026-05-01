@@ -339,3 +339,64 @@ class DXYAlignmentAnalyzer(Agent):
             return {"dxy_close": close_v, "dxy_ema20": ema_v, "usd_strong": close_v > ema_v}
         except Exception as e:
             return {"error": str(e)}
+
+
+class FundamentalMacroAnalyzer(Agent):
+    """Sources rate-differential / 10y-yield-differential / CPI YoY per pair from
+    FRED (free, no API key, 24h cache). Computes a per-pair macro tilt score
+    (BUY/SELL/NEUTRAL with confidence). The forecast scanner reads this same
+    fundamentals.json directly via teamagent.fundamentals — this agent's role is
+    to (a) refresh the cache periodically and (b) surface the snapshot on the
+    dashboard.
+
+    Why this is honest "thinking like institutionals" (per user request):
+    - Real macro flows track interest rate differentials, bond yields, CPI
+      surprises — exactly what this agent reads from FRED public CSVs.
+    - The data is the SAME data the Fed/ECB/BoE publish; nothing is simulated.
+    - We do NOT have private order flow / paid news sentiment — that would
+      require paid feeds; this is the realistic free-tier ceiling.
+    """
+    name = "analyzer_fundamental_macro"
+    category = "analyzer"
+    interval_sec = 6 * 60 * 60   # refresh every 6h (FRED data updates daily)
+
+    def tick(self):
+        try:
+            from ... import fundamentals
+            data = fundamentals.get_cached(force_refresh=False)
+            tilts = fundamentals.all_pair_tilts()
+            ccy_view = {
+                ccy: {
+                    "policy_rate": (vals.get("policy_rate") or {}).get("value"),
+                    "10y_yield":   (vals.get("10y_yield")   or {}).get("value"),
+                    "cpi_yoy_pct": (vals.get("cpi")         or {}).get("yoy_pct"),
+                }
+                for ccy, vals in data.get("currencies", {}).items()
+            }
+            # top biases (highest |tilt_score|)
+            ranked = sorted(
+                tilts.get("tilts", {}).items(),
+                key=lambda kv: abs(kv[1].get("tilt_score", 0)),
+                reverse=True,
+            )[:10]
+            top = [
+                {
+                    "pair": p,
+                    "side": v.get("side"),
+                    "tilt_score": v.get("tilt_score"),
+                    "confidence_pct": v.get("confidence_pct"),
+                }
+                for p, v in ranked
+            ]
+            return {
+                "currencies": ccy_view,
+                "n_pairs_with_tilt": sum(
+                    1 for v in tilts.get("tilts", {}).values()
+                    if v.get("side") in ("BUY", "SELL")
+                ),
+                "top_bias_pairs": top,
+                "fundamentals_as_of": data.get("as_of"),
+                "source": data.get("source"),
+            }
+        except Exception as e:
+            return {"error": str(e)}
