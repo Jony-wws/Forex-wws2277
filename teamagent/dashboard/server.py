@@ -216,6 +216,42 @@ def api_stakan_signals():
     })
 
 
+@app.get("/api/daily/open-trades")
+def api_daily_open():
+    """Открытые сделки 'Лучший прогноз дня' (paper_trader_daily)."""
+    return _load(config.STATE_DIR / "daily_open_trades.json", [])
+
+
+@app.get("/api/daily/closed-trades")
+def api_daily_closed():
+    return _load(config.STATE_DIR / "daily_closed_trades.json", [])
+
+
+@app.get("/api/daily/stats")
+def api_daily_stats():
+    return _load(config.STATE_DIR / "daily_stats.json", {
+        "strategy": "daily",
+        "total": 0, "wins": 0, "losses": 0,
+        "win_rate_pct": 0.0, "total_pnl_usd": 0.0,
+    })
+
+
+@app.get("/api/daily/signals")
+def api_daily_signals():
+    """Последний скан 'Лучшего прогноза дня': по каждой паре meta-score
+    (компоненты: forecast, radar, stakan, reversal, macro, COT) + результат."""
+    return _load(config.STATE_DIR / "daily_signals.json", {
+        "as_of": None, "signals": [],
+        "note": "ещё не считали — жди первого daily sweep",
+    })
+
+
+@app.get("/api/daily/paused")
+def api_daily_paused():
+    """Пары на auto-pause (rolling 20-trade WR < 60%)."""
+    return _load(config.STATE_DIR / "daily_paused_pairs.json", {})
+
+
 @app.get("/api/market-radar")
 def api_market_radar():
     """«Военный радар» рынка: 20+ независимых сканеров × 28 пар.
@@ -374,6 +410,7 @@ def api_health():
         ("paper_trader", "heartbeat_paper_trader.json"),
         ("paper_trader_stakan", "heartbeat_paper_trader_stakan.json"),
         ("market_radar", "heartbeat_market_radar.json"),
+        ("paper_trader_daily", "heartbeat_paper_trader_daily.json"),
         ("orchestrator", "heartbeat_orchestrator.json"),
         ("watchdog", "heartbeat_watchdog.json"),
         ("backtester", "heartbeat_backtester.json"),

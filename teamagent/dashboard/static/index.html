@@ -300,6 +300,136 @@
     </div>
   </section>
 
+  <!-- ───── 3rd PARALLEL STRATEGY: «Лучший прогноз дня» ───── -->
+  <section id="daily-stats-section" class="card daily-card">
+    <h2>📅 «Лучший прогноз дня» (3-я параллельная) <span class="badge daily-badge">DAILY</span></h2>
+    <div class="muted small">
+      Раз в сутки сканирует все 28 пар, считает <b>META-score</b> (объединяет:
+      PROGNOZY-28 + Market Radar + Stakan-голоса + 10-мин reversal-фильтр + Macro + COT)
+      и открывает <b>1 сделку на пару</b>. Стейк адаптивный: $2 / $1 / $0.50 / $0.25
+      по уровню confidence. Auto-pause: пара с rolling 20-trade WR &lt;60% → пауза 7 дней.
+    </div>
+    <div class="stats-grid" id="daily-stats-grid">
+      <div><div class="big" id="daily-stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="daily-stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="daily-stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="daily-stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="daily-stat-rolling-wr">0%</div><div class="muted">WR last 30</div></div>
+      <div><div class="big" id="daily-stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="daily-open-section" class="card daily-card">
+    <h2>🎯 Daily — сейчас открыто <span class="badge" id="daily-open-count">0</span></h2>
+    <div class="muted small">Live PnL по реальной цене Yahoo · обновление 30 сек.</div>
+    <div class="table-wrap">
+      <table id="daily-open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Confidence</th>
+            <th>Meta-score</th>
+            <th>Stake</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Pips</th>
+            <th>Прогноз PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="daily-signals-section" class="card daily-card">
+    <h2>🧮 Daily — последний скан 28 пар (META-score breakdown)</h2>
+    <div class="muted small">
+      Каждые 60 сек проверяется «пора ли»: при наступлении торгового дня (00:00 UTC+5)
+      запускается полный sweep всех 28 пар. Здесь видно: confidence-score каждой
+      пары, какие компоненты дали + или − голос, и почему пара не открыта.
+    </div>
+    <div class="table-wrap">
+      <table id="daily-signals-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Confidence</th>
+            <th>Meta-score</th>
+            <th>Forecast</th>
+            <th>Radar</th>
+            <th>Stakan</th>
+            <th>Reversal</th>
+            <th>Macro</th>
+            <th>COT</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="daily-paused-section" class="card daily-card">
+    <h2>⏸ Daily — пары на auto-pause</h2>
+    <div class="muted small">
+      Пары с rolling 20-trade WR &lt; 60% автоматически ставятся на паузу на 7 дней.
+      Восстанавливаются автоматически когда срок истекает.
+    </div>
+    <div id="daily-paused-list" class="muted">Нет пауз — все 28 пар активны.</div>
+  </section>
+
+  <section id="daily-closed-section" class="card daily-card">
+    <h2>📚 Daily — история закрытых</h2>
+    <div class="table-wrap">
+      <table id="daily-closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Confidence</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── MARKET RADAR (20 scanners × 28 pairs) ───── -->
+  <section id="radar-section" class="card radar-card">
+    <h2>📡 Market Radar — 20 сканеров × 28 пар <span class="badge radar-badge">RADAR</span></h2>
+    <div class="muted small">
+      «Военный радар» рынка: 20 независимых сканеров (currency strength, correlation,
+      triangular arb, volatility regime, session/hour/dow bias, pivots, MTF EMA,
+      Bollinger, ADX, candle patterns, range expansion, VP imbalance, news, macro,
+      COT, smart money, yearly position, mean-rev) дают каждой паре общий
+      <b>overall_score</b> [-100..+100]. Используется как 11-й голос в Стакан-стратегии
+      и как компонент META-score в Daily.
+    </div>
+    <div class="table-wrap">
+      <table id="radar-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Direction</th>
+            <th>Overall score</th>
+            <th>Strong scanners</th>
+            <th>Top сканеры (топ-3)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="agents-section" class="card">
     <h2>🎯 62 агента (heartbeat + auto-restart)</h2>
     <div id="agents-grid" class="agents-grid muted">Загружаю…</div>

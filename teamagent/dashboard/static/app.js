@@ -536,6 +536,187 @@ function tick() {
   refreshStakanOpen();
   refreshStakanSignals();
   refreshStakanClosed();
+  refreshDailyStats();
+  refreshDailyOpen();
+  refreshDailySignals();
+  refreshDailyPaused();
+  refreshDailyClosed();
+  refreshMarketRadar();
+}
+
+// ───── Daily Best Pick (3-я стратегия) ─────
+async function refreshDailyStats() {
+  try {
+    const s = await api("/api/daily/stats");
+    $("daily-stat-total").textContent = s.total ?? 0;
+    $("daily-stat-wins").textContent = s.wins ?? 0;
+    $("daily-stat-losses").textContent = s.losses ?? 0;
+    $("daily-stat-wr").textContent = ((s.win_rate_pct ?? 0)).toFixed(1) + "%";
+    $("daily-stat-rolling-wr").textContent = ((s.rolling_30_win_rate_pct ?? 0)).toFixed(1) + "%";
+    const pnl = s.total_pnl_usd ?? 0;
+    $("daily-stat-pnl").textContent = (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toFixed(2);
+    $("daily-stat-pnl").className = "big " + (pnl >= 0 ? "green" : "red");
+  } catch (e) { console.error("daily stats:", e); }
+}
+
+async function refreshDailyOpen() {
+  try {
+    const trades = await api("/api/daily/open-trades");
+    const tb = document.querySelector("#daily-open-table tbody");
+    tb.innerHTML = "";
+    $("daily-open-count").textContent = (trades || []).length;
+    if (!trades || !trades.length) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 10, class: "muted" },
+        "пока нет открытых сделок (ждём первый daily sweep — каждый день в 19:00 UTC = 00:00 UTC+5)")));
+      return;
+    }
+    for (const t of trades) {
+      const sideCls = t.side === "BUY" ? "green" : "red";
+      const expiryAt = new Date(t.expiry_time);
+      const remaining = Math.max(0, Math.floor((expiryAt - Date.now()) / 60000));
+      const conf = (t.confidence_pct ?? 0).toFixed(1);
+      const meta = (t.meta_score ?? 0).toFixed(1);
+      const row = el("tr", {},
+        el("td", { class: "mono" }, t.pair),
+        el("td", { class: sideCls }, t.side),
+        el("td", { class: "mono" }, (t.open_price ?? 0).toFixed(5)),
+        el("td", { class: "mono" }, conf + "%"),
+        el("td", { class: "mono" }, meta),
+        el("td", { class: "mono" }, "$" + (t.stake_usd ?? 0).toFixed(2)),
+        el("td", { class: "mono" }, remaining + " мин"),
+        el("td", { class: "mono" }, "—"),
+        el("td", { class: "mono" }, "—"),
+        el("td", { class: "mono" }, "—"),
+      );
+      tb.appendChild(row);
+    }
+  } catch (e) { console.error("daily open:", e); }
+}
+
+function _fmtComp(comp) {
+  if (!comp) return "—";
+  const score = (comp.score ?? 0).toFixed(0);
+  const sgn = comp.score > 0 ? "+" : "";
+  return sgn + score;
+}
+
+async function refreshDailySignals() {
+  try {
+    const r = await api("/api/daily/signals");
+    const tb = document.querySelector("#daily-signals-table tbody");
+    tb.innerHTML = "";
+    if (!r || !r.signals || !r.signals.length) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 11, class: "muted" },
+        "ещё не считали — daily sweep запускается раз в день в " + (r.next_run_hour_utc ?? 19) + ":00 UTC")));
+      return;
+    }
+    for (const s of r.signals) {
+      const sideCls = s.side === "BUY" ? "green" : (s.side === "SELL" ? "red" : "muted");
+      const conf = (s.confidence_pct ?? 0).toFixed(1) + "%";
+      const meta = (s.meta_score ?? 0).toFixed(1);
+      const c = s.components || {};
+      const status = s.opened ? `OPEN ${s.expiry_hours}h $${s.stake_usd}` : (s.skip_reason || "—");
+      const statusCls = s.opened ? "green" : "muted";
+      const row = el("tr", {},
+        el("td", { class: "mono" }, s.pair),
+        el("td", { class: sideCls }, s.side || "—"),
+        el("td", { class: "mono" }, conf),
+        el("td", { class: "mono" }, meta),
+        el("td", { class: "mono" }, _fmtComp(c.forecast_prob)),
+        el("td", { class: "mono" }, _fmtComp(c.radar_score)),
+        el("td", { class: "mono" }, _fmtComp(c.stakan_votes)),
+        el("td", { class: "mono" }, _fmtComp(c.reversal_filter)),
+        el("td", { class: "mono" }, _fmtComp(c.macro_tilt)),
+        el("td", { class: "mono" }, _fmtComp(c.cot_z)),
+        el("td", { class: statusCls }, status),
+      );
+      tb.appendChild(row);
+    }
+  } catch (e) { console.error("daily signals:", e); }
+}
+
+async function refreshDailyPaused() {
+  try {
+    const r = await api("/api/daily/paused");
+    const node = $("daily-paused-list");
+    if (!r || Object.keys(r).length === 0) {
+      node.textContent = "Нет пауз — все 28 пар активны.";
+      return;
+    }
+    node.innerHTML = "";
+    for (const [pair, info] of Object.entries(r)) {
+      const until = new Date(info.until).toLocaleString();
+      node.appendChild(el("div", {},
+        el("strong", {}, pair), ` paused until ${until} (rolling WR ${info.rolling_wr}%, ${info.trades_in_window} trades)`));
+    }
+  } catch (e) { console.error("daily paused:", e); }
+}
+
+async function refreshDailyClosed() {
+  try {
+    const trades = await api("/api/daily/closed-trades");
+    const tb = document.querySelector("#daily-closed-table tbody");
+    tb.innerHTML = "";
+    if (!trades || !trades.length) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 9, class: "muted" }, "пусто")));
+      return;
+    }
+    for (const t of trades.slice().reverse().slice(0, 50)) {
+      const sideCls = t.side === "BUY" ? "green" : "red";
+      const resultCls = t.result === "WIN" ? "green" : "red";
+      const conf = (t.confidence_pct ?? 0).toFixed(1) + "%";
+      const row = el("tr", {},
+        el("td", { class: "mono" }, t.pair),
+        el("td", { class: sideCls }, t.side),
+        el("td", { class: "mono" }, conf),
+        el("td", { class: "mono" }, (t.open_price ?? 0).toFixed(5)),
+        el("td", { class: "mono" }, (t.close_price ?? 0).toFixed(5)),
+        el("td", { class: "mono" }, t.open_time?.slice(0, 16).replace("T", " ") || ""),
+        el("td", { class: "mono" }, t.close_time?.slice(0, 16).replace("T", " ") || ""),
+        el("td", { class: resultCls }, t.result || "—"),
+        el("td", { class: (t.pnl_usd >= 0 ? "green" : "red") }, "$" + (t.pnl_usd ?? 0).toFixed(2)),
+      );
+      tb.appendChild(row);
+    }
+  } catch (e) { console.error("daily closed:", e); }
+}
+
+// ───── Market Radar (20 scanners × 28 pairs) ─────
+async function refreshMarketRadar() {
+  try {
+    const r = await api("/api/market-radar");
+    const tb = document.querySelector("#radar-table tbody");
+    tb.innerHTML = "";
+    const pairs = r.pairs || {};
+    const pairKeys = Object.keys(pairs).sort();
+    if (!pairKeys.length) {
+      tb.appendChild(el("tr", {}, el("td", { colspan: 5, class: "muted" },
+        "ещё не считали — ждём первый цикл market_radar (60 сек)")));
+      return;
+    }
+    for (const pair of pairKeys) {
+      const p = pairs[pair];
+      const score = p.overall_score ?? 0;
+      const dir = p.direction || "NEUTRAL";
+      const dirCls = dir === "BUY" ? "green" : (dir === "SELL" ? "red" : "muted");
+      const strong = (p.scanners_passing ?? 0) + " / " + (p.scanner_count ?? 0);
+      // top 3 scanners by abs score
+      const scanners = p.scanners || {};
+      const ranked = Object.entries(scanners)
+        .filter(([_, s]) => typeof s.score === "number")
+        .sort((a, b) => Math.abs(b[1].score) - Math.abs(a[1].score))
+        .slice(0, 3);
+      const top = ranked.map(([n, s]) => `${n.replace(/^s\d+_/, "")}=${(s.score >= 0 ? "+" : "") + s.score.toFixed(0)}`).join(" · ");
+      const row = el("tr", {},
+        el("td", { class: "mono" }, pair),
+        el("td", { class: dirCls }, dir),
+        el("td", { class: "mono" }, (score >= 0 ? "+" : "") + score.toFixed(1)),
+        el("td", { class: "mono" }, strong),
+        el("td", { class: "small mono" }, top || "—"),
+      );
+      tb.appendChild(row);
+    }
+  } catch (e) { console.error("market radar:", e); }
 }
 
 function tickForecasts() {

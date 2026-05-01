@@ -77,6 +77,13 @@ PERSISTED_FILES = [
     "teamagent/state/stakan_signals.json",
     # «Военный радар» рынка (added 2026-05-01): 20+ независимых сканеров × 28 пар.
     "teamagent/state/market_radar.json",
+    # «Лучший прогноз дня» (added 2026-05-01): 1 сделка/день/пара, meta-score из всех источников.
+    "teamagent/state/daily_open_trades.json",
+    "teamagent/state/daily_closed_trades.json",
+    "teamagent/state/daily_stats.json",
+    "teamagent/state/daily_signals.json",
+    "teamagent/state/daily_paused_pairs.json",
+    "teamagent/state/daily_last_run.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

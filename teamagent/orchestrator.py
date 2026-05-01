@@ -138,6 +138,11 @@ def _build_all_children() -> dict[str, ChildProc]:
         "market_radar",
         [sys.executable, "-m", "teamagent.market_radar"],
     )
+    # «Лучший прогноз дня» (2026-05-01): 28 сделок/день, по 1 на пару, meta-score из всех источников.
+    out["paper_trader_daily"] = ChildProc(
+        "paper_trader_daily",
+        [sys.executable, "-m", "teamagent.paper_trader_daily"],
+    )
     out["state_committer"] = ChildProc("state_committer", [sys.executable, "-m", "teamagent.state_committer"])
     out["backtester"] = ChildProc("backtester", [sys.executable, "-m", "teamagent.backtester"])
     out["strategy_search"] = ChildProc("strategy_search", [sys.executable, "-m", "teamagent.strategy_search", "--loop"])
