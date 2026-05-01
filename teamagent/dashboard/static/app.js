@@ -276,16 +276,35 @@ function renderVP(vp) {
   const top = top30.sort((a, b) => b.price - a.price);
   const max = Math.max(...top.map(b => b.weight_pct));
   const bigPrices = new Set((vp.big_players || []).map(b => b.price));
+  // Чётко определяем bucket текущей цены: тот, что ближе всего по абсолютной
+  // разнице (а не по «±1/50 диапазона»). Это чтобы ровно одна полоса в стакане
+  // подсвечивалась как «текущая цена», и пользователь не путался.
+  const currPrice = vp.current_price;
+  let currKey = null;
+  if (currPrice != null && top.length) {
+    let bestD = Infinity;
+    for (const b of top) {
+      const d = Math.abs(b.price - currPrice);
+      if (d < bestD) { bestD = d; currKey = b.price; }
+    }
+  }
   for (const b of top) {
     const isPoc = Math.abs(b.price - vp.poc) < 1e-9;
     const isBig = bigPrices.has(b.price);
-    const isCurr = Math.abs(b.price - vp.current_price) <= (vp.high - vp.low) / 50;
+    const isCurr = currKey !== null && b.price === currKey;
     const cls = ["vp-bar", isPoc ? "poc" : "", isBig ? "big-player" : "", isCurr ? "current" : ""].filter(Boolean).join(" ");
+    // Подпись справа: сначала «🎯 ЦЕНА», потом 🐋 кит / POC / VAH / VAL
+    let tag = "";
+    if (isCurr) tag = "🎯 цена";
+    else if (isBig) tag = "🐋 кит";
+    else if (isPoc) tag = "POC";
+    else if (Math.abs(b.price - vp.vah) < 1e-9) tag = "VAH";
+    else if (Math.abs(b.price - vp.val) < 1e-9) tag = "VAL";
     bars.appendChild(el("div", { class: cls },
       el("span", {}, fmt.price(b.price)),
       el("div", { class: "fill" }, el("div", { class: "v", style: `width:${(b.weight_pct / max * 100).toFixed(1)}%` })),
       el("span", {}, fmt.pct(b.weight_pct)),
-      el("span", { class: "muted" }, isBig ? "🐋 кит" : isPoc ? "POC" : ""),
+      el("span", { class: isCurr ? "" : "muted" }, tag),
     ));
   }
   container.appendChild(bars);
@@ -390,6 +409,46 @@ function tick() {
 function tickForecasts() {
   refreshForecasts();
   refreshStrategyMatrix();
+  refreshMarketRegime();
+}
+
+// ───── 365-day market regime ─────
+async function refreshMarketRegime() {
+  const node = $("market-regime-content");
+  if (!node) return;
+  try {
+    const r = await api("/api/market-regime");
+    if (!r || !r.pairs || !r.global_hot_hours_utc_top10 || r.global_hot_hours_utc_top10.length === 0) {
+      node.innerHTML = "";
+      node.appendChild(el("div", {},
+        r && r.note ? r.note : "ещё не вычислено — запусти `python -m teamagent.market_regime_analyzer`"));
+      return;
+    }
+    node.innerHTML = "";
+    // глобальные hot hours
+    const ghh = r.global_hot_hours_utc_top10.slice(0, 5).map(h =>
+      `${String(h.hour_utc).padStart(2, "0")}:00 ${h.session} (${h.mean_abs_ret_bp_avg} bp)`
+    ).join(" · ");
+    node.appendChild(el("div", {}, el("strong", {}, "🔥 Топ-5 hot hours UTC по 28 парам: "), ghh));
+
+    // топ "движущихся" пар
+    const moves = Object.entries(r.pairs)
+      .filter(([_, p]) => p.vol_thresholds)
+      .map(([pair, p]) => ({ pair, mean: p.vol_thresholds.mean_abs_ret_bp }))
+      .sort((a, b) => b.mean - a.mean);
+    const topMove = moves.slice(0, 5).map(m => `${m.pair} ${m.mean}bp`).join(" · ");
+    const calmMove = moves.slice(-5).map(m => `${m.pair} ${m.mean}bp`).join(" · ");
+    node.appendChild(el("div", {}, el("strong", {}, "💨 Самые волатильные: "), topMove));
+    node.appendChild(el("div", {}, el("strong", {}, "🧊 Самые тихие: "), calmMove));
+
+    // обновлено когда
+    if (r.as_of) {
+      node.appendChild(el("div", { class: "muted", style: "margin-top:6px;" },
+        `Обновлено: ${fmt.ago(r.as_of)} · lookback ${r.lookback_days || 365} дней · pairs ${r.pairs_analyzed || Object.keys(r.pairs).length}`));
+    }
+  } catch (e) {
+    node.textContent = "ошибка: " + (e.message || e);
+  }
 }
 
 // ───── per-session strategy matrix (Asia / London / Overlap / NY × 28 пар) ─────

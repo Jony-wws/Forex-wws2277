@@ -164,6 +164,36 @@ def api_volume_profile(pair: str):
     return vp_mod.build(pair)
 
 
+@app.get("/api/market-regime")
+def api_market_regime():
+    """Глобальный 365-дневный анализ поведения рынка.
+
+    Что внутри:
+      - global_hot_hours_utc_top10 — топ-10 часов UTC по среднему |return|
+        (по всем 28 парам).
+      - per-pair: hot_hours_utc, by_session_dow, by_hour, high_vol_clusters,
+        vol_thresholds.
+    Источник: state/market_regime_365d.json (обновляется по требованию).
+    """
+    return _load(
+        config.STATE_DIR / "market_regime_365d.json",
+        {"as_of": None, "pairs": {}, "global_hot_hours_utc_top10": [],
+         "note": "ещё не вычислено — запусти `python -m teamagent.market_regime_analyzer`"},
+    )
+
+
+@app.get("/api/market-regime/{pair}")
+def api_market_regime_pair(pair: str):
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    data = _load(config.STATE_DIR / "market_regime_365d.json", {"pairs": {}})
+    p = data.get("pairs", {}).get(pair)
+    if not p:
+        raise HTTPException(404, f"market regime for {pair} not yet computed")
+    return p
+
+
 @app.get("/api/agents")
 def api_agents():
     """Список всех агентов с heartbeat."""

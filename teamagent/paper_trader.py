@@ -255,7 +255,7 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
     """
     rankings = snapshot.get("rankings", [])
     forecasts = snapshot.get("forecasts", {})
-    has_strategy_cfg = bool((strategy_cfg or {}).get("pairs"))
+    has_strategy_cfg = bool((strategy_cfg or {}).get("pairs"))   # для per_pair_cfg ниже
     opened = 0
     now_ts = _now()
     for r in rankings:
@@ -269,20 +269,19 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict, st
         if not f:
             continue
 
-        # Главный гейт — strategy_search результат
+        # Главный гейт (free 70%, since 2026-05-01): probability_pct >= 70 уже
+        # проверен выше. _strategy_qualified только выбирает side/expiry, не
+        # блокирует сделку. Если strategy_cfg пуст (свежая сессия) — функция
+        # gracefully fall-through-ит в ветку "no qualified variant → baseline".
         rsi_1h = ((f.get("indicators") or {}).get("1H") or {}).get("rsi14")
-        if has_strategy_cfg:
-            ok, why = _strategy_qualified(
-                pair, now_ts,
-                score=r.get("score", 0),
-                prob_pct=r["probability_pct"],
-                baseline_side=f.get("side", "BUY"),
-                rsi_1h=rsi_1h,
-                strategy_cfg=strategy_cfg,
-            )
-        else:
-            # fallback: старый backtest_30d gate
-            ok, why = _backtest_qualified(pair, backtest)
+        ok, why = _strategy_qualified(
+            pair, now_ts,
+            score=r.get("score", 0),
+            prob_pct=r["probability_pct"],
+            baseline_side=f.get("side", "BUY"),
+            rsi_1h=rsi_1h,
+            strategy_cfg=strategy_cfg or {},
+        )
         if not ok:
             log.info(f"SKIP {pair} prob={r['probability_pct']}% — gate: {why}")
             continue

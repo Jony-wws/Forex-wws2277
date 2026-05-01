@@ -1,12 +1,14 @@
-"""backtester — реальный 30-дневный бэктест для каждой пары.
+"""backtester — реальный 365-дневный бэктест для каждой пары.
 
-Цель: paper-trader должен открывать сделку только если **исторический** WR на
-последних 30 днях для этой пары ≥ 70%, а не только если probability scanner-а
-≥ 70%. Это и есть «реальный 70% win rate», а не теоретический.
+Цель: paper-trader использует исторический WR на 365 днях per pair как
+второй «trust score». Гейт сделки = `forecast.probability_pct >= 70`
+(free 70% gate с 2026-05-01); этот WR — диагностика «как реально вела себя
+пара за год», не блокатор.
 
 Алгоритм для одной пары:
-  1. Скачиваем 1H историю за ~2 месяца (yahoo period="3mo", interval="1h").
-  2. Берём последние 30 дней (≈720 баров).
+  1. Скачиваем 1H историю за 2 года (yahoo period="2y", interval="1h") —
+     чтобы было ~30 дней буфера для индикаторов перед началом окна.
+  2. Берём последние 365 дней (≈8760 баров).
   3. Идём по часу: каждый час делаем «прогноз» точно той же логикой
      forecast_scanner.evaluate_pair(), но на срезе данных до этого часа.
   4. Если probability ≥ MIN_PROBABILITY и сделка по этой паре ещё не открыта —
@@ -18,7 +20,7 @@
   6. Считаем wins / losses / win_rate, средний PnL ($50 stake, 85% payout).
 
 Запускается раз в час отдельным процессом (state_committer-style).
-Результат: state/backtest_30d.json
+Результат: state/backtest_30d.json (имя legacy — сохраняем для совместимости).
 """
 from __future__ import annotations
 import json
@@ -50,7 +52,7 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_backtester.json"
 
 REFRESH_INTERVAL_SEC = 60 * 60   # раз в час
 MIN_BARS_FOR_HISTORY = 200       # ниже — пропускаем пару
-LOOKBACK_DAYS = 30
+LOOKBACK_DAYS = 365              # 1 год реальной истории Yahoo 1H
 STAKE_USD = 50.0
 PAYOUT_PCT = 0.85
 
@@ -179,7 +181,8 @@ def _evaluate_slice(slice_4h: pd.DataFrame, slice_1h: pd.DataFrame, slice_15m: p
 
 def backtest_pair(pair: str) -> dict:
     """Один прогон бэктеста по одной паре. Возвращает dict со статистикой."""
-    bars = yahoo.fetch(pair, interval="1h", period="3mo")
+    # 2y нужно для LOOKBACK_DAYS=365 + ~30 дней буфера на индикаторы
+    bars = yahoo.fetch(pair, interval="1h", period="2y")
     if bars is None or bars.empty or len(bars) < MIN_BARS_FOR_HISTORY:
         return {
             "pair": pair,
@@ -192,7 +195,7 @@ def backtest_pair(pair: str) -> dict:
             "note": f"insufficient history ({len(bars) if bars is not None else 0} bars)",
         }
 
-    # отрезаем последние 30 дней по дате (а не по числу баров — на случай выходных и пропусков)
+    # отрезаем последние LOOKBACK_DAYS дней по дате (а не по числу баров — на случай выходных и пропусков)
     cutoff = bars.index[-1] - timedelta(days=LOOKBACK_DAYS)
     backtest_window_start_idx = bars.index.searchsorted(cutoff)
     if backtest_window_start_idx >= len(bars) - 5:
@@ -211,7 +214,7 @@ def backtest_pair(pair: str) -> dict:
     bars_4h = bars.resample("4h").agg({
         "Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum",
     }).dropna()
-    # для 15m нет 30-дневной истории на yahoo — используем 1H для 15m тоже (грубо, но не страшно для бэктеста)
+    # для 15m yahoo держит только 60 дней — используем 1H для 15m тоже (грубо, но не страшно для бэктеста на 365д)
     bars_15m = bars
 
     open_trades: list[dict] = []

@@ -50,6 +50,9 @@ PERSISTED_FILES = [
     # Без этих двух новая сессия не пройдёт гейт ≥70% и сделки не откроются:
     "teamagent/state/backtest_30d.json",
     "teamagent/state/strategy_config.json",
+    # 365-дневный анализ поведения рынка (per pair × hour × dow × session) —
+    # дорогой пересчёт (~15с по всем 28 парам), поэтому переносим между сессиями.
+    "teamagent/state/market_regime_365d.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

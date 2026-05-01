@@ -47,24 +47,22 @@ PAYOUT_PCT = 0.85
 # В сегментации per-session это особенно важно: при 4 сессиях у каждой сессии
 # в среднем 1/4 сделок от общего числа.
 MIN_TRADES_FOR_VALID = 10
-# История для бэктеста. Yahoo 1H держит ~730 дней. 180 дней (≈6 месяцев) —
-# компромисс между repeatability (тренды могут меняться) и статистической
-# стабильностью. С 180д на каждую (пара, сессия) ячейку приходится в среднем
-# 180/4 = 45 рабочих часов сессии × ~25% сигналов = ~11 сделок (хватает чтобы
-# больше вариантов проходили MIN_TRADES_FOR_VALID и реже теряли качественные
-# ячейки из-за статистической недосигнальности).
-LOOKBACK_DAYS = 90
+# История для бэктеста. Yahoo 1H держит ~730 дней. 365 дней (1 год) дают
+# полный цикл сезонности и «поведение рынка за год». На каждую (пара, сессия)
+# ячейку приходится ~365/4 рабочих дней × ~6 рабочих часов × ~25% сигналов
+# = ~135 сделок, что статистически значимо даже для variant'ов с жесткими
+# фильтрами. Буфер в ~30 дней на индикаторы берём из yahoo period="2y".
+LOOKBACK_DAYS = 365
 
 
 def _precompute(pair: str) -> dict | None:
     """Вычислить (ts, close, ind_4h, ind_1h, ind_15m) для каждого валидного idx.
 
-    Yahoo 1H interval поддерживает period до 2y. Используем 6mo чтобы иметь
-    запас данных для индикаторов И LOOKBACK_DAYS=60 окна.
+    Yahoo 1H interval поддерживает period до 2y. Берём 2y — это даёт ~730 дней
+    1H баров; из них последние LOOKBACK_DAYS=365 идут в бэктест, а остальные
+    365 дней — прогрев для EMA200/RSI/ATR/Bollinger и др. индикаторов.
     """
-    # 1y даёт ~365 дней 1H баров — нужно для LOOKBACK_DAYS=180 + ~30 дней
-    # запаса для индикаторов (EMA, RSI, etc.).
-    bars = yahoo.fetch(pair, interval="1h", period="1y")
+    bars = yahoo.fetch(pair, interval="1h", period="2y")
     if bars is None or bars.empty or len(bars) < 200:
         return None
     cutoff = bars.index[-1] - timedelta(days=LOOKBACK_DAYS)
@@ -391,7 +389,12 @@ def search_all(top: int = 5) -> dict:
 
 
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_search.json"
-LOOP_INTERVAL_SEC = 60 * 60        # раз в час (юзер запросил 2026-05-01)
+# 365-дневный sweep × 120 вариантов × 4 сессий × 28 пар = ~50 мин. Часовой
+# шедулер бы убивал sweep до завершения, поэтому LOOP = 24h. Если на старте
+# `strategy_config.json` уже свежий (моложе 23h) — sweep пропускается, просто
+# heartbeat. Это позволяет hourly schedule перезапускать систему дёшево.
+LOOP_INTERVAL_SEC = 24 * 60 * 60
+SKIP_IF_FRESHER_THAN_SEC = 23 * 60 * 60
 HEARTBEAT_INTERVAL_SEC = 60        # каждую минуту, чтобы watchdog видел
 
 
@@ -423,13 +426,30 @@ def _do_one_run(top: int = 5) -> dict:
     return out
 
 
+def _config_age_sec() -> float:
+    """Возраст strategy_config.json в секундах (или +inf, если файла нет)."""
+    if not OUTPUT_FILE.exists():
+        return float("inf")
+    return time.time() - OUTPUT_FILE.stat().st_mtime
+
+
 def run_loop(top: int = 5) -> None:
-    """Цикл: первый прогон сразу, далее раз в сутки. Heartbeat каждую минуту."""
+    """Цикл: при старте, если strategy_config.json свежий (моложе SKIP_*) —
+    пропускаем sweep и просто heartbeat. Иначе запускаем sweep сразу.
+    Далее sweep раз в LOOP_INTERVAL_SEC."""
     signal.signal(signal.SIGTERM, _on_sig)
     signal.signal(signal.SIGINT, _on_sig)
     log.info("strategy_search loop start")
     _heartbeat(0)
-    last_run_at = 0.0
+
+    age = _config_age_sec()
+    if age < SKIP_IF_FRESHER_THAN_SEC:
+        log.info(f"strategy_config.json свежий ({int(age)}s) — пропускаю первоначальный sweep, "
+                 f"следующий через {LOOP_INTERVAL_SEC - age:.0f}s")
+        last_run_at = time.time() - (LOOP_INTERVAL_SEC - (SKIP_IF_FRESHER_THAN_SEC - age))
+    else:
+        last_run_at = 0.0   # форсим первый sweep сразу
+
     tick = 0
     while _running:
         now = time.time()

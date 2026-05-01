@@ -81,17 +81,50 @@ tbody tr.selected { background: #1f2937; }
   padding: 6px 10px; border-radius: 6px;
 }
 
-.vp-bars { display: grid; gap: 2px; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.vp-bars { display: grid; gap: 2px; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 0.8rem; position: relative; }
 .vp-bar {
-  display: grid; grid-template-columns: 80px 1fr 50px 80px; align-items: center; gap: 8px;
+  display: grid; grid-template-columns: 80px 1fr 50px 110px; align-items: center; gap: 8px;
+  padding: 1px 4px; border-radius: 3px;
 }
 .vp-bar .fill { background: #30363d; height: 14px; border-radius: 3px; position: relative; }
 .vp-bar .fill > .v { background: #58a6ff; height: 100%; border-radius: 3px; }
 .vp-bar.poc .fill > .v { background: #d29922; }
 .vp-bar.big-player .fill > .v { background: #f85149; }
-.vp-bar.current .fill::after {
-  content: "⬅ ЦЕНА"; color: #3fb950; font-weight: 700; padding-left: 6px;
+
+/* Маркер текущей цены — большая зелёная горизонтальная полоса с подписью.
+   Видно с любого размера экрана, чтобы пользователь сразу находил цену в стакане. */
+.vp-bar.current {
+  background: linear-gradient(90deg,
+    rgba(63, 185, 80, 0.22) 0%,
+    rgba(63, 185, 80, 0.12) 65%,
+    rgba(63, 185, 80, 0.30) 100%);
+  border-left: 4px solid #3fb950;
+  border-right: 4px solid #3fb950;
+  position: relative;
+  z-index: 1;
 }
+.vp-bar.current > span:first-child {
+  color: #3fb950; font-weight: 700;
+}
+.vp-bar.current .fill {
+  box-shadow: 0 0 0 1px #3fb950 inset;
+}
+.vp-bar.current .fill::before {
+  /* Горизонтальная линия, тянущаяся через всю шкалу — «уровень цены» */
+  content: ""; position: absolute; left: -8px; right: -8px; top: 50%;
+  height: 2px; background: #3fb950; transform: translateY(-1px);
+  box-shadow: 0 0 6px #3fb950;
+}
+.vp-bar.current .fill::after {
+  content: "⬅ ТЕКУЩАЯ ЦЕНА"; color: #3fb950; font-weight: 700;
+  padding-left: 8px; letter-spacing: 0.5px;
+  text-shadow: 0 0 4px rgba(63, 185, 80, 0.8);
+}
+@keyframes vp-current-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.vp-bar.current { animation: vp-current-pulse 2.4s ease-in-out infinite; }
 
 .agents-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
