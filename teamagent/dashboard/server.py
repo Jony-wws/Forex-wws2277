@@ -194,8 +194,11 @@ def api_health():
         try:
             ts = datetime.fromisoformat(hb["ts"])
             age = (datetime.now(timezone.utc) - ts).total_seconds()
+            # forecast_scanner heartbeats only at end of each scan (~5min cycle);
+            # use AGENT_DEAD_AFTER_SEC (10min) as the UI alive threshold to match
+            # what watchdog uses to actually kill stale processes.
             out["components"][name] = {
-                "alive": age < 120,
+                "alive": age < config.AGENT_DEAD_AFTER_SEC,
                 "age_sec": int(age),
                 "last_seen": hb["ts"],
                 "pid": hb.get("pid"),
