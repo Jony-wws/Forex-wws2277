@@ -6,9 +6,12 @@ how to continue work without re-asking the user.
 
 ## How to start a NEW session (зачем оно)
 
-If the user just writes "продолжай" / "continue" — DO ALL OF THIS:
+If the user just writes "продолжай" / "continue" — DO ALL OF THIS, in order:
 
-1. Read the latest commits: `git log --oneline -20`.
+1. **Read recent context FIRST** — before doing anything else, read:
+   - `git log --oneline -20` on `devin/1777586006-teamagent-rebuild`.
+   - The 3 most recent files in `HISTORY/` (sorted by filename desc).
+   - This `AGENTS.md` (which you're reading) and `SESSION_STATE.md`.
 2. Install deps if needed: `pip install -q -r teamagent/requirements.txt`.
 3. Start the system: `bash scripts/start_all.sh` (it auto-installs deps too).
 4. Wait ~5 sec, then verify: `curl -s http://127.0.0.1:8080/api/health`.
@@ -24,6 +27,23 @@ If the user just writes "продолжай" / "continue" — DO ALL OF THIS:
    `https://user:<password>@<host>/` so they can just tap and open it.
 
 **Do NOT** re-create the project from scratch. Everything is already built.
+
+## How to END a session (CRITICAL — do not skip)
+
+Before the final `message_user` with `block_on_user=true`, you MUST:
+
+1. Create `HISTORY/<UTC-date>_<short-slug>.md` summarizing the session — see
+   `HISTORY/README.md` for the required structure (verbatim user quotes,
+   what was done, current state, open TODOs).
+2. `git add HISTORY/` → `git commit -m "history: <slug> [skip ci]"` →
+   `git push origin devin/1777586006-teamagent-rebuild`.
+3. If you changed `AGENTS.md` or any code, commit those too — every change
+   the user might want to recall MUST live in git, not just in chat.
+
+The user explicitly requires that NO conversation, no code change, no
+system state ever be lost between sessions / accounts / chats. The
+`HISTORY/` log is the canonical mechanism — chat history in the Devin
+webapp is per-account and DOES NOT migrate to a new account.
 
 ## Project: FOREX AI 2026 — TeamAgent
 
