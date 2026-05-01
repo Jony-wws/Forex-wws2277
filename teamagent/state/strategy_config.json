@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-05-01T06:36:44.856433+00:00",
+  "as_of": "2026-05-01T07:01:04.173512+00:00",
   "summary": {
     "runs": 3360,
     "runs_per_session": 13440,
@@ -128,9 +128,9 @@
         "qualified_count": 5,
         "total_pairs_with_data": 28,
         "mean_wr_pct": 63.7,
-        "aggregated_wr_pct": 62.9,
-        "trades_total": 914,
-        "wins_total": 575
+        "aggregated_wr_pct": 63.0,
+        "trades_total": 941,
+        "wins_total": 593
       },
       "London": {
         "session": "London",
@@ -210,7 +210,7 @@
         "wins_total": 417
       }
     },
-    "est_trades_per_day_via_session_gate": 103.4
+    "est_trades_per_day_via_session_gate": 104.3
   },
   "pairs": {
     "EURUSD": {
@@ -547,10 +547,10 @@
           "variant": "v14_asia",
           "label": "Asia 00-08 UTC",
           "trades": 49,
-          "wins": 31,
-          "losses": 18,
-          "pnl_usd": 417.5,
-          "win_rate_pct": 63.3
+          "wins": 32,
+          "losses": 17,
+          "pnl_usd": 510.0,
+          "win_rate_pct": 65.3
         },
         {
           "variant": "v97_asia_emph_meanrev",
@@ -587,15 +587,51 @@
             0,
             7
           ],
-          "best_variant": "v04_prob75",
-          "best_label": "prob>=75%",
+          "best_variant": "v01_baseline",
+          "best_label": "baseline (текущая)",
           "win_rate_pct": 66.7,
-          "trades": 15,
-          "wins": 10,
-          "losses": 5,
-          "pnl_usd": 175.0,
+          "trades": 42,
+          "wins": 28,
+          "losses": 14,
+          "pnl_usd": 490.0,
           "qualifies_70pct": false,
           "top_variants": [
+            {
+              "variant": "v01_baseline",
+              "label": "baseline (текущая)",
+              "trades": 42,
+              "wins": 28,
+              "losses": 14,
+              "pnl_usd": 490.0,
+              "win_rate_pct": 66.7
+            },
+            {
+              "variant": "v14_asia",
+              "label": "Asia 00-08 UTC",
+              "trades": 42,
+              "wins": 28,
+              "losses": 14,
+              "pnl_usd": 490.0,
+              "win_rate_pct": 66.7
+            },
+            {
+              "variant": "v16_full_mtf",
+              "label": "full MTF alignment",
+              "trades": 42,
+              "wins": 28,
+              "losses": 14,
+              "pnl_usd": 490.0,
+              "win_rate_pct": 66.7
+            },
+            {
+              "variant": "v31_score10",
+              "label": "|score|>=10",
+              "trades": 42,
+              "wins": 28,
+              "losses": 14,
+              "pnl_usd": 490.0,
+              "win_rate_pct": 66.7
+            },
             {
               "variant": "v04_prob75",
               "label": "prob>=75%",
@@ -604,42 +640,6 @@
               "losses": 5,
               "pnl_usd": 175.0,
               "win_rate_pct": 66.7
-            },
-            {
-              "variant": "v07_high_conv",
-              "label": "|score|>=12 + prob>=75",
-              "trades": 15,
-              "wins": 10,
-              "losses": 5,
-              "pnl_usd": 175.0,
-              "win_rate_pct": 66.7
-            },
-            {
-              "variant": "v95_asia_fade_rsi_prob76",
-              "label": "Asia + fade RSI + prob>=76%",
-              "trades": 15,
-              "wins": 10,
-              "losses": 5,
-              "pnl_usd": 175.0,
-              "win_rate_pct": 66.7
-            },
-            {
-              "variant": "v01_baseline",
-              "label": "baseline (текущая)",
-              "trades": 42,
-              "wins": 27,
-              "losses": 15,
-              "pnl_usd": 397.5,
-              "win_rate_pct": 64.3
-            },
-            {
-              "variant": "v14_asia",
-              "label": "Asia 00-08 UTC",
-              "trades": 42,
-              "wins": 27,
-              "losses": 15,
-              "pnl_usd": 397.5,
-              "win_rate_pct": 64.3
             }
           ]
         },
@@ -4622,22 +4622,22 @@
           "win_rate_pct": 55.3
         },
         {
+          "variant": "v21_emph_mtf",
+          "label": "emphasis: MTF (block A x2 + H x2)",
+          "trades": 204,
+          "wins": 108,
+          "losses": 96,
+          "pnl_usd": -210.0,
+          "win_rate_pct": 52.9
+        },
+        {
           "variant": "v24_only_mtf",
           "label": "only structure (A,H weight x3, остальное x0)",
           "trades": 188,
-          "wins": 100,
-          "losses": 88,
-          "pnl_usd": -150.0,
-          "win_rate_pct": 53.2
-        },
-        {
-          "variant": "v53_only_struct_score10",
-          "label": "only structure (A,H x3) + |score|>=10",
-          "trades": 188,
-          "wins": 100,
-          "losses": 88,
-          "pnl_usd": -150.0,
-          "win_rate_pct": 53.2
+          "wins": 99,
+          "losses": 89,
+          "pnl_usd": -242.5,
+          "win_rate_pct": 52.7
         }
       ],
       "by_session": {
@@ -5248,17 +5248,17 @@
           "win_rate_pct": 55.4
         },
         {
-          "variant": "v24_only_mtf",
-          "label": "only structure (A,H weight x3, остальное x0)",
-          "trades": 128,
-          "wins": 69,
-          "losses": 59,
-          "pnl_usd": -17.5,
-          "win_rate_pct": 53.9
+          "variant": "v115_emph_struct_volat_score16",
+          "label": "emphasis structure+volatility (A,C,G,H x2) + |score|>=16",
+          "trades": 118,
+          "wins": 64,
+          "losses": 54,
+          "pnl_usd": 20.0,
+          "win_rate_pct": 54.2
         },
         {
-          "variant": "v53_only_struct_score10",
-          "label": "only structure (A,H x3) + |score|>=10",
+          "variant": "v24_only_mtf",
+          "label": "only structure (A,H weight x3, остальное x0)",
           "trades": 128,
           "wins": 69,
           "losses": 59,
