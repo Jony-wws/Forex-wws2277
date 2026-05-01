@@ -1,0 +1,2523 @@
+{
+  "as_of": "2026-05-01T18:23:06.758918+00:00",
+  "elapsed_sec": 24.4,
+  "scanners": [
+    "currency_strength",
+    "correlation_divergence",
+    "triangular_arb",
+    "volatility_regime",
+    "session_momentum",
+    "hour_of_day_bias",
+    "dow_bias",
+    "pivot_distance",
+    "mtf_ema_alignment",
+    "bb_squeeze_pos",
+    "adx_like",
+    "candle_pattern",
+    "range_expansion",
+    "vp_imbalance",
+    "news_lookahead",
+    "macro_tilt",
+    "cot_extreme",
+    "smart_money_index",
+    "yearly_position",
+    "mean_rev_vs_momentum"
+  ],
+  "scanner_count": 20,
+  "neutral_threshold": 10,
+  "pass_threshold": 30,
+  "pairs": {
+    "EURUSD": {
+      "overall_score": -4.32,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -3.6876418672982094,
+          "label": "EUR=+0.01 vs USD=+0.08"
+        },
+        "correlation_divergence": {
+          "score": 56.28002371847699,
+          "label": "vs GBPUSD z=-1.88"
+        },
+        "triangular_arb": {
+          "score": -1.9257826133515865,
+          "label": "impl=1.17271 act=1.17316 d=+0.039%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.24)",
+          "ratio": 1.243
+        },
+        "session_momentum": {
+          "score": -4.692698546831913,
+          "label": "sess Δ=-0.094%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=1.17300 (Δ-0.02ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 33.0,
+          "label": "15m↓ 1h↑ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 49.4194900971257,
+          "label": "diff/ATR=+0.99"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -9.341620965135847,
+          "label": "range ×1.21, dir=-0.0008"
+        },
+        "vp_imbalance": {
+          "score": -9.928057553956837,
+          "label": "above POC=26.5% below=21.7%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -48.4880505407046,
+          "label": "SMI/ATR=-0.97"
+        },
+        "yearly_position": {
+          "score": -36.99641425859524,
+          "label": "yearly pos=68%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "GBPUSD": {
+      "overall_score": -8.88,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -9.664656245932923,
+          "label": "GBP=-0.11 vs USD=+0.08"
+        },
+        "correlation_divergence": {
+          "score": -56.28002371847699,
+          "label": "vs EURUSD z=+1.88"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.25)",
+          "ratio": 1.245
+        },
+        "session_momentum": {
+          "score": -5.773042420969675,
+          "label": "sess Δ=-0.115%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=1.35692 (Δ-0.11ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 33.0,
+          "label": "15m↓ 1h↑ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 76.40128362729538,
+          "label": "diff/ATR=+1.53"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -16.15523555251485,
+          "label": "range ×1.03, dir=-0.0023"
+        },
+        "vp_imbalance": {
+          "score": 22.395833333333332,
+          "label": "above POC=20.7% below=32.6%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -74.70642509646032,
+          "label": "SMI/ATR=-1.49"
+        },
+        "yearly_position": {
+          "score": -36.802841309766144,
+          "label": "yearly pos=68%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "USDJPY": {
+      "overall_score": 7.34,
+      "direction": "NEUTRAL",
+      "scanners_passing": 9,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 18.204918924249036,
+          "label": "USD=+0.08 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 11.872000636261395,
+          "label": "vs USDCHF z=-0.40"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×2.38)",
+          "ratio": 2.383
+        },
+        "session_momentum": {
+          "score": 3.154020525439986,
+          "label": "sess Δ=+0.063%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=156.92267 (Δ0.03ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -84.77395690015264,
+          "label": "diff/ATR=-1.70"
+        },
+        "candle_pattern": {
+          "score": 60,
+          "label": "bullish engulfing"
+        },
+        "range_expansion": {
+          "score": 100.0,
+          "label": "range ×2.90, dir=+0.4720"
+        },
+        "vp_imbalance": {
+          "score": -38.53904282115869,
+          "label": "above POC=38.2% below=16.9%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 60.339601398677104,
+          "label": "SMI/ATR=+1.21"
+        },
+        "yearly_position": {
+          "score": -60.497556013668905,
+          "label": "yearly pos=80%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=6 (BUY)"
+        }
+      }
+    },
+    "USDCHF": {
+      "overall_score": 0.72,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -2.0053191460067774,
+          "label": "USD=+0.08 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": -11.872000636261395,
+          "label": "vs USDJPY z=+0.40"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.27)",
+          "ratio": 1.266
+        },
+        "session_momentum": {
+          "score": 3.07484876043465,
+          "label": "sess Δ=+0.061%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.78366 (Δ-0.26ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -99.0,
+          "label": "15m↓ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -79.26125731922518,
+          "label": "diff/ATR=-1.59"
+        },
+        "candle_pattern": {
+          "score": -50,
+          "label": "bearish pin"
+        },
+        "range_expansion": {
+          "score": 0.7992952650493136,
+          "label": "range ×1.08, dir=+0.0001"
+        },
+        "vp_imbalance": {
+          "score": 60.6951871657754,
+          "label": "above POC=10.2% below=41.7%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 26.218337327881947,
+          "label": "SMI/ATR=+0.52"
+        },
+        "yearly_position": {
+          "score": 55.66677027834659,
+          "label": "yearly pos=22%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=7 (BUY)"
+        }
+      }
+    },
+    "AUDUSD": {
+      "overall_score": -3.22,
+      "direction": "NEUTRAL",
+      "scanners_passing": 8,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 6.399959731529273,
+          "label": "AUD=+0.21 vs USD=+0.08"
+        },
+        "correlation_divergence": {
+          "score": -44.950825709578645,
+          "label": "vs NZDUSD z=+1.50"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.85)",
+          "ratio": 0.855
+        },
+        "session_momentum": {
+          "score": -4.685341889517465,
+          "label": "sess Δ=-0.094%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=0.71778 (Δ-0.37ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 99.0,
+          "label": "15m↑ 1h↑ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 89.53522422042913,
+          "label": "diff/ATR=+1.79"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 4.112876092214317,
+          "label": "range ×0.81, dir=+0.0005"
+        },
+        "vp_imbalance": {
+          "score": 76.69291338582678,
+          "label": "above POC=5.1% below=39.0%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -85.38676187458874,
+          "label": "SMI/ATR=-1.71"
+        },
+        "yearly_position": {
+          "score": -95.18980934473515,
+          "label": "yearly pos=98%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=6 (SELL)"
+        }
+      }
+    },
+    "USDCAD": {
+      "overall_score": 5.48,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 3.6603892300698235,
+          "label": "USD=+0.08 vs CAD=+0.01"
+        },
+        "correlation_divergence": {
+          "score": 20.173070246562904,
+          "label": "vs USDCHF z=-0.67"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.04)",
+          "ratio": 1.043
+        },
+        "session_momentum": {
+          "score": 2.3560137283327043,
+          "label": "sess Δ=+0.047%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.36205 (Δ-0.32ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -78.01835322032802,
+          "label": "diff/ATR=-1.56"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 5.0960196915361475,
+          "label": "range ×0.97, dir=+0.0005"
+        },
+        "vp_imbalance": {
+          "score": -43.54194407456725,
+          "label": "above POC=37.4% below=14.7%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 54.9070945945946,
+          "label": "SMI/ATR=+1.10"
+        },
+        "yearly_position": {
+          "score": 67.96351157449084,
+          "label": "yearly pos=16%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=5 (BUY)"
+        }
+      }
+    },
+    "NZDUSD": {
+      "overall_score": 2.04,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -4.807238326632565,
+          "label": "NZD=-0.02 vs USD=+0.08"
+        },
+        "correlation_divergence": {
+          "score": 44.950825709578645,
+          "label": "vs AUDUSD z=-1.50"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.92)",
+          "ratio": 0.92
+        },
+        "session_momentum": {
+          "score": -8.263845456865901,
+          "label": "sess Δ=-0.165%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=0.58827 (Δ-0.25ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 99.0,
+          "label": "15m↑ 1h↑ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 77.37375964118021,
+          "label": "diff/ATR=+1.55"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -7.7998824953411745,
+          "label": "range ×0.88, dir=-0.0007"
+        },
+        "vp_imbalance": {
+          "score": 69.01004304160688,
+          "label": "above POC=7.5% below=40.9%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -100.0,
+          "label": "SMI/ATR=-2.08"
+        },
+        "yearly_position": {
+          "score": -18.678213228079365,
+          "label": "yearly pos=59%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=10 (SELL)"
+        }
+      }
+    },
+    "EURGBP": {
+      "overall_score": 2.94,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 5.977014378634713,
+          "label": "EUR=+0.01 vs GBP=-0.11"
+        },
+        "correlation_divergence": {
+          "score": 40.04099748308777,
+          "label": "vs EURUSD z=-1.33"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.07)",
+          "ratio": 1.07
+        },
+        "session_momentum": {
+          "score": 1.1583672787311339,
+          "label": "sess Δ=+0.023%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.86403 (Δ-0.22ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -59.483987119050894,
+          "label": "diff/ATR=-1.19"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 22.110484419100388,
+          "label": "range ×0.94, dir=+0.0011"
+        },
+        "vp_imbalance": {
+          "score": -74.66666666666667,
+          "label": "above POC=45.5% below=6.6%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 54.541310443293824,
+          "label": "SMI/ATR=+1.09"
+        },
+        "yearly_position": {
+          "score": -7.92766909403988,
+          "label": "yearly pos=54%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=5 (BUY)"
+        }
+      }
+    },
+    "EURJPY": {
+      "overall_score": 10.39,
+      "direction": "BUY",
+      "scanners_passing": 8,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 14.517277056950828,
+          "label": "EUR=+0.01 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 56.17748233091981,
+          "label": "vs GBPJPY z=-1.87"
+        },
+        "triangular_arb": {
+          "score": 0.8377730959979188,
+          "label": "impl=184.21986 act=184.18900 d=-0.017%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×2.34)",
+          "ratio": 2.335
+        },
+        "session_momentum": {
+          "score": -1.3296707137354364,
+          "label": "sess Δ=-0.027%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=183.84667 (Δ0.10ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -76.40761343959535,
+          "label": "diff/ATR=-1.53"
+        },
+        "candle_pattern": {
+          "score": 0,
+          "label": "inside bar"
+        },
+        "range_expansion": {
+          "score": 100.0,
+          "label": "range ×3.08, dir=+0.4490"
+        },
+        "vp_imbalance": {
+          "score": 79.39393939393939,
+          "label": "above POC=4.7% below=41.1%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 29.67842276199625,
+          "label": "SMI/ATR=+0.59"
+        },
+        "yearly_position": {
+          "score": -72.0666469064555,
+          "label": "yearly pos=86%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=6 (BUY)"
+        }
+      }
+    },
+    "EURCHF": {
+      "overall_score": -4.25,
+      "direction": "NEUTRAL",
+      "scanners_passing": 5,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -5.692961013304987,
+          "label": "EUR=+0.01 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 2.011546662450887,
+          "label": "impl=0.91632 act=0.91595 d=-0.040%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.03)",
+          "ratio": 1.032
+        },
+        "session_momentum": {
+          "score": -1.0913563148576306,
+          "label": "sess Δ=-0.022%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.91807 (Δ-0.29ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -99.0,
+          "label": "15m↓ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -71.49225487609444,
+          "label": "diff/ATR=-1.43"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": -5.3702689137329145,
+          "label": "range ×0.79, dir=-0.0004"
+        },
+        "vp_imbalance": {
+          "score": 19.308357348703172,
+          "label": "above POC=19.4% below=28.8%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -6.554678891404714,
+          "label": "SMI/ATR=-0.13"
+        },
+        "yearly_position": {
+          "score": 22.847198311158913,
+          "label": "yearly pos=39%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=6 (SELL)"
+        }
+      }
+    },
+    "EURAUD": {
+      "overall_score": 3.9,
+      "direction": "NEUTRAL",
+      "scanners_passing": 8,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -10.087601598827481,
+          "label": "EUR=+0.01 vs AUD=+0.21"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "squeeze (×0.81) — breakout coming",
+          "ratio": 0.812
+        },
+        "session_momentum": {
+          "score": -0.9521567595732404,
+          "label": "sess Δ=-0.019%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.63237 (Δ-0.44ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -99.0,
+          "label": "15m↓ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -47.98633396400964,
+          "label": "diff/ATR=-0.96"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": -11.86960978769507,
+          "label": "range ×0.92, dir=-0.0020"
+        },
+        "vp_imbalance": {
+          "score": -42.00988467874793,
+          "label": "above POC=29.9% below=12.2%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 44.172533380634036,
+          "label": "SMI/ATR=+0.88"
+        },
+        "yearly_position": {
+          "score": 85.8220563941964,
+          "label": "yearly pos=7%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=7 (BUY)"
+        }
+      }
+    },
+    "EURCAD": {
+      "overall_score": 0.66,
+      "direction": "NEUTRAL",
+      "scanners_passing": 4,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -0.02725263722838569,
+          "label": "EUR=+0.01 vs CAD=+0.01"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.09)",
+          "ratio": 1.092
+        },
+        "session_momentum": {
+          "score": -3.7308032940503892,
+          "label": "sess Δ=-0.075%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.59438 (Δ-0.11ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -25.602165021100554,
+          "label": "diff/ATR=-0.51"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 0.9514778079106374,
+          "label": "range ×1.26, dir=+0.0001"
+        },
+        "vp_imbalance": {
+          "score": 41.66666666666667,
+          "label": "above POC=15.1% below=36.6%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 12.736116381413273,
+          "label": "SMI/ATR=+0.25"
+        },
+        "yearly_position": {
+          "score": 10.147542934200615,
+          "label": "yearly pos=45%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "EURNZD": {
+      "overall_score": -0.71,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 1.1195964593343561,
+          "label": "EUR=+0.01 vs NZD=-0.02"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "squeeze (×0.79) — breakout coming",
+          "ratio": 0.794
+        },
+        "session_momentum": {
+          "score": 2.2912050141674145,
+          "label": "sess Δ=+0.046%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.99098 (Δ-0.24ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -99.0,
+          "label": "15m↓ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -40.86532260016228,
+          "label": "diff/ATR=-0.82"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 5.943004641412348,
+          "label": "range ×1.00, dir=+0.0011"
+        },
+        "vp_imbalance": {
+          "score": -64.61038961038962,
+          "label": "above POC=35.2% below=7.6%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 84.53855274038797,
+          "label": "SMI/ATR=+1.69"
+        },
+        "yearly_position": {
+          "score": -13.663592897699562,
+          "label": "yearly pos=57%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=8 (BUY)"
+        }
+      }
+    },
+    "GBPJPY": {
+      "overall_score": -13.04,
+      "direction": "SELL",
+      "scanners_passing": 9,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 8.540262678316113,
+          "label": "GBP=-0.11 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": -56.17748233091981,
+          "label": "vs EURJPY z=+1.87"
+        },
+        "triangular_arb": {
+          "score": -0.4484627205866663,
+          "label": "impl=213.29087 act=213.31000 d=+0.009%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×2.06)",
+          "ratio": 2.059
+        },
+        "session_momentum": {
+          "score": -2.4602069919926377,
+          "label": "sess Δ=-0.049%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=212.18899 (Δ0.30ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -58.118643997951395,
+          "label": "diff/ATR=-1.16"
+        },
+        "candle_pattern": {
+          "score": -50,
+          "label": "bearish pin"
+        },
+        "range_expansion": {
+          "score": 59.93535376720995,
+          "label": "range ×2.70, dir=+0.3730"
+        },
+        "vp_imbalance": {
+          "score": -59.7684515195369,
+          "label": "above POC=38.3% below=9.7%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -5.88714264999498,
+          "label": "SMI/ATR=-0.12"
+        },
+        "yearly_position": {
+          "score": -73.4473062063215,
+          "label": "yearly pos=87%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=6 (SELL)"
+        }
+      }
+    },
+    "GBPCHF": {
+      "overall_score": -4.77,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -11.669975391939701,
+          "label": "GBP=-0.11 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.7032318495201045,
+          "label": "impl=1.06092 act=1.06077 d=-0.014%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.99)",
+          "ratio": 0.991
+        },
+        "session_momentum": {
+          "score": -2.2146313046082415,
+          "label": "sess Δ=-0.044%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.06092 (Δ-0.02ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↓ 1h↓ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -34.12912536639049,
+          "label": "diff/ATR=-0.68"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -14.56031985886858,
+          "label": "range ×0.90, dir=-0.0013"
+        },
+        "vp_imbalance": {
+          "score": 4.494382022471909,
+          "label": "above POC=23.6% below=25.8%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -46.86789637161845,
+          "label": "SMI/ATR=-0.94"
+        },
+        "yearly_position": {
+          "score": 31.746590547850552,
+          "label": "yearly pos=34%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "GBPAUD": {
+      "overall_score": -4.21,
+      "direction": "NEUTRAL",
+      "scanners_passing": 5,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -16.064615977462196,
+          "label": "GBP=-0.11 vs AUD=+0.21"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "squeeze (×0.84) — breakout coming",
+          "ratio": 0.843
+        },
+        "session_momentum": {
+          "score": -2.201011561269201,
+          "label": "sess Δ=-0.044%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=1.88697 (Δ-0.20ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -99.0,
+          "label": "15m↓ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -6.348901651669436,
+          "label": "diff/ATR=-0.13"
+        },
+        "candle_pattern": {
+          "score": 0,
+          "label": "inside bar"
+        },
+        "range_expansion": {
+          "score": -26.387578382332716,
+          "label": "range ×1.04, dir=-0.0043"
+        },
+        "vp_imbalance": {
+          "score": -38.066465256797585,
+          "label": "above POC=31.7% below=14.2%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 6.9133304427422075,
+          "label": "SMI/ATR=+0.14"
+        },
+        "yearly_position": {
+          "score": 87.03223306514933,
+          "label": "yearly pos=6%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=7 (SELL)"
+        }
+      }
+    },
+    "GBPCAD": {
+      "overall_score": -8.41,
+      "direction": "NEUTRAL",
+      "scanners_passing": 3,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -6.0042670158631,
+          "label": "GBP=-0.11 vs CAD=+0.01"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.03)",
+          "ratio": 1.031
+        },
+        "session_momentum": {
+          "score": -5.006898479495365,
+          "label": "sess Δ=-0.100%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=1.84854 (Δ0.35ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↓ 1h↑ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 12.7267212712613,
+          "label": "diff/ATR=+0.25"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -9.226695407374962,
+          "label": "range ×0.99, dir=-0.0015"
+        },
+        "vp_imbalance": {
+          "score": -0.7812500000000022,
+          "label": "above POC=26.9% below=26.5%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -18.91745602165088,
+          "label": "SMI/ATR=-0.38"
+        },
+        "yearly_position": {
+          "score": 2.0629986998242478,
+          "label": "yearly pos=49%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "GBPNZD": {
+      "overall_score": -5.99,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -4.857417919300358,
+          "label": "GBP=-0.11 vs NZD=-0.02"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "squeeze (×0.83) — breakout coming",
+          "ratio": 0.826
+        },
+        "session_momentum": {
+          "score": 0.9124944270996233,
+          "label": "sess Δ=+0.018%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=2.30097 (Δ0.00ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↓ 1h↓ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 0.20826481362323096,
+          "label": "diff/ATR=+0.00"
+        },
+        "candle_pattern": {
+          "score": -50,
+          "label": "bearish pin"
+        },
+        "range_expansion": {
+          "score": -3.7971745435896143,
+          "label": "range ×1.05, dir=-0.0007"
+        },
+        "vp_imbalance": {
+          "score": -65.79406631762652,
+          "label": "above POC=33.0% below=6.8%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 44.4787599790222,
+          "label": "SMI/ATR=+0.89"
+        },
+        "yearly_position": {
+          "score": -17.86723538438746,
+          "label": "yearly pos=59%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=7 (SELL)"
+        }
+      }
+    },
+    "AUDJPY": {
+      "overall_score": 5.35,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 24.604878655778307,
+          "label": "AUD=+0.21 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 1.3859143379376835,
+          "label": "impl=113.19037 act=113.15900 d=-0.028%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.57)",
+          "ratio": 1.569
+        },
+        "session_momentum": {
+          "score": -0.17663756506599773,
+          "label": "sess Δ=-0.004%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=112.15900 (Δ0.48ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -48.653822856391855,
+          "label": "diff/ATR=-0.97"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 65.71188528150707,
+          "label": "range ×1.92, dir=+0.4720"
+        },
+        "vp_imbalance": {
+          "score": 83.1111111111111,
+          "label": "above POC=4.0% below=42.9%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -9.38858017715268,
+          "label": "SMI/ATR=-0.19"
+        },
+        "yearly_position": {
+          "score": -86.60702393550581,
+          "label": "yearly pos=93%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=7 (BUY)"
+        }
+      }
+    },
+    "CADJPY": {
+      "overall_score": 6.95,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 14.544529694179214,
+          "label": "CAD=+0.01 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×2.13)",
+          "ratio": 2.128
+        },
+        "session_momentum": {
+          "score": 2.640265988222333,
+          "label": "sess Δ=+0.053%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=114.89867 (Δ0.30ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -55.46331969261365,
+          "label": "diff/ATR=-1.11"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": 98.32402291055179,
+          "label": "range ×2.81, dir=+0.3330"
+        },
+        "vp_imbalance": {
+          "score": 58.778625954198475,
+          "label": "above POC=11.2% below=43.3%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 16.41105606582621,
+          "label": "SMI/ATR=+0.33"
+        },
+        "yearly_position": {
+          "score": -73.24775528678646,
+          "label": "yearly pos=87%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=5 (BUY)"
+        }
+      }
+    },
+    "CHFJPY": {
+      "overall_score": 2.71,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 20.210238070255816,
+          "label": "CHF=+0.12 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.89)",
+          "ratio": 1.891
+        },
+        "session_momentum": {
+          "score": -0.09977130747149765,
+          "label": "sess Δ=-0.002%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -20,
+          "label": "below PP=201.30918"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -35.46279016468861,
+          "label": "diff/ATR=-0.71"
+        },
+        "candle_pattern": {
+          "score": 0,
+          "label": "inside bar"
+        },
+        "range_expansion": {
+          "score": 96.5818620344361,
+          "label": "range ×2.17, dir=+0.8090"
+        },
+        "vp_imbalance": {
+          "score": 21.540656205420827,
+          "label": "above POC=19.1% below=29.6%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 33.38396838809572,
+          "label": "SMI/ATR=+0.67"
+        },
+        "yearly_position": {
+          "score": -78.88653859372616,
+          "label": "yearly pos=89%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=9 (BUY)"
+        }
+      }
+    },
+    "NZDJPY": {
+      "overall_score": -2.3,
+      "direction": "NEUTRAL",
+      "scanners_passing": 8,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 13.397680597616471,
+          "label": "NZD=-0.02 vs JPY=-0.29"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "elevated vol (×1.60)",
+          "ratio": 1.603
+        },
+        "session_momentum": {
+          "score": -3.827569455971066,
+          "label": "sess Δ=-0.077%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=91.99467 (Δ0.40ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -49.50048491904957,
+          "label": "diff/ATR=-0.99"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": 46.95275626215321,
+          "label": "range ×2.25, dir=+0.2250"
+        },
+        "vp_imbalance": {
+          "score": 11.538461538461537,
+          "label": "above POC=22.4% below=28.2%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -33.27335871793799,
+          "label": "SMI/ATR=-0.67"
+        },
+        "yearly_position": {
+          "score": -58.34721560272455,
+          "label": "yearly pos=79%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=6 (SELL)"
+        }
+      }
+    },
+    "AUDCAD": {
+      "overall_score": 0.6,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 10.060348961599095,
+          "label": "AUD=+0.21 vs CAD=+0.01"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 1.5095436871493502,
+          "label": "impl=0.97954 act=0.97924 d=-0.030%"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.92)",
+          "ratio": 0.92
+        },
+        "session_momentum": {
+          "score": -2.6536919260784364,
+          "label": "sess Δ=-0.053%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=0.97809 (Δ-0.13ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 33.0,
+          "label": "15m↑ 1h↑ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 11.449181697999833,
+          "label": "diff/ATR=+0.23"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": 18.437734267213965,
+          "label": "range ×1.16, dir=+0.0016"
+        },
+        "vp_imbalance": {
+          "score": 100.0,
+          "label": "above POC=0.0% below=50.8%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -13.799853988319063,
+          "label": "SMI/ATR=-0.28"
+        },
+        "yearly_position": {
+          "score": -86.01115568864924,
+          "label": "yearly pos=93%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=8 (SELL)"
+        }
+      }
+    },
+    "AUDCHF": {
+      "overall_score": -2.53,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 4.394640585522494,
+          "label": "AUD=+0.21 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.97)",
+          "ratio": 0.968
+        },
+        "session_momentum": {
+          "score": -0.0889558363924257,
+          "label": "sess Δ=-0.002%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.56102 (Δ0.39ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 33.0,
+          "label": "15m↑ 1h↓ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -14.345746234964327,
+          "label": "diff/ATR=-0.29"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": 18.033359701506065,
+          "label": "range ×0.78, dir=+0.0015"
+        },
+        "vp_imbalance": {
+          "score": -40.64914992272025,
+          "label": "above POC=31.6% below=13.3%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -25.614190933570217,
+          "label": "SMI/ATR=-0.51"
+        },
+        "yearly_position": {
+          "score": -85.32743184790263,
+          "label": "yearly pos=93%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    },
+    "AUDNZD": {
+      "overall_score": 9.51,
+      "direction": "NEUTRAL",
+      "scanners_passing": 6,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": 11.207198058161838,
+          "label": "AUD=+0.21 vs NZD=-0.02"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "squeeze (×0.72) — breakout coming",
+          "ratio": 0.719
+        },
+        "session_momentum": {
+          "score": 3.442215000377637,
+          "label": "sess Δ=+0.069%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=1.22284 (Δ0.31ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 99.0,
+          "label": "15m↑ 1h↑ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 8.755032847274158,
+          "label": "diff/ATR=+0.18"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": 24.134105546886982,
+          "label": "range ×0.89, dir=+0.0025"
+        },
+        "vp_imbalance": {
+          "score": 81.16883116883116,
+          "label": "above POC=4.0% below=38.8%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": 44.34598067050962,
+          "label": "SMI/ATR=+0.89"
+        },
+        "yearly_position": {
+          "score": -96.77699491150042,
+          "label": "yearly pos=98%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 25.0,
+          "label": "weak run=4"
+        }
+      }
+    },
+    "CADCHF": {
+      "overall_score": 6.75,
+      "direction": "NEUTRAL",
+      "scanners_passing": 5,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -5.665708376076601,
+          "label": "CAD=+0.01 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×1.09)",
+          "ratio": 1.085
+        },
+        "session_momentum": {
+          "score": 2.9595300863939964,
+          "label": "sess Δ=+0.059%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.57403 (Δ0.15ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↓ 1h↓ 4h↑"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -23.44619743845874,
+          "label": "diff/ATR=-0.47"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": 1.8942521996203232,
+          "label": "range ×1.22, dir=+0.0001"
+        },
+        "vp_imbalance": {
+          "score": 10.55408970976253,
+          "label": "above POC=23.5% below=29.1%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -11.965466531267937,
+          "label": "SMI/ATR=-0.24"
+        },
+        "yearly_position": {
+          "score": 33.648719036444774,
+          "label": "yearly pos=33%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": 50.0,
+          "label": "momentum run=8 (BUY)"
+        }
+      }
+    },
+    "NZDCAD": {
+      "overall_score": -4.92,
+      "direction": "NEUTRAL",
+      "scanners_passing": 5,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -1.1468490965627416,
+          "label": "NZD=-0.02 vs CAD=+0.01"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.96)",
+          "ratio": 0.962
+        },
+        "session_momentum": {
+          "score": -5.85393469709609,
+          "label": "sess Δ=-0.117%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": -60,
+          "label": "near R1=0.80158 (Δ-0.05ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": 33.0,
+          "label": "15m↑ 1h↑ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": 9.123502399259351,
+          "label": "diff/ATR=+0.18"
+        },
+        "candle_pattern": {
+          "score": 0.0,
+          "label": "no pattern"
+        },
+        "range_expansion": {
+          "score": -5.6748328257434,
+          "label": "range ×1.18, dir=-0.0004"
+        },
+        "vp_imbalance": {
+          "score": -6.692913385826772,
+          "label": "above POC=18.8% below=16.5%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -42.752767880452566,
+          "label": "SMI/ATR=-0.86"
+        },
+        "yearly_position": {
+          "score": 31.611281341968834,
+          "label": "yearly pos=34%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=8 (SELL)"
+        }
+      }
+    },
+    "NZDCHF": {
+      "overall_score": 2.23,
+      "direction": "NEUTRAL",
+      "scanners_passing": 7,
+      "scanners_total": 20,
+      "scanners": {
+        "currency_strength": {
+          "score": -6.812557472639343,
+          "label": "NZD=-0.02 vs CHF=+0.12"
+        },
+        "correlation_divergence": {
+          "score": 0.0,
+          "label": "no sibling"
+        },
+        "triangular_arb": {
+          "score": 0.0,
+          "label": "no triangle"
+        },
+        "volatility_regime": {
+          "score": 0,
+          "label": "normal vol (×0.91)",
+          "ratio": 0.913
+        },
+        "session_momentum": {
+          "score": -2.8185623199830703,
+          "label": "sess Δ=-0.056%"
+        },
+        "hour_of_day_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "dow_bias": {
+          "score": 0.0,
+          "label": "no history"
+        },
+        "pivot_distance": {
+          "score": 60,
+          "label": "near S1=0.45968 (Δ0.30ATR)"
+        },
+        "mtf_ema_alignment": {
+          "score": -33.0,
+          "label": "15m↑ 1h↓ 4h↓"
+        },
+        "bb_squeeze_pos": {
+          "score": 0.0,
+          "label": "err AttributeError"
+        },
+        "adx_like": {
+          "score": -22.413252717734572,
+          "label": "diff/ATR=-0.45"
+        },
+        "candle_pattern": {
+          "score": 50,
+          "label": "bullish pin"
+        },
+        "range_expansion": {
+          "score": -4.886252985813653,
+          "label": "range ×1.06, dir=-0.0003"
+        },
+        "vp_imbalance": {
+          "score": 73.1523378582202,
+          "label": "above POC=6.2% below=39.9%"
+        },
+        "news_lookahead": {
+          "score": 0.0,
+          "label": "no news"
+        },
+        "macro_tilt": {
+          "score": 0.0,
+          "label": "FRED tilt=+0.00"
+        },
+        "cot_extreme": {
+          "score": 0,
+          "label": "z=+0.00 (no extreme)"
+        },
+        "smart_money_index": {
+          "score": -64.68977862875728,
+          "label": "SMI/ATR=-1.29"
+        },
+        "yearly_position": {
+          "score": 46.02329730869644,
+          "label": "yearly pos=27%"
+        },
+        "mean_rev_vs_momentum": {
+          "score": -50.0,
+          "label": "momentum run=5 (SELL)"
+        }
+      }
+    }
+  }
+}
