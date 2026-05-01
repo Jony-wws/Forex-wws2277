@@ -237,7 +237,51 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
             "gate_mode": "free",
         }
 
-    # Нет qualified variant — открываем по baseline (forecast direction)
+    # Нет qualified variant — открываем по baseline (forecast direction).
+    #
+    # Macro safety filter (added 2026-05-01 per user "100% бесплатный
+    # институциональный анализ" request): когда нет qualified variant,
+    # дополнительно проверяем что baseline side НЕ конфликтует с macro
+    # позиционированием. Это повышает honest WR без блокировки большого
+    # числа сделок:
+    #   - сильный fundamental tilt (|tilt_score| ≥ 50) против baseline → SKIP
+    #   - очень сильный COT contrarian (strength ≥ 40%) против baseline → SKIP
+    # Эти пороги выбраны намеренно высокими, чтобы не сжать число сделок
+    # ниже 5-10/день. Когда есть qualified variant — мы уже доверяем 365-day
+    # бэктесту и macro фильтр не применяем.
+    try:
+        from . import fundamentals as fund
+        ft = fund.pair_macro_tilt(pair)
+        ts_score = ft.get("tilt_score") or 0
+        if abs(ts_score) >= 50:
+            macro_side = "BUY" if ts_score > 0 else "SELL"
+            if macro_side != baseline_side:
+                return False, {
+                    "reason": (
+                        f"macro filter: fundamental tilt={ts_score} → {macro_side}, "
+                        f"но baseline={baseline_side} (rate_diff={ft.get('rate_diff_pct')}, "
+                        f"yield_diff={ft.get('yield_diff_pct')})"
+                    ),
+                    "session": sess_name,
+                }
+    except Exception:
+        pass
+    try:
+        from . import cot as cot_mod
+        cs = cot_mod.pair_cot_signal(pair)
+        if cs.get("side") in ("BUY", "SELL") and (cs.get("strength_pct") or 0) >= 40:
+            if cs["side"] != baseline_side:
+                return False, {
+                    "reason": (
+                        f"macro filter: COT contrarian={cs['side']} "
+                        f"(strength={cs.get('strength_pct')}%, z={cs.get('combined_z')}), "
+                        f"но baseline={baseline_side}"
+                    ),
+                    "session": sess_name,
+                }
+    except Exception:
+        pass
+
     return True, {
         "variant": None,
         "variant_label": "free-gate (no qualified variant — using baseline forecast)",
