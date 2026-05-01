@@ -866,7 +866,7 @@ function _formatTs(iso) {
 
 async function refreshMetaStrategy() {
   try {
-    const r = await fetch("/api/meta-strategy").then((x) => x.json());
+    const r = await api("/api/meta-strategy");
     const summary = r.summary || {};
     const cells = r.cells || {};
     const grid = document.getElementById("meta-summary-grid");
@@ -962,7 +962,7 @@ async function refreshMetaStrategy() {
 
   // log tab
   try {
-    const lr = await fetch("/api/meta-strategy/log?limit=20").then((x) => x.json());
+    const lr = await api("/api/meta-strategy/log?limit=20");
     const el = document.getElementById("meta-log-content");
     if (!el) return;
     const entries = lr.entries || [];
