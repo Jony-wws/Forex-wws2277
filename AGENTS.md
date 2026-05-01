@@ -175,13 +175,21 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ## Honest known limitations (do NOT hide these)
 
-**Latest state (May 2026 — per-session strategy_search 90 variants × 4 sessions × 60d):**
-- 36 of 112 (pair, session) cells achieve ≥70% WR on real 60-day Yahoo data.
-- Per session: Asia 1/28 (USDCAD only), London 15/28, Overlap 18/28, NY 2/28.
-- 18/28 pairs qualify in ≥1 session; 10 pairs honestly frozen across all sessions.
-- paper_trader gate is now per-session-aware: opens trades only on qualified
-  (pair, current_session) cells, falls back to global best_variant only if it
-  also qualifies. Estimated ~80 trades/day across all qualified cells.
+**Latest state (May 2026 — per-session strategy_search 120 variants × 4 sessions × 90d):**
+- 37 of 112 (pair, session) cells achieve ≥70% WR on real 90-day Yahoo data.
+- Per session: Asia 5/28, London 9/28, Overlap 19/28, NY 4/28.
+- 14/28 pairs qualify in ≥1 session.
+- paper_trader gate is per-session-aware: opens trades only on qualified
+  (pair, current_session) cells, falls back to global best_variant only if
+  its variant's session_utc filter is compatible with the current hour.
+  Estimated ~30-50 trades/day across all qualified cells.
+
+**Why 90d (not 60d, not 180d):**
+- 60d sweep: 36/112 cells but most London cells were over-fit to recent regime.
+- 180d sweep: 25/112 cells (under-trained for some seasonal patterns).
+- 90d sweep: 37/112 cells with healthier distribution (Asia 5 vs 1, NY 4 vs 2).
+- 120 variants (was 60→90→120). New v118_contra_emph_meanrev + v77_overlap_emph_momentum
+  + v43_full_mtf_momentum each win 3-4 cells.
 
 **Why ALL 112 cells ≥70% WR is hard / probably impossible without new data:**
 - Asia and NY sessions are intrinsically tougher for technical-only signals
