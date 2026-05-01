@@ -49,17 +49,48 @@ class ChildProc:
         self.proc: subprocess.Popen | None = None
         self.start_count = 0
         self.last_start: datetime | None = None
+        self._stdout_fh = None
+        self._stderr_fh = None
 
     def is_alive(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
 
+    def _close_log_handles(self) -> None:
+        for fh_attr in ("_stdout_fh", "_stderr_fh"):
+            fh = getattr(self, fh_attr, None)
+            if fh is None:
+                continue
+            try:
+                fh.close()
+            except Exception:
+                pass
+            setattr(self, fh_attr, None)
+
+    def _reap_previous(self) -> None:
+        """Дождаться завершения и реапнуть предыдущий Popen, чтобы не накапливать
+        зомби-процессы при auto-restart. Если процесс ещё жив — не блокируемся."""
+        if self.proc is None:
+            return
+        if self.proc.poll() is None:
+            return  # ещё жив, не ждём
+        try:
+            self.proc.wait(timeout=1)
+        except Exception:
+            pass
+
     def start(self) -> None:
+        # Перед перезапуском: закрываем старые FD и реапаем зомби.
+        self._reap_previous()
+        self._close_log_handles()
+
         log_path = config.LOGS_DIR / f"{self.name}.out"
         err_path = config.LOGS_DIR / f"{self.name}.err"
+        self._stdout_fh = open(log_path, "ab")
+        self._stderr_fh = open(err_path, "ab")
         self.proc = subprocess.Popen(
             self.cmd,
-            stdout=open(log_path, "ab"),
-            stderr=open(err_path, "ab"),
+            stdout=self._stdout_fh,
+            stderr=self._stderr_fh,
             preexec_fn=os.setsid if hasattr(os, "setsid") else None,
         )
         self.start_count += 1
@@ -76,6 +107,11 @@ class ChildProc:
                 self.proc.terminate()
             except Exception:
                 pass
+
+    def close(self) -> None:
+        """Финальная зачистка ресурсов: дождаться процесса и закрыть FD."""
+        self._reap_previous()
+        self._close_log_handles()
 
 
 def _build_agent_cmd(agent: dict) -> list[str]:
@@ -165,6 +201,9 @@ def run() -> None:
             time.sleep(0.2)
         if ch.is_alive():
             ch.stop(signal.SIGKILL)
+    # реапнуть процессы и закрыть FDs
+    for ch in children.values():
+        ch.close()
     log.info("orchestrator exit")
 
 
