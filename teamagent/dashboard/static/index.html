@@ -9,6 +9,11 @@
 <body>
 <header class="topbar">
   <div class="brand">TeamAgent <span class="muted">FOREX AI</span></div>
+  <div class="clock-block">
+    <div><span class="muted small">сейчас:</span> <span id="clock-utc">—</span> <span class="muted small">UTC</span></div>
+    <div><span class="muted small">локально:</span> <span id="clock-utc5">—</span> <span class="muted small">UTC+5</span></div>
+    <div class="muted small" id="clock-session">—</div>
+  </div>
   <div class="health" id="health">…</div>
   <div class="auto-refresh">обновление: <span id="last-refresh">—</span> · <button id="manual-refresh">⟳</button></div>
 </header>
@@ -24,7 +29,7 @@
       <li><b>Стакан (Volume Profile)</b> — POC/VAH/VAL + крупные игроки 🐋 + прогноз «куда цена не вернётся до 00:00 UTC+5».</li>
       <li><b>История</b> — все закрытые сделки с реальной ценой Yahoo на момент экспирации.</li>
       <li><b>60+ агентов</b> — каждый отдельный процесс с heartbeat. Watchdog убивает зависших, orchestrator перезапускает.</li>
-      <li><b>WR 30д (лучшая стратегия)</b> — strategy_search перебирает 30+ вариантов (разные пороги score, экспирации, сессии London/NY/Asia, contrarian, full MTF и т.д.) и для каждой пары выбирает лучшую. Сделка открывается ТОЛЬКО если эта лучшая стратегия даёт ≥70% WR на 30-дневном бэктесте <b>И</b> текущий сигнал проходит её фильтры. 🔒 = пара заморожена (даже лучшая стратегия даёт <70%).</li>
+      <li><b>WR backtest</b> — strategy_search ежечасно перебирает 120 вариантов на каждой из 4 сессий и обновляет лучший подход для каждой ячейки (пара × сессия) на 90-дневной истории Yahoo. Это используется для выбора стороны (BUY/SELL c учётом contrarian/fade-RSI flip) и времени экспирации. <b>Гейт открытия: только `forecast.probability_pct ≥ 70%` — без жёсткой блокировки по WR ячейки.</b> Для пар где есть qualified variant на текущую сессию, его параметры применяются как «обогащение».</li>
     </ul>
   </section>
   <section id="stats-section" class="card">
@@ -48,10 +53,11 @@
             <th>Пара</th>
             <th>Сторона</th>
             <th>Цена входа</th>
-            <th>Время открытия (UTC)</th>
+            <th>Время открытия</th>
             <th>До экспирации</th>
             <th>Текущая цена</th>
-            <th>Разница</th>
+            <th>Pips</th>
+            <th>%</th>
             <th>Прогноз PnL</th>
             <th>Прав?</th>
           </tr>

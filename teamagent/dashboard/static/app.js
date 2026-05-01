@@ -11,10 +11,17 @@ const fmt = {
   pct: x => x == null ? "—" : (x).toFixed(1) + "%",
   price: x => x == null ? "—" : (x).toFixed(5),
   pnl: x => x == null ? "—" : (x >= 0 ? `+$${x.toFixed(2)}` : `-$${Math.abs(x).toFixed(2)}`),
+  pips: x => x == null ? "—" : (x >= 0 ? "+" : "") + x.toFixed(1),
   utc: s => {
     if (!s) return "—";
     const d = new Date(s);
     return d.toISOString().slice(0, 19).replace("T", " ");
+  },
+  utc5: s => {
+    // UTC+5 (Иркутск/Челябинск/Уральск). Локальное время пользователя.
+    if (!s) return "—";
+    const d = new Date(new Date(s).getTime() + 5 * 3600 * 1000);
+    return d.toISOString().slice(0, 19).replace("T", " ") + " UTC+5";
   },
   countdown: sec => {
     if (sec == null) return "—";
@@ -101,20 +108,22 @@ async function refreshOpenTrades() {
       const okClass = inMoney === true ? "win" : inMoney === false ? "loss" : "muted";
       const projPayout = live.projected_payout;
 
+      const pipsClass = live.pips == null ? "muted" : (live.pips >= 0 ? "win" : "loss");
       tb.appendChild(el("tr", {},
         el("td", {}, t.pair),
         el("td", { class: sideClass }, t.side),
         el("td", {}, fmt.price(t.open_price)),
-        el("td", { class: "muted" }, fmt.utc(t.open_time)),
+        el("td", { class: "muted small" }, fmt.utc5(t.open_time)),
         el("td", {}, fmt.countdown(live.time_remaining_sec)),
         el("td", {}, fmt.price(live.current_price)),
-        el("td", {}, live.diff_pct == null ? "—" : (live.diff_pct >= 0 ? "+" : "") + live.diff_pct.toFixed(3) + "%"),
+        el("td", { class: pipsClass }, fmt.pips(live.pips)),
+        el("td", { class: pipsClass }, live.diff_pct == null ? "—" : (live.diff_pct >= 0 ? "+" : "") + live.diff_pct.toFixed(3) + "%"),
         el("td", { class: okClass }, fmt.pnl(projPayout)),
         el("td", { class: okClass }, okLabel),
       ));
     }
     if (r.count === 0) {
-      tb.appendChild(el("tr", {}, el("td", { colspan: 9, class: "muted" }, "пока нет открытых сделок")));
+      tb.appendChild(el("tr", {}, el("td", { colspan: 10, class: "muted" }, "пока нет открытых сделок")));
     }
   } catch (e) { console.error(e); }
 }
@@ -232,6 +241,12 @@ function renderVP(vp) {
   if (vp.error) { container.appendChild(el("div", { class: "muted" }, "ошибка: " + vp.error)); return container; }
 
   const fc = vp.forecast_to_utc5_midnight || {};
+  // Текущая цена крупно сверху — пользователь жаловался что её не видно
+  container.appendChild(el("div", { class: "vp-current-price" },
+    el("span", { class: "muted small" }, "Текущая цена: "),
+    el("strong", { class: "big green" }, fmt.price(vp.current_price)),
+    el("span", { class: "muted small" }, ` (диапазон ${fmt.price(vp.low)}–${fmt.price(vp.high)})`),
+  ));
   container.appendChild(el("div", { class: "muted small" },
     `POC ${fmt.price(vp.poc)} · VAH ${fmt.price(vp.vah)} · VAL ${fmt.price(vp.val)} · ` +
     `направление ${vp.direction} · ${fc.explanation || ""}`
@@ -245,10 +260,20 @@ function renderVP(vp) {
     container.appendChild(el("div", {}, el("strong", {}, "Куда не вернётся: "), ul));
   }
 
-  // bars (топ-30 по объёму)
+  // bars (топ-30 по объёму + всегда включаем bucket текущей цены)
   const bars = el("div", { class: "vp-bars" });
-  const sorted = [...vp.buckets].sort((a, b) => b.weight_pct - a.weight_pct).slice(0, 30);
-  const top = sorted.sort((a, b) => b.price - a.price);
+  const sortedByWeight = [...vp.buckets].sort((a, b) => b.weight_pct - a.weight_pct);
+  const top30 = sortedByWeight.slice(0, 30);
+  // bucket ближайший к текущей цене
+  let currBucket = null, bestDist = Infinity;
+  for (const b of vp.buckets) {
+    const d = Math.abs(b.price - vp.current_price);
+    if (d < bestDist) { bestDist = d; currBucket = b; }
+  }
+  if (currBucket && !top30.find(b => b.price === currBucket.price)) {
+    top30.push(currBucket);
+  }
+  const top = top30.sort((a, b) => b.price - a.price);
   const max = Math.max(...top.map(b => b.weight_pct));
   const bigPrices = new Set((vp.big_players || []).map(b => b.price));
   for (const b of top) {
@@ -427,6 +452,24 @@ async function refreshStrategyMatrix() {
   } catch (e) { console.error("refreshStrategyMatrix:", e); }
 }
 
+function tickClock() {
+  const now = new Date();
+  const utc = now.toISOString().slice(11, 19);
+  const localMs = now.getTime() + 5 * 3600 * 1000;
+  const utc5 = new Date(localMs).toISOString().slice(11, 19);
+  $("clock-utc").textContent = utc;
+  $("clock-utc5").textContent = utc5;
+  // Текущая FX-сессия (по UTC часу, как у backend)
+  const h = now.getUTCHours();
+  let sess;
+  if (h < 7) sess = "Asia (00–07 UTC)";
+  else if (h < 13) sess = "London (07–13 UTC)";
+  else if (h < 17) sess = "Overlap (13–17 UTC)";
+  else if (h < 22) sess = "NY (17–22 UTC)";
+  else sess = "off-hours (22–24 UTC)";
+  $("clock-session").textContent = "сессия: " + sess;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   $("manual-refresh").addEventListener("click", () => { tick(); tickForecasts(); refreshVP(); });
   $("vp-refresh").addEventListener("click", refreshVP);
@@ -434,8 +477,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   populateVPDropdown().then(refreshVP);
 
+  tickClock();
   tick();
   tickForecasts();
+  setInterval(tickClock, 1000);
   setInterval(tick, REFRESH_LIVE_MS);
   setInterval(tickForecasts, REFRESH_FORECASTS_MS);
 });

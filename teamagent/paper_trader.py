@@ -89,25 +89,38 @@ def _is_open_for_pair(open_trades: list[dict], pair: str) -> bool:
     return any(t["pair"] == pair and t["status"] == "open" for t in open_trades)
 
 
+def _pip_size(pair: str) -> float:
+    """1 pip для forex: 0.01 для JPY-пар, 0.0001 для остальных."""
+    return 0.01 if pair.upper().endswith("JPY") else 0.0001
+
+
 def _live_pnl(t: dict, current_price: float) -> dict:
     """Текущий PnL открытой сделки по live-цене.
 
     Бинарный опцион "если в твою сторону на момент сейчас, projected = WIN, иначе LOSS".
     Это «прогноз исхода», а не реальный PnL — UI должен это понимать.
+
+    Дополнительно возвращаем `pips` (со знаком: + если в твою сторону, − иначе)
+    и `current_pnl_pct` (синоним diff_pct со знаком относительно стороны).
     """
     side = t["side"]
     open_price = t["open_price"]
+    pip_size = _pip_size(t.get("pair", ""))
     if side == "BUY":
         in_money = current_price > open_price
         diff_pct = (current_price - open_price) / open_price * 100.0
+        pips = (current_price - open_price) / pip_size
     else:
         in_money = current_price < open_price
         diff_pct = (open_price - current_price) / open_price * 100.0
+        pips = (open_price - current_price) / pip_size
 
     projected_payout = config.STAKE_USD * config.PAYOUT_PCT if in_money else -config.STAKE_USD
     return {
         "current_price": float(current_price),
         "diff_pct": round(diff_pct, 5),
+        "pips": round(pips, 1),
+        "current_pnl_pct": round(diff_pct, 3),
         "in_money_now": in_money,
         "projected_payout": round(projected_payout, 2),
     }
@@ -156,138 +169,81 @@ def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
 def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
                          baseline_side: str, rsi_1h: float | None,
                          strategy_cfg: dict) -> tuple[bool, dict]:
-    """Основной гейт: проверяет что для пары есть лучшая стратегия с ≥70% WR
-    в ТЕКУЩЕЙ сессии (Asia/London/Overlap/NY) на 30д бэктесте, И текущий сигнал
-    соответствует фильтрам той стратегии.
+    """Облегчённый гейт (по явной просьбе пользователя 2026-05-01):
 
-    Логика выбора стратегии:
-    1. Определяем текущую сессию по `ts.hour` (`strategies.detect_session`).
-    2. Если `strategy_cfg.pairs[pair].by_session[session].qualifies_70pct=True` —
-       берём её best_variant.
-    3. Иначе — фолбэк на общий best_variant (`strategy_cfg.pairs[pair]`),
-       но ТОЛЬКО если он сам qualifies_70pct.
-    4. Иначе — пропускаем (пара/сессия заморожена).
+    Сделка открывается, как только `forecast.probability_pct >= 70` (это
+    единственный hard-gate, верхняя ветка caller-а уже это проверила).
+    Дополнительно:
+    - Если у пары есть per-session backtest вариант с qualifies_70pct=True,
+      используем его сторону (с учётом contrarian/fade_extreme_rsi flip)
+      и его fixed_expiry_h. Это ОБОГАЩЕНИЕ, а не блокировка.
+    - Если такого варианта нет — используем `baseline_side` напрямую.
 
-    Возвращает в info также recommended `side` (с учётом contrarian/fade_extreme_rsi),
-    `session`, `variant`, `win_rate_pct`.
+    Старая жёсткая логика (требовать |score|>=N + per-session ≥70% + variant.session_utc
+    в окне) ОТКЛЮЧЕНА. Пользователь явно потребовал торговать как только prob ≥ 70%
+    независимо от сессии и от backtest WR конкретной ячейки.
     """
-    pairs = (strategy_cfg or {}).get("pairs") or {}
-    p = pairs.get(pair)
-    if not p:
-        return False, {"reason": "strategy_search ещё не запускался для этой пары"}
-
-    # шаг 1 — текущая сессия
     sess_name = strategies.detect_session(ts.hour)
     if sess_name is None:
+        # 22-23 UTC off-hours — даже free gate не торгует (нет ликвидности)
         return False, {
             "reason": f"вне канонических сессий (час {ts.hour} UTC = 22-23 off-hours)",
-            "win_rate_pct": p.get("win_rate_pct"),
         }
 
-    # шаг 2 — per-session best
+    pairs = (strategy_cfg or {}).get("pairs") or {}
+    p = pairs.get(pair) or {}
     by_session = p.get("by_session") or {}
     session_cfg = by_session.get(sess_name) or {}
     variants_map = strategies.variants_by_id()
-    chosen_source = "by_session"
+
     chosen = None
-
-    def _variant_compatible_with_hour(var_id: str | None, h: int) -> bool:
-        """True если у варианта нет своего session_utc, либо текущий час в окне."""
-        if not var_id:
-            return False
-        v = variants_map.get(var_id)
-        if v is None:
-            return False
-        if v.session_utc is None:
-            return True
-        s, e = v.session_utc
-        if s <= e:
-            return s <= h < e
-        return h >= s or h < e
-
+    chosen_source = None
     if session_cfg.get("qualifies_70pct") and (session_cfg.get("trades") or 0) >= MIN_TRADES:
         chosen = session_cfg
-    elif (
-        p.get("qualifies_70pct")
-        and (p.get("trades") or 0) >= MIN_TRADES
-        and _variant_compatible_with_hour(p.get("best_variant"), ts.hour)
-    ):
-        # шаг 3 — фолбэк на общий best_variant (если его session_utc совместим)
+        chosen_source = "by_session"
+    elif p.get("qualifies_70pct") and (p.get("trades") or 0) >= MIN_TRADES:
         chosen = p
         chosen_source = "global_best"
-    else:
-        # шаг 4 — заморожено (per-session не qualified ИЛИ
-        # global qualified но его variant имеет session_utc вне текущего часа)
-        return False, {
-            "reason": (
-                f"в сессии {sess_name} лучшая стратегия даёт "
-                f"{session_cfg.get('win_rate_pct')}% WR (trades={session_cfg.get('trades')}); "
-                f"общий best — {p.get('win_rate_pct')}% (trades={p.get('trades')}, "
-                f"variant={p.get('best_variant')})"
-            ),
-            "session": sess_name,
-            "win_rate_pct_session": session_cfg.get("win_rate_pct"),
-            "trades_session": session_cfg.get("trades"),
-            "win_rate_pct_global": p.get("win_rate_pct"),
-            "trades_global": p.get("trades"),
-            "variant_session": session_cfg.get("best_variant"),
-            "variant_global": p.get("best_variant"),
-        }
 
-    variant = variants_map.get(chosen.get("best_variant"))
-    if variant is None:
-        return False, {"reason": f"unknown variant id {chosen.get('best_variant')}"}
+    variant = None
+    if chosen is not None:
+        variant = variants_map.get(chosen.get("best_variant"))
 
-    # Эффективный score (с учётом contrarian / fade_extreme_rsi)
-    effective_score = score
-    if variant.fade_extreme_rsi and rsi_1h is not None and (rsi_1h <= 25 or rsi_1h >= 75):
-        effective_score = -effective_score
-    if variant.contrarian:
-        effective_score = -effective_score
-
-    # 1) variant.session_utc — если у варианта есть СВОЙ session filter,
-    #    он применяется поверх (на практике редко конфликтует с per-session search,
-    #    поскольку per-session search фильтрует часы извне).
-    if variant.session_utc is not None:
-        h = ts.hour
-        s, e = variant.session_utc
-        if s <= e:
-            in_window = s <= h < e
+    # Сторона
+    if variant is not None:
+        # Применяем flip-правила, чтобы поднять WR без отказа от сделки
+        eff = score
+        if variant.fade_extreme_rsi and rsi_1h is not None and (rsi_1h <= 25 or rsi_1h >= 75):
+            eff = -eff
+        if variant.contrarian:
+            eff = -eff
+        if eff != 0:
+            side = "BUY" if eff > 0 else "SELL"
         else:
-            in_window = h >= s or h < e
-        if not in_window:
-            return False, {
-                "reason": f"current hour {h} UTC не попадает в session_utc варианта {variant.session_utc}",
-                "variant": variant.id,
-                "win_rate_pct": chosen.get("win_rate_pct"),
-                "session": sess_name,
-            }
-    # 2) min_abs_score (на effective_score)
-    if abs(effective_score) < variant.min_abs_score:
-        return False, {
-            "reason": f"|effective_score|={abs(effective_score)} < {variant.min_abs_score}",
-            "variant": variant.id, "win_rate_pct": chosen.get("win_rate_pct"),
+            side = baseline_side
+        return True, {
+            "variant": variant.id,
+            "variant_label": variant.label,
+            "win_rate_pct": chosen.get("win_rate_pct"),
+            "trades": chosen.get("trades"),
+            "side": side,
+            "effective_score": eff,
             "session": sess_name,
-        }
-    # 3) min_probability (probability — функция от |score|, симметрична)
-    if prob_pct / 100.0 < variant.min_probability:
-        return False, {
-            "reason": f"prob={prob_pct}% < {variant.min_probability * 100}%",
-            "variant": variant.id, "win_rate_pct": chosen.get("win_rate_pct"),
-            "session": sess_name,
+            "chosen_source": chosen_source,
+            "gate_mode": "free",
         }
 
-    # сторона: variant определяет направление (с учётом флипа)
-    side = "BUY" if effective_score > 0 else "SELL"
+    # Нет qualified variant — открываем по baseline (forecast direction)
     return True, {
-        "variant": variant.id,
-        "variant_label": variant.label,
-        "win_rate_pct": chosen.get("win_rate_pct"),
-        "trades": chosen.get("trades"),
-        "side": side,
-        "effective_score": effective_score,
+        "variant": None,
+        "variant_label": "free-gate (no qualified variant — using baseline forecast)",
+        "win_rate_pct": session_cfg.get("win_rate_pct") or p.get("win_rate_pct"),
+        "trades": session_cfg.get("trades") or p.get("trades") or 0,
+        "side": baseline_side,
+        "effective_score": score,
         "session": sess_name,
-        "chosen_source": chosen_source,  # "by_session" или "global_best"
+        "chosen_source": "baseline",
+        "gate_mode": "free",
     }
 
 

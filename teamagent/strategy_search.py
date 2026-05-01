@@ -391,7 +391,7 @@ def search_all(top: int = 5) -> dict:
 
 
 HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_search.json"
-LOOP_INTERVAL_SEC = 24 * 60 * 60   # раз в сутки
+LOOP_INTERVAL_SEC = 60 * 60        # раз в час (юзер запросил 2026-05-01)
 HEARTBEAT_INTERVAL_SEC = 60        # каждую минуту, чтобы watchdog видел
 
 
