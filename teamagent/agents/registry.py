@@ -27,8 +27,8 @@ def all_agents() -> list[dict]:
             "init_args": {"pair": pair},
         })
 
-    # ─── 15 analyzers (was 14; added fundamental_macro 2026-05-01 per user
-    # request to think "like institutionals" using FRED rates/yields/CPI). ───
+    # ─── 16 analyzers (added 2026-05-01: fundamental_macro from FRED, and
+    # cot_positioning from CFTC — user wanted "as institutional, not retail"). ─
     analyzer_specs = [
         ("vwap_bias",         "VWAPBiasAnalyzer"),
         ("bbp_regime",        "BBPRegimeAnalyzer"),
@@ -45,6 +45,7 @@ def all_agents() -> list[dict]:
         ("news_filter",       "NewsFilterAnalyzer"),
         ("dxy_alignment",     "DXYAlignmentAnalyzer"),
         ("fundamental_macro", "FundamentalMacroAnalyzer"),
+        ("cot_positioning",   "COTPositioningAnalyzer"),
     ]
     for name, cls in analyzer_specs:
         agents.append({
@@ -111,5 +112,5 @@ def all_agents() -> list[dict]:
             "init_args": {},
         })
 
-    assert len(agents) == 63, f"expected 63 agents, got {len(agents)}"
+    assert len(agents) == 64, f"expected 64 agents, got {len(agents)}"
     return agents

@@ -53,7 +53,7 @@ Multi-agent paper-trading system for **28 forex pairs**.
 cd ~/repos/Forex-wws2277       # or wherever the repo is checked out
 pip install -q -r teamagent/requirements.txt
 bash scripts/start_all.sh      # spawns: orchestrator (→ scanner + paper_trader
-                               # + state_committer + backtester + 60 agents)
+                               # + state_committer + backtester + 64 agents)
                                # + watchdog + dashboard on :8080
 ```
 
@@ -77,12 +77,14 @@ Stop everything: `bash scripts/stop_all.sh`.
 | `paper_trader.py` | binary $50/85% trades, 1-4h expiry, settles on real Yahoo close. Gated by backtest WR. |
 | `backtester.py` | hourly 30-day walk-forward backtest per pair, writes `state/backtest_30d.json` |
 | `strategy_search.py` | (run on demand) tries 30+ scoring/expiry/session variants to find ≥70% WR config |
-| `orchestrator.py` | spawns ALL child processes (scanner / paper / backtester / state_committer / 60 agents) |
+| `orchestrator.py` | spawns ALL child processes (scanner / paper / backtester / state_committer / 64 agents) |
 | `watchdog.py` | heartbeat-level health check, kills stale agents, MUST `continue` (not `pass`) on heartbeat_watchdog/orchestrator |
 | `state_committer.py` | every 15 min: `git add+commit+push` of state/*.json so trade history survives across sessions |
 | `dashboard/server.py` | FastAPI: `/api/forecasts`, `/api/forecast/{pair}`, `/api/open-trades`, `/api/closed-trades`, `/api/stats`, `/api/volume-profile/{pair}`, `/api/health`, `/api/agents`, `/api/backtest` |
 | `dashboard/static/` | vanilla JS frontend, auto-refresh every 30 sec |
-| `agents/` | 62 subprocess agents: 28 specialists + 14 analyzers + 12 learners (incl. WR floor monitor + weekly loss review) + 5 health + 3 LLM |
+| `agents/` | 64 subprocess agents: 28 specialists + 16 analyzers (incl. fundamental_macro from FRED + cot_positioning from CFTC, added 2026-05-01) + 12 learners (incl. WR floor monitor + weekly loss review) + 5 health + 3 LLM |
+| `fundamentals.py` | FRED public CSV fetcher: policy rate / 10y bond yield / CPI YoY for USD/EUR/GBP/JPY/CHF/AUD/CAD/NZD; per-pair macro tilt; 24h cache (no API key) |
+| `cot.py` | CFTC public Socrata API: weekly speculator long/short for EUR/GBP/JPY/CHF/AUD/CAD/NZD futures; per-pair contrarian z-score signal; 24h cache (no API key) |
 
 ## State files (in `teamagent/state/`)
 
@@ -161,7 +163,7 @@ For a permanent URL (Devin tunnel dies when the VM dies), use:
 - **Fly.io** (recommended, free tier ok): `infra/fly/Dockerfile` and
   `infra/fly/fly.toml` are checked in. Deploy from a Devin session via the
   `deploy backend` tool. The fly app runs the FastAPI dashboard +
-  forecast_scanner + paper_trader + backtester (without the 60 subprocess
+  forecast_scanner + paper_trader + backtester (without the 64 subprocess
   agents — those stay Devin-session-only because of resource limits).
 - **Devin Schedule** (already configured, sched-083b11171a0841668f4608b075d769b5):
   hourly recurring session that runs `start_all.sh`, waits 10 min,

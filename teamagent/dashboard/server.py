@@ -232,6 +232,30 @@ def api_weekly_loss():
     )
 
 
+@app.get("/api/cot")
+def api_cot():
+    """CFTC COT speculator positioning + per-pair contrarian signals."""
+    raw = _load(config.STATE_DIR / "agent_analyzer_cot_positioning.json", {})
+    summary = _unwrap_agent_state(
+        raw,
+        "COT данные ещё не загружены — жди первого tick analyzer_cot_positioning",
+    )
+    cot_raw = _load(config.STATE_DIR / "cot_positioning.json", {})
+    if cot_raw:
+        summary["cot_raw"] = {
+            "as_of": cot_raw.get("as_of"),
+            "currencies": cot_raw.get("currencies", {}),
+            "source": cot_raw.get("source"),
+        }
+    try:
+        from .. import cot as cot_mod
+        if cot_raw:
+            summary["all_pair_signals"] = cot_mod.all_pair_signals().get("signals", {})
+    except Exception as e:
+        summary["all_pair_signals_error"] = str(e)
+    return summary
+
+
 @app.get("/api/fundamentals")
 def api_fundamentals():
     """Per-currency macro snapshot (FRED) + per-pair tilt scores. Updates

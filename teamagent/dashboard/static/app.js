@@ -413,6 +413,7 @@ function tickForecasts() {
   refreshWRFloor();
   refreshWeeklyLoss();
   refreshFundamentals();
+  refreshCOT();
 }
 
 // ───── WR floor monitor (rolling 50 trades vs 70%) ─────
@@ -482,6 +483,102 @@ async function refreshWeeklyLoss() {
     if (r.as_of) {
       node.appendChild(el("div", { class: "muted small" },
         `Обновлено: ${fmt.ago(r.as_of)}`));
+    }
+  } catch (e) {
+    node.textContent = "ошибка: " + (e.message || e);
+  }
+}
+
+// ───── COT speculator positioning ─────
+async function refreshCOT() {
+  const node = $("cot-content");
+  if (!node) return;
+  try {
+    const r = await api("/api/cot");
+    node.innerHTML = "";
+    if (!r || r.note) {
+      node.appendChild(el("div", {}, r && r.note ? r.note : "пусто"));
+      return;
+    }
+    const ccy = r.currencies || (r.cot_raw || {}).currencies || {};
+    // 1) Per-currency table
+    const tt = el("table", { class: "trades-table compact" });
+    tt.appendChild(el("tr", {},
+      el("th", {}, "CCY"),
+      el("th", {}, "net % OI"),
+      el("th", {}, "z-score"),
+      el("th", {}, "mean %"),
+      el("th", {}, "stdev"),
+      el("th", {}, "extreme?"),
+    ));
+    for (const code of ["EUR","GBP","JPY","CHF","AUD","CAD","NZD"]) {
+      const v = ccy[code] || {};
+      const z = v.z_score;
+      let cls = "muted";
+      if (typeof z === "number") {
+        if (z > 1.5) cls = "loss";       // crowded long → contrarian sell
+        else if (z < -1.5) cls = "win";  // crowded short → contrarian buy
+      }
+      tt.appendChild(el("tr", {},
+        el("td", {}, el("strong", {}, code)),
+        el("td", {}, fmtNum(v.net_pct_oi)),
+        el("td", { class: cls }, fmtNum(v.z_score)),
+        el("td", {}, fmtNum(v.mean_pct_oi)),
+        el("td", {}, fmtNum(v.std_pct_oi)),
+        el("td", {}, v.extreme || "—"),
+      ));
+    }
+    node.appendChild(tt);
+
+    // 2) Top contrarian signals
+    const top = r.top_contrarian_signals || [];
+    if (top.length) {
+      node.appendChild(el("div", { class: "muted small", style: "margin-top:10px;" },
+        "Top контра-сигналы (specs растянулись → ожидаем разворот):"));
+      const ul = el("ul", { class: "compact" });
+      for (const t of top) {
+        const cls = t.side === "BUY" ? "win" : "loss";
+        ul.appendChild(el("li", {},
+          el("strong", { class: cls }, `${t.pair} ${t.side}`),
+          ` · combined_z=${fmtNum(t.combined_z)}`,
+          ` · сила ${fmtNum(t.strength_pct)}%`,
+        ));
+      }
+      node.appendChild(ul);
+    }
+
+    // 3) all 28 pair signals (collapsible)
+    const sigs = r.all_pair_signals || {};
+    if (Object.keys(sigs).length) {
+      const det = el("details", { style: "margin-top:8px;" });
+      det.appendChild(el("summary", { class: "muted small" },
+        `все ${Object.keys(sigs).length} пар — раскрыть`));
+      const stt = el("table", { class: "trades-table compact" });
+      stt.appendChild(el("tr", {},
+        el("th", {}, "pair"),
+        el("th", {}, "side"),
+        el("th", {}, "combined z"),
+        el("th", {}, "base z"),
+        el("th", {}, "quote z"),
+        el("th", {}, "strength%"),
+      ));
+      const arr = Object.entries(sigs).sort((a,b) => Math.abs(b[1].combined_z||0) - Math.abs(a[1].combined_z||0));
+      for (const [p, v] of arr) {
+        const cls = v.side === "BUY" ? "win" : (v.side === "SELL" ? "loss" : "muted");
+        stt.appendChild(el("tr", {},
+          el("td", {}, p),
+          el("td", {}, el("span", { class: cls }, v.side || "?")),
+          el("td", {}, fmtNum(v.combined_z)),
+          el("td", {}, fmtNum(v.base_z)),
+          el("td", {}, fmtNum(v.quote_z)),
+          el("td", {}, fmtNum(v.strength_pct)),
+        ));
+      }
+      det.appendChild(stt);
+      node.appendChild(det);
+    }
+    if (r.source) {
+      node.appendChild(el("div", { class: "muted small", style: "margin-top:6px;" }, r.source));
     }
   } catch (e) {
     node.textContent = "ошибка: " + (e.message || e);

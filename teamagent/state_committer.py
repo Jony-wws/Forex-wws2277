@@ -65,6 +65,11 @@ PERSISTED_FILES = [
     # is 24h-cached so checking these in saves Yahoo/FRED calls on restart.
     "teamagent/state/fundamentals.json",
     "teamagent/state/agent_analyzer_fundamental_macro.json",
+    # CFTC COT positioning (added 2026-05-01): weekly speculator long/short
+    # in EUR/GBP/JPY/CHF/AUD/CAD/NZD futures. 24h cache; report itself is
+    # weekly, so persisting saves a fresh API hit at restart.
+    "teamagent/state/cot_positioning.json",
+    "teamagent/state/agent_analyzer_cot_positioning.json",
 ]
 
 COMMIT_INTERVAL_SEC = 15 * 60   # 15 мин

@@ -50,7 +50,7 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def _score_to_probability(score: int, max_score: int = 49) -> float:
+def _score_to_probability(score: int, max_score: int = 53) -> float:
     """Score -44..+44 → probability 0..1, абсолютная.
     Score>0 → BUY вероятность; <0 → SELL вероятность.
     """
@@ -175,7 +175,6 @@ def evaluate_pair(pair: str) -> dict | None:
         score_pts = round(tilt.get("tilt_score", 0) / 16.0, 1)  # ±5 cap below
         score_pts = max(-5, min(5, score_pts))
         if abs(score_pts) >= 1:
-            sign = "+" if score_pts > 0 else ""
             vote(
                 "fundamental_macro_tilt",
                 int(round(score_pts)),
@@ -185,6 +184,28 @@ def evaluate_pair(pair: str) -> dict | None:
             )
     except Exception as e:
         log.warning(f"forecast_scanner: fundamental tilt failed for {pair}: {e}")
+
+    # ───── BLOCK J — COT speculator positioning (CFTC weekly) ─────
+    # Source: teamagent.cot (CFTC public Socrata API, 24h cache, no key).
+    # Contrarian: when leveraged-money funds are stretched long/short
+    # (|z|>1.5 over 52w), expect mean-reversion. Cap ±4 score contribution.
+    # Read once per scan pass via module-level cache (cheap after first call).
+    try:
+        from . import cot as cot_mod
+        sig = cot_mod.pair_cot_signal(pair)
+        if sig.get("side") in ("BUY", "SELL"):
+            strength = sig.get("strength_pct", 0)
+            pts = max(1, min(4, int(round(strength / 25))))
+            if sig["side"] == "SELL":
+                pts = -pts
+            vote(
+                "cot_speculator_contrarian",
+                pts,
+                f"{sig['side']} (combined_z={sig.get('combined_z')}, "
+                f"strength={strength}%) — {sig.get('note')}",
+            )
+    except Exception as e:
+        log.warning(f"forecast_scanner: cot signal failed for {pair}: {e}")
 
     # ───── PENALTY: news blackout ─────
     # high-impact новость ±30 мин: снижаем confidence обеих сторон,
@@ -200,7 +221,7 @@ def evaluate_pair(pair: str) -> dict | None:
         return None  # нейтрально, не показываем
 
     side = "BUY" if score > 0 else "SELL"
-    p_raw = _score_to_probability(abs(score), 49)
+    p_raw = _score_to_probability(abs(score), 53)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
@@ -222,7 +243,7 @@ def evaluate_pair(pair: str) -> dict | None:
         "probability": round(p, 4),
         "probability_pct": round(p * 100.0, 1),
         "score": score,
-        "max_score": 49,
+        "max_score": 53,
         "recommended_hours": recommended_hours,
         "current_price": ind_15m["close"],
         "indicators": {

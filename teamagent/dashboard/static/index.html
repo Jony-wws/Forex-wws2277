@@ -140,6 +140,19 @@
     <div id="wr-floor-content" class="muted small">Загружаю…</div>
   </section>
 
+  <section id="cot-section" class="card">
+    <h2>📊 COT positioning <span class="muted small">(CFTC · 7 валют · 52 недели · z-score контраприан)</span></h2>
+    <div class="muted small">
+      Реальные публичные данные CFTC: позиции hedge funds (leveraged money) во
+      фьючерсах EUR/GBP/JPY/CHF/AUD/CAD/NZD на CME. Когда позиции растянуты
+      (|z| &gt; 1.5 за 52 недели) — высокая вероятность mean-reversion
+      (контрапариан). Это «как смотрят macro hedge funds»: тот самый отчёт
+      который выходит каждую пятницу. Источник:
+      <a href="https://publicreporting.cftc.gov" target="_blank">CFTC public Socrata API</a>.
+    </div>
+    <div id="cot-content" class="muted small">Загружаю…</div>
+  </section>
+
   <section id="fundamentals-section" class="card">
     <h2>🏦 Фундаментал per валюта <span class="muted small">(FRED · 8 валют · rates / 10y yield / CPI YoY)</span></h2>
     <div class="muted small">

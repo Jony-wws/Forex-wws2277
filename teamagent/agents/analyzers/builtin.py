@@ -341,6 +341,51 @@ class DXYAlignmentAnalyzer(Agent):
             return {"error": str(e)}
 
 
+class COTPositioningAnalyzer(Agent):
+    """CFTC Commitments of Traders — speculator positioning per FX future.
+
+    Free, public CFTC Socrata API; 24h cache; fetches 52 weekly observations
+    per currency to compute z-score of leveraged-money net long/short. Extreme
+    z-scores (|z|>1.5) generate contrarian signals — same approach used by
+    macro hedge funds reading the Tuesday/Friday COT report.
+    """
+    name = "analyzer_cot_positioning"
+    category = "analyzer"
+    interval_sec = 12 * 60 * 60   # 12h — COT reports are weekly anyway
+
+    def tick(self):
+        try:
+            from ... import cot
+            data = cot.get_cached(force_refresh=False)
+            sigs = cot.all_pair_signals()
+            ranked = sorted(
+                sigs.get("signals", {}).items(),
+                key=lambda kv: kv[1].get("strength_pct", 0) or 0,
+                reverse=True,
+            )[:10]
+            top = [
+                {
+                    "pair": p,
+                    "side": v.get("side"),
+                    "combined_z": v.get("combined_z"),
+                    "strength_pct": v.get("strength_pct"),
+                }
+                for p, v in ranked if v.get("side") in ("BUY", "SELL")
+            ]
+            return {
+                "currencies": data.get("currencies", {}),
+                "n_pairs_with_signal": sum(
+                    1 for v in sigs.get("signals", {}).values()
+                    if v.get("side") in ("BUY", "SELL")
+                ),
+                "top_contrarian_signals": top,
+                "cot_as_of": data.get("as_of"),
+                "source": data.get("source"),
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+
 class FundamentalMacroAnalyzer(Agent):
     """Sources rate-differential / 10y-yield-differential / CPI YoY per pair from
     FRED (free, no API key, 24h cache). Computes a per-pair macro tilt score
