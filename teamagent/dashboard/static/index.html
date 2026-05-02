@@ -98,6 +98,58 @@
     <div id="forecast-diag" class="forecast-diag muted small"></div>
   </section>
 
+  <!-- ═══ MASTER STRATEGY AGENT (5h cycle) ═══ -->
+  <section id="meta-strategy-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span id="meta-emoji" class="ms-emoji">🧠</span>
+      ГЛАВНЫЙ СТРАТЕГИЧЕСКИЙ АГЕНТ
+      <span class="live-pulse" title="каждые 5 часов делает полный sweep всех валют + сессий"></span>
+      <span id="meta-status-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      Тактический мета-агент. Каждые <b>5 часов</b> прогоняет 28 пар × 4 сессии × 120 вариантов
+      на <b>4 окнах</b> (3д / 5д / 7д / 10д) свежих данных Yahoo и подмешивает ансамбль из
+      8 реальных источников (COT · FRED · Regime · Radar · Multi-TF · Momentum · News · Specialist).
+      Для каждой ячейки выбирает лучшее окно + лучший variant и присваивает статус
+      <b class="green">КАЧЕСТВЕННАЯ</b> (WR ≥ 70% + Wilson_lower ≥ 60%) /
+      <b class="yellow">ВЕРОЯТНАЯ</b> (55–70%) / <b class="orange">ЗАМОРОЖЕНА</b> (нет edge).
+      <br>Качественные ячейки добавляют <b>±3 score</b>-голоса в forecast_scanner-е,
+      Вероятные — <b>±2</b>. 365-дневный locked-baseline остаётся эталоном — мета-агент его не перезаписывает.
+      <br><b>Только реальные данные:</b> Yahoo Finance · CFTC COT · FRED · 64 живых субагента. Без симуляторов и mock-данных.
+    </div>
+    <div class="meta-summary-grid" id="meta-summary-grid">
+      <div class="muted">Загружаю последний прогон…</div>
+    </div>
+    <div class="meta-tabs">
+      <button class="meta-tab-btn active" data-meta-tab="cells">Ячейки 28×4</button>
+      <button class="meta-tab-btn" data-meta-tab="log">Журнал прогонов</button>
+      <button class="meta-tab-btn" data-meta-tab="ensemble">Источники ансамбля</button>
+    </div>
+    <div id="meta-tab-cells" class="meta-tab-content">
+      <div class="table-wrapper">
+        <table id="meta-cells-table">
+          <thead><tr>
+            <th>Пара</th><th>Сессия</th><th>Статус</th><th>WR</th><th>Wilson↓</th>
+            <th>Сделки</th><th>Окно</th><th>Вариант</th><th>Смещение</th><th>Источники</th>
+          </tr></thead>
+          <tbody><tr><td colspan="10" class="muted">Загружаю последний прогон…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="meta-tab-log" class="meta-tab-content hidden">
+      <div class="meta-log" id="meta-log-content">
+        <div class="muted">Загружаю журнал прогонов…</div>
+      </div>
+    </div>
+    <div id="meta-tab-ensemble" class="meta-tab-content hidden">
+      <div id="meta-ensemble-content" class="muted small">
+        После первого прогона здесь будут источники ансамбля для каждой пары
+        (COT contrarian · fundamental tilt · market_radar · market_regime ·
+        multi-TF consensus · momentum burst · news filter · specialist).
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ ГЛАВНАЯ КАРТОЧКА: ОБЩАЯ ОЦЕНКА + ПРОГНОЗ + ГАРАНТИИ ═══ -->
   <section id="assessment-section" class="card glass premium-card hero-card">
     <h2 class="hero-title"><span class="dot dot-pulse"></span> ОБЩАЯ ОЦЕНКА СИСТЕМЫ <span class="live-pulse" title="данные в реальном времени"></span></h2>

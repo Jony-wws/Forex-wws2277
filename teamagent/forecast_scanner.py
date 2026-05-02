@@ -185,6 +185,37 @@ def evaluate_pair(pair: str) -> dict | None:
     except Exception as e:
         log.warning(f"forecast_scanner: fundamental tilt failed for {pair}: {e}")
 
+    # ───── BLOCK J0 — meta_strategy_agent tactical bias (5h cycle) ─────
+    # Источник: teamagent.strategy_meta_agent — каждые 5 часов делает sweep
+    # 28 пар × 4 сессии × 120 вариантов на 5d окне + ансамбль COT/Fund/Regime/Radar.
+    # Если ячейка (pair, current_session) у мета-агента имеет статус
+    # QUALIFIED — добавляем +/-3 голос; PROBABLE — +/-2; FROZEN — 0.
+    # Знак определяет side_bias из ансамбля (если он 0, голос не идёт).
+    try:
+        from . import strategy_meta_agent as meta
+        from . import strategies as _strats
+        # Используем именно strategies.SESSION_WINDOWS (Asia/London/Overlap/NY),
+        # так как meta_agent пишет ключи именно в этой нотации. config.SESSIONS
+        # использует чуть другое разбиение для UI, и оно НЕ совпадает.
+        meta_session = _strats.detect_session(now.hour)
+        if meta_session is not None:
+            cell = meta.get_cell_for(pair, meta_session)
+            if cell:
+                status = cell.get("status")
+                bias = int(cell.get("side_bias") or 0)
+                if status in ("QUALIFIED", "PROBABLE") and bias != 0:
+                    pts = 3 if status == "QUALIFIED" else 2
+                    pts = pts if bias > 0 else -pts
+                    vote(
+                        "meta_strategy_agent",
+                        pts,
+                        f"{status} cell, expected_wr={cell.get('win_rate_pct')}% "
+                        f"(wilson_lower={cell.get('wilson_lower_pct')}%) "
+                        f"variant={cell.get('variant')} bias={bias}",
+                    )
+    except Exception as e:
+        log.warning(f"forecast_scanner: meta_strategy_agent integration failed for {pair}: {e}")
+
     # ───── BLOCK J — COT speculator positioning (CFTC weekly) ─────
     # Source: teamagent.cot (CFTC public Socrata API, 24h cache, no key).
     # Contrarian: when leveraged-money funds are stretched long/short

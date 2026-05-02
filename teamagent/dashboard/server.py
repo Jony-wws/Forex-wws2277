@@ -611,6 +611,64 @@ def api_stability_forecast(hours_ahead: int = 24):
     return sf.forecast_window(hours_ahead=hours_ahead)
 
 
+@app.get("/api/meta-strategy")
+def api_meta_strategy():
+    """Master Strategy Agent — последний 5h sweep ансамбля сигналов.
+
+    Каждые 5 часов teamagent.strategy_meta_agent делает sweep 28 пар × 4
+    сессий × 120 вариантов на 5-дневном окне Yahoo. Возвращает summary +
+    cells (per-(pair, session) ячейки со статусом QUALIFIED / PROBABLE /
+    FROZEN, ожидаемой WR, Wilson lower bound, side_bias из ансамбля
+    COT/fundamentals/regime/radar)."""
+    return _load(
+        config.STATE_DIR / "meta_strategy.json",
+        {"as_of": None, "summary": {}, "cells": {}, "pairs": {}},
+    )
+
+
+@app.get("/api/meta-strategy/log")
+def api_meta_strategy_log(limit: int = 50):
+    """Live-лог последних прогонов мета-агента (по одной строке на sweep).
+
+    Объявлена ДО /api/meta-strategy/{pair}, иначе FastAPI ловит "log" как pair.
+    """
+    log_path = config.STATE_DIR / "meta_strategy_log.jsonl"
+    if not log_path.exists():
+        return {"as_of": None, "entries": []}
+    limit = max(1, min(200, int(limit)))
+    try:
+        lines = log_path.read_text().splitlines()
+    except Exception:
+        return {"as_of": None, "entries": []}
+    entries = []
+    for ln in lines[-limit:]:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            entries.append(json.loads(ln))
+        except Exception:
+            continue
+    return {
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "log_file": str(log_path),
+        "total_entries": len(lines),
+        "returned": len(entries),
+        "entries": entries,
+    }
+
+
+@app.get("/api/meta-strategy/{pair}")
+def api_meta_strategy_pair(pair: str):
+    """Per-pair срез: все 4 сессии этой пары + ensemble-сигналы."""
+    pair = pair.upper()
+    data = _load(config.STATE_DIR / "meta_strategy.json", {})
+    pair_data = (data.get("pairs") or {}).get(pair)
+    if not pair_data:
+        raise HTTPException(404, f"no meta-strategy data for {pair}")
+    return pair_data
+
+
 @app.get("/api/system-audit")
 def api_system_audit():
     """Доказательства корректности системы.
@@ -653,6 +711,7 @@ def api_health():
         ("backtester", "heartbeat_backtester.json"),
         ("state_committer", "heartbeat_state_committer.json"),
         ("strategy_search", "heartbeat_strategy_search.json"),
+        ("strategy_meta_agent", "heartbeat_strategy_meta_agent.json"),
     ]:
         hb = _load(config.STATE_DIR / fname, None)
         if hb is None:

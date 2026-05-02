@@ -146,6 +146,14 @@ def _build_all_children() -> dict[str, ChildProc]:
     out["state_committer"] = ChildProc("state_committer", [sys.executable, "-m", "teamagent.state_committer"])
     out["backtester"] = ChildProc("backtester", [sys.executable, "-m", "teamagent.backtester"])
     out["strategy_search"] = ChildProc("strategy_search", [sys.executable, "-m", "teamagent.strategy_search", "--loop"])
+    # «Master Strategy Agent» (2026-05-01): тактический мета-агент,
+    # каждые 5 часов прогоняет ансамбль (technical + COT + fundamentals +
+    # regime + radar) на 5-дневном окне и обновляет state/meta_strategy.json.
+    # forecast_scanner читает meta_strategy.json как +/-3 score-голос.
+    out["strategy_meta_agent"] = ChildProc(
+        "strategy_meta_agent",
+        [sys.executable, "-m", "teamagent.strategy_meta_agent", "--loop"],
+    )
     for a in all_agents():
         out[a["name"]] = ChildProc(a["name"], _build_agent_cmd(a))
     return out

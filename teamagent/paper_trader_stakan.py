@@ -468,6 +468,19 @@ def _find_signal(pair: str, snapshot: dict, fundamentals: dict | None,
         forecast, fundamentals, cot, news_blackouts, atr_5d_median, radar,
     )
 
+    # HARD GATE: forecast_prob_70 ОБЯЗАТЕЛЕН — без него мы не торгуем
+    # (ранее это был один из 11 голосов, что давало пройти при WR<70%)
+    f_prob = (forecast or {}).get("probability_pct", 0)
+    if f_prob < 70:
+        return {
+            "pair": pair,
+            "skip_reason": f"forecast_prob_below_70_({f_prob:.1f}%)",
+            "direction": direction,
+            "best_level": best,
+            "votes": vote_result,
+            "current_price": current_price,
+        }
+
     if vote_result["yes"] < MIN_VOTES:
         return {
             "pair": pair,

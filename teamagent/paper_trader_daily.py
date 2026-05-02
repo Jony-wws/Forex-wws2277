@@ -14,8 +14,9 @@
         reversal_filter.yes_count/5             ×1.0
         macro_tilt                              ×0.5
         cot_z                                   ×0.5
-  - **Открывает 1 сделку на пару** (28 trades/день максимум) — даже если
-    probability < 70% — всё равно лучшая возможность дня для этой пары.
+  - **Открывает 1 сделку на пару** (до 28 trades/день) — ТОЛЬКО если
+    forecast.probability_pct ≥ 70% (HARD GATE по запросу Jony 2026-05-01).
+    Если прогноз ниже 70% — пара пропускается сегодня (нет «лучших из плохих»).
   - **Адаптивный stake**: confidence ≥80% → $2 ; 70-80% → $1 ; 60-70% → $0.50 ; <60% → skip.
   - **Адаптивная экспирация**: 12-23 часа (до следующего цикла), от ATR.
   - **Auto-pause**: пара с rolling 20-trade WR < 60% → пауза 7 дней.
@@ -515,6 +516,18 @@ def _daily_sweep(open_trades: list[dict], paused: dict) -> tuple[int, list[dict]
 
         if side == "NEUTRAL" or confidence < MIN_CONFIDENCE_FOR_TRADE:
             signal_entry["skip_reason"] = f"confidence_{confidence:.1f}_below_{MIN_CONFIDENCE_FOR_TRADE}"
+            signals.append(signal_entry)
+            continue
+
+        # HARD GATE 70%: forecast.probability_pct ОБЯЗАТЕЛЕН ≥ 70 (запрос Jony 2026-05-01).
+        # Раньше daily-trader открывал сделки даже при WR<70%, но пользователь
+        # явно потребовал «полностью 70% на ВСЕХ ячейках». Если прогноз ниже —
+        # пропускаем эту пару сегодня (а не открываем «лучший из плохих»).
+        f = (snapshot.get("forecasts") or {}).get(pair) or {}
+        f_prob = float(f.get("probability_pct") or 0)
+        if f_prob < 70.0:
+            signal_entry["skip_reason"] = f"forecast_prob_{f_prob:.1f}%_below_70%"
+            signal_entry["forecast_prob_pct"] = f_prob
             signals.append(signal_entry)
             continue
 
