@@ -278,16 +278,19 @@ def _intent_bars_save_disk(pair: str, interval: str, n: int, payload: dict) -> N
         pass
 
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
+# Долгоживущий пул — не блокирует выход handler-а если yfinance не успел
+# (если использовать `with ThreadPoolExecutor()` то __exit__ ждёт thread.join,
+# что сводит наш timeout на нет).
+_INTENT_BARS_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="intentbars")
+
+
 def _intent_bars_fetch_yahoo(pair: str, interval: str, n: int) -> dict | None:
     """Fetch from Yahoo with a hard wall-clock budget.
 
     Returns None on timeout / any failure so the caller can fall back to disk
-    cache. NEVER raises. Bounded to _INTENT_BARS_NET_TIMEOUT sec via a
-    ThreadPoolExecutor — yfinance is synchronous so we can't await it, but
-    we can refuse to wait longer than the budget.
+    cache. NEVER raises. Bounded to _INTENT_BARS_NET_TIMEOUT sec.
     """
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
-
     def _do_fetch():
         df = yahoo.latest_bars(pair, interval=interval, n=n)
         if df is None or df.empty:
@@ -304,9 +307,8 @@ def _intent_bars_fetch_yahoo(pair: str, interval: str, n: int) -> dict | None:
         return out
 
     try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(_do_fetch)
-            bars = fut.result(timeout=_INTENT_BARS_NET_TIMEOUT)
+        fut = _INTENT_BARS_EXECUTOR.submit(_do_fetch)
+        bars = fut.result(timeout=_INTENT_BARS_NET_TIMEOUT)
         if not bars:
             return None
         return {"pair": pair, "interval": interval, "bars": bars}
