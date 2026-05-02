@@ -113,12 +113,23 @@ def _load_optional_signal(path: Path) -> dict:
         return {}
 
 
-def _ensemble_signals(pair: str) -> dict:
+def _ensemble_signals(pair: str, ctx: Optional[dict] = None) -> dict:
     """Собрать сигналы из COT / fundamentals / market_radar / market_regime
-    для одной пары. Возвращаем dict с side_bias (-3..+3) и conf_bonus (0..15)."""
+    + 5 бесплатных free_signals (currency strength, DXY, ATR regime,
+    JPY confluence, VP distance) для одной пары.
+
+    Возвращаем dict с side_bias (-7..+7) и conf_bonus (0..20).
+
+    `ctx` — опциональный dict с предвычисленными:
+      - 'strength_matrix': dict[currency, score]
+      - 'dxy_df': pd.DataFrame DXY 1h
+      - 'bulk_data': dict[pair, df] (тот же что run_full_sweep)
+      - 'snapshots': list — для ATR-regime
+    Если ctx None — free_signals не подключаются (унаследованное поведение)."""
     bias = 0
     bonus = 0.0
     sources: list[dict] = []
+    ctx = ctx or {}
 
     # COT contrarian (CFTC)
     try:
@@ -246,9 +257,54 @@ def _ensemble_signals(pair: str) -> dict:
             "pts": pts,
         })
 
-    # cap final bias / bonus to reasonable bounds
-    bias = max(-5, min(5, int(bias)))
-    bonus = min(15.0, bonus)
+    # ─── free_signals (бесплатные источники, без API ключей) ───
+    try:
+        from . import free_signals
+        # 1. currency strength matrix
+        sm = ctx.get("strength_matrix")
+        if sm:
+            sig = free_signals.pair_strength_signal(pair, sm)
+            if sig:
+                bias += int(sig["pts"])
+                bonus += min(2.0, abs(sig["pts"]))
+                sources.append(sig)
+        # 2. DXY trend (только USD-пары)
+        dxy = ctx.get("dxy_df")
+        if dxy is not None:
+            sig = free_signals.pair_dxy_signal(pair, dxy)
+            if sig:
+                bias += int(sig["pts"])
+                bonus += min(2.0, abs(sig["pts"]))
+                sources.append(sig)
+        # 3. ATR regime (confidence bonus, без bias)
+        snaps = ctx.get("snapshots")
+        if snaps:
+            sig = free_signals.pair_atr_regime(snaps)
+            if sig:
+                # NORMAL — нейтрально, LOW/HIGH дают +1 bonus (variant adapt)
+                if sig["regime"] in ("LOW", "HIGH"):
+                    bonus += 1.0
+                sources.append(sig)
+        # 4. JPY confluence (только JPY-пары)
+        bd = ctx.get("bulk_data")
+        if bd:
+            sig = free_signals.jpy_confluence_signal(pair, bd)
+            if sig:
+                bias += int(sig["pts"])
+                bonus += 1.5
+                sources.append(sig)
+        # 5. VP distance (используем уже подготовленные agent_specialist_*.json)
+        sig = free_signals.pair_vp_distance_signal(pair)
+        if sig:
+            bias += int(sig["pts"])
+            bonus += 1.0
+            sources.append(sig)
+    except Exception as e:
+        log.debug(f"free_signals for {pair} failed: {e}")
+
+    # cap final bias / bonus to reasonable bounds (был ±5, теперь ±7 с free_signals)
+    bias = max(-7, min(7, int(bias)))
+    bonus = min(20.0, bonus)
 
     return {
         "side_bias": int(bias),
@@ -587,9 +643,14 @@ def _evaluate_cell(snapshots: list, session_name: str,
     }
 
 
-def evaluate_pair_with_snapshots(pair: str, snapshots: Optional[list]) -> dict:
+def evaluate_pair_with_snapshots(pair: str, snapshots: Optional[list],
+                                  ctx: Optional[dict] = None) -> dict:
     """То же что evaluate_pair, но snapshots передаются извне (после параллельной
-    закачки в run_full_sweep). Не делает Yahoo-запрос — чистая CPU-работа."""
+    закачки в run_full_sweep). Не делает Yahoo-запрос — чистая CPU-работа.
+
+    `ctx` — общий контекст (currency_strength_matrix, dxy_df, bulk_data),
+    предвычисленный один раз в run_full_sweep и переиспользуемый для всех 28
+    пар (вместо 28× повторов). Snapshots добавляется в ctx внутри функции."""
     t0 = time.time()
     if snapshots is None:
         return {
@@ -598,7 +659,9 @@ def evaluate_pair_with_snapshots(pair: str, snapshots: Optional[list]) -> dict:
             "by_session": {},
             "duration_sec": round(time.time() - t0, 1),
         }
-    ensemble = _ensemble_signals(pair)
+    pair_ctx = dict(ctx or {})
+    pair_ctx["snapshots"] = snapshots
+    ensemble = _ensemble_signals(pair, pair_ctx)
     by_session: dict[str, dict] = {}
     for sname, swin in strategies.SESSION_WINDOWS.items():
         cell = _evaluate_cell(snapshots, sname, swin)
@@ -694,11 +757,28 @@ def run_full_sweep() -> dict:
     n_ok = sum(1 for s in snapshots_by_pair.values() if s is not None)
     log.info(f"meta-agent: phase 1 (fetch+snapshot) done in {fetch_dur}s — {n_ok}/{len(config.PAIRS)} pairs ok")
 
+    # ── Phase 1c: pre-compute free_signals context (один раз на весь sweep) ──
+    # currency strength matrix + DXY data — используются всеми 28 парами.
+    fs_t0 = time.time()
+    ctx: dict = {"bulk_data": bulk_data}
+    try:
+        from . import free_signals
+        ctx["strength_matrix"] = free_signals.compute_currency_strength_matrix(bulk_data)
+        ctx["dxy_df"] = free_signals.fetch_dxy_data()
+        log.info(
+            f"meta-agent: free_signals ctx ready in {round(time.time() - fs_t0, 1)}s "
+            f"(strength={'/'.join(f'{c}={v:+.0f}' for c, v in (ctx.get('strength_matrix') or {}).items())} "
+            f"dxy_rows={0 if ctx.get('dxy_df') is None else len(ctx['dxy_df'])})"
+        )
+    except Exception as e:
+        log.warning(f"meta-agent: free_signals ctx prep failed: {e}")
+        ctx = {"bulk_data": bulk_data, "strength_matrix": {}, "dxy_df": None}
+
     # ── Phase 2: parallel walk-forward eval ──
     eval_t0 = time.time()
     with ThreadPoolExecutor(max_workers=PARALLEL_EVAL_WORKERS) as ex:
         futures = {
-            ex.submit(evaluate_pair_with_snapshots, p, snapshots_by_pair.get(p)): p
+            ex.submit(evaluate_pair_with_snapshots, p, snapshots_by_pair.get(p), ctx): p
             for p in config.PAIRS
         }
         completed = 0
