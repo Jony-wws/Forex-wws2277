@@ -64,12 +64,16 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_strategy_meta_agent.json"
 
 # ───── параметры цикла ─────
 LOOP_INTERVAL_SEC = 5 * 60 * 60          # 5 часов
-LOOKBACK_DAYS = 10                       # МАКСИМАЛЬНОЕ окно (snapshot-фрейм)
+LOOKBACK_DAYS = 25                       # МАКСИМАЛЬНОЕ окно (snapshot-фрейм)
                                          # Реальный walk-forward делается по
-                                         # MULTI_WINDOWS — каждой ячейке даём 4
-                                         # шанса попасть в 70% WR.
-MULTI_WINDOWS = [3, 5, 7, 10]            # дни — несколько окон, лучшее
-                                         # выбирается по Wilson_lower
+                                         # MULTI_WINDOWS — каждой ячейке даём 6
+                                         # шансов попасть в 70% WR.
+MULTI_WINDOWS = [3, 5, 7, 10, 14, 21]    # дни — больше окон, лучшее выбирается
+                                         # по Wilson_lower. 14d/21d дают больше
+                                         # сделок (Wilson tighter), что
+                                         # позволяет ячейкам с WR≥70% но n<8
+                                         # пройти 60% Wilson-гейт без снижения
+                                         # самого 70% порога.
 MIN_TRADES_FOR_VALID = 5                 # минимум сделок чтобы ячейка считалась
 QUALIFIED_WR_PCT = 70.0                  # минимум WR для QUALIFIED — НЕ снижаем
 QUALIFIED_WILSON_LOWER_PCT = 60.0        # минимум Wilson нижней границы — НЕ снижаем
