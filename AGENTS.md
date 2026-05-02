@@ -218,18 +218,49 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ## Where to find the user's data
 
-- Live dashboard (current Devin session, dies when session ends):
-  `https://37f7cabd0dd8-tunnel-fzgmzc7u.devinapps.com/`
-  user / 43587988369c24653d87acda5af5ee95
-  (auto-login URL: `https://user:43587988369c24653d87acda5af5ee95@37f7cabd0dd8-tunnel-fzgmzc7u.devinapps.com/`)
-  NOTE: this URL changes every Devin session. The current value is updated by
-  the agent at the start of each "продолжай"/"continue" session and committed
-  to this file so the user always has the latest.
-- Permanent dashboard (fly.io if deployed): see `infra/fly/` and the latest
-  commit body for the URL. Recommended for 24/7 uptime without burning ACU.
-- PR #1: `https://github.com/Jony-wws/Forex-wws2277/pull/1`
+### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
+
+**`https://fxinvestment-mjfdsshe.fly.dev/`**
+
+- No login. No password. Just open it.
+- Routes:
+  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts,
+    pressure bars, currency strength heatmap, 10-sec refresh).
+  - `/system` → audit dashboard (heartbeats, agents, paper-trader stats,
+    closed-trades history).
+  - `/agents` → redirect to `/system#agents-section`.
+  - `/history` → redirect to `/system#closed-trades-section`.
+- Deployed via Devin's `deploy backend` tool from `Jony-wws/Forex-wws2277`.
+  It auto-generates a Dockerfile from `pyproject.toml` (uv sync) and a
+  fly.toml (auto-stop machines, /data volume, region sjc).
+- Fly config: dashboard-only mode (auto-detected via `/data` mount). The
+  scanner / paper_trader / 60+ subprocess agents run on the Devin VM via
+  the hourly Schedule (`sched-083b…`); state files are committed to git
+  and travel with each Fly redeploy.
+- Cold-start: ~10–20 sec on first request after idle (fly auto-stops the
+  machine to save quota). Subsequent requests are instant.
+- To redeploy after code changes (in a Devin session):
+  ```bash
+  # Devin tool — installs flyctl-equivalent + builds + ships:
+  deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true
+  ```
+
+### Live tunnel (current Devin session, dies when session ends)
+
+`https://4ee881dbffe0-tunnel-q78oebby.devinapps.com/`
+user / `c7e01b4403f37888d4efcf17054c101b`
+(auto-login URL: `https://user:c7e01b4403f37888d4efcf17054c101b@4ee881dbffe0-tunnel-q78oebby.devinapps.com/`)
+
+This URL changes every Devin session. The current value is updated by the
+agent at the start of each "продолжай"/"continue" session and committed to
+this file so the user always has the latest.
+
+### Other links
+
+- PR #1: https://github.com/Jony-wws/Forex-wws2277/pull/1
 - All commits + state history:
-  `https://github.com/Jony-wws/Forex-wws2277/commits/devin/1777586006-teamagent-rebuild`
+  https://github.com/Jony-wws/Forex-wws2277/commits/devin/1777586006-teamagent-rebuild
+- Devin Schedule (hourly): `sched-083b11171a0841668f4608b075d769b5`
 
 ## Honest known limitations (do NOT hide these)
 
