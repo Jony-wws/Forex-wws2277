@@ -103,6 +103,52 @@
 .fx-link { color: var(--fx-muted); font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--fx-line); text-decoration: none; transition: all .15s; }
 .fx-link:hover { color: var(--fx-accent); border-color: var(--fx-accent); }
 
+/* TAB NAVIGATION (shared across pages: Market Intent / System / Agents / History) */
+.fx-tabs {
+  position: sticky;
+  top: 70px;
+  z-index: 9;
+  display: flex;
+  gap: 6px;
+  padding: 10px 18px 8px;
+  background: linear-gradient(180deg, rgba(4,6,13,.85), rgba(4,6,13,.45));
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--fx-line);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.fx-tabs::-webkit-scrollbar { display: none; }
+.fx-tab {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  background: var(--fx-panel);
+  color: var(--fx-muted);
+  border: 1px solid var(--fx-line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+.fx-tab:hover { color: var(--fx-text); border-color: var(--fx-accent); }
+.fx-tab.active {
+  background: linear-gradient(135deg, var(--fx-accent), var(--fx-accent2));
+  color: var(--fx-bg);
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgba(0,225,255,.35);
+}
+.fx-tab .ico { display: inline-block; margin-right: 4px; }
+
+/* "Wrapper" for legacy /system page so it inherits cinematic aura without
+   rewriting every section. Apply <body class="fx-shell-body"> on /system. */
+.fx-shell-body { background: var(--fx-bg); color: var(--fx-text); }
+.fx-shell-body main { position: relative; z-index: 1; }
+
 /* CONTROLS */
 .fx-controls {
   position: relative;

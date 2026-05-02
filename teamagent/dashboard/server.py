@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import config
@@ -65,8 +65,20 @@ def intent_page():
 
 @app.get("/system")
 def system_page():
-    """Полный системный дашборд (старая главная) — аудит, heartbeats, журналы."""
+    """Полный системный дашборд под брендом FX INVESTMENT — аудит, heartbeats, журналы."""
     return FileResponse(str(STATIC / "index.html"))
+
+
+@app.get("/agents")
+def agents_page():
+    """Quick deep-link → /system со скроллом к секции агентов."""
+    return RedirectResponse(url="/system#agents-section", status_code=302)
+
+
+@app.get("/history")
+def history_page():
+    """Quick deep-link → /system со скроллом к закрытым сделкам / paper-stats."""
+    return RedirectResponse(url="/system#closed-trades-section", status_code=302)
 
 
 @app.get("/api/intent-bars/{pair}")

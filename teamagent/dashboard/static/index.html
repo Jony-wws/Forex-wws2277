@@ -3,31 +3,49 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TeamAgent — FOREX AI 2026 · Гарантии стабильности</title>
+<meta name="theme-color" content="#04060d">
+<title>FX INVESTMENT — System · Audit · Heartbeats</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/intent.css">
 </head>
-<body>
+<body class="fx-shell-body">
 
-<!-- Премиум-фон: плавающие неоновые «звёзды» + градиентные ауры -->
-<div class="stars" aria-hidden="true"></div>
-<div class="aura aura-blue" aria-hidden="true"></div>
-<div class="aura aura-pink" aria-hidden="true"></div>
-<div class="aura aura-green" aria-hidden="true"></div>
+<!-- FX INVESTMENT cinematic background (shared with /intent) -->
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-aura aura-cyan" aria-hidden="true"></div>
+<div class="bg-aura aura-violet" aria-hidden="true"></div>
+<div class="bg-aura aura-pink" aria-hidden="true"></div>
 
-<header class="topbar premium">
-  <div class="brand">
-    <span class="brand-glow">TeamAgent</span>
-    <span class="muted brand-sub">FOREX AI · 2026</span>
-    <span class="badge-pro">PRO</span>
+<header class="fx-topbar">
+  <div class="fx-brand">
+    <div class="fx-logo">FX</div>
+    <div class="fx-brand-text">
+      <div class="fx-brand-name">FX INVESTMENT</div>
+      <div class="fx-brand-sub" id="fx-sub">System · audit · heartbeats · agents · history</div>
+    </div>
   </div>
-  <div class="clock-block">
-    <div><span class="muted small">сейчас:</span> <span id="clock-utc">—</span> <span class="muted small">UTC</span></div>
-    <div><span class="muted small">локально:</span> <span id="clock-utc5">—</span> <span class="muted small">UTC+5</span></div>
-    <div class="muted small" id="clock-session">—</div>
+  <div class="fx-toolbar">
+    <div class="fx-status" id="health">…</div>
+    <div class="fx-clock" id="fx-clock">—</div>
+    <button class="fx-link" id="manual-refresh" title="Refresh now">⟳</button>
   </div>
-  <div class="health" id="health">…</div>
-  <div class="auto-refresh">обновление: <span id="last-refresh">—</span> · <button id="manual-refresh">⟳</button></div>
 </header>
+
+<nav class="fx-tabs" aria-label="Sections">
+  <a class="fx-tab" href="/intent"><span class="ico">📈</span>Market Intent</a>
+  <a class="fx-tab active" href="/system" id="tab-system"><span class="ico">🩺</span>System</a>
+  <a class="fx-tab" href="/agents" id="tab-agents"><span class="ico">🤖</span>Agents</a>
+  <a class="fx-tab" href="/history" id="tab-history"><span class="ico">📜</span>History</a>
+</nav>
+
+<!-- legacy clock IDs kept inside main for compatibility with app.js -->
+<div style="display:none">
+  <span id="clock-utc">—</span>
+  <span id="clock-utc5">—</span>
+  <span id="clock-session">—</span>
+  <span id="last-refresh">—</span>
+</div>
 
 <main>
 
@@ -629,5 +647,31 @@
 </main>
 
 <script src="/static/app.js"></script>
+<script>
+// FX INVESTMENT shell extras for /system page:
+//  - keep the new fx-clock in the topbar in sync (UTC + UTC+5)
+//  - toggle Agents/History tab .active based on URL hash
+(function () {
+  const fxClock = document.getElementById("fx-clock");
+  function tick() {
+    if (!fxClock) return;
+    const d = new Date();
+    const utc = d.toISOString().slice(11, 19);
+    const utc5 = new Date(d.getTime() + 5 * 3600 * 1000).toISOString().slice(11, 19);
+    fxClock.textContent = utc + " UTC · " + utc5 + " +5";
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  function syncTabsToHash() {
+    const hash = location.hash || "";
+    document.getElementById("tab-system")?.classList.toggle("active", !hash || (!hash.includes("agents") && !hash.includes("closed-trades")));
+    document.getElementById("tab-agents")?.classList.toggle("active", hash.includes("agents-section"));
+    document.getElementById("tab-history")?.classList.toggle("active", hash.includes("closed-trades-section"));
+  }
+  syncTabsToHash();
+  window.addEventListener("hashchange", syncTabsToHash);
+})();
+</script>
 </body>
 </html>
