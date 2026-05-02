@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04060d">
+<title>FX INVESTMENT — System · Audit · Heartbeats</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/intent.css">
+</head>
+<body class="fx-shell-body">
+
+<!-- FX INVESTMENT cinematic background (shared with /intent) -->
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-aura aura-cyan" aria-hidden="true"></div>
+<div class="bg-aura aura-violet" aria-hidden="true"></div>
+<div class="bg-aura aura-pink" aria-hidden="true"></div>
+
+<header class="fx-topbar">
+  <div class="fx-brand">
+    <div class="fx-logo">FX</div>
+    <div class="fx-brand-text">
+      <div class="fx-brand-name">FX INVESTMENT</div>
+      <div class="fx-brand-sub" id="fx-sub">System · audit · heartbeats · agents · history</div>
+    </div>
+  </div>
+  <div class="fx-toolbar">
+    <div class="fx-status" id="health">…</div>
+    <div class="fx-clock" id="fx-clock">—</div>
+    <button class="fx-link" id="manual-refresh" title="Refresh now">⟳</button>
+  </div>
+</header>
+
+<nav class="fx-tabs" aria-label="Sections">
+  <a class="fx-tab" href="/intent"><span class="ico">📈</span>Market Intent</a>
+  <a class="fx-tab active" href="/system" id="tab-system"><span class="ico">🩺</span>System</a>
+  <a class="fx-tab" href="/agents" id="tab-agents"><span class="ico">🤖</span>Agents</a>
+  <a class="fx-tab" href="/history" id="tab-history"><span class="ico">📜</span>History</a>
+</nav>
+
+<!-- legacy clock IDs kept inside main for compatibility with app.js -->
+<div style="display:none">
+  <span id="clock-utc">—</span>
+  <span id="clock-utc5">—</span>
+  <span id="clock-session">—</span>
+  <span id="last-refresh">—</span>
+</div>
+
+<main>
+
+  <!-- ═══ FOREX MARKET COUNTDOWN + PRE-EMPTIVE STABILITY FORECAST ═══ -->
+  <section id="market-status-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span id="ms-emoji" class="ms-emoji">🟢</span>
+      <span>FOREX <span id="ms-status">…</span></span>
+      <span class="live-pulse" title="обновляется каждую секунду"></span>
+      <span id="ms-session-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="ms-grid">
+      <div class="ms-cell ms-countdown">
+        <div class="ms-cell-label" id="ms-countdown-label">до закрытия</div>
+        <div class="ms-cell-value big-number" id="ms-countdown">—</div>
+        <div class="ms-cell-sub" id="ms-next-event">—</div>
+      </div>
+      <div class="ms-cell">
+        <div class="ms-cell-label">время пользователя (UTC+5)</div>
+        <div class="ms-cell-value" id="ms-user-time">—</div>
+        <div class="ms-cell-sub" id="ms-utc-time">UTC: —</div>
+      </div>
+      <div class="ms-cell">
+        <div class="ms-cell-label">безопасный max expiry</div>
+        <div class="ms-cell-value" id="ms-max-expiry">—</div>
+        <div class="ms-cell-sub">обе стратегии 1–5h</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ САМОЙ СИСТЕМЫ ═══ -->
+  <section id="audit-section" class="card glass premium-card hero-card audit-hero">
+    <h2 class="hero-title">
+      <span id="audit-emoji" class="ms-emoji">🟢</span>
+      ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ СИСТЕМЫ
+      <span class="live-pulse" title="система проверяет сама себя"></span>
+      <span id="audit-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      Это <b>мета-проверки</b>: можно ли верить тому, что система сама про
+      себя говорит. paper_stats ↔ closed_trades, forecasts ↔ config.PAIRS,
+      market_hours ↔ session, schema-валидация state-файлов, code health
+      (импорты + синтаксис), кросс-модульные инварианты. Если хоть одна 🔴 —
+      система противоречит сама себе и данным верить нельзя.
+    </div>
+    <div id="audit-summary" class="audit-summary muted small">Запускаю проверки…</div>
+    <div id="audit-grid" class="audit-grid">
+      <div class="muted">Загружаю аудит…</div>
+    </div>
+    <div id="audit-verdict" class="audit-verdict muted small"></div>
+  </section>
+
+  <section id="forecast-stability-section" class="card glass premium-card stability-hero">
+    <h2 class="hero-title">
+      <span class="icon-shield">🔮</span>
+      ПРЕДВАРИТЕЛЬНЫЙ ПРОГНОЗ СТАБИЛЬНОСТИ
+      <span class="live-pulse" title="расчёт без зависимости от закрытых сделок"></span>
+      <span class="badge-stable">не зависит от # сделок</span>
+    </h2>
+    <div class="muted small">
+      Это <b>заранее</b> предсказанный WR на следующие N часов — расчёт идёт по
+      strategy_config × сессиям × market_hours × news. <b>Не зависит</b> от
+      количества закрытых сделок: ответ есть, даже если сделок ещё нет.
+    </div>
+    <div class="forecast-windows" id="forecast-windows">
+      <div class="muted">Загружаю прогноз на 1ч / 6ч / 24ч…</div>
+    </div>
+    <div id="forecast-diag" class="forecast-diag muted small"></div>
+  </section>
+
+  <!-- ═══ MASTER STRATEGY AGENT (5h cycle) ═══ -->
+  <section id="meta-strategy-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span id="meta-emoji" class="ms-emoji">🧠</span>
+      ГЛАВНЫЙ СТРАТЕГИЧЕСКИЙ АГЕНТ
+      <span class="live-pulse" title="каждые 5 часов делает полный sweep всех валют + сессий"></span>
+      <span id="meta-status-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      Тактический мета-агент. Каждые <b>5 часов</b> прогоняет 28 пар × 4 сессии × 120 вариантов
+      на <b>4 окнах</b> (3д / 5д / 7д / 10д) свежих данных Yahoo и подмешивает ансамбль из
+      8 реальных источников (COT · FRED · Regime · Radar · Multi-TF · Momentum · News · Specialist).
+      Для каждой ячейки выбирает лучшее окно + лучший variant и присваивает статус
+      <b class="green">КАЧЕСТВЕННАЯ</b> (WR ≥ 70% + Wilson_lower ≥ 60%) /
+      <b class="yellow">ВЕРОЯТНАЯ</b> (55–70%) / <b class="orange">ЗАМОРОЖЕНА</b> (нет edge).
+      <br>Качественные ячейки добавляют <b>±3 score</b>-голоса в forecast_scanner-е,
+      Вероятные — <b>±2</b>. 365-дневный locked-baseline остаётся эталоном — мета-агент его не перезаписывает.
+      <br><b>Только реальные данные:</b> Yahoo Finance · CFTC COT · FRED · 64 живых субагента. Без симуляторов и mock-данных.
+    </div>
+    <div class="meta-summary-grid" id="meta-summary-grid">
+      <div class="muted">Загружаю последний прогон…</div>
+    </div>
+    <div class="meta-tabs">
+      <button class="meta-tab-btn active" data-meta-tab="cells">Ячейки 28×4</button>
+      <button class="meta-tab-btn" data-meta-tab="log">Журнал прогонов</button>
+      <button class="meta-tab-btn" data-meta-tab="ensemble">Источники ансамбля</button>
+    </div>
+    <div id="meta-tab-cells" class="meta-tab-content">
+      <div class="table-wrapper">
+        <table id="meta-cells-table">
+          <thead><tr>
+            <th>Пара</th><th>Сессия</th><th>Статус</th><th>WR</th><th>Wilson↓</th>
+            <th>Сделки</th><th>Окно</th><th>Вариант</th><th>Смещение</th><th>Источники</th>
+          </tr></thead>
+          <tbody><tr><td colspan="10" class="muted">Загружаю последний прогон…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="meta-tab-log" class="meta-tab-content hidden">
+      <div class="meta-log" id="meta-log-content">
+        <div class="muted">Загружаю журнал прогонов…</div>
+      </div>
+    </div>
+    <div id="meta-tab-ensemble" class="meta-tab-content hidden">
+      <div id="meta-ensemble-content" class="muted small">
+        После первого прогона здесь будут источники ансамбля для каждой пары
+        (COT contrarian · fundamental tilt · market_radar · market_regime ·
+        multi-TF consensus · momentum burst · news filter · specialist).
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ГЛАВНАЯ КАРТОЧКА: ОБЩАЯ ОЦЕНКА + ПРОГНОЗ + ГАРАНТИИ ═══ -->
+  <section id="assessment-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title"><span class="dot dot-pulse"></span> ОБЩАЯ ОЦЕНКА СИСТЕМЫ <span class="live-pulse" title="данные в реальном времени"></span></h2>
+    <div id="assessment-content" class="assessment-content">
+      <div class="muted">Считаю стабильность…</div>
+    </div>
+  </section>
+
+  <!-- ═══ 50+ МЕТРИК ГАРАНТИЙ СТАБИЛЬНОСТИ ═══ -->
+  <section id="stability-section" class="card glass premium-card stability-hero">
+    <h2 class="hero-title"><span class="icon-shield">🛡️</span> ГАРАНТИИ СТАБИЛЬНОСТИ <span class="live-pulse" title="обновляется каждые 30 сек"></span> <span class="badge-stable">мат. границы · 95% доверие</span></h2>
+    <div class="muted small">
+      Все цифры — это <b>математические нижние границы</b> по реальным историческим данным,
+      не прогноз и не теория. Wilson 95% CI = «худший правдоподобный WR», bootstrap p5 = «худший
+      ожидаемый PnL/сделку», VaR/CVaR = «худшие 5% реальных потерь», conformal coverage =
+      «90% будущих цен попадут в этот коридор». Никаких симуляторов, никакой случайности —
+      bootstrap идёт по реальным закрытым сделкам с фиксированным seed.
+    </div>
+    <div id="stability-grid" class="stability-grid">
+      <div class="muted">Загружаю 50+ метрик стабильности…</div>
+    </div>
+  </section>
+
+  <section id="intro-section" class="card glass intro">
+    <h2>👋 Что я тут вижу?</h2>
+    <ul class="muted small">
+      <li><b>Общая оценка системы</b> (вверху) — единый stability score 0–100 + русскоязычный диагноз и прогноз. Обновляется каждые 60 сек.</li>
+      <li><b>Гарантии стабильности</b> — 50+ математических метрик (Wilson CI, bootstrap, VaR/CVaR, Sharpe, Sortino, Calmar, Kelly, conformal bands, calibration, streaks). Все по реальным данным, без random.</li>
+      <li><b>Сводка paper-trader</b> — общая статистика: сколько сделок, WR, PnL.</li>
+      <li><b>Сейчас открыто</b> — активные виртуальные сделки $1/85% (бинарки 1–4ч). Обновляется каждые 30 сек: цена, осталось до экспирации, прогноз PnL.</li>
+      <li><b>PROGNOZY-28</b> — единая таблица прогнозов по 28 парам. Каждые 5 минут scanner пересчитывает score (−44..+44), вероятность (50–92%), за/против. Кликни строку — увидишь breakdown агентов и Стакан.</li>
+      <li><b>Стакан (Volume Profile)</b> — POC/VAH/VAL + крупные игроки 🐋 + прогноз «куда цена не вернётся до 00:00 UTC+5».</li>
+      <li><b>История</b> — все закрытые сделки с реальной ценой Yahoo на момент экспирации.</li>
+      <li><b>60+ агентов</b> — каждый отдельный процесс с heartbeat. Watchdog убивает зависших, orchestrator перезапускает.</li>
+      <li><b>WR backtest</b> — strategy_search раз в 5 дней перебирает 120 вариантов на 4 сессиях × 28 парах × 365 дней Yahoo (≈50 мин). Это используется для выбора стороны (BUY/SELL c учётом contrarian/fade-RSI flip) и времени экспирации. <b>STRICT-gate</b>: trade открывается только на qualified-ячейке (per-session или global) с реальным ≥70% WR.</li>
+    </ul>
+  </section>
+  <section id="stats-section" class="card">
+    <h2>📊 Сводка paper-trader (24/7)</h2>
+    <div class="stats-grid" id="stats-grid">
+      <div><div class="big" id="stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="open-trades-section" class="card">
+    <h2>🤖 Сейчас открыто <span class="badge" id="open-count">0</span></h2>
+    <div class="muted">Цена входа · Открыто · Осталось до экспирации · Текущая цена · PnL — обновление каждые 30 сек.</div>
+    <div class="table-wrap">
+      <table id="open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Время открытия</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Pips</th>
+            <th>%</th>
+            <th>Прогноз PnL</th>
+            <th>Прав?</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="forecasts-section" class="card">
+    <h2>🎯 PROGNOZY — 28 валютных пар <span class="muted small">(единый источник, обновление каждые 5 минут)</span></h2>
+    <div class="muted">Один источник правды: технический анализ + мета-голосование агентов в одной таблице. Кликни строку — увидишь breakdown.<br>Снимок сделан: <span id="forecasts-as-of">—</span></div>
+    <div id="strategy-summary" class="muted small" style="margin-top:6px;"></div>
+    <div class="table-wrap">
+      <table id="forecasts-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Вероятность</th>
+            <th>WR 30д (лучшая стратегия)</th>
+            <th>Стратегия</th>
+            <th>Score</th>
+            <th>Экспирация</th>
+            <th>За</th>
+            <th>Против</th>
+            <th>Свежесть</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="forecast-detail" class="hidden card-inset"></div>
+  </section>
+
+  <section id="strategy-matrix-section" class="card">
+    <h2>📅 WR по сессиям (28 пар × 4 сессии)</h2>
+    <div class="muted small">
+      Per-session strategy_search: лучший вариант стратегии и его 30-дневный WR
+      ОТДЕЛЬНО для каждой сессии. <span class="win">Зелёный ≥70%</span> — paper-trader откроет сделку в эту сессию по этой паре. <span class="loss">Красный &lt;70%</span> — заморожено. «—» — нет валидной выборки. Сессии UTC: Asia 0–7, London 7–13, Overlap 13–17, NY 17–22.
+    </div>
+    <div id="strategy-matrix-summary" class="muted small" style="margin-top:6px;"></div>
+    <div class="table-wrap">
+      <table id="strategy-matrix-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Asia</th>
+            <th>London</th>
+            <th>Overlap</th>
+            <th>NY</th>
+            <th>Σ qual</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="market-regime-section" class="card">
+    <h2>🌍 Поведение рынка за 365 дней <span class="muted small">(real Yahoo, no simulator)</span></h2>
+    <div class="muted small">
+      Анализ ~6000 1H баров на пару. Hot hours UTC = когда рынок реально движется
+      сильнее всего (NFP/FOMC/ECB/CPI окна эмерджентно попадают сюда без парсинга
+      календаря). Кластеры (dow × hour) с долей high-vol ≥ 25% — сезонные «реакции».
+      <br>strategy_search пересчитывает variant'ы каждые <b>5 дней</b> (~4 раза в месяц)
+      на свежих 365 днях — экономим ACU, не даём стратегии устареть.
+    </div>
+    <div id="market-regime-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="wr-floor-section" class="card">
+    <h2>🛡️ WR floor monitor <span class="muted small">(rolling 50 trades · floor 70%)</span></h2>
+    <div class="muted small">
+      Если средний WR за последние 50 закрытых сделок опустится ниже 70% — здесь
+      появится alert. Сам гейт открытия сделок не блокируется, это индикатор
+      «пора триггернуть свежий strategy_search sweep».
+    </div>
+    <div id="wr-floor-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="cot-section" class="card">
+    <h2>📊 COT positioning <span class="muted small">(CFTC · 7 валют · 52 недели · z-score контраприан)</span></h2>
+    <div class="muted small">
+      Реальные публичные данные CFTC: позиции hedge funds (leveraged money) во
+      фьючерсах EUR/GBP/JPY/CHF/AUD/CAD/NZD на CME. Когда позиции растянуты
+      (|z| &gt; 1.5 за 52 недели) — высокая вероятность mean-reversion
+      (контрапариан). Это «как смотрят macro hedge funds»: тот самый отчёт
+      который выходит каждую пятницу. Источник:
+      <a href="https://publicreporting.cftc.gov" target="_blank">CFTC public Socrata API</a>.
+    </div>
+    <div id="cot-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="fundamentals-section" class="card">
+    <h2>🏦 Фундаментал per валюта <span class="muted small">(FRED · 8 валют · rates / 10y yield / CPI YoY)</span></h2>
+    <div class="muted small">
+      Реальные публичные данные ФРС / ЕЦБ / BoE / BoJ / SNB / RBA / BoC / RBNZ
+      из <a href="https://fred.stlouisfed.org" target="_blank">FRED</a>.
+      Обновляется раз в сутки (FRED CSV кеш 24 ч). Per-pair tilt
+      (BUY/SELL/NEUTRAL) на основе rate-/yield-/CPI-differentials добавляется
+      ±5 очков к score прогноза. Это «как смотрят macro hedge funds»: реальные
+      ставки ЦБ + 10-летние трежери + инфляция, без симуляторов.
+    </div>
+    <div id="fundamentals-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="weekly-loss-section" class="card">
+    <h2>📉 Минусы за последние 7 дней <span class="muted small">(weekly loss review)</span></h2>
+    <div class="muted small">
+      Где система проигрывала на этой неделе: пары / сессии / часы UTC / направления.
+      Помогает увидеть «слепые пятна» стратегии и понять что чинить в следующем
+      strategy_search sweep'е.
+    </div>
+    <div id="weekly-loss-content" class="muted small">Загружаю…</div>
+  </section>
+
+  <section id="vp-section" class="card">
+    <h2>📊 Стакан (Volume Profile) с прогнозом до 00:00 UTC+5</h2>
+    <div class="vp-controls">
+      <label>Пара:
+        <select id="vp-pair">
+          <option value="EURUSD">EURUSD</option>
+        </select>
+      </label>
+      <button id="vp-refresh">обновить</button>
+    </div>
+    <div id="vp-content" class="muted">Выбери пару…</div>
+  </section>
+
+  <section id="closed-trades-section" class="card">
+    <h2>📜 История закрытых сделок (основная стратегия)</h2>
+    <div class="table-wrap">
+      <table id="closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── PARALLEL STRATEGY: «Стакан» ───── -->
+  <section id="stakan-stats-section" class="card stakan-card">
+    <h2>📐 Сводка СТАКАН-стратегии (параллельная) <span class="badge stakan-badge">2-я система</span></h2>
+    <div class="muted small">
+      Открывает сделку только если найден <b>уровень от которого цена уходит</b>
+      (24h цена не приближалась ближе чем 0.6×ATR от 7-day big-player уровня)
+      <b>И</b> ≥7 из 10 агентов согласны с направлением «от уровня». Экспирация
+      1–20 ч авто-выбирается из расстояния до уровня.
+    </div>
+    <div class="stats-grid" id="stakan-stats-grid">
+      <div><div class="big" id="stakan-stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="stakan-stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="stakan-stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="stakan-stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="stakan-stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="stakan-open-section" class="card stakan-card">
+    <h2>🎯 Стакан — сейчас открыто <span class="badge" id="stakan-open-count">0</span></h2>
+    <div class="muted small">Live PnL · обновление 30 сек.</div>
+    <div class="table-wrap">
+      <table id="stakan-open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Уровень</th>
+            <th>Дист. до уровня</th>
+            <th>Открыто</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Pips</th>
+            <th>Прогноз PnL</th>
+            <th>Голоса</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="stakan-signals-section" class="card stakan-card">
+    <h2>🧮 Стакан — последний скан 28 пар</h2>
+    <div class="muted small">
+      Каждые 60 сек paper_trader_stakan сканирует все 28 пар. Здесь видно: какие
+      нашли валидные уровни, сколько голосов набрала пара, почему не открыли.
+    </div>
+    <div class="table-wrap">
+      <table id="stakan-signals-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Статус</th>
+            <th>Сторона</th>
+            <th>Уровень</th>
+            <th>Дист. (pips)</th>
+            <th>Avoid (pips)</th>
+            <th>Голоса</th>
+            <th>Причина пропуска</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="stakan-closed-section" class="card stakan-card">
+    <h2>📚 Стакан — история закрытых сделок</h2>
+    <div class="table-wrap">
+      <table id="stakan-closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Уровень</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── 3rd PARALLEL STRATEGY: «Лучший прогноз дня» ───── -->
+  <section id="daily-stats-section" class="card daily-card">
+    <h2>📅 «Лучший прогноз дня» (3-я параллельная) <span class="badge daily-badge">DAILY</span></h2>
+    <div class="muted small">
+      Раз в сутки сканирует все 28 пар, считает <b>META-score</b> (объединяет:
+      PROGNOZY-28 + Market Radar + Stakan-голоса + 10-мин reversal-фильтр + Macro + COT)
+      и открывает <b>1 сделку на пару</b>. Стейк адаптивный: $2 / $1 / $0.50 / $0.25
+      по уровню confidence. Auto-pause: пара с rolling 20-trade WR &lt;60% → пауза 7 дней.
+    </div>
+    <div class="stats-grid" id="daily-stats-grid">
+      <div><div class="big" id="daily-stat-total">0</div><div class="muted">сделок</div></div>
+      <div><div class="big green" id="daily-stat-wins">0</div><div class="muted">WIN</div></div>
+      <div><div class="big red" id="daily-stat-losses">0</div><div class="muted">LOSS</div></div>
+      <div><div class="big" id="daily-stat-wr">0%</div><div class="muted">WR</div></div>
+      <div><div class="big" id="daily-stat-rolling-wr">0%</div><div class="muted">WR last 30</div></div>
+      <div><div class="big" id="daily-stat-pnl">$0</div><div class="muted">PnL</div></div>
+    </div>
+  </section>
+
+  <section id="daily-open-section" class="card daily-card">
+    <h2>🎯 Daily — сейчас открыто <span class="badge" id="daily-open-count">0</span></h2>
+    <div class="muted small">Live PnL по реальной цене Yahoo · обновление 30 сек.</div>
+    <div class="table-wrap">
+      <table id="daily-open-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Цена входа</th>
+            <th>Confidence</th>
+            <th>Meta-score</th>
+            <th>Stake</th>
+            <th>До экспирации</th>
+            <th>Текущая цена</th>
+            <th>Pips</th>
+            <th>Прогноз PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="daily-signals-section" class="card daily-card">
+    <h2>🧮 Daily — последний скан 28 пар (META-score breakdown)</h2>
+    <div class="muted small">
+      Каждые 60 сек проверяется «пора ли»: при наступлении торгового дня (00:00 UTC+5)
+      запускается полный sweep всех 28 пар. Здесь видно: confidence-score каждой
+      пары, какие компоненты дали + или − голос, и почему пара не открыта.
+    </div>
+    <div class="table-wrap">
+      <table id="daily-signals-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Confidence</th>
+            <th>Meta-score</th>
+            <th>Forecast</th>
+            <th>Radar</th>
+            <th>Stakan</th>
+            <th>Reversal</th>
+            <th>Macro</th>
+            <th>COT</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="daily-paused-section" class="card daily-card">
+    <h2>⏸ Daily — пары на auto-pause</h2>
+    <div class="muted small">
+      Пары с rolling 20-trade WR &lt; 60% автоматически ставятся на паузу на 7 дней.
+      Восстанавливаются автоматически когда срок истекает.
+    </div>
+    <div id="daily-paused-list" class="muted">Нет пауз — все 28 пар активны.</div>
+  </section>
+
+  <section id="daily-closed-section" class="card daily-card">
+    <h2>📚 Daily — история закрытых</h2>
+    <div class="table-wrap">
+      <table id="daily-closed-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Сторона</th>
+            <th>Confidence</th>
+            <th>Цена входа</th>
+            <th>Цена закрытия</th>
+            <th>Время открытия</th>
+            <th>Время закрытия</th>
+            <th>Результат</th>
+            <th>PnL</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── MARKET RADAR (20 scanners × 28 pairs) ───── -->
+  <section id="radar-section" class="card radar-card">
+    <h2>📡 Market Radar — 20 сканеров × 28 пар <span class="badge radar-badge">RADAR</span></h2>
+    <div class="muted small">
+      «Военный радар» рынка: 20 независимых сканеров (currency strength, correlation,
+      triangular arb, volatility regime, session/hour/dow bias, pivots, MTF EMA,
+      Bollinger, ADX, candle patterns, range expansion, VP imbalance, news, macro,
+      COT, smart money, yearly position, mean-rev) дают каждой паре общий
+      <b>overall_score</b> [-100..+100]. Используется как 11-й голос в Стакан-стратегии
+      и как компонент META-score в Daily.
+    </div>
+    <div class="table-wrap">
+      <table id="radar-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Direction</th>
+            <th>Overall score</th>
+            <th>Strong scanners</th>
+            <th>Top сканеры (топ-3)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───── PRO: «Что происходит ВНУТРИ рынка» (microstructure) ───── -->
+  <section id="microstructure-section" class="card pro-card">
+    <h2>🔬 Что происходит ВНУТРИ рынка <span class="badge pro-badge">PRO</span></h2>
+    <div class="muted small">
+      Микроструктура рынка: Wyckoff Stage (Accumulation/Markup/Distribution/Markdown),
+      Cumulative Delta (куда уходят деньги), Smart Money Concepts (Order Blocks,
+      Fair Value Gaps, Liquidity Sweeps), Whale activity, Hurst exponent (тренд vs
+      mean-reversion). <b>Внутренний факт</b> — что показывает order flow прямо сейчас.
+      <b>Внешний вид</b> — структурный режим / стадия / магниты для цены.
+    </div>
+    <div class="muted small">
+      ⚠️ Загрузка ~30-40 сек (28 пар × ~1 сек на пару). Кнопка ниже — обновить вручную.
+    </div>
+    <div style="margin: 8px 0;">
+      <button id="microstructure-refresh-btn" style="padding: 6px 14px; background: #58a6ff; color: #0d1117; border: 0; border-radius: 4px; font-weight: 700; cursor: pointer;">
+        🔄 Обновить microstructure
+      </button>
+      <span id="microstructure-status" class="muted small" style="margin-left: 10px;"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="microstructure-table">
+        <thead>
+          <tr>
+            <th>Пара</th>
+            <th>Wyckoff Stage</th>
+            <th>Δ Delta</th>
+            <th>Hurst</th>
+            <th>SMC (OB · FVG · Sweep · Whale)</th>
+            <th>Внутренний факт</th>
+            <th>Внешний вид</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="7" class="muted">нажми «Обновить microstructure» чтобы посчитать всё внутри 28 пар</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="agents-section" class="card">
+    <h2>🎯 62 агента (heartbeat + auto-restart)</h2>
+    <div id="agents-grid" class="agents-grid muted">Загружаю…</div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+<script>
+// FX INVESTMENT shell extras for /system page:
+//  - keep the new fx-clock in the topbar in sync (UTC + UTC+5)
+//  - toggle Agents/History tab .active based on URL hash
+(function () {
+  const fxClock = document.getElementById("fx-clock");
+  function tick() {
+    if (!fxClock) return;
+    const d = new Date();
+    const utc = d.toISOString().slice(11, 19);
+    const utc5 = new Date(d.getTime() + 5 * 3600 * 1000).toISOString().slice(11, 19);
+    fxClock.textContent = utc + " UTC · " + utc5 + " +5";
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  function syncTabsToHash() {
+    const hash = location.hash || "";
+    document.getElementById("tab-system")?.classList.toggle("active", !hash || (!hash.includes("agents") && !hash.includes("closed-trades")));
+    document.getElementById("tab-agents")?.classList.toggle("active", hash.includes("agents-section"));
+    document.getElementById("tab-history")?.classList.toggle("active", hash.includes("closed-trades-section"));
+  }
+  syncTabsToHash();
+  window.addEventListener("hashchange", syncTabsToHash);
+})();
+</script>
+</body>
+</html>
