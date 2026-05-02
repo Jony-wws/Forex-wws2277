@@ -53,7 +53,47 @@ def _load(path: Path, default):
 
 @app.get("/")
 def root():
+    """FX INVESTMENT — cinematic per-pair market intent landing.
+    Use /system для полного аудита/heartbeats."""
+    return FileResponse(str(STATIC / "intent.html"))
+
+
+@app.get("/intent")
+def intent_page():
+    return FileResponse(str(STATIC / "intent.html"))
+
+
+@app.get("/system")
+def system_page():
+    """Полный системный дашборд (старая главная) — аудит, heartbeats, журналы."""
     return FileResponse(str(STATIC / "index.html"))
+
+
+@app.get("/api/intent-bars/{pair}")
+def api_intent_bars(pair: str, interval: str = "15m", n: int = 96):
+    """Облегчённые OHLC-бары для cinematic chart на /intent — Yahoo, кэшируется."""
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        return JSONResponse({"error": f"unknown pair {pair}"}, status_code=404)
+    if interval not in {"1m", "5m", "15m", "1h", "4h", "1d"}:
+        return JSONResponse({"error": "bad interval"}, status_code=400)
+    n = max(20, min(int(n), 300))
+    try:
+        df = yahoo.latest_bars(pair, interval=interval, n=n)
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+    if df is None or df.empty:
+        return JSONResponse({"pair": pair, "bars": []})
+    bars = []
+    for ts, row in df.iterrows():
+        bars.append({
+            "time": int(ts.timestamp()),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
+        })
+    return {"pair": pair, "interval": interval, "bars": bars}
 
 
 @app.get("/api/forecasts")
@@ -64,14 +104,33 @@ def api_forecasts():
     чтобы фронт мог прямо из одного запроса взять agents_for_count/against_count.
     """
     snap = _load(config.STATE_DIR / "forecasts.json", {"forecasts": {}, "rankings": []})
-    # вся расширенная по-парамная инфа (без больших indicators — их выкачаем лениво через /api/forecast/{pair})
+    # Расширенная по-парамная инфа + сжатый набор ключевых indicators (нужны
+    # cinematic Market-Intent карточкам без второго round-trip).
     forecasts_lite = {}
     for pair, f in (snap.get("forecasts") or {}).items():
+        ind_full = f.get("indicators") or {}
+        ind_compact = {}
+        for tf in ("4H", "1H", "15m"):
+            ind_tf = ind_full.get(tf) or {}
+            if not ind_tf:
+                continue
+            ind_compact[tf] = {
+                k: ind_tf.get(k)
+                for k in (
+                    "rsi14", "ema20", "ema50", "ema200", "atr14",
+                    "bb_pct", "mom5", "cei10", "ofi10", "vwap", "bbp", "close",
+                )
+                if k in ind_tf
+            }
         forecasts_lite[pair] = {
             "pair": f.get("pair"),
             "side": f.get("side"),
             "probability_pct": f.get("probability_pct"),
+            "probability": f.get("probability"),
             "score": f.get("score"),
+            "max_score": f.get("max_score"),
+            "current_price": f.get("current_price"),
+            "indicators": ind_compact,
             "agents_for_count": f.get("agents_for_count", len(f.get("agents_for", []))),
             "agents_against_count": f.get("agents_against_count", len(f.get("agents_against", []))),
             "recommended_hours": f.get("recommended_hours"),

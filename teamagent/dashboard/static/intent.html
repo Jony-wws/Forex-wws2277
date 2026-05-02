@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04060d">
+<title>FX INVESTMENT — Market Intent · Live Order-Flow на 28 пар</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/intent.css">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body class="intent-body">
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-aura aura-cyan" aria-hidden="true"></div>
+<div class="bg-aura aura-violet" aria-hidden="true"></div>
+<div class="bg-aura aura-pink" aria-hidden="true"></div>
+
+<header class="fx-topbar">
+  <div class="fx-brand">
+    <div class="fx-logo">FX</div>
+    <div class="fx-brand-text">
+      <div class="fx-brand-name">FX INVESTMENT</div>
+      <div class="fx-brand-sub">Live Market Intent · 28 pairs · order-flow & forecast</div>
+    </div>
+  </div>
+  <div class="fx-toolbar">
+    <div class="fx-status" id="fx-status">
+      <span class="fx-dot" id="fx-status-dot"></span>
+      <span id="fx-status-text">подключаюсь…</span>
+    </div>
+    <div class="fx-clock" id="fx-clock">—</div>
+    <a class="fx-link" href="/system">System →</a>
+  </div>
+</header>
+
+<section class="fx-controls">
+  <div class="fx-summary">
+    <div class="fx-summary-pill">
+      <span class="lbl">Рынок</span>
+      <span class="val" id="fx-market-state">—</span>
+    </div>
+    <div class="fx-summary-pill">
+      <span class="lbl">Top BUY</span>
+      <span class="val pos" id="fx-top-buy">—</span>
+    </div>
+    <div class="fx-summary-pill">
+      <span class="lbl">Top SELL</span>
+      <span class="val neg" id="fx-top-sell">—</span>
+    </div>
+    <div class="fx-summary-pill">
+      <span class="lbl">след. tick</span>
+      <span class="val" id="fx-next-tick">—</span>
+    </div>
+  </div>
+
+  <div class="fx-strength" id="fx-strength" aria-label="Currency strength heatmap"></div>
+
+  <div class="fx-filters">
+    <button class="fx-chip active" data-filter="all">все 28</button>
+    <button class="fx-chip" data-filter="majors">мажоры</button>
+    <button class="fx-chip" data-filter="buy">тянут BUY</button>
+    <button class="fx-chip" data-filter="sell">тянут SELL</button>
+    <button class="fx-chip" data-filter="reversal">у разворота</button>
+    <button class="fx-chip" data-filter="active">есть сделки</button>
+  </div>
+
+  <div class="fx-search">
+    <input id="fx-search-input" placeholder="EUR, GBP, USD…" autocomplete="off">
+  </div>
+</section>
+
+<main class="fx-grid" id="fx-grid">
+  <div class="fx-empty">Загружаю 28 пар…</div>
+</main>
+
+<dialog id="fx-deep" class="fx-deep">
+  <button class="fx-deep-close" aria-label="Close">×</button>
+  <div id="fx-deep-body"></div>
+</dialog>
+
+<footer class="fx-footer">
+  <span>FX INVESTMENT · powered by TeamAgent · auto-refresh каждые 10s</span>
+  <span class="muted" id="fx-build">build —</span>
+</footer>
+
+<script src="/static/intent.js"></script>
+</body>
+</html>
