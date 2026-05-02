@@ -247,31 +247,111 @@ def api_debug():
     return info
 
 
+_INTENT_BARS_DISK_TTL = 60 * 60  # 1h
+_INTENT_BARS_NET_TIMEOUT = 1.8   # sec — never block a worker longer than this
+
+
+def _intent_bars_disk_path(pair: str, interval: str, n: int) -> Path:
+    cache_dir = config.STATE_DIR / "_intent_bars_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f"{pair}_{interval}_{n}.json"
+
+
+def _intent_bars_load_disk(pair: str, interval: str, n: int):
+    fp = _intent_bars_disk_path(pair, interval, n)
+    if not fp.exists():
+        return None
+    try:
+        if time.time() - fp.stat().st_mtime > _INTENT_BARS_DISK_TTL * 12:
+            # >12 h stale — refuse to serve very old data; let frontend show empty
+            return None
+        return json.loads(fp.read_text())
+    except Exception:
+        return None
+
+
+def _intent_bars_save_disk(pair: str, interval: str, n: int, payload: dict) -> None:
+    try:
+        fp = _intent_bars_disk_path(pair, interval, n)
+        fp.write_text(json.dumps(payload, ensure_ascii=False))
+    except Exception:
+        pass
+
+
+def _intent_bars_fetch_yahoo(pair: str, interval: str, n: int) -> dict | None:
+    """Fetch from Yahoo with a hard wall-clock budget.
+
+    Returns None on timeout / any failure so the caller can fall back to disk
+    cache. NEVER raises. Bounded to _INTENT_BARS_NET_TIMEOUT sec via a
+    ThreadPoolExecutor — yfinance is synchronous so we can't await it, but
+    we can refuse to wait longer than the budget.
+    """
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
+
+    def _do_fetch():
+        df = yahoo.latest_bars(pair, interval=interval, n=n)
+        if df is None or df.empty:
+            return None
+        out = []
+        for ts, row in df.iterrows():
+            out.append({
+                "time": int(ts.timestamp()),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+            })
+        return out
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(_do_fetch)
+            bars = fut.result(timeout=_INTENT_BARS_NET_TIMEOUT)
+        if not bars:
+            return None
+        return {"pair": pair, "interval": interval, "bars": bars}
+    except FutTimeout:
+        log.info(f"intent-bars timeout pair={pair} tf={interval} (>{_INTENT_BARS_NET_TIMEOUT}s)")
+        return None
+    except Exception as e:
+        log.warning(f"intent-bars yahoo failed pair={pair}: {e}")
+        return None
+
+
 @app.get("/api/intent-bars/{pair}")
 def api_intent_bars(pair: str, interval: str = "15m", n: int = 96):
-    """Облегчённые OHLC-бары для cinematic chart на /intent — Yahoo, кэшируется."""
+    """Лёгкие OHLC-бары для cinematic chart.
+
+    Стратегия: всегда отвечаем за < 2 секунд. Если Yahoo не успевает —
+    отдаём disk-кэш в /data/state/_intent_bars_cache (1h TTL → fresh, 12h
+    TTL → still ok stale). Гарантирует что worker pool не блокируется на
+    медленные yfinance вызовы — и значит /system / /history / любой
+    другой запрос всегда отвечает быстро.
+    """
     pair = pair.upper()
     if pair not in config.PAIRS:
         return JSONResponse({"error": f"unknown pair {pair}"}, status_code=404)
     if interval not in {"1m", "5m", "15m", "1h", "4h", "1d"}:
         return JSONResponse({"error": "bad interval"}, status_code=400)
     n = max(20, min(int(n), 300))
-    try:
-        df = yahoo.latest_bars(pair, interval=interval, n=n)
-    except Exception as e:
-        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
-    if df is None or df.empty:
-        return JSONResponse({"pair": pair, "bars": []})
-    bars = []
-    for ts, row in df.iterrows():
-        bars.append({
-            "time": int(ts.timestamp()),
-            "open": float(row["Open"]),
-            "high": float(row["High"]),
-            "low": float(row["Low"]),
-            "close": float(row["Close"]),
-        })
-    return {"pair": pair, "interval": interval, "bars": bars}
+
+    cached = _intent_bars_load_disk(pair, interval, n)
+    fresh_threshold = time.time() - _INTENT_BARS_DISK_TTL
+    fp = _intent_bars_disk_path(pair, interval, n)
+    is_fresh = fp.exists() and fp.stat().st_mtime > fresh_threshold
+
+    if cached and is_fresh:
+        return cached  # fast path: disk cache <1h old → no network call
+
+    fresh = _intent_bars_fetch_yahoo(pair, interval, n)
+    if fresh:
+        _intent_bars_save_disk(pair, interval, n, fresh)
+        return fresh
+
+    if cached:
+        return cached  # network failed/timed out → serve stale disk cache
+
+    return JSONResponse({"pair": pair, "interval": interval, "bars": []})
 
 
 @app.get("/api/forecasts")
