@@ -50,9 +50,12 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def _score_to_probability(score: int, max_score: int = 53) -> float:
-    """Score -44..+44 → probability 0..1, абсолютная.
+def _score_to_probability(score: int, max_score: int = 75) -> float:
+    """Score -75..+75 → probability 0..1, абсолютная.
+
     Score>0 → BUY вероятность; <0 → SELL вероятность.
+    max_score=75 учитывает 6 новых блоков (MACD, Stoch, ADX, Williams %R,
+    Ichimoku, и ADX regime gate) добавленных в 2026-05-03.
     """
     norm = score / max_score              # -1..+1
     p = _sigmoid(norm * 4.0)              # softer sigmoid
@@ -165,6 +168,77 @@ def evaluate_pair(pair: str) -> dict | None:
     elif bull_count == 0:
         vote("MTF_full_bear", -3, "все 3 TF ниже EMA")
 
+    # ───── BLOCK H2 — ADX Regime Gate (флэт-штраф / тренд-бонус) ─────
+    adx_val = ind_1h.get("adx", 0.0)
+    if adx_val < 15:
+        # Флэт — рынок непредсказуем; штрафуем абсолютную силу сигнала.
+        penalty = int(round(abs(score) * 0.6))
+        if penalty > 0:
+            if score > 0:
+                vote("ADX_flat_penalty", -penalty,
+                     f"ADX={adx_val:.1f} < 15 — флэт, score снижен на 60%")
+            elif score < 0:
+                vote("ADX_flat_penalty", +penalty,
+                     f"ADX={adx_val:.1f} < 15 — флэт, score снижен на 60%")
+    elif adx_val > 30:
+        plus_di = ind_1h.get("plus_di", 0.0)
+        minus_di = ind_1h.get("minus_di", 0.0)
+        if plus_di > minus_di:
+            vote("ADX_strong_uptrend", +3,
+                 f"ADX={adx_val:.1f}>30, +DI>-DI — сильный восходящий тренд")
+        else:
+            vote("ADX_strong_downtrend", -3,
+                 f"ADX={adx_val:.1f}>30, -DI>+DI — сильный нисходящий тренд")
+
+    # ───── BLOCK H3 — MACD Confirmation ─────
+    macd_hist = ind_1h.get("macd_hist", 0.0)
+    macd_prev = ind_1h.get("macd_prev_hist", 0.0)
+    if macd_hist > 0 and macd_prev <= 0:
+        vote("MACD_bullish_cross", +2, "MACD гистограмма пересекла 0 вверх")
+    elif macd_hist < 0 and macd_prev >= 0:
+        vote("MACD_bearish_cross", -2, "MACD гистограмма пересекла 0 вниз")
+    elif macd_hist > 0 and macd_hist > macd_prev:
+        vote("MACD_bullish_accel", +1, "MACD гистограмма растёт")
+    elif macd_hist < 0 and macd_hist < macd_prev:
+        vote("MACD_bearish_accel", -1, "MACD гистограмма падает")
+
+    # ───── BLOCK H4 — Stochastic Oscillator ─────
+    stoch_k = ind_1h.get("stoch_k", 50.0)
+    stoch_d = ind_1h.get("stoch_d", 50.0)
+    if stoch_k < 20 and stoch_d < 20:
+        vote("Stoch_oversold", +2,
+             f"Stoch K={stoch_k:.1f} D={stoch_d:.1f} — перепроданность")
+    elif stoch_k > 80 and stoch_d > 80:
+        vote("Stoch_overbought", -2,
+             f"Stoch K={stoch_k:.1f} D={stoch_d:.1f} — перекупленность")
+    elif stoch_k > stoch_d and stoch_k < 80:
+        vote("Stoch_bullish", +1, "Stoch K > D (бычий)")
+    elif stoch_k < stoch_d and stoch_k > 20:
+        vote("Stoch_bearish", -1, "Stoch K < D (медвежий)")
+
+    # ───── BLOCK H5 — Williams %R ─────
+    wr_val = ind_1h.get("williams_r", -50.0)
+    if wr_val > -20:
+        vote("WilliamsR_overbought", -1,
+             f"Williams %R={wr_val:.1f} > -20 — перекупленность")
+    elif wr_val < -80:
+        vote("WilliamsR_oversold", +1,
+             f"Williams %R={wr_val:.1f} < -80 — перепроданность")
+
+    # ───── BLOCK H6 — Ichimoku Cloud ─────
+    above_cloud = bool(ind_1h.get("ichimoku_above_cloud", 0.0))
+    below_cloud = bool(ind_1h.get("ichimoku_below_cloud", 0.0))
+    tenkan = ind_1h.get("ichimoku_tenkan", 0.0)
+    kijun = ind_1h.get("ichimoku_kijun", 0.0)
+    if above_cloud and tenkan > kijun:
+        vote("Ichimoku_strong_bull", +3, "Цена выше облака + Tenkan > Kijun")
+    elif below_cloud and tenkan < kijun:
+        vote("Ichimoku_strong_bear", -3, "Цена ниже облака + Tenkan < Kijun")
+    elif above_cloud:
+        vote("Ichimoku_bull", +1, "Цена выше облака Ишимоку")
+    elif below_cloud:
+        vote("Ichimoku_bear", -1, "Цена ниже облака Ишимоку")
+
     # ───── BLOCK I — Fundamental macro tilt (FRED rates / yields / CPI) ─────
     # Source: teamagent.fundamentals (FRED 24h cache, no API key).
     # Cap ±5 contribution so tech signals dominate; fundamentals are a slow-
@@ -252,7 +326,7 @@ def evaluate_pair(pair: str) -> dict | None:
         return None  # нейтрально, не показываем
 
     side = "BUY" if score > 0 else "SELL"
-    p_raw = _score_to_probability(abs(score), 53)
+    p_raw = _score_to_probability(abs(score), 75)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
@@ -274,7 +348,7 @@ def evaluate_pair(pair: str) -> dict | None:
         "probability": round(p, 4),
         "probability_pct": round(p * 100.0, 1),
         "score": score,
-        "max_score": 53,
+        "max_score": 75,
         "recommended_hours": recommended_hours,
         "current_price": ind_15m["close"],
         "indicators": {

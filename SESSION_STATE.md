@@ -111,9 +111,13 @@ auras, glassmorphism, animated gradient borders, pulsing dots, shimmer bars.
 
 ### Strategy Search
 
-**Strategy Search** перебирает **120 вариантов** стратегий × **4 канонические
-сессии** × **28 пар** на **365-дневном** Yahoo 1H бэктесте (минимум 10 сделок
-для статистической значимости). Re-train каждые 5 дней (`LOOP_INTERVAL_SEC = 5 * 24 * 3600`).
+**Strategy Search** перебирает **250 вариантов** стратегий (было 120, расширены
+2026-05-03 для использования новых индикаторов MACD/Stoch/ADX/Williams/Ichimoku)
+× **4 канонические сессии** × **28 пар** на **365-дневном** Yahoo 1H бэктесте
+(минимум 10 сделок для статистической значимости). Re-train каждые 5 дней
+(`LOOP_INTERVAL_SEC = 5 * 24 * 3600`). По каждой (pair, session) ячейке
+сохраняется до 10 top_variants с полной информацией (id, win_rate_pct, trades,
+dominant_side) — это «топливо» ensemble voting в paper_trader.
 
 **Сессии UTC** (не пересекаются):
 - `Asia` — 00:00–06:59
@@ -137,15 +141,21 @@ auras, glassmorphism, animated gradient borders, pulsing dots, shimmer bars.
 сессии): EURUSD, GBPUSD, USDCHF, NZDCAD, CADCHF, CHFJPY, NZDJPY (примерный
 список; сверять с `state/strategy_config.json`).
 
-**Paper-trader gate** (per-session):
+**Paper-trader gate** (per-session, обновлён 2026-05-03):
 1. `forecast.probability_pct ≥ 70` (live signal)
-2. `strategy_config[pair].by_session[current_session].qualifies_70pct == True`
-   (per-session WR ≥70% на 60-дневном бэктесте)
-3. фолбэк на `strategy_config[pair].best_variant` если он сам qualifies (без
-   session-фильтра)
-4. сигнал должен пройти фильтры выбранного варианта (|score|, prob, session)
+2. **Корреляционный фильтр**: НЕ открываем 3+ сделок на одну базовую валюту
+   (например EURUSD + EURGBP + EURJPY уже = 3 на EUR — block). Cap из
+   `config.MAX_SAME_CURRENCY_BLOCK = 2`.
+3. **Ensemble voting** (если `config.ENSEMBLE_ENABLED`): из top_variants той
+   ячейки фильтруем по WR ≥ 65% и trades ≥ 8, затем считаем голоса BUY/SELL.
+   Открываем только при кворуме (≥4/5, 3/3, 2/2). Иначе — STRICT отказ.
+4. Fallback (если ensemble=None / выключен): per-session qualified variant.
+5. Финальный fallback: `strategy_config[pair].best_variant` если он qualifies
+   глобально, иначе baseline-направление с macro-фильтром.
+6. сигнал должен пройти фильтры выбранного варианта (|score|, prob, session,
+   `require_adx_above` для ADX-gated вариантов).
 
-Если ни (2), ни (3) — пара/сессия **frozen**, сделка не открывается.
+Если ни ensemble, ни (2)-(5) — пара/сессия **frozen**, сделка не открывается.
 
 ---
 
