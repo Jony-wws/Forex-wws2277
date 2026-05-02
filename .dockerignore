@@ -8,9 +8,18 @@ __pycache__/
 *.log
 *.tmp
 teamagent/logs/
-teamagent/state/*.json
+# state/*.json are intentionally INCLUDED in the image so the dashboard
+# renders real data immediately on a fresh Fly machine. They are bootstrapped
+# from /app/teamagent/state into config.STATE_DIR (e.g. /data/state) on first
+# boot. Heartbeat / per-agent volatile files we still skip:
+teamagent/state/heartbeat_*.json
+teamagent/state/agent_*.json
+teamagent/state/agents.json
+teamagent/state/recommended_restart.json
+teamagent/state/dukascopy_cache/
 teamagent/state/*.bak
 teamagent/state/.gitkeep.local
+teamagent/state/archive/
 node_modules/
 .venv/
 *.egg-info/

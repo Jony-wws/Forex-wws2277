@@ -9,8 +9,9 @@ from datetime import timedelta
 
 # ───── корневые директории ─────
 ROOT = Path(__file__).resolve().parent
-STATE_DIR = ROOT / "state"
-LOGS_DIR = ROOT / "logs"
+# Allow override via env (Fly.io persistent volume at /data); fallback to ROOT.
+STATE_DIR = Path(os.environ.get("TEAMAGENT_STATE_DIR", ROOT / "state"))
+LOGS_DIR = Path(os.environ.get("TEAMAGENT_LOGS_DIR", ROOT / "logs"))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 

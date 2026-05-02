@@ -15,7 +15,11 @@
 from __future__ import annotations
 import json
 import logging
+import os
+import subprocess
+import sys
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -38,7 +42,140 @@ logging.basicConfig(
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 
-app = FastAPI(title="TeamAgent Dashboard")
+
+def _seed_state_files() -> None:
+    """Cold-boot seed for STATE_DIR so dashboard works before scanner's first sweep.
+
+    Strategy:
+      1. If we're on a fresh persistent volume (TEAMAGENT_STATE_DIR set and
+         empty), copy any shipped state from the repo (/app/teamagent/state)
+         so the dashboard renders real data immediately after deploy.
+      2. Then fill in the minimal placeholder schemas for any file still
+         missing.
+    """
+    import shutil
+
+    # Repo-shipped state (always under <package_dir>/state regardless of override).
+    shipped = Path(__file__).resolve().parent.parent / "state"
+    target = config.STATE_DIR
+
+    if target != shipped and target.exists():
+        try:
+            existing = list(target.glob("*.json"))
+            if not existing and shipped.exists():
+                shipped_files = list(shipped.glob("*.json"))
+                for src in shipped_files:
+                    dst = target / src.name
+                    try:
+                        shutil.copy2(src, dst)
+                    except Exception as e:
+                        log.warning(f"[seed] copy {src.name} failed: {e}")
+                if shipped_files:
+                    log.info(
+                        f"[seed] bootstrapped {len(shipped_files)} state files "
+                        f"from {shipped} → {target}"
+                    )
+        except Exception as e:
+            log.warning(f"[seed] bootstrap probe failed: {e}")
+
+    seeds = {
+        "forecasts.json": {"forecasts": {}, "rankings": [], "scanned_at": None},
+        "market_radar.json": {"pairs": {}, "scanners": [], "as_of": None},
+        "cot.json": {"currencies": {}, "as_of": None},
+        "open_trades.json": {"trades": []},
+        "stakan_open_trades_enriched.json": {"trades": []},
+        "stakan_signals.json": {"signals": [], "as_of": None},
+        "daily_signals.json": {"signals": [], "as_of": None},
+    }
+    for fn, payload in seeds.items():
+        fp = target / fn
+        if not fp.exists():
+            try:
+                fp.write_text(json.dumps(payload, ensure_ascii=False))
+                log.info(f"[seed] {fn}")
+            except Exception as e:
+                log.warning(f"[seed] {fn} failed: {e}")
+
+
+def _spawn_supervisor_processes() -> list[subprocess.Popen]:
+    """Spawn supporting processes alongside the FastAPI dashboard.
+
+    Three modes (selected via env vars):
+
+    * DASHBOARD_ONLY=1       → spawn nothing. Dashboard only. Useful for local
+      dev where you start scanner/paper_trader manually.
+    * FLY_MINIMAL=1          → spawn ONLY core trading loop (forecast_scanner +
+      paper_trader_daily). Lightweight, fits in a free-tier Fly machine. The
+      60+ subprocess agents are skipped — they only run on the Devin VM.
+    * (default, e.g. on a Devin VM) → spawn full orchestrator + watchdog. The
+      orchestrator itself fans out to forecast_scanner, paper_traders, 60
+      agents, etc.
+    """
+    if os.environ.get("DASHBOARD_ONLY") == "1":
+        log.info("DASHBOARD_ONLY=1 — skipping background processes")
+        return []
+    children: list[subprocess.Popen] = []
+    log_dir = config.LOGS_DIR
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Auto-detect Fly.io: presence of /data mount + FLY_APP_NAME env var.
+    on_fly = os.environ.get("FLY_APP_NAME") is not None or Path("/data").is_dir()
+    if on_fly and os.environ.get("FLY_FULL") != "1":
+        # Default Fly machine = 256 MB → cannot fit orchestrator + 60 agents.
+        # Dashboard-only mode reads state files committed by the hourly Devin
+        # schedule (sched-…); for live scanning use a Fly machine with ≥1 GB.
+        log.info("on-fly default-memory mode → dashboard-only (no scanner spawn)")
+        return []
+    if os.environ.get("FLY_MINIMAL") == "1":
+        modules = (
+            "teamagent.forecast_scanner",
+            "teamagent.paper_trader_daily",
+        )
+        log.info(
+            f"FLY_MINIMAL=1 — spawning {len(modules)} core processes only"
+        )
+    else:
+        modules = (
+            "teamagent.orchestrator",
+            "teamagent.watchdog",
+        )
+
+    for mod in modules:
+        try:
+            stem = mod.split(".")[-1]
+            out = open(log_dir / f"{stem}.out", "ab", buffering=0)
+            err = open(log_dir / f"{stem}.err", "ab", buffering=0)
+            p = subprocess.Popen(
+                [sys.executable, "-m", mod],
+                stdout=out,
+                stderr=err,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            )
+            log.info(f"[spawn] {mod} pid={p.pid}")
+            children.append(p)
+        except Exception as e:
+            log.exception(f"[spawn] {mod} failed: {e}")
+    return children
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI lifespan: seed state + spawn orchestrator/watchdog on startup,
+    terminate them on shutdown. Works both in local dev and on Fly.io.
+    """
+    _seed_state_files()
+    children = _spawn_supervisor_processes()
+    try:
+        yield
+    finally:
+        for p in children:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
+
+app = FastAPI(title="TeamAgent Dashboard", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
@@ -79,6 +216,35 @@ def agents_page():
 def history_page():
     """Quick deep-link → /system со скроллом к закрытым сделкам / paper-stats."""
     return RedirectResponse(url="/system#closed-trades-section", status_code=302)
+
+
+@app.get("/api/_debug")
+def api_debug():
+    """Diagnostic endpoint to check container layout / state availability."""
+    import shutil
+    import teamagent
+    pkg = Path(teamagent.__file__).resolve().parent
+    candidates = [
+        Path("/app/teamagent/state"),
+        pkg / "state",
+        Path("/app/state"),
+        config.STATE_DIR,
+    ]
+    info = {
+        "STATE_DIR": str(config.STATE_DIR),
+        "pkg_dir": str(pkg),
+        "cwd": str(Path.cwd()),
+    }
+    for c in candidates:
+        if c.exists():
+            info[str(c)] = {
+                "exists": True,
+                "files": [p.name for p in sorted(c.glob("*.json"))[:10]],
+                "count": len(list(c.glob("*.json"))),
+            }
+        else:
+            info[str(c)] = {"exists": False}
+    return info
 
 
 @app.get("/api/intent-bars/{pair}")

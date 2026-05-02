@@ -3,7 +3,36 @@ name = "fxinvestment"
 version = "0.1.0"
 description = "FX INVESTMENT — TeamAgent FOREX AI dashboard"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "python-dateutil>=2.8",
+    "yfinance>=0.2.40",
+    "requests>=2.31",
+    "feedparser>=6.0",
+    "fastapi[standard]>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "groq>=0.11",
+    "google-generativeai>=0.7",
+    "openai>=1.40",
+    "psutil>=5.9",
+    "filelock>=3.13",
+    "websocket-client>=1.7",
+]
 
 [tool.setuptools]
-packages = ["teamagent"]
+packages = [
+    "teamagent",
+    "teamagent.agents",
+    "teamagent.agents.health",
+    "teamagent.agents.specialists",
+    "teamagent.agents.learners",
+    "teamagent.agents.analyzers",
+    "teamagent.dashboard",
+    "teamagent.data",
+]
+
+[tool.setuptools.package-data]
+"teamagent" = ["state/*.json"]
+"teamagent.dashboard" = ["static/*"]
