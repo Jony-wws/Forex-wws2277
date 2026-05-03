@@ -88,10 +88,12 @@ done
 echo "== 5/5 copy + patch HTML/JS/CSS =="
 cp "$SRC/intent.html"  "$OUT/index.html"
 cp "$SRC/index.html"   "$OUT/system.html"
+cp "$SRC/trades.html"  "$OUT/trades.html"
 cp "$SRC/intent.css"   "$OUT/intent.css"
 cp "$SRC/style.css"    "$OUT/style.css"
 cp "$SRC/intent.js"    "$OUT/intent.js"
 cp "$SRC/app.js"       "$OUT/app.js"
+cp "$SRC/trades.js"    "$OUT/trades.js"
 cp "$SRC/fx-ux.js"     "$OUT/fx-ux.js"
 cp "$SRC/static-shim.js" "$OUT/static-shim.js"
 
@@ -106,18 +108,21 @@ else
     -o "$OUT/lightweight-charts.standalone.production.js"
 fi
 
-# Fix asset paths and tab links in both HTML files.
-for f in "$OUT/index.html" "$OUT/system.html"; do
+# Fix asset paths and tab links in all three HTML files.
+for f in "$OUT/index.html" "$OUT/system.html" "$OUT/trades.html"; do
   sed -i \
     -e 's|"/static/style.css"|"./style.css"|g' \
     -e 's|"/static/intent.css"|"./intent.css"|g' \
     -e 's|"/static/fx-ux.js"|"./fx-ux.js"|g' \
     -e 's|"/static/intent.js"|"./static-shim.js"></script>\n<script src="./intent.js"|g' \
     -e 's|"/static/app.js"|"./static-shim.js"></script>\n<script src="./app.js"|g' \
+    -e 's|"/static/trades.js"|"./trades.js"|g' \
+    -e 's|"/static/static-shim.js"|"./static-shim.js"|g' \
     -e 's|href="/intent"|href="./"|g' \
+    -e 's|href="/trades"|href="./trades.html"|g' \
     -e 's|href="/system"|href="./system.html"|g' \
     -e 's|href="/agents"|href="./system.html#agents-section"|g' \
-    -e 's|href="/history"|href="./system.html#closed-trades-section"|g' \
+    -e 's|href="/history"|href="./trades.html"|g' \
     "$f"
 done
 

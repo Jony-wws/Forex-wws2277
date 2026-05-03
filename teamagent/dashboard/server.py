@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -292,6 +293,32 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TeamAgent Dashboard", lifespan=lifespan)
+
+# CORS — allow the static CDN mirror (and any future custom domain) to proxy
+# every /api/* request through to this live backend. Without this, browsers
+# block cross-origin fetches and the static mirror falls back to its frozen
+# baked JSON, which lies about market-status/forecasts.
+#
+# Allowed origins:
+#   * https://*.devinapps.com  — the static-build deploy host
+#   * https://fxinvestment.fly.dev (and *.fly.dev)  — same-host self-call
+#   * http://localhost:* / http://127.0.0.1:*       — local dev
+# We use allow_origin_regex to cover the wildcard subdomains.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=(
+        r"^https?://"
+        r"(localhost|127\.0\.0\.1)(:\d+)?$"
+        r"|^https://([a-z0-9-]+\.)*devinapps\.com$"
+        r"|^https://([a-z0-9-]+\.)*fly\.dev$"
+    ),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["X-FX-Source"],
+    max_age=600,
+)
+
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
@@ -328,10 +355,20 @@ def agents_page():
     return RedirectResponse(url="/system#agents-section", status_code=302)
 
 
+@app.get("/trades")
+def trades_page():
+    """Единая страница 'Сделки' — все open + closed в одном месте.
+
+    Юзер просил: 'один единственный место где будет собрано все истории сделки
+    и все открытые сделки только одна мест на отдельном разделе'. Это оно.
+    """
+    return FileResponse(str(STATIC / "trades.html"))
+
+
 @app.get("/history")
 def history_page():
-    """Quick deep-link → /system со скроллом к закрытым сделкам / paper-stats."""
-    return RedirectResponse(url="/system#closed-trades-section", status_code=302)
+    """Раньше скроллилось внутрь /system; теперь сразу ведёт на единую /trades."""
+    return RedirectResponse(url="/trades", status_code=302)
 
 
 @app.get("/api/_debug")
