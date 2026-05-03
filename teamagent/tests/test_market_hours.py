@@ -68,6 +68,18 @@ class TestIsMarketOpen:
         # EST: still closed at 21:59 UTC
         assert mh.is_market_open(_t(2026, 12, 13, 21, 59)) is False
 
+    def test_user_complaint_2026_05_03_2120_utc_open(self):
+        # 2026-05-03 21:20 UTC — the exact moment the user reported the bug:
+        # «Система написал что рынок закрыт … но рынок открыт».
+        # Sunday EDT, 17:20 NY-local → must be OPEN.
+        assert mh.is_market_open(_t(2026, 5, 3, 21, 20)) is True
+
+    def test_user_complaint_status_emoji_green(self):
+        st = mh.market_status(_t(2026, 5, 3, 21, 20))
+        assert st["is_open"] is True
+        assert st["status_emoji"] == "🟢"
+        assert st["next_event"] == "close"
+
 
 # ───────── next_close / next_open ─────────
 

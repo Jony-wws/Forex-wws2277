@@ -662,19 +662,66 @@
     else if ((summary.go_caution || 0) > 0) body.classList.add("fx-mood-cau");
     else                                    body.classList.add("fx-mood-wait");
   }
+  function ensureStaleBanner() {
+    let el = document.getElementById("fs-stale-banner");
+    if (el) return el;
+    const host = document.getElementById("final-signals-section") || document.body;
+    el = document.createElement("div");
+    el.id = "fs-stale-banner";
+    el.style.cssText =
+      "display:none;padding:10px 14px;margin:8px 0;border-radius:10px;" +
+      "background:rgba(255,206,94,.12);border:1px solid rgba(255,206,94,.45);" +
+      "color:#ffce5e;font-size:13px;line-height:1.5;";
+    const grid = document.getElementById("fs-grid");
+    if (grid && grid.parentNode) grid.parentNode.insertBefore(el, grid);
+    else host.appendChild(el);
+    return el;
+  }
   async function refreshFinalSignals() {
     const grid = document.getElementById("fs-grid");
     const pill = document.getElementById("fs-summary-pill");
     if (!grid) return;
     try {
-      const r = await fetch("/api/final-signals", { cache: "no-cache" })
-        .then(x => x.ok ? x.json() : Promise.reject(x.status));
+      const resp = await fetch("/api/final-signals", { cache: "no-cache" });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const source = resp.headers.get("X-FX-Source") || "live";
+      const r = await resp.json();
       if (!r || r.error) {
         grid.innerHTML = `<div class="muted">Не удалось получить финальные прогнозы: ${r ? r.error : "?"}</div>`;
         return;
       }
       const sigs = r.signals || [];
       const sum = r.summary || {};
+
+      // Stale-snapshot banner: if the JSON snapshot is older than 10 min OR
+      // says "market closed" while the client clock says "market open", the
+      // user is looking at frozen data — make that obvious so they don't
+      // trade on it.
+      const banner = ensureStaleBanner();
+      const ageSec = r.as_of_utc
+        ? Math.max(0, (Date.now() - new Date(r.as_of_utc).getTime()) / 1000)
+        : Infinity;
+      const cs = (typeof window.FX_clientMarketStatus === "function")
+        ? window.FX_clientMarketStatus() : null;
+      const liveOpen = cs ? cs.is_open : null;
+      const snapMarketOk = r.global_context && r.global_context.market_ok === true;
+      const conflict = liveOpen === true && snapMarketOk === false;
+      const tooOld = ageSec > 10 * 60;
+      if (conflict || tooOld || source === "baked") {
+        banner.style.display = "block";
+        const ageMin = Math.round(ageSec / 60);
+        const reasons = [];
+        if (conflict) reasons.push("по часам устройства рынок ОТКРЫТ, но снапшот говорит «закрыт»");
+        if (tooOld) reasons.push(`снапшот старше ${ageMin} мин`);
+        if (source === "baked" && reasons.length === 0) reasons.push("живой backend недоступен — показывается кэш с момента последнего деплоя");
+        banner.innerHTML =
+          `⚠ <b>Внимание: данные снапшота устарели.</b> ` +
+          reasons.join("; ") + ". " +
+          "Обновляю при следующем тике или после рестарта live backend (Fly.io). " +
+          "Рекомендация: открывай сделки только когда статус сверху «ОТКРЫТ» совпадает с экспертом и снапшот свежий.";
+      } else {
+        banner.style.display = "none";
+      }
 
       if (pill) {
         pill.innerHTML =
@@ -767,29 +814,100 @@
   refreshFinalSignals();
   setInterval(refreshFinalSignals, 15 * 1000);  // every 15s, was 30s
 
-  // ─── Live market-status badge — обновляется каждые 5 сек ───────────────
+  // ─── Live market-status badge — обновляется каждую секунду ─────────────
   // Так пользователь видит «ОТКРЫТ / ЗАКРЫТ / откроется через X» в реальном
-  // времени без перезагрузки страницы. Без этого блока статус read-only из
-  // первого запроса /api/final-signals.global_context и не двигается.
+  // времени без перезагрузки страницы. На статическом миррере /api/market-status
+  // полностью синтезируется static-shim.js на стороне клиента (DST-aware
+  // NY-логика), так что время отсчёта всегда совпадает с реальным —
+  // даже если сам бандл был задеплоен сутки назад.
+  function fmtCountdown(secs) {
+    if (!isFinite(secs) || secs <= 0) return "—";
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (d > 0) return `${d}д ${h}ч ${m}м`;
+    if (h > 0) return `${h}ч ${m}м ${String(s).padStart(2, "0")}с`;
+    if (m > 0) return `${m}м ${String(s).padStart(2, "0")}с`;
+    return `${s}с`;
+  }
+  function ensureMarketBadgeEl() {
+    let badge = document.getElementById("fx-market-badge");
+    if (badge) return badge;
+    const host = document.querySelector(".fs-multi-header") || document.body;
+    badge = document.createElement("div");
+    badge.id = "fx-market-badge";
+    badge.className = "fx-market-badge";
+    badge.style.cssText =
+      "display:inline-flex;align-items:center;gap:8px;padding:6px 12px;" +
+      "border-radius:999px;background:rgba(255,255,255,.06);" +
+      "border:1px solid rgba(255,255,255,.12);font-size:13px;line-height:1;" +
+      "margin-left:auto;white-space:nowrap;";
+    host.appendChild(badge);
+    return badge;
+  }
   async function refreshLiveMarketBadge() {
     const pill = document.getElementById("fs-summary-pill");
-    if (!pill) return;
+    const badge = ensureMarketBadgeEl();
+    let ms;
+    let source = "unknown";
     try {
-      const r = await fetch("/api/market-status", {cache: "no-store"});
-      const ms = await r.json();
-      const cur = pill.dataset.lastIs || "";
-      const now = ms.is_open ? "open" : "closed";
-      // Trigger a celebratory ding when market transitions closed → open.
-      if (cur === "closed" && now === "open" && window.FX_UX && window.FX_UX.sound) {
-        try { window.FX_UX.sound.goDing(); } catch (e) {}
-        // Also force a final-signals refresh so cards switch to GO immediately.
-        refreshFinalSignals();
+      const r = await fetch("/api/market-status", { cache: "no-store" });
+      source = r.headers && r.headers.get("X-FX-Source") || "live";
+      ms = await r.json();
+      // If the response somehow snuck through stale (older than 60s) and we
+      // have a client-side computer available, override with fresh values.
+      const ageSec =
+        ms && ms.as_of_utc
+          ? Math.abs((Date.now() - new Date(ms.as_of_utc).getTime()) / 1000)
+          : Infinity;
+      const stale = ageSec > 60;
+      if (stale && typeof window.FX_clientMarketStatus === "function") {
+        ms = window.FX_clientMarketStatus();
+        source = "client_side_shim";
       }
-      pill.dataset.lastIs = now;
-    } catch (e) {}
+    } catch (e) {
+      // Network failure — synthesize purely from the user's clock.
+      if (typeof window.FX_clientMarketStatus === "function") {
+        ms = window.FX_clientMarketStatus();
+        source = "client_side_shim";
+      } else {
+        return;
+      }
+    }
+    const isOpen = !!ms.is_open;
+    const cur = pill ? pill.dataset.lastIs || "" : "";
+    const now = isOpen ? "open" : "closed";
+    if (cur === "closed" && now === "open" && window.FX_UX && window.FX_UX.sound) {
+      try { window.FX_UX.sound.goDing(); } catch (e) {}
+      refreshFinalSignals();
+    }
+    if (pill) pill.dataset.lastIs = now;
+
+    // Render the live badge.
+    const dotColor = isOpen ? "#4afaa3" : "#ff8090";
+    const eventLabel = ms.next_event_text_ru ||
+      (isOpen ? "закроется через" : "откроется через");
+    const eventSecs = isOpen
+      ? (ms.seconds_until_close || 0)
+      : (ms.seconds_until_open || 0);
+    const sourceTag =
+      source === "live"
+        ? '<span style="opacity:.6;font-size:11px">live</span>'
+        : source === "client_side_shim"
+        ? '<span style="opacity:.6;font-size:11px">по часам устройства</span>'
+        : '<span style="opacity:.6;font-size:11px">кэш</span>';
+    badge.innerHTML =
+      `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;` +
+      `background:${dotColor};box-shadow:0 0 8px ${dotColor}"></span>` +
+      `<b>${ms.status_text || (isOpen ? "ОТКРЫТ" : "ЗАКРЫТ")}</b>` +
+      `<span style="opacity:.7">·</span>` +
+      `<span>${eventLabel} <b>${fmtCountdown(eventSecs)}</b></span>` +
+      `<span style="opacity:.7">·</span>` +
+      sourceTag;
   }
   refreshLiveMarketBadge();
-  setInterval(refreshLiveMarketBadge, 5 * 1000);
+  setInterval(refreshLiveMarketBadge, 1000);
 
   // ─── AI-АНАЛИТИК: развёрнутый комментарий через Pollinations.ai (free) ──
   async function refreshAINarrative() {
