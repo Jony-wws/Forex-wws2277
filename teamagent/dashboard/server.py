@@ -1086,6 +1086,145 @@ def api_final_signal():
         return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
 
 
+@app.get("/api/ai-narrative")
+def api_ai_narrative():
+    """AI-АГЕНТ: развёрнутый прогноз свободным языком на русском.
+
+    Использует БЕСПЛАТНЫЙ публичный endpoint Pollinations.ai (без API-ключа,
+    без учёток, без лимитов на разумных объёмах). Берёт текущее состояние
+    системы (final-signals + agent reports) и просит LLM написать одну-две
+    короткие связные пары абзацев на русском, которые объясняют:
+        — что система предлагает торговать прямо сейчас и почему,
+        — какие риски стоит держать в голове,
+        — что меняется к ближайшей сессии.
+
+    Если Pollinations недоступен — fallback на детерминированную сводку
+    (никаких симуляций, всё из real state).
+
+    Кэшируется в памяти на 5 мин чтобы не спамить free-API.
+    """
+    import urllib.parse
+    import urllib.request
+    cache = getattr(api_ai_narrative, "_cache", None)
+    now_ts = time.time()
+    if cache and now_ts - cache["ts"] < 300:
+        return JSONResponse(cache["data"])
+
+    try:
+        from .. import final_signal as fs
+        from .. import agent_reports as ar
+    except ImportError:
+        from teamagent import final_signal as fs
+        from teamagent import agent_reports as ar
+
+    try:
+        full = fs.build_all()
+    except Exception as e:
+        full = {"error": f"final_signal: {e}"}
+    try:
+        rep = ar.all_reports() or {}
+    except Exception as e:
+        rep = {"error": f"agent_reports: {e}"}
+
+    sum_ = (full.get("summary") or {}) if isinstance(full, dict) else {}
+    sigs = (full.get("signals") or []) if isinstance(full, dict) else []
+    top = sigs[:3]
+
+    fact_lines = []
+    fact_lines.append(
+        f"Сессия сейчас: {full.get('session_now_ru','?')}. "
+        f"GO={sum_.get('go',0)}, GO_CAUTION={sum_.get('go_caution',0)}, "
+        f"WAIT={sum_.get('wait',0)} из {sum_.get('total',28)}. "
+        f"Стратегии готовы для {sum_.get('qualified_cells_for_session',0)}/28 пар."
+    )
+    fact_lines.append(
+        f"Рынок: {(full.get('global_context') or {}).get('market_detail','?')}"
+    )
+    for s in top:
+        fact_lines.append(
+            f"{s.get('pair')} {s.get('side')} prob={s.get('probability_pct',0):.0f}% "
+            f"verdict={s.get('verdict')} blocker={s.get('short_blocker','-')}"
+        )
+    for k in ("technical", "fundamental", "macro", "political", "news"):
+        r = (rep.get("reports") or {}).get(k) or {}
+        if r.get("verdict_ru"):
+            fact_lines.append(f"{k}: {r['verdict_ru']}")
+
+    facts_block = "\n".join(fact_lines)[:3500]
+
+    prompt = (
+        "Ты — старший аналитик торговой системы FX INVESTMENT. Тебе дают набор "
+        "фактов про текущее состояние рынка форекс (28 пар) и просят написать "
+        "короткий связный комментарий на РУССКОМ языке (2 коротких абзаца, "
+        "150–250 слов). \n"
+        "Стиль: уверенный, спокойный, без воды и без выдумок. Никаких новых "
+        "пар или цифр которых нет в фактах. Не говори «по моему мнению», "
+        "говори «система видит»/«стратегия рекомендует».\n"
+        "Формат:\n"
+        "  Абзац 1: Что система предлагает делать прямо сейчас и почему "
+        "(перечисли пары из GO/GO_CAUTION с обоснованием).\n"
+        "  Абзац 2: Какие риски и что меняется к следующей сессии.\n\n"
+        "ФАКТЫ:\n" + facts_block
+    )
+
+    narrative = None
+    source = "pollinations"
+    err = None
+    try:
+        url = "https://text.pollinations.ai/" + urllib.parse.quote(prompt)
+        req = urllib.request.Request(url, headers={"User-Agent": "fx-investment/1.0"})
+        with urllib.request.urlopen(req, timeout=18) as resp:
+            body = resp.read().decode("utf-8", errors="replace").strip()
+            if body and len(body) > 40:
+                narrative = body
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+
+    if not narrative:
+        # Honest deterministic fallback — no fake data, no simulator
+        source = "fallback_deterministic"
+        if sum_.get("go", 0) >= 1:
+            lead = (
+                f"Прямо сейчас система видит {sum_.get('go',0)} парy/пары в "
+                f"состоянии GO и {sum_.get('go_caution',0)} в GO_CAUTION на "
+                f"сессии «{full.get('session_now_ru','?')}». Это значит что "
+                f"для этих пар все 8 проверок зелёные или почти зелёные."
+            )
+        else:
+            lead = (
+                f"Сейчас на сессии «{full.get('session_now_ru','?')}» нет ни "
+                f"одной пары в состоянии GO. Все 28 ждут — главные блокеры: "
+                f"{(full.get('global_context') or {}).get('market_detail','?')}."
+            )
+        risks = []
+        macro_v = (rep.get("reports") or {}).get("macro", {}).get("verdict_ru", "")
+        polit_v = (rep.get("reports") or {}).get("political", {}).get("verdict_ru", "")
+        news_v = (rep.get("reports") or {}).get("news", {}).get("verdict_ru", "")
+        for v in (macro_v, polit_v, news_v):
+            if v and not v.startswith("🟢"):
+                risks.append(v)
+        risk_text = " ".join(risks[:3]) or "Серьёзных макро/политических рисков сейчас нет."
+        narrative = (
+            lead + "\n\n"
+            "Что важно держать в голове: " + risk_text + " "
+            "Стратегии для текущей сессии готовы у "
+            f"{sum_.get('qualified_cells_for_session',0)}/28 пар — это значит "
+            "что система не торгует «вслепую», для каждой одобренной пары есть "
+            "проверенная 30-дневная история. Когда сессия сменится, набор "
+            "доступных пар изменится автоматически."
+        )
+
+    out = {
+        "as_of_utc": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "narrative_ru": narrative,
+        "facts_used": fact_lines,
+        "error": err,
+    }
+    api_ai_narrative._cache = {"ts": now_ts, "data": out}
+    return JSONResponse(out)
+
+
 @app.get("/api/final-signals")
 def api_final_signals():
     """ФИНАЛЬНЫЙ ПРОГНОЗ — ВСЕ 28 ПАР с индивидуальной валидацией.

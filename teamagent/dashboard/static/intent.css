@@ -856,3 +856,83 @@
   .fx-splash-logo, .fs-card-go { animation: none !important; }
   .fx-splash, .fx-splash-inner { animation-duration: .01s !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   PHASE 2 — Dynamic background + value-tween animations
+   ════════════════════════════════════════════════════════════════ */
+
+/* The body has a baseline aurora gradient. When data updates we add a
+   verdict-color class to <body> that tints the auras subtly:
+     .fx-mood-go    → green + cyan dominant
+     .fx-mood-cau   → yellow + violet dominant
+     .fx-mood-wait  → red + pink dominant (calmer)
+   transition is a slow ease so it never jolts.                 */
+body.fx-mood-go .bg-aura.aura-cyan,
+body.fx-mood-go .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(74,250,163,.32) 0%,
+    rgba(0,225,255,.16) 40%,
+    transparent 75%);
+  animation-duration: 26s;
+  transition: background 1.6s ease;
+}
+body.fx-mood-cau .bg-aura.aura-cyan,
+body.fx-mood-cau .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(255,206,94,.30) 0%,
+    rgba(124,92,255,.18) 40%,
+    transparent 75%);
+  animation-duration: 28s;
+  transition: background 1.6s ease;
+}
+body.fx-mood-wait .bg-aura.aura-cyan,
+body.fx-mood-wait .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(255,128,144,.20) 0%,
+    rgba(124,92,255,.10) 40%,
+    transparent 75%);
+  animation-duration: 36s;
+  transition: background 1.6s ease;
+}
+
+/* Slow drift animation on aura blobs */
+.bg-aura {
+  animation: bg-drift 30s ease-in-out infinite alternate;
+}
+@keyframes bg-drift {
+  0%   { transform: translate(0,0)        scale(1); }
+  50%  { transform: translate(-3vw,-2vh)  scale(1.06); }
+  100% { transform: translate(2vw, 3vh)   scale(.97); }
+}
+
+/* Update flash — the .fs-card-prob and other live numbers wear this when
+   their value changes between refreshes. */
+.fs-card-prob.fx-flash-up,
+.fs-card-prob.fx-flash-dn {
+  border-radius: 6px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+
+/* Tween smoothly between values on numeric elements (CSS handles fades; JS
+   handles the actual text replacement). */
+.fs-card-prob,
+.fx-tweenable {
+  transition: color .35s ease-out;
+}
+
+/* Subtle "live data" pulse on the sub-summary pill */
+@keyframes fs-summary-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(124,92,255,.10); }
+}
+.fs-summary-pill { animation: fs-summary-breathe 4s ease-in-out infinite; }
+
+/* On phones reduce the drift animation distance to avoid jank */
+@media (max-width: 480px) {
+  @keyframes bg-drift {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50%      { transform: translate(-2vw,-1vh) scale(1.03); }
+  }
+  .fs-grid { grid-template-columns: 1fr; }
+}

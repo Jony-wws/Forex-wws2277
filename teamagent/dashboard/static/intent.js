@@ -653,6 +653,15 @@
 
   // ─── МУЛЬТИ-СИГНАЛЫ: 28 финальных прогнозов (индивидуальный подход) ──
   let _lastVerdicts = {};   // pair -> verdict — для WAIT->GO dingа
+  let _lastProbs = {};      // pair -> probability — для flash-эффекта
+  function _applyMood(summary) {
+    const body = document.body;
+    body.classList.remove("fx-mood-go", "fx-mood-cau", "fx-mood-wait");
+    if (!summary) return;
+    if ((summary.go || 0) > 0)              body.classList.add("fx-mood-go");
+    else if ((summary.go_caution || 0) > 0) body.classList.add("fx-mood-cau");
+    else                                    body.classList.add("fx-mood-wait");
+  }
   async function refreshFinalSignals() {
     const grid = document.getElementById("fs-grid");
     const pill = document.getElementById("fs-summary-pill");
@@ -687,9 +696,29 @@
         window.FX_UX.sound.goDing();
       }
 
+      // Apply background mood class based on aggregate verdict
+      _applyMood(sum);
+
+      // Render cards
       grid.innerHTML = sigs.map(s => renderFinalCard(s)).join("");
-      // wire expand-on-click
+
+      // Flash probability values that changed since last refresh
+      const ux = window.FX_UX;
       grid.querySelectorAll(".fs-card").forEach(card => {
+        const pair = card.getAttribute("data-pair");
+        const probEl = card.querySelector(".fs-card-prob");
+        if (!pair || !probEl) return;
+        const prev = _lastProbs[pair];
+        const curStr = probEl.textContent.trim();
+        const cur = parseFloat(curStr) || 0;
+        if (prev != null && prev !== cur) {
+          probEl.classList.remove("fx-flash-up", "fx-flash-dn");
+          void probEl.offsetWidth;
+          probEl.classList.add(cur > prev ? "fx-flash-up" : "fx-flash-dn");
+          setTimeout(() => probEl.classList.remove("fx-flash-up", "fx-flash-dn"), 900);
+        }
+        _lastProbs[pair] = cur;
+        // wire expand-on-click for this card
         card.addEventListener("click", e => {
           if (e.target.closest("[data-explain]")) return;
           card.classList.toggle("is-expanded");
@@ -737,4 +766,29 @@
   }
   refreshFinalSignals();
   setInterval(refreshFinalSignals, 30 * 1000);
+
+  // ─── AI-АНАЛИТИК: развёрнутый комментарий через Pollinations.ai (free) ──
+  async function refreshAINarrative() {
+    const el = document.getElementById("ai-narrative-text");
+    const src = document.getElementById("ai-narrative-source");
+    if (!el) return;
+    try {
+      const r = await fetch("/api/ai-narrative", {cache: "no-store"});
+      const j = await r.json();
+      if (src) {
+        if (j.source === "pollinations") src.textContent = "🤖 Pollinations.ai · LLM";
+        else                              src.textContent = "📋 детерминированный fallback";
+      }
+      if (j.narrative_ru) {
+        el.textContent = j.narrative_ru;
+        el.classList.remove("muted");
+      } else {
+        el.innerHTML = `<span class="muted">Источник недоступен: ${j.error || "—"}</span>`;
+      }
+    } catch (e) {
+      el.innerHTML = `<span class="muted">AI-аналитик: ${e}</span>`;
+    }
+  }
+  refreshAINarrative();
+  setInterval(refreshAINarrative, 5 * 60 * 1000);  // matches server cache
 })();
