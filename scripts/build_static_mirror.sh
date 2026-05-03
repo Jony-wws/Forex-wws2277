@@ -58,8 +58,13 @@ echo "== 4/5 bake /api/* responses =="
 for ep in forecasts market-radar cot open-trades closed-trades stats agents backtest health \
           strategy-config market-status system-audit system-health meta-strategy stability \
           fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
-          risk-metrics calibration; do
-  curl -sf --max-time 12 "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
+          risk-metrics calibration agent-reports coverage-matrix; do
+  # /api/agent-reports does live RSS fetches — give it more time.
+  case "$ep" in
+    agent-reports) timeout=45 ;;
+    *)             timeout=12 ;;
+  esac
+  curl -sf --max-time "$timeout" "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
 done
 for ep in stakan/open-trades stakan/signals stakan/stats stakan/closed-trades \
           daily/signals daily/stats daily/open-trades \

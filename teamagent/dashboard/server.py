@@ -1012,6 +1012,51 @@ def api_system_audit():
         )
 
 
+@app.get("/api/agent-reports")
+def api_agent_reports():
+    """5 narrative-отчётов в одном вызове, ВСЁ НА РУССКОМ:
+
+    1. ``technical``   — что говорят 28 пар на текущих индикаторах
+    2. ``fundamental`` — ставки / доходности / инфляция (FRED)
+    3. ``news``        — high-impact события (ForexFactory RSS)
+    4. ``macro``       — DXY / US10Y / нефть / золото (Yahoo)
+    5. ``political``   — гео-политические триггеры (Reuters/BBC RSS)
+
+    Каждый отчёт честно говорит "источник недоступен" если RSS / API упал —
+    никаких выдумок. Все источники открытые, без API-ключей.
+    """
+    try:
+        from .. import agent_reports as ar
+    except ImportError:
+        from teamagent import agent_reports as ar
+    try:
+        return JSONResponse(ar.all_reports())
+    except Exception as e:
+        log.exception(f"api_agent_reports failed: {e}")
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
+@app.get("/api/coverage-matrix")
+def api_coverage_matrix():
+    """28 пар × 4 сессии = 112 ячеек. Цвет каждой:
+    🟢 QUALIFIED (≥70% WR), 🟡 PROBABLE (60-70%), 🔴 FROZEN (<60%), ⚫ MISSING.
+
+    Источник: ``state/meta_strategy.json`` который пишется
+    ``strategy_meta_agent`` (sweep по 28 × 4 × 250 вариантам каждые 5 часов).
+    Это даёт пользователю наглядную картину "где ИНДИВИДУАЛЬНЫЙ подход
+    к (паре, сессии) уже работает, а где надо ещё дотянуть".
+    """
+    try:
+        from .. import agent_reports as ar
+    except ImportError:
+        from teamagent import agent_reports as ar
+    try:
+        return JSONResponse(ar.coverage_matrix())
+    except Exception as e:
+        log.exception(f"api_coverage_matrix failed: {e}")
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
 @app.get("/api/system-health")
 def api_system_health():
     """Две сводки в одном вызове — то что user-у нужно для понимания

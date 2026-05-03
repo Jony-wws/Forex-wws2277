@@ -98,6 +98,55 @@
     <div id="audit-verdict" class="audit-verdict muted small"></div>
   </section>
 
+  <!-- ═══ 5 АГЕНТОВ-АНАЛИТИКОВ (часовой отчёт, всё на русском) ═══ -->
+  <section id="agent-reports-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span class="ms-emoji">🧭</span>
+      ОТЧЁТЫ 5 АГЕНТОВ-АНАЛИТИКОВ
+      <span class="live-pulse" title="часовое обновление, кэш 5 мин"></span>
+      <span id="ar-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      <b>5 независимых каналов</b>: технический · фундаментальный · новости ·
+      макро · политический. Каждый читает <b>реальные открытые источники</b>
+      (Yahoo · FRED · ForexFactory · Reuters · BBC) и пишет вердикт на русском.
+      Если источник упал — отчёт честно говорит "недоступен", не выдумывает
+      данные. Все 5 в <code>/api/agent-reports</code> — единый источник правды.
+    </div>
+    <div id="agent-reports-grid" class="ar-grid">
+      <div class="muted">Запрашиваю отчёты у агентов…</div>
+    </div>
+  </section>
+
+  <!-- ═══ COVERAGE MATRIX 28 × 4 ═══ -->
+  <section id="coverage-matrix-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span class="ms-emoji">🗺️</span>
+      ПОКРЫТИЕ СТРАТЕГИЯМИ 28 × 4
+      <span class="live-pulse" title="индивидуальный подход к каждой (паре, сессии)"></span>
+      <span id="cov-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      28 валютных пар × 4 сессии = <b>112 ячеек</b>. Каждая ячейка — отдельная
+      стратегия, найденная sweep-ом из 250 вариантов на реальных Yahoo-свечах.
+      <span class="cov-leg cov-leg-q">🟢 ≥70% WR</span>
+      <span class="cov-leg cov-leg-p">🟡 60-70%</span>
+      <span class="cov-leg cov-leg-f">🔴 <60%</span>
+      <span class="cov-leg cov-leg-m">⚫ нет данных</span>
+      Источник: <code>state/meta_strategy.json</code> (strategy_meta_agent
+      обновляет каждые 5ч).
+    </div>
+    <div class="cov-table-wrapper">
+      <table id="coverage-matrix-table">
+        <thead><tr>
+          <th>Пара</th><th>Asia</th><th>London</th><th>Overlap</th><th>NY</th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="muted">Загружаю матрицу…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="cov-summary" class="muted small"></div>
+  </section>
+
   <section id="forecast-stability-section" class="card glass premium-card stability-hero">
     <h2 class="hero-title">
       <span class="icon-shield">🔮</span>

@@ -942,6 +942,118 @@ function tick() {
   refreshStabilityForecast();
   refreshAudit();
   refreshMetaStrategy();
+  refreshAgentReports();
+  refreshCoverageMatrix();
+}
+
+// ───── 5 AGENTS' NARRATIVE REPORTS (Russian) ─────
+async function refreshAgentReports() {
+  const grid = document.getElementById("agent-reports-grid");
+  if (!grid) return;
+  try {
+    const r = await api("/api/agent-reports");
+    if (!r || !r.reports) {
+      grid.innerHTML = `<div class="muted">Нет данных от агентов.</div>`;
+      return;
+    }
+    const order = [
+      ["technical",   "📊"],
+      ["fundamental", "🏦"],
+      ["news",        "📰"],
+      ["macro",       "🌍"],
+      ["political",   "🏛️"],
+    ];
+    const html = order.map(([k, icon]) => {
+      const rep = r.reports[k];
+      if (!rep) return "";
+      const verdict = rep.verdict_ru || "—";
+      const verClass =
+        verdict.startsWith("🟢") ? "ar-green" :
+        verdict.startsWith("🟡") ? "ar-yellow" :
+        verdict.startsWith("🟠") ? "ar-orange" :
+        verdict.startsWith("🔴") ? "ar-red" : "";
+      const hl = (rep.highlights_ru || []).slice(0, 6).map(
+        h => `<li>${h.replace(/^•\s*/, "")}</li>`
+      ).join("");
+      const errs = (rep.errors || []).slice(0, 2).map(
+        e => `<div class="ar-err">⚠️ ${e}</div>`
+      ).join("");
+      const age = rep.as_of_utc
+        ? `обновлено ${_humanAgo(rep.as_of_utc)}` : "";
+      return `<div class="ar-card ${verClass}">
+        <div class="ar-head">
+          <span class="ar-icon">${icon}</span>
+          <span class="ar-title">${rep.title_ru || k}</span>
+        </div>
+        <div class="ar-verdict">${verdict}</div>
+        <ul class="ar-points">${hl || "<li class='muted'>(данных нет)</li>"}</ul>
+        ${errs}
+        <div class="ar-source muted small">
+          <b>Источник:</b> ${rep.source || "—"} <span class="ar-age">${age}</span>
+        </div>
+      </div>`;
+    }).join("");
+    grid.innerHTML = html;
+    const sumBadge = document.getElementById("ar-overall-badge");
+    if (sumBadge && r.summary) {
+      sumBadge.textContent = r.summary.verdict_ru || "—";
+      sumBadge.className = "badge-stable";
+    }
+  } catch (e) {
+    console.error("agent-reports:", e);
+    grid.innerHTML = `<div class="muted">Не удалось загрузить отчёты: ${e}</div>`;
+  }
+}
+
+function _humanAgo(iso) {
+  try {
+    const d = new Date(iso);
+    const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+    if (sec < 90) return `${sec}с назад`;
+    const min = Math.floor(sec / 60);
+    if (min < 90) return `${min}м назад`;
+    const h = Math.floor(min / 60);
+    return `${h}ч ${min % 60}м назад`;
+  } catch (_) { return iso; }
+}
+
+// ───── COVERAGE MATRIX 28×4 ─────
+async function refreshCoverageMatrix() {
+  const tbody = document.querySelector("#coverage-matrix-table tbody");
+  const summaryEl = document.getElementById("cov-summary");
+  const badge = document.getElementById("cov-overall-badge");
+  if (!tbody) return;
+  try {
+    const r = await api("/api/coverage-matrix");
+    if (!r || !r.matrix) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">Матрица недоступна.</td></tr>`;
+      return;
+    }
+    const rows = r.matrix.map(row => {
+      const cells = ["Asia", "London", "Overlap", "NY"].map(s => {
+        const c = row.cells[s];
+        if (!c || c.color === "gray")
+          return `<td class="cov-cell cov-gray" title="нет данных">⚫</td>`;
+        const wr = c.win_rate_pct != null ? c.win_rate_pct.toFixed(0) + "%" : "—";
+        const wlo = c.wilson_lower_pct != null ? c.wilson_lower_pct.toFixed(0) + "%" : "—";
+        const n = c.trades || 0;
+        const cls = "cov-cell cov-" + (c.color || "gray");
+        const tip = `${s}: ${c.status || ""}  WR=${wr}  Wilson↓=${wlo}  n=${n}  variant=${c.variant || "—"}`;
+        return `<td class="${cls}" title="${tip}">${wr}<small>(${n})</small></td>`;
+      }).join("");
+      return `<tr><td class="cov-pair"><b>${row.pair}</b></td>${cells}</tr>`;
+    }).join("");
+    tbody.innerHTML = rows || `<tr><td colspan="5" class="muted">Пусто.</td></tr>`;
+    if (summaryEl && r.summary) {
+      summaryEl.textContent = r.summary.verdict_ru || "";
+    }
+    if (badge && r.summary) {
+      badge.textContent = `🟢 ${r.summary.qualified}  🟡 ${r.summary.probable}  🔴 ${r.summary.frozen}`;
+    }
+  } catch (e) {
+    console.error("coverage-matrix:", e);
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Ошибка: ${e}</td></tr>`;
+  }
 }
 
 // ───── MASTER STRATEGY AGENT (5h cycle) ─────
