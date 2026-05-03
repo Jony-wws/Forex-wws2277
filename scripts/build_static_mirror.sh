@@ -58,11 +58,11 @@ echo "== 4/5 bake /api/* responses =="
 for ep in forecasts market-radar cot open-trades closed-trades stats agents backtest health \
           strategy-config market-status system-audit system-health meta-strategy stability \
           fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
-          risk-metrics calibration agent-reports coverage-matrix final-signal final-signals; do
+          risk-metrics calibration agent-reports coverage-matrix final-signal final-signals ai-narrative; do
   # /api/agent-reports does live RSS fetches — give it more time.
   # /api/final-signal in turn calls all_reports() so it also needs a long timeout.
   case "$ep" in
-    agent-reports|final-signal|final-signals) timeout=45 ;;
+    agent-reports|final-signal|final-signals|ai-narrative) timeout=45 ;;
     *)                          timeout=12 ;;
   esac
   curl -sf --max-time "$timeout" "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
