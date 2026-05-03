@@ -102,10 +102,17 @@ _DASHBOARD_ONLY = (
     or bool(_os.environ.get("FLY_MACHINE_ID"))
 )
 if _DASHBOARD_ONLY:
+    # forecasts.json — обновляется встроенным _fly_state_refresher() раз в 10
+    # минут на Fly, плюс часовым Devin-расписанием. Поэтому 90 мин / 4 часа.
+    # paper_stats / stakan_stats — обновляются только paper_trader-ом, который
+    # на Fly не запущен (256 МБ не хватит). Свежесть зависит от того, как часто
+    # Devin Schedule (sched-083b11171a0841668f4608b075d769b5) успешно запускал
+    # full start_all.sh. Tolerated окно = 12ч yellow / 36ч red — после этого
+    # реально нужно расследовать что Devin расписание не работает.
     _FRESHNESS_THRESHOLDS_SEC: dict[str, tuple[int, int]] = {
-        "forecasts.json":   (90 * 60,  4 * 60 * 60),
-        "paper_stats.json": (120 * 60, 6 * 60 * 60),
-        "stakan_stats.json":(120 * 60, 6 * 60 * 60),
+        "forecasts.json":   (90 * 60,   4 * 60 * 60),
+        "paper_stats.json": (12 * 3600, 36 * 3600),
+        "stakan_stats.json":(12 * 3600, 36 * 3600),
     }
 else:
     _FRESHNESS_THRESHOLDS_SEC: dict[str, tuple[int, int]] = {
