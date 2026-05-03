@@ -88,6 +88,17 @@ cp "$SRC/intent.js"    "$OUT/intent.js"
 cp "$SRC/app.js"       "$OUT/app.js"
 cp "$SRC/static-shim.js" "$OUT/static-shim.js"
 
+# Inline lightweight-charts so the static deploy has zero external CDN deps.
+# When unpkg.com is slow / cache-validating / blocked by ISP, the page used
+# to hang on second visit waiting for the chart library.
+if [ -f "$SRC/lightweight-charts.standalone.production.js" ]; then
+  cp "$SRC/lightweight-charts.standalone.production.js" "$OUT/lightweight-charts.standalone.production.js"
+else
+  curl -sSL --max-time 30 \
+    "https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" \
+    -o "$OUT/lightweight-charts.standalone.production.js"
+fi
+
 # Fix asset paths and tab links in both HTML files.
 for f in "$OUT/index.html" "$OUT/system.html"; do
   sed -i \
