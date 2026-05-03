@@ -510,3 +510,429 @@
   .fx-strength { grid-template-columns: repeat(4, 1fr); }
   .fx-clock, .fx-link { display: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   FX-UX layer: welcome splash, sound toggle, tooltips, value flash,
+   final-signals grid (28 cards). Added 2026-05-04.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Welcome splash overlay ── */
+.fx-splash {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at 50% 35%,
+    rgba(124,92,255,.30) 0%,
+    rgba(0,225,255,.18) 35%,
+    rgba(4,6,13,.97) 75%);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  animation: fx-splash-in .55s ease-out;
+}
+@keyframes fx-splash-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fx-splash-fade { animation: fx-splash-out .55s ease-in forwards; }
+@keyframes fx-splash-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.04); }
+}
+.fx-splash-inner {
+  text-align: center;
+  padding: 30px;
+  animation: fx-splash-pop 1.2s cubic-bezier(.2,.9,.3,1) both;
+}
+@keyframes fx-splash-pop {
+  from { transform: translateY(20px) scale(.92); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);   opacity: 1; }
+}
+.fx-splash-logo {
+  width: 110px; height: 110px;
+  margin: 0 auto 22px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #00e1ff 0%, #7c5cff 100%);
+  color: #04060d;
+  font: 800 46px system-ui, sans-serif;
+  border-radius: 26px;
+  letter-spacing: 1px;
+  box-shadow:
+    0 0 70px rgba(0,225,255,.45),
+    0 0 110px rgba(124,92,255,.35);
+  animation: fx-logo-pulse 2.4s ease-in-out infinite;
+}
+@keyframes fx-logo-pulse {
+  0%,100% { transform: scale(1);    box-shadow: 0 0 70px rgba(0,225,255,.45), 0 0 110px rgba(124,92,255,.35); }
+  50%     { transform: scale(1.05); box-shadow: 0 0 90px rgba(0,225,255,.6),  0 0 140px rgba(124,92,255,.5); }
+}
+.fx-splash-title {
+  font: 800 26px system-ui, sans-serif;
+  letter-spacing: 4px;
+  background: linear-gradient(90deg,#00e1ff 0%,#7c5cff 50%,#ff6ad5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 8px;
+}
+.fx-splash-greet {
+  color: rgba(255,255,255,.78);
+  font-size: 15px;
+  margin-top: 6px;
+  max-width: 340px;
+  line-height: 1.4;
+  margin-left: auto; margin-right: auto;
+}
+.fx-splash-sound-prompt {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.fx-splash-btn {
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+  padding: 12px 22px;
+  font: 600 14px system-ui, sans-serif;
+  cursor: pointer;
+  min-width: 220px;
+  transition: all .15s;
+}
+.fx-splash-btn:active { transform: scale(.97); }
+.fx-splash-btn-yes {
+  background: linear-gradient(135deg,#00e1ff 0%,#7c5cff 100%);
+  color: #04060d;
+  border-color: transparent;
+  font-weight: 800;
+  box-shadow: 0 4px 18px rgba(0,225,255,.3);
+}
+.fx-splash-btn-no {
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.65);
+  border-color: rgba(255,255,255,.10);
+}
+/* quick variant for repeat visits — minimal text shown briefly */
+.fx-splash-quick .fx-splash-inner { animation-duration: .4s; }
+.fx-splash-quick .fx-splash-logo  { animation-duration: 1s; }
+
+/* ── Sound toggle button ── */
+.fx-sound-toggle {
+  position: fixed;
+  top: 12px; right: 12px;
+  z-index: 9000;
+  width: 38px; height: 38px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(8,12,22,.6);
+  backdrop-filter: blur(8px);
+  color: #e3e7ff;
+  font-size: 17px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.fx-sound-toggle:hover { background: rgba(124,92,255,.20); border-color: rgba(124,92,255,.4); }
+.fx-sound-toggle.fx-sound-on { box-shadow: 0 0 0 2px rgba(0,225,255,.18); }
+.fx-sound-toggle:active { transform: scale(.92); }
+
+/* ── Click-tooltip bubble ── */
+.fx-tip-bubble {
+  position: absolute;
+  z-index: 9500;
+  background: rgba(8,12,22,.96);
+  color: #e3e7ff;
+  border: 1px solid rgba(124,92,255,.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 12px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(0,225,255,.08);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: fx-tip-pop .2s ease-out;
+}
+@keyframes fx-tip-pop {
+  from { opacity: 0; transform: translateY(6px) scale(.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ── data-explain hint cursor ── */
+[data-explain] {
+  cursor: help;
+  text-decoration: underline dotted rgba(255,255,255,.25);
+  text-underline-offset: 3px;
+}
+[data-explain]:hover {
+  text-decoration-color: rgba(124,92,255,.7);
+  color: #e3e7ff;
+}
+
+/* ── Value flash on update ── */
+.fx-flash-up {
+  background: rgba(32,227,165,.22) !important;
+  transition: background .9s ease-out, color .25s ease-out;
+}
+.fx-flash-dn {
+  background: rgba(255,85,119,.22) !important;
+  transition: background .9s ease-out, color .25s ease-out;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FINAL SIGNALS GRID — 28 пар, по одному «финальному прогнозу»
+   на каждую. Используется в /intent (вверху) и /system.
+   ════════════════════════════════════════════════════════════════ */
+.fs-multi-section {
+  margin: 18px 14px 22px;
+}
+.fs-multi-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.fs-multi-header h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: .8px;
+  flex: 1;
+}
+.fs-summary-pill {
+  font: 600 11px system-ui, sans-serif;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  color: rgba(255,255,255,.85);
+  letter-spacing: .4px;
+}
+.fs-summary-pill .fs-pill-go     { color: #4afaa3; font-weight: 800; }
+.fs-summary-pill .fs-pill-cau    { color: #ffce5e; font-weight: 800; }
+.fs-summary-pill .fs-pill-wait   { color: #ff8090; font-weight: 800; }
+
+.fs-multi-help {
+  font-size: 12px;
+  color: rgba(255,255,255,.55);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  background: rgba(255,255,255,.02);
+  border-left: 2px solid rgba(124,92,255,.5);
+  padding: 9px 12px;
+  border-radius: 0 10px 10px 0;
+}
+
+.fs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.fs-card {
+  border: 1px solid rgba(255,255,255,.10);
+  background: linear-gradient(135deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all .18s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+.fs-card:hover {
+  border-color: rgba(124,92,255,.4);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.25);
+}
+.fs-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, transparent 60%, rgba(0,0,0,.0) 100%);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.fs-card.fs-card-go {
+  border-color: rgba(74,250,163,.55);
+  background: linear-gradient(135deg,rgba(74,250,163,.10),rgba(74,250,163,.02));
+  box-shadow: 0 0 0 1px rgba(74,250,163,.18), 0 0 18px rgba(74,250,163,.13);
+  animation: fs-glow-go 2.5s ease-in-out infinite;
+}
+@keyframes fs-glow-go {
+  0%,100% { box-shadow: 0 0 0 1px rgba(74,250,163,.18), 0 0 18px rgba(74,250,163,.13); }
+  50%     { box-shadow: 0 0 0 1px rgba(74,250,163,.34), 0 0 28px rgba(74,250,163,.25); }
+}
+.fs-card.fs-card-cau {
+  border-color: rgba(255,206,94,.45);
+  background: linear-gradient(135deg,rgba(255,206,94,.08),rgba(255,206,94,.02));
+}
+.fs-card.fs-card-wait {
+  border-color: rgba(255,128,144,.30);
+  background: linear-gradient(135deg,rgba(255,128,144,.05),rgba(255,128,144,.01));
+  opacity: .92;
+}
+.fs-card-row1 {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-bottom: 4px;
+}
+.fs-card-pair { font: 800 16px/1 system-ui, sans-serif; letter-spacing: .5px; }
+.fs-card-side {
+  font: 700 11px/1 system-ui, sans-serif;
+  letter-spacing: .8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.fs-card-side-buy  { color: #4afaa3; }
+.fs-card-side-sell { color: #ff8090; }
+.fs-card-row2 {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+}
+.fs-card-prob {
+  font: 700 19px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.fs-card-prob.go    { color: #4afaa3; }
+.fs-card-prob.cau   { color: #ffce5e; }
+.fs-card-prob.wait  { color: rgba(255,255,255,.55); }
+.fs-card-expiry {
+  font: 600 11px/1 system-ui, sans-serif;
+  color: rgba(255,255,255,.50);
+}
+.fs-card-verdict {
+  font: 600 11.5px/1.4 system-ui, sans-serif;
+  color: rgba(255,255,255,.78);
+  margin: 4px 0 6px;
+}
+.fs-card-blocker {
+  font: 600 11px/1.4 system-ui, sans-serif;
+  color: #ff8090;
+  margin: 2px 0 6px;
+  display: flex; gap: 4px; align-items: baseline;
+}
+.fs-card-checks {
+  font-size: 10px;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .4px;
+  display: flex; gap: 6px; align-items: baseline;
+}
+.fs-card-tap {
+  font-size: 10px;
+  color: rgba(124,92,255,.7);
+  margin-top: 4px;
+  letter-spacing: .4px;
+}
+/* expanded section inside card after tap */
+.fs-card-expanded {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255,255,255,.08);
+  display: none;
+}
+.fs-card.is-expanded .fs-card-expanded { display: block; }
+.fs-card.is-expanded .fs-card-tap { display: none; }
+.fs-card-expanded ul {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; gap: 4px;
+}
+.fs-card-expanded li {
+  font-size: 11.5px;
+  line-height: 1.4;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.02);
+}
+.fs-card-expanded li.fs-green { background: rgba(74,250,163,.06); }
+.fs-card-expanded li.fs-red   { background: rgba(255,85,119,.06); }
+.fs-card-expanded li.fs-yellow{ background: rgba(255,206,94,.06); }
+.fs-card-expanded li > .fs-cli-name { font-weight: 600; color: rgba(255,255,255,.86); }
+.fs-card-expanded li > .fs-cli-detail { font-size: 11px; color: rgba(255,255,255,.55); grid-column: 2; }
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .fx-splash-logo, .fs-card-go { animation: none !important; }
+  .fx-splash, .fx-splash-inner { animation-duration: .01s !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PHASE 2 — Dynamic background + value-tween animations
+   ════════════════════════════════════════════════════════════════ */
+
+/* The body has a baseline aurora gradient. When data updates we add a
+   verdict-color class to <body> that tints the auras subtly:
+     .fx-mood-go    → green + cyan dominant
+     .fx-mood-cau   → yellow + violet dominant
+     .fx-mood-wait  → red + pink dominant (calmer)
+   transition is a slow ease so it never jolts.                 */
+body.fx-mood-go .bg-aura.aura-cyan,
+body.fx-mood-go .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(74,250,163,.32) 0%,
+    rgba(0,225,255,.16) 40%,
+    transparent 75%);
+  animation-duration: 26s;
+  transition: background 1.6s ease;
+}
+body.fx-mood-cau .bg-aura.aura-cyan,
+body.fx-mood-cau .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(255,206,94,.30) 0%,
+    rgba(124,92,255,.18) 40%,
+    transparent 75%);
+  animation-duration: 28s;
+  transition: background 1.6s ease;
+}
+body.fx-mood-wait .bg-aura.aura-cyan,
+body.fx-mood-wait .bg-aura.aura-violet {
+  background: radial-gradient(circle at center,
+    rgba(255,128,144,.20) 0%,
+    rgba(124,92,255,.10) 40%,
+    transparent 75%);
+  animation-duration: 36s;
+  transition: background 1.6s ease;
+}
+
+/* Slow drift animation on aura blobs */
+.bg-aura {
+  animation: bg-drift 30s ease-in-out infinite alternate;
+}
+@keyframes bg-drift {
+  0%   { transform: translate(0,0)        scale(1); }
+  50%  { transform: translate(-3vw,-2vh)  scale(1.06); }
+  100% { transform: translate(2vw, 3vh)   scale(.97); }
+}
+
+/* Update flash — the .fs-card-prob and other live numbers wear this when
+   their value changes between refreshes. */
+.fs-card-prob.fx-flash-up,
+.fs-card-prob.fx-flash-dn {
+  border-radius: 6px;
+  padding: 1px 4px;
+  margin-left: -4px;
+}
+
+/* Tween smoothly between values on numeric elements (CSS handles fades; JS
+   handles the actual text replacement). */
+.fs-card-prob,
+.fx-tweenable {
+  transition: color .35s ease-out;
+}
+
+/* Subtle "live data" pulse on the sub-summary pill */
+@keyframes fs-summary-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(124,92,255,.10); }
+}
+.fs-summary-pill { animation: fs-summary-breathe 4s ease-in-out infinite; }
+
+/* On phones reduce the drift animation distance to avoid jank */
+@media (max-width: 480px) {
+  @keyframes bg-drift {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50%      { transform: translate(-2vw,-1vh) scale(1.03); }
+  }
+  .fs-grid { grid-template-columns: 1fr; }
+}

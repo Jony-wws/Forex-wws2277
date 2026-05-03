@@ -56,10 +56,16 @@ echo "== 4/5 bake /api/* responses =="
 # `SyntaxError: Unexpected token '<'` because the SPA fallback returns
 # index.html for the missing JSON path.
 for ep in forecasts market-radar cot open-trades closed-trades stats agents backtest health \
-          strategy-config market-status system-audit meta-strategy stability \
+          strategy-config market-status system-audit system-health meta-strategy stability \
           fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
-          risk-metrics calibration; do
-  curl -sf --max-time 12 "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
+          risk-metrics calibration agent-reports coverage-matrix final-signal final-signals ai-narrative; do
+  # /api/agent-reports does live RSS fetches — give it more time.
+  # /api/final-signal in turn calls all_reports() so it also needs a long timeout.
+  case "$ep" in
+    agent-reports|final-signal|final-signals|ai-narrative) timeout=45 ;;
+    *)                          timeout=12 ;;
+  esac
+  curl -sf --max-time "$timeout" "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
 done
 for ep in stakan/open-trades stakan/signals stakan/stats stakan/closed-trades \
           daily/signals daily/stats daily/open-trades \
@@ -86,6 +92,7 @@ cp "$SRC/intent.css"   "$OUT/intent.css"
 cp "$SRC/style.css"    "$OUT/style.css"
 cp "$SRC/intent.js"    "$OUT/intent.js"
 cp "$SRC/app.js"       "$OUT/app.js"
+cp "$SRC/fx-ux.js"     "$OUT/fx-ux.js"
 cp "$SRC/static-shim.js" "$OUT/static-shim.js"
 
 # Inline lightweight-charts so the static deploy has zero external CDN deps.
@@ -104,6 +111,7 @@ for f in "$OUT/index.html" "$OUT/system.html"; do
   sed -i \
     -e 's|"/static/style.css"|"./style.css"|g' \
     -e 's|"/static/intent.css"|"./intent.css"|g' \
+    -e 's|"/static/fx-ux.js"|"./fx-ux.js"|g' \
     -e 's|"/static/intent.js"|"./static-shim.js"></script>\n<script src="./intent.js"|g' \
     -e 's|"/static/app.js"|"./static-shim.js"></script>\n<script src="./app.js"|g' \
     -e 's|href="/intent"|href="./"|g' \

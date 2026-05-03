@@ -508,8 +508,9 @@
         fetchJson(`/api/microstructure/${pair}`),
         fetchJson(`/api/forecast/${pair}`).catch(() => null),
       ]);
-      const inner = (ms.summary?.inner_facts || []).map(s => `<li>${escapeHtml(s)}</li>`).join("");
-      const outer = (ms.summary?.outer_view || []).map(s => `<li>${escapeHtml(s)}</li>`).join("");
+      const ux = window.FX_UX || { ru: x => x, ruPhrase: x => x, ruSummaryLine: x => x };
+      const inner = (ms.summary?.inner_facts || []).map(s => `<li>${escapeHtml(ux.ruSummaryLine(s))}</li>`).join("");
+      const outer = (ms.summary?.outer_view || []).map(s => `<li>${escapeHtml(ux.ruSummaryLine(s))}</li>`).join("");
       const cd = ms.cumulative_delta || {};
       const wy = ms.wyckoff || {};
       const hu = ms.hurst || {};
@@ -517,38 +518,38 @@
       const fvgs = (ms.fair_value_gaps || []).slice(0, 3);
       const sweeps = (ms.liquidity_sweeps || []).slice(0, 3);
       deepBody.innerHTML = `
-        <h3>${pair} · Market Intent</h3>
+        <h3>${pair} · Рыночный контекст (Market Intent)</h3>
         <div class="deep-section">
-          <h4>Что происходит ВНУТРИ рынка (inner)</h4>
+          <h4>Что происходит внутри рынка (ордер-флоу)</h4>
           <ul>${inner || "<li class='muted'>нет inner-фактов</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Что показывает СНАРУЖИ (outer)</h4>
+          <h4>Что показывает снаружи (режим и стадия)</h4>
           <ul>${outer || "<li class='muted'>нет outer-view</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Cumulative Delta</h4>
-          <div>bias: <b>${cd.bias || "—"}</b> · norm: <b>${toFixedSafe(cd.norm_pct, 0)}%</b> · divergence: <b>${cd.divergence ? "yes" : "no"}</b></div>
+          <h4 data-explain="Cumulative Delta">Кумулятивная дельта</h4>
+          <div>Перевес: <b>${ux.ru(cd.bias) || "—"}</b> · сила: <b>${toFixedSafe(cd.norm_pct, 0)}%</b> · расхождение с ценой: <b>${cd.divergence ? "да" : "нет"}</b></div>
         </div>
         <div class="deep-section">
-          <h4>Wyckoff stage</h4>
-          <div>stage: <b>${wy.stage || "—"}</b> · confidence: <b>${toFixedSafe(wy.confidence, 0)}%</b> · позиция: <b>${toFixedSafe(wy.position_in_range_pct, 0)}%</b></div>
+          <h4 data-explain="Wyckoff">Стадия Wyckoff</h4>
+          <div>стадия: <b>${ux.ru(wy.stage) || "—"}</b> · уверенность: <b>${toFixedSafe(wy.confidence, 0)}%</b> · позиция в диапазоне: <b>${toFixedSafe(wy.position_in_range_pct, 0)}%</b></div>
         </div>
         <div class="deep-section">
-          <h4>Hurst regime</h4>
-          <div>H = <b>${toFixedSafe(hu.H, 3)}</b> · ${hu.regime || "—"}</div>
+          <h4 data-explain="Hurst">Экспонента Хёрста (режим рынка)</h4>
+          <div>H = <b>${toFixedSafe(hu.H, 3)}</b> · режим: <b>${ux.ru(hu.regime) || "—"}</b></div>
         </div>
         <div class="deep-section">
-          <h4>Order blocks (последние ${obs.length})</h4>
-          <ul>${obs.map(o => `<li>${o.kind} @ ${fmtPrice(o.low)}–${fmtPrice(o.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="Order Block">Ордер-блоки (последние ${obs.length})</h4>
+          <ul>${obs.map(o => `<li>${ux.ru(o.kind)} @ ${fmtPrice(o.low)}–${fmtPrice(o.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Fair-value gaps</h4>
-          <ul>${fvgs.map(g => `<li>${g.kind} @ ${fmtPrice(g.low)}–${fmtPrice(g.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="FVG">Разрывы справедливой стоимости (FVG)</h4>
+          <ul>${fvgs.map(g => `<li>${ux.ru(g.kind)} @ ${fmtPrice(g.lo || g.low)}–${fmtPrice(g.hi || g.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Liquidity sweeps</h4>
-          <ul>${sweeps.map(s => `<li>${s.kind} → ${s.expectation || ""}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="Liquidity Sweep">Снятие ликвидности</h4>
+          <ul>${sweeps.map(s => `<li>${ux.ru(s.kind)} → ${ux.ru(s.implication || s.expectation || "")}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         ${fc ? `
         <div class="deep-section">
@@ -584,4 +585,234 @@
     renderClock();
     updateNextTick();
   }, 1000);
+
+  // ─── ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ МЕНЯ — единый сигнал для реальной сделки ──
+  async function refreshFinalSignal() {
+    const body = document.getElementById("final-signal-body");
+    const badge = document.getElementById("fs-verdict-badge");
+    if (!body) return;
+    try {
+      const r = await fetch("/api/final-signal", { cache: "no-cache" }).then(x => x.ok ? x.json() : Promise.reject(x.status));
+      if (!r || r.error) {
+        body.innerHTML = `<div class="muted">Не удалось получить сигнал: ${r ? r.error : "?"}</div>`;
+        return;
+      }
+      const verdictClass =
+        r.verdict === "GO" ? "fs-go" :
+        r.verdict === "GO_CAUTION" ? "fs-cau" :
+        "fs-wait";
+      const checksHtml = (r.checks || []).map(c => {
+        const dot =
+          c.status === "green" ? "🟢" :
+          c.status === "red"   ? "🔴" :
+                                 "🟡";
+        return `<li class="fs-check fs-${c.status}">
+          <span class="fs-dot">${dot}</span>
+          <span class="fs-name">${c.name_ru}</span>
+          <span class="fs-detail muted small">${c.detail_ru || ""}</span>
+        </li>`;
+      }).join("");
+      const sumPair = r.pair
+        ? `<div class="fs-pair">${r.pair} <span class="fs-side fs-side-${(r.side || "").toLowerCase()}">${r.side_ru || r.side || ""}</span></div>`
+        : "";
+      const sumProb = `<div class="fs-prob">${(r.probability_pct || 0).toFixed(0)}%</div>`;
+      const sumExp = r.expiry_hours ? `<div class="fs-expiry">экспайри ${r.expiry_hours}ч</div>` : "";
+      const altHtml = (r.alternates || []).slice(0, 3).map(a =>
+        `<span class="fs-alt-pill">${a.pair} ${a.side} ${(a.probability_pct || 0).toFixed(0)}%</span>`
+      ).join(" ");
+
+      body.innerHTML = `
+        <div class="fs-row ${verdictClass}">
+          <div class="fs-pick">
+            ${sumPair}${sumProb}${sumExp}
+          </div>
+          <div class="fs-verdict">${r.verdict_ru || "—"}</div>
+        </div>
+        <div class="fs-reasoning small muted">${r.reasoning_ru || ""}</div>
+        <div class="fs-checks-title small muted">8 проверок:</div>
+        <ul class="fs-checks">${checksHtml}</ul>
+        ${altHtml ? `<div class="fs-alts small"><b>Запасные кандидаты:</b> ${altHtml}</div>` : ""}
+        <div class="fs-meta small muted">
+          Сессия сейчас: <b>${r.session_now_ru || "?"}</b> ·
+          источник: <code>/api/final-signal</code> ·
+          обновлено только что
+        </div>`;
+
+      if (badge) {
+        const c = r.summary_counts || {};
+        badge.textContent = `${r.verdict || "?"} · 🟢${c.green||0} 🟡${c.yellow||0} 🔴${c.red||0}`;
+        badge.className = "badge-stable fs-badge-" + (r.verdict === "GO" ? "go" : r.verdict === "GO_CAUTION" ? "cau" : "wait");
+      }
+    } catch (e) {
+      console.error("final-signal:", e);
+      body.innerHTML = `<div class="muted">Ошибка: ${e}</div>`;
+    }
+  }
+  refreshFinalSignal();
+  setInterval(refreshFinalSignal, 30 * 1000);
+
+  // ─── МУЛЬТИ-СИГНАЛЫ: 28 финальных прогнозов (индивидуальный подход) ──
+  let _lastVerdicts = {};   // pair -> verdict — для WAIT->GO dingа
+  let _lastProbs = {};      // pair -> probability — для flash-эффекта
+  function _applyMood(summary) {
+    const body = document.body;
+    body.classList.remove("fx-mood-go", "fx-mood-cau", "fx-mood-wait");
+    if (!summary) return;
+    if ((summary.go || 0) > 0)              body.classList.add("fx-mood-go");
+    else if ((summary.go_caution || 0) > 0) body.classList.add("fx-mood-cau");
+    else                                    body.classList.add("fx-mood-wait");
+  }
+  async function refreshFinalSignals() {
+    const grid = document.getElementById("fs-grid");
+    const pill = document.getElementById("fs-summary-pill");
+    if (!grid) return;
+    try {
+      const r = await fetch("/api/final-signals", { cache: "no-cache" })
+        .then(x => x.ok ? x.json() : Promise.reject(x.status));
+      if (!r || r.error) {
+        grid.innerHTML = `<div class="muted">Не удалось получить финальные прогнозы: ${r ? r.error : "?"}</div>`;
+        return;
+      }
+      const sigs = r.signals || [];
+      const sum = r.summary || {};
+
+      if (pill) {
+        pill.innerHTML =
+          `сессия «<b>${r.session_now_ru || "?"}</b>» · ` +
+          `<span class="fs-pill-go">🟢 ${sum.go || 0} GO</span> · ` +
+          `<span class="fs-pill-cau">🟡 ${sum.go_caution || 0}</span> · ` +
+          `<span class="fs-pill-wait">🔴 ${sum.wait || 0}</span> · ` +
+          `стратегии готовы: <b>${sum.qualified_cells_for_session || 0}/${sum.total || 28}</b>`;
+      }
+
+      // detect WAIT → GO transitions for the celebratory ding
+      let wokeUp = 0;
+      for (const s of sigs) {
+        const prev = _lastVerdicts[s.pair];
+        if (prev && prev !== "GO" && s.verdict === "GO") wokeUp++;
+        _lastVerdicts[s.pair] = s.verdict;
+      }
+      if (wokeUp > 0 && window.FX_UX && window.FX_UX.sound) {
+        window.FX_UX.sound.goDing();
+      }
+
+      // Apply background mood class based on aggregate verdict
+      _applyMood(sum);
+
+      // Render cards
+      grid.innerHTML = sigs.map(s => renderFinalCard(s)).join("");
+
+      // Flash probability values that changed since last refresh
+      const ux = window.FX_UX;
+      grid.querySelectorAll(".fs-card").forEach(card => {
+        const pair = card.getAttribute("data-pair");
+        const probEl = card.querySelector(".fs-card-prob");
+        if (!pair || !probEl) return;
+        const prev = _lastProbs[pair];
+        const curStr = probEl.textContent.trim();
+        const cur = parseFloat(curStr) || 0;
+        if (prev != null && prev !== cur) {
+          probEl.classList.remove("fx-flash-up", "fx-flash-dn");
+          void probEl.offsetWidth;
+          probEl.classList.add(cur > prev ? "fx-flash-up" : "fx-flash-dn");
+          setTimeout(() => probEl.classList.remove("fx-flash-up", "fx-flash-dn"), 900);
+        }
+        _lastProbs[pair] = cur;
+        // wire expand-on-click for this card
+        card.addEventListener("click", e => {
+          if (e.target.closest("[data-explain]")) return;
+          card.classList.toggle("is-expanded");
+        });
+      });
+    } catch (e) {
+      console.error("final-signals:", e);
+      grid.innerHTML = `<div class="muted">Ошибка: ${e}</div>`;
+    }
+  }
+  function renderFinalCard(s) {
+    const v = s.verdict || "WAIT";
+    const cls = v === "GO" ? "fs-card-go" : v === "GO_CAUTION" ? "fs-card-cau" : "fs-card-wait";
+    const probCls = v === "GO" ? "go" : v === "GO_CAUTION" ? "cau" : "wait";
+    const sideCls = (s.side || "").toLowerCase() === "buy" ? "fs-card-side-buy" : "fs-card-side-sell";
+    const sideRu = (s.side || "").toLowerCase() === "buy" ? "BUY (покупка)" : "SELL (продажа)";
+    const c = s.summary_counts || {};
+    const blocker = (v === "WAIT" && s.short_blocker)
+      ? `<div class="fs-card-blocker">⛔ блокирует: ${escapeHtml(s.short_blocker)}</div>` : "";
+    const checksHtml = (s.checks || []).map(ch => {
+      const dot = ch.status === "green" ? "🟢" : ch.status === "red" ? "🔴" : "🟡";
+      return `<li class="fs-${ch.status}">
+        <span>${dot}</span>
+        <span class="fs-cli-name">${escapeHtml(ch.name_ru)}</span>
+        <span class="fs-cli-detail">${escapeHtml(ch.detail_ru || "")}</span>
+      </li>`;
+    }).join("");
+    return `<div class="fs-card ${cls}" data-pair="${s.pair}">
+      <div class="fs-card-row1">
+        <span class="fs-card-pair">${s.pair}</span>
+        <span class="fs-card-side ${sideCls}">${sideRu}</span>
+      </div>
+      <div class="fs-card-row2">
+        <span class="fs-card-prob ${probCls}">${(s.probability_pct||0).toFixed(0)}%</span>
+        <span class="fs-card-expiry">экспайри ${s.expiry_hours || "?"}ч</span>
+      </div>
+      <div class="fs-card-verdict">${escapeHtml(s.verdict_ru || "")}</div>
+      ${blocker}
+      <div class="fs-card-checks">Проверки: 🟢${c.green||0} 🟡${c.yellow||0} 🔴${c.red||0}</div>
+      <div class="fs-card-tap">→ нажми чтобы развернуть все 8 проверок</div>
+      <div class="fs-card-expanded">
+        <ul>${checksHtml}</ul>
+      </div>
+    </div>`;
+  }
+  refreshFinalSignals();
+  setInterval(refreshFinalSignals, 15 * 1000);  // every 15s, was 30s
+
+  // ─── Live market-status badge — обновляется каждые 5 сек ───────────────
+  // Так пользователь видит «ОТКРЫТ / ЗАКРЫТ / откроется через X» в реальном
+  // времени без перезагрузки страницы. Без этого блока статус read-only из
+  // первого запроса /api/final-signals.global_context и не двигается.
+  async function refreshLiveMarketBadge() {
+    const pill = document.getElementById("fs-summary-pill");
+    if (!pill) return;
+    try {
+      const r = await fetch("/api/market-status", {cache: "no-store"});
+      const ms = await r.json();
+      const cur = pill.dataset.lastIs || "";
+      const now = ms.is_open ? "open" : "closed";
+      // Trigger a celebratory ding when market transitions closed → open.
+      if (cur === "closed" && now === "open" && window.FX_UX && window.FX_UX.sound) {
+        try { window.FX_UX.sound.goDing(); } catch (e) {}
+        // Also force a final-signals refresh so cards switch to GO immediately.
+        refreshFinalSignals();
+      }
+      pill.dataset.lastIs = now;
+    } catch (e) {}
+  }
+  refreshLiveMarketBadge();
+  setInterval(refreshLiveMarketBadge, 5 * 1000);
+
+  // ─── AI-АНАЛИТИК: развёрнутый комментарий через Pollinations.ai (free) ──
+  async function refreshAINarrative() {
+    const el = document.getElementById("ai-narrative-text");
+    const src = document.getElementById("ai-narrative-source");
+    if (!el) return;
+    try {
+      const r = await fetch("/api/ai-narrative", {cache: "no-store"});
+      const j = await r.json();
+      if (src) {
+        if (j.source === "pollinations") src.textContent = "🤖 Pollinations.ai · LLM";
+        else                              src.textContent = "📋 детерминированный fallback";
+      }
+      if (j.narrative_ru) {
+        el.textContent = j.narrative_ru;
+        el.classList.remove("muted");
+      } else {
+        el.innerHTML = `<span class="muted">Источник недоступен: ${j.error || "—"}</span>`;
+      }
+    } catch (e) {
+      el.innerHTML = `<span class="muted">AI-аналитик: ${e}</span>`;
+    }
+  }
+  refreshAINarrative();
+  setInterval(refreshAINarrative, 5 * 60 * 1000);  // matches server cache
 })();

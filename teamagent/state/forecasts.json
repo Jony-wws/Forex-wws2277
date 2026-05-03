@@ -1,15 +1,15 @@
 {
-  "scanned_at": "2026-05-02T21:02:24.048574+00:00",
+  "scanned_at": "2026-05-03T20:26:09.644716+00:00",
   "total_pairs": 28,
   "forecasts": {
     "EURUSD": {
       "pair": "EURUSD",
       "side": "SELL",
-      "probability": 0.742,
-      "probability_pct": 74.2,
-      "score": -14,
-      "max_score": 53,
-      "recommended_hours": 3,
+      "probability": 0.7231,
+      "probability_pct": 72.3,
+      "score": -18,
+      "max_score": 75,
+      "recommended_hours": 5,
       "current_price": 1.172333002090454,
       "indicators": {
         "4H": {
@@ -24,7 +24,23 @@
           "ofi10": -0.1,
           "vwap": 1.1742645442485808,
           "bbp": -0.00022158454580267772,
-          "close": 1.172333002090454
+          "close": 1.172333002090454,
+          "macd_line": 0.00017416220247334913,
+          "macd_signal": 0.0006803035440845242,
+          "macd_hist": -0.0005061413416111751,
+          "macd_prev_hist": -0.0004724653215620019,
+          "stoch_k": 4.060431046626285,
+          "stoch_d": 4.751193521389191,
+          "adx": 31.653874672188408,
+          "plus_di": 23.27223489778869,
+          "minus_di": 35.689600244777566,
+          "williams_r": -95.93956895337371,
+          "ichimoku_tenkan": 1.175443172454834,
+          "ichimoku_kijun": 1.175443172454834,
+          "ichimoku_senkou_a": 1.175443172454834,
+          "ichimoku_senkou_b": 1.1723685264587402,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 42.8774960735921,
@@ -38,7 +54,23 @@
           "ofi10": -0.1,
           "vwap": 1.1742645442485808,
           "bbp": -0.0012980650681155836,
-          "close": 1.172333002090454
+          "close": 1.172333002090454,
+          "macd_line": 0.00017448574149470097,
+          "macd_signal": 0.0006807791812282037,
+          "macd_hist": -0.0005062934397335028,
+          "macd_prev_hist": -0.0004726295683312536,
+          "stoch_k": 4.060431046626285,
+          "stoch_d": 4.751193521389191,
+          "adx": 31.654210475664083,
+          "plus_di": 23.27222921773381,
+          "minus_di": 35.68958880964953,
+          "williams_r": -95.93956895337371,
+          "ichimoku_tenkan": 1.175443172454834,
+          "ichimoku_kijun": 1.175443172454834,
+          "ichimoku_senkou_a": 1.175443172454834,
+          "ichimoku_senkou_b": 1.1723685264587402,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 33.32659193343349,
@@ -52,7 +84,23 @@
           "ofi10": -0.2,
           "vwap": 1.1730968316396078,
           "bbp": -0.0011137247655492732,
-          "close": 1.172333002090454
+          "close": 1.172333002090454,
+          "macd_line": -0.0007876796511760986,
+          "macd_signal": -0.0007857801992090471,
+          "macd_hist": -1.899451967051543e-06,
+          "macd_prev_hist": -2.7789969269060265e-05,
+          "stoch_k": 16.652224147891392,
+          "stoch_d": 19.551928550973056,
+          "adx": 53.186967397769614,
+          "plus_di": 15.546661289454677,
+          "minus_di": 34.24897249089365,
+          "williams_r": -83.34777585210861,
+          "ichimoku_tenkan": 1.1724705696105957,
+          "ichimoku_kijun": 1.1747491359710693,
+          "ichimoku_senkou_a": 1.1736098527908325,
+          "ichimoku_senkou_b": 1.175443172454834,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -97,12 +145,45 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=31.7>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=4.1 D=4.8 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-95.9 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_bear",
+          "contrib": -1,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": -2,
           "reason": "SELL (rate_diff=-1.612 yield_diff=-1.179 cpi_diff=-0.76, conf=57.2%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=75.0% (wilson_lower=40.9%) variant=v18_fade_rsi bias=-5"
         }
       ],
-      "agents_for": [],
+      "agents_for": [
+        "Stoch_oversold",
+        "WilliamsR_oversold"
+      ],
       "agents_against": [
         "4H_downtrend",
         "15m_below_ema20",
@@ -112,13 +193,17 @@
         "1H_below_vwap",
         "1H_bbp_bear",
         "MTF_full_bear",
-        "fundamental_macro_tilt"
+        "ADX_strong_downtrend",
+        "MACD_bearish_accel",
+        "Ichimoku_bear",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 0,
-      "agents_against_count": 9,
+      "agents_for_count": 2,
+      "agents_against_count": 13,
       "volume_profile": {
         "pair": "EURUSD",
-        "as_of": "2026-05-02T21:02:24.591505+00:00",
+        "as_of": "2026-05-03T20:26:13.545045+00:00",
         "current_price": 1.172333002090454,
         "high": 1.178828239440918,
         "low": 1.17205810546875,
@@ -391,21 +476,21 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [],
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:24.286706+00:00",
+      "as_of": "2026-05-03T20:26:09.644733+00:00",
       "session": "NY"
     },
     "GBPUSD": {
       "pair": "GBPUSD",
       "side": "SELL",
-      "probability": 0.5749,
-      "probability_pct": 57.5,
-      "score": -4,
-      "max_score": 53,
+      "probability": 0.5663,
+      "probability_pct": 56.6,
+      "score": -5,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 1.357478380203247,
       "indicators": {
@@ -421,7 +506,23 @@
           "ofi10": -0.3,
           "vwap": 1.360315529505412,
           "bbp": 0.000911931854100434,
-          "close": 1.357478380203247
+          "close": 1.357478380203247,
+          "macd_line": 0.00029710282231421026,
+          "macd_signal": 0.0011256823060325181,
+          "macd_hist": -0.0008285794837183079,
+          "macd_prev_hist": -0.0008270633820365884,
+          "stoch_k": 7.084670784668087,
+          "stoch_d": 4.87793893979795,
+          "adx": 33.2276333707261,
+          "plus_di": 20.691284751437113,
+          "minus_di": 33.75297468595844,
+          "williams_r": -92.91532921533191,
+          "ichimoku_tenkan": 1.361271619796753,
+          "ichimoku_kijun": 1.361271619796753,
+          "ichimoku_senkou_a": 1.361271619796753,
+          "ichimoku_senkou_b": 1.3555848002433777,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 38.57314689520373,
@@ -435,7 +536,23 @@
           "ofi10": -0.3,
           "vwap": 1.360315529505412,
           "bbp": -0.0015880947134387924,
-          "close": 1.357478380203247
+          "close": 1.357478380203247,
+          "macd_line": 0.00029724007039888534,
+          "macd_signal": 0.0011258839811840735,
+          "macd_hist": -0.0008286439107851882,
+          "macd_prev_hist": -0.0008271329434834118,
+          "stoch_k": 7.084670784668087,
+          "stoch_d": 4.87793893979794,
+          "adx": 33.22809248525585,
+          "plus_di": 20.691275672296534,
+          "minus_di": 33.75296622004649,
+          "williams_r": -92.91532921533191,
+          "ichimoku_tenkan": 1.361271619796753,
+          "ichimoku_kijun": 1.361271619796753,
+          "ichimoku_senkou_a": 1.361271619796753,
+          "ichimoku_senkou_b": 1.3555848002433777,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 27.260354480497384,
@@ -449,7 +566,23 @@
           "ofi10": -0.2,
           "vwap": 1.3583449443181357,
           "bbp": -0.0013066268629375877,
-          "close": 1.357478380203247
+          "close": 1.357478380203247,
+          "macd_line": -0.001038388446318761,
+          "macd_signal": -0.001064472964006306,
+          "macd_hist": 2.608451768754518e-05,
+          "macd_prev_hist": -1.6988976954966043e-05,
+          "stoch_k": 24.781808746520735,
+          "stoch_d": 23.531365732681227,
+          "adx": 65.76968884417256,
+          "plus_di": 10.063391359561317,
+          "minus_di": 41.88496955287952,
+          "williams_r": -75.21819125347926,
+          "ichimoku_tenkan": 1.3575247526168823,
+          "ichimoku_kijun": 1.3598849773406982,
+          "ichimoku_senkou_a": 1.3587048649787903,
+          "ichimoku_senkou_b": 1.361271619796753,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -482,23 +615,47 @@
           "name": "1H_bbp_bear",
           "contrib": -1,
           "reason": "BBP=-0.00159"
+        },
+        {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=33.2>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=7.1 D=4.9 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-92.9 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
         }
       ],
       "agents_for": [
-        "4H_strong_uptrend"
+        "4H_strong_uptrend",
+        "Stoch_oversold",
+        "WilliamsR_oversold"
       ],
       "agents_against": [
         "15m_below_ema20",
         "1H_rsi_bearish",
         "1H_momentum_down",
         "1H_below_vwap",
-        "1H_bbp_bear"
+        "1H_bbp_bear",
+        "ADX_strong_downtrend",
+        "MACD_bearish_accel"
       ],
-      "agents_for_count": 1,
-      "agents_against_count": 5,
+      "agents_for_count": 3,
+      "agents_against_count": 7,
       "volume_profile": {
         "pair": "GBPUSD",
-        "as_of": "2026-05-02T21:02:25.076635+00:00",
+        "as_of": "2026-05-03T20:26:18.401476+00:00",
         "current_price": 1.357478380203247,
         "high": 1.365691065788269,
         "low": 1.3568521738052368,
@@ -761,7 +918,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.3571173405647277,
@@ -785,16 +942,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:24.878447+00:00",
+      "as_of": "2026-05-03T20:26:13.545194+00:00",
       "session": "NY"
     },
     "USDJPY": {
       "pair": "USDJPY",
       "side": "BUY",
-      "probability": 0.5749,
-      "probability_pct": 57.5,
-      "score": 4,
-      "max_score": 53,
+      "probability": 0.5399,
+      "probability_pct": 54.0,
+      "score": 3,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 157.0399932861328,
       "indicators": {
@@ -810,7 +967,23 @@
           "ofi10": 0.2,
           "vwap": 156.80208384195961,
           "bbp": -0.710201212536191,
-          "close": 157.0399932861328
+          "close": 157.0399932861328,
+          "macd_line": -0.15855841875864485,
+          "macd_signal": -0.2890565820308024,
+          "macd_hist": 0.13049816327215757,
+          "macd_prev_hist": 0.1328669434220992,
+          "stoch_k": 93.85798390003605,
+          "stoch_d": 88.47870310620463,
+          "adx": 27.42278337388066,
+          "plus_di": 16.590424787963816,
+          "minus_di": 17.736785363762483,
+          "williams_r": -6.142016099963955,
+          "ichimoku_tenkan": 156.72100067138672,
+          "ichimoku_kijun": 156.3895034790039,
+          "ichimoku_senkou_a": 156.5552520751953,
+          "ichimoku_senkou_b": 158.08800506591797,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 82.33077191116328,
@@ -824,7 +997,23 @@
           "ofi10": 0.2,
           "vwap": 156.80208384195961,
           "bbp": 0.0347628537766127,
-          "close": 157.0399932861328
+          "close": 157.0399932861328,
+          "macd_line": -0.15858073991194033,
+          "macd_signal": -0.289089394111399,
+          "macd_hist": 0.13050865419945867,
+          "macd_prev_hist": 0.1328782720007119,
+          "stoch_k": 93.85798390003605,
+          "stoch_d": 88.47870310620463,
+          "adx": 27.423022347876856,
+          "plus_di": 16.59041639420695,
+          "minus_di": 17.736781448555647,
+          "williams_r": -6.142016099963955,
+          "ichimoku_tenkan": 156.72100067138672,
+          "ichimoku_kijun": 156.3895034790039,
+          "ichimoku_senkou_a": 156.5552520751953,
+          "ichimoku_senkou_b": 158.08800506591797,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 60.77952188488893,
@@ -838,7 +1027,23 @@
           "ofi10": 0.0,
           "vwap": 156.9737164815267,
           "bbp": 0.10854964159935321,
-          "close": 157.0399932861328
+          "close": 157.0399932861328,
+          "macd_line": 0.08613694992106957,
+          "macd_signal": 0.09471946584396745,
+          "macd_hist": -0.008582515922897882,
+          "macd_prev_hist": -0.006661036373485432,
+          "stoch_k": 71.1088504577823,
+          "stoch_d": 66.17120681210203,
+          "adx": 18.095768333155913,
+          "plus_di": 16.76991156025057,
+          "minus_di": 16.990948056544102,
+          "williams_r": -28.8911495422177,
+          "ichimoku_tenkan": 157.01950073242188,
+          "ichimoku_kijun": 156.76349639892578,
+          "ichimoku_senkou_a": 156.89149856567383,
+          "ichimoku_senkou_b": 156.68499755859375,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -878,9 +1083,24 @@
           "reason": "BBP=0.03476"
         },
         {
+          "name": "Stoch_overbought",
+          "contrib": -2,
+          "reason": "Stoch K=93.9 D=88.5 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-6.1 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 3,
           "reason": "BUY (rate_diff=2.37 yield_diff=2.055 cpi_diff=3.69, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=68.8% (wilson_lower=44.4%) variant=v18_fade_rsi bias=6"
         }
       ],
       "agents_for": [
@@ -889,17 +1109,20 @@
         "1H_momentum_up",
         "1H_above_vwap",
         "1H_bbp_bull",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
-        "1H_rsi_overbought"
+        "1H_rsi_overbought",
+        "Stoch_overbought",
+        "WilliamsR_overbought"
       ],
-      "agents_for_count": 6,
-      "agents_against_count": 2,
+      "agents_for_count": 7,
+      "agents_against_count": 4,
       "volume_profile": {
         "pair": "USDJPY",
-        "as_of": "2026-05-02T21:02:25.521288+00:00",
+        "as_of": "2026-05-03T20:26:19.198425+00:00",
         "current_price": 157.0399932861328,
         "high": 157.1179962158203,
         "low": 156.32400512695312,
@@ -1162,7 +1385,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 157.06241683959962,
@@ -1180,17 +1403,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:25.324063+00:00",
+      "as_of": "2026-05-03T20:26:18.401628+00:00",
       "session": "NY"
     },
     "USDCHF": {
       "pair": "USDCHF",
       "side": "BUY",
-      "probability": 0.6291,
-      "probability_pct": 62.9,
-      "score": 7,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6548,
+      "probability_pct": 65.5,
+      "score": 12,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 0.7815300226211548,
       "indicators": {
         "4H": {
@@ -1205,7 +1428,23 @@
           "ofi10": 0.0,
           "vwap": 0.7809561679760615,
           "bbp": -0.0022544043635258637,
-          "close": 0.7815300226211548
+          "close": 0.7815300226211548,
+          "macd_line": -0.0007623016357103385,
+          "macd_signal": -0.0011319870408874836,
+          "macd_hist": 0.0003696854051771451,
+          "macd_prev_hist": 0.00033769985646417465,
+          "stoch_k": 87.5897975731539,
+          "stoch_d": 75.08659529458166,
+          "adx": 36.610629132893884,
+          "plus_di": 21.29616029287309,
+          "minus_di": 21.05589900495451,
+          "williams_r": -12.410202426846096,
+          "ichimoku_tenkan": 0.7799249887466431,
+          "ichimoku_kijun": 0.7804349958896637,
+          "ichimoku_senkou_a": 0.7801799923181534,
+          "ichimoku_senkou_b": 0.785180002450943,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 54.027504911591365,
@@ -1219,7 +1458,23 @@
           "ofi10": 0.0,
           "vwap": 0.7809561679760615,
           "bbp": -6.48191192917924e-05,
-          "close": 0.7815300226211548
+          "close": 0.7815300226211548,
+          "macd_line": -0.0007625733654895717,
+          "macd_signal": -0.0011323865432295286,
+          "macd_hist": 0.00036981317773995695,
+          "macd_prev_hist": 0.0003378378384520846,
+          "stoch_k": 87.5897975731539,
+          "stoch_d": 75.08659529458166,
+          "adx": 36.61106563769154,
+          "plus_di": 21.296146390071023,
+          "minus_di": 21.05588937798824,
+          "williams_r": -12.410202426846096,
+          "ichimoku_tenkan": 0.7799249887466431,
+          "ichimoku_kijun": 0.7804349958896637,
+          "ichimoku_senkou_a": 0.7801799923181534,
+          "ichimoku_senkou_b": 0.785180002450943,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 71.84480064811063,
@@ -1233,7 +1488,23 @@
           "ofi10": 0.0,
           "vwap": 0.7809745003779729,
           "bbp": 0.0005592793917723604,
-          "close": 0.7815300226211548
+          "close": 0.7815300226211548,
+          "macd_line": 0.0003974990593507144,
+          "macd_signal": 0.0003358549861314091,
+          "macd_hist": 6.164407321930531e-05,
+          "macd_prev_hist": 9.064660035364527e-05,
+          "stoch_k": 69.129530362429,
+          "stoch_d": 82.79491937863976,
+          "adx": 52.36263142554303,
+          "plus_di": 22.446727418173165,
+          "minus_di": 16.33541991143295,
+          "williams_r": -30.870469637571006,
+          "ichimoku_tenkan": 0.7814750075340271,
+          "ichimoku_kijun": 0.7801049947738647,
+          "ichimoku_senkou_a": 0.7807900011539459,
+          "ichimoku_senkou_b": 0.7799549996852875,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -1268,9 +1539,29 @@
           "reason": "BBP=-0.00006"
         },
         {
+          "name": "ADX_strong_uptrend",
+          "contrib": 3,
+          "reason": "ADX=36.6>30, +DI>-DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u0432\u043e\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "MACD_bullish_accel",
+          "contrib": 1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u0440\u0430\u0441\u0442\u0451\u0442"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-12.4 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 5,
           "reason": "BUY (rate_diff=3.68 yield_diff=4.0 cpi_diff=3.26, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=80.0% (wilson_lower=37.6%) variant=v118_contra_emph_meanrev bias=3"
         }
       ],
       "agents_for": [
@@ -1278,17 +1569,21 @@
         "1H_rsi_bullish",
         "1H_bb_above_mid",
         "1H_momentum_up",
-        "fundamental_macro_tilt"
+        "ADX_strong_uptrend",
+        "MACD_bullish_accel",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
-        "1H_bbp_bear"
+        "1H_bbp_bear",
+        "WilliamsR_overbought"
       ],
-      "agents_for_count": 5,
-      "agents_against_count": 2,
+      "agents_for_count": 8,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "USDCHF",
-        "as_of": "2026-05-02T21:02:25.952068+00:00",
+        "as_of": "2026-05-03T20:26:19.869000+00:00",
         "current_price": 0.7815300226211548,
         "high": 0.7819899916648865,
         "low": 0.7778599858283997,
@@ -1551,7 +1846,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.7817008912563324,
@@ -1575,17 +1870,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:25.773132+00:00",
+      "as_of": "2026-05-03T20:26:19.198610+00:00",
       "session": "NY"
     },
     "AUDUSD": {
       "pair": "AUDUSD",
       "side": "BUY",
-      "probability": 0.6113,
-      "probability_pct": 61.1,
-      "score": 6,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6051,
+      "probability_pct": 60.5,
+      "score": 8,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 0.7208245992660522,
       "indicators": {
         "4H": {
@@ -1600,7 +1895,23 @@
           "ofi10": -0.1,
           "vwap": 0.7204460571209589,
           "bbp": 0.0023197401772758752,
-          "close": 0.7208245992660522
+          "close": 0.7208245992660522,
+          "macd_line": 0.0007711556616197823,
+          "macd_signal": 0.0009410277133047268,
+          "macd_hist": -0.00016987205168494447,
+          "macd_prev_hist": -0.00015510361781506036,
+          "stoch_k": 49.223196654663724,
+          "stoch_d": 45.00764703604756,
+          "adx": 28.167152151522394,
+          "plus_di": 22.734362618061027,
+          "minus_di": 25.3398247635176,
+          "williams_r": -50.776803345336276,
+          "ichimoku_tenkan": 0.7215294241905212,
+          "ichimoku_kijun": 0.7208564877510071,
+          "ichimoku_senkou_a": 0.7211929559707642,
+          "ichimoku_senkou_b": 0.7167447805404663,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 58.26236325829491,
@@ -1614,7 +1925,23 @@
           "ofi10": -0.1,
           "vwap": 0.720446057120959,
           "bbp": 0.0007532066315192321,
-          "close": 0.7208245992660522
+          "close": 0.7208245992660522,
+          "macd_line": 0.0007705588946238517,
+          "macd_signal": 0.0009401501317726403,
+          "macd_hist": -0.00016959123714878853,
+          "macd_prev_hist": -0.00015480034021935906,
+          "stoch_k": 49.223196654663724,
+          "stoch_d": 45.00764703604755,
+          "adx": 28.16750021179771,
+          "plus_di": 22.734349879287183,
+          "minus_di": 25.339822529700427,
+          "williams_r": -50.776803345336276,
+          "ichimoku_tenkan": 0.7215294241905212,
+          "ichimoku_kijun": 0.7208564877510071,
+          "ichimoku_senkou_a": 0.7211929559707642,
+          "ichimoku_senkou_b": 0.7167447805404663,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 41.81249348211492,
@@ -1628,7 +1955,23 @@
           "ofi10": -0.6,
           "vwap": 0.7210205912590026,
           "bbp": -0.00013647807785044375,
-          "close": 0.7208245992660522
+          "close": 0.7208245992660522,
+          "macd_line": -0.00014222076174852383,
+          "macd_signal": -7.613081665544077e-05,
+          "macd_hist": -6.608994509308305e-05,
+          "macd_prev_hist": -9.443126821788312e-05,
+          "stoch_k": 56.47792466949364,
+          "stoch_d": 41.49210744527016,
+          "adx": 25.506235190422604,
+          "plus_di": 21.546400946345145,
+          "minus_di": 31.465994337544664,
+          "williams_r": -43.52207533050636,
+          "ichimoku_tenkan": 0.7206951677799225,
+          "ichimoku_kijun": 0.7213465869426727,
+          "ichimoku_senkou_a": 0.7210208773612976,
+          "ichimoku_senkou_b": 0.7208564877510071,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -1666,6 +2009,21 @@
           "name": "1H_bbp_bull",
           "contrib": 1,
           "reason": "BBP=0.00075"
+        },
+        {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=57.9% (wilson_lower=36.3%) variant=v22_emph_momentum bias=2"
         }
       ],
       "agents_for": [
@@ -1673,17 +2031,20 @@
         "1H_uptrend",
         "1H_rsi_bullish",
         "1H_bb_above_mid",
-        "1H_bbp_bull"
+        "1H_bbp_bull",
+        "Stoch_bullish",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "15m_below_ema20",
-        "1H_momentum_down"
+        "1H_momentum_down",
+        "MACD_bearish_accel"
       ],
-      "agents_for_count": 5,
-      "agents_against_count": 2,
+      "agents_for_count": 7,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "AUDUSD",
-        "as_of": "2026-05-02T21:02:26.364597+00:00",
+        "as_of": "2026-05-03T20:26:20.405149+00:00",
         "current_price": 0.7208245992660522,
         "high": 0.7229090332984924,
         "low": 0.7188039422035217,
@@ -1951,21 +2312,21 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [],
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:26.202873+00:00",
+      "as_of": "2026-05-03T20:26:19.869117+00:00",
       "session": "NY"
     },
     "USDCAD": {
       "pair": "USDCAD",
       "side": "BUY",
-      "probability": 0.5749,
-      "probability_pct": 57.5,
-      "score": 4,
-      "max_score": 53,
+      "probability": 0.5399,
+      "probability_pct": 54.0,
+      "score": 3,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 1.3588000535964966,
       "indicators": {
@@ -1981,7 +2342,23 @@
           "ofi10": 0.2,
           "vwap": 1.3576641579469046,
           "bbp": -0.002431500305896339,
-          "close": 1.3588000535964966
+          "close": 1.3588000535964966,
+          "macd_line": -0.0006093867521417273,
+          "macd_signal": -0.0010934148949814303,
+          "macd_hist": 0.000484028142839703,
+          "macd_prev_hist": 0.0005013797415252318,
+          "stoch_k": 88.6097278808913,
+          "stoch_d": 89.80433579799809,
+          "adx": 28.397502447843785,
+          "plus_di": 13.625365261088195,
+          "minus_di": 11.660834845668935,
+          "williams_r": -11.390272119108698,
+          "ichimoku_tenkan": 1.3571199774742126,
+          "ichimoku_kijun": 1.356969952583313,
+          "ichimoku_senkou_a": 1.3570449650287628,
+          "ichimoku_senkou_b": 1.3618899583816528,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 57.10246033493066,
@@ -1995,7 +2372,23 @@
           "ofi10": 0.2,
           "vwap": 1.3576641579469044,
           "bbp": 4.291107695175711e-06,
-          "close": 1.3588000535964966
+          "close": 1.3588000535964966,
+          "macd_line": -0.000608823752685117,
+          "macd_signal": -0.0010925869029681575,
+          "macd_hist": 0.00048376315028304047,
+          "macd_prev_hist": 0.000501093543196573,
+          "stoch_k": 88.6097278808913,
+          "stoch_d": 89.80433579799808,
+          "adx": 28.397910663084613,
+          "plus_di": 13.625351102292685,
+          "minus_di": 11.660820039719948,
+          "williams_r": -11.390272119108698,
+          "ichimoku_tenkan": 1.3571199774742126,
+          "ichimoku_kijun": 1.356969952583313,
+          "ichimoku_senkou_a": 1.3570449650287628,
+          "ichimoku_senkou_b": 1.3618899583816528,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 52.43537657931158,
@@ -2009,7 +2402,23 @@
           "ofi10": 0.4,
           "vwap": 1.358612670501073,
           "bbp": 0.0003493973466917044,
-          "close": 1.3588000535964966
+          "close": 1.3588000535964966,
+          "macd_line": 0.00037417568417752456,
+          "macd_signal": 0.00043006704093200205,
+          "macd_hist": -5.589135675447749e-05,
+          "macd_prev_hist": -3.989407471746589e-05,
+          "stoch_k": 62.50517426939316,
+          "stoch_d": 67.13304081463697,
+          "adx": 31.255636639469266,
+          "plus_di": 8.731728144854946,
+          "minus_di": 7.021706773574264,
+          "williams_r": -37.49482573060684,
+          "ichimoku_tenkan": 1.3586000204086304,
+          "ichimoku_kijun": 1.3577699661254883,
+          "ichimoku_senkou_a": 1.3581849932670593,
+          "ichimoku_senkou_b": 1.356969952583313,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -2039,9 +2448,24 @@
           "reason": "BBP=0.00000"
         },
         {
+          "name": "Stoch_overbought",
+          "contrib": -2,
+          "reason": "Stoch K=88.6 D=89.8 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-11.4 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 2,
           "reason": "BUY (rate_diff=1.41 yield_diff=0.96 cpi_diff=0.97, conf=51.3%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=66.7% (wilson_lower=30.0%) variant=v118_contra_emph_meanrev bias=3"
         }
       ],
       "agents_for": [
@@ -2049,16 +2473,19 @@
         "1H_rsi_bullish",
         "1H_bb_above_mid",
         "1H_bbp_bull",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
-        "4H_strong_downtrend"
+        "4H_strong_downtrend",
+        "Stoch_overbought",
+        "WilliamsR_overbought"
       ],
-      "agents_for_count": 5,
-      "agents_against_count": 1,
+      "agents_for_count": 6,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "USDCAD",
-        "as_of": "2026-05-02T21:02:26.814473+00:00",
+        "as_of": "2026-05-03T20:26:21.058510+00:00",
         "current_price": 1.3588000535964966,
         "high": 1.359339952468872,
         "low": 1.354599952697754,
@@ -2321,7 +2748,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.3589133524894714,
@@ -2339,26 +2766,472 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:26.596019+00:00",
+      "as_of": "2026-05-03T20:26:20.405267+00:00",
       "session": "NY"
     },
     "NZDUSD": {
       "pair": "NZDUSD",
-      "side": "NEUTRAL",
-      "probability_pct": 50.0,
-      "score": 0.0,
-      "skipped": true,
-      "skip_reason": "no_data",
-      "scanned_at": "2026-05-02T21:02:24.048574+00:00"
+      "side": "SELL",
+      "probability": 0.5266,
+      "probability_pct": 52.7,
+      "score": -2,
+      "max_score": 75,
+      "recommended_hours": 1,
+      "current_price": 0.5897617340087891,
+      "indicators": {
+        "4H": {
+          "rsi14": 51.71898943067071,
+          "ema20": 0.590159904836288,
+          "ema50": 0.5890557759367964,
+          "ema200": 0.588473275910888,
+          "atr14": 0.0007201475756508964,
+          "bb_pct": 0.35196192613411753,
+          "mom5": -0.2653895230558471,
+          "cei10": 53.154200775350645,
+          "ofi10": -0.1,
+          "vwap": 0.5902717997630437,
+          "bbp": 0.0009178066336297253,
+          "close": 0.5897617340087891,
+          "macd_line": 0.00044876861349796293,
+          "macd_signal": 0.0006722360481724616,
+          "macd_hist": -0.00022346743467449863,
+          "macd_prev_hist": -0.0001824165800221357,
+          "stoch_k": 19.905399405758,
+          "stoch_d": 25.759239308737985,
+          "adx": 23.391205972464437,
+          "plus_di": 23.088675624560917,
+          "minus_di": 28.78647540759294,
+          "williams_r": -80.094600594242,
+          "ichimoku_tenkan": 0.5911596119403839,
+          "ichimoku_kijun": 0.590742826461792,
+          "ichimoku_senkou_a": 0.590951219201088,
+          "ichimoku_senkou_b": 0.5871962904930115,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
+        },
+        "1H": {
+          "rsi14": 51.71898943067071,
+          "ema20": 0.5901599353283071,
+          "ema50": 0.5890897892984772,
+          "ema200": 0.5887562626784569,
+          "atr14": 0.0007201475756508964,
+          "bb_pct": 0.3519619261333567,
+          "mom5": -0.2653895230558471,
+          "cei10": 53.154200775350645,
+          "ofi10": -0.1,
+          "vwap": 0.5902717997630437,
+          "bbp": -0.0001940269965486907,
+          "close": 0.5897617340087891,
+          "macd_line": 0.0004482773811372853,
+          "macd_signal": 0.0006715136472294879,
+          "macd_hist": -0.00022323626609220255,
+          "macd_prev_hist": -0.00018216691790785106,
+          "stoch_k": 19.905399405758,
+          "stoch_d": 25.759239308737985,
+          "adx": 23.391611981253583,
+          "plus_di": 23.088661235759368,
+          "minus_di": 28.786467386872047,
+          "williams_r": -80.094600594242,
+          "ichimoku_tenkan": 0.5911596119403839,
+          "ichimoku_kijun": 0.590742826461792,
+          "ichimoku_senkou_a": 0.590951219201088,
+          "ichimoku_senkou_b": 0.5871962904930115,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
+        },
+        "15m": {
+          "rsi14": 27.427452278494982,
+          "ema20": 0.5903775137007634,
+          "ema50": 0.5905208856395111,
+          "ema200": 0.590541045367971,
+          "atr14": 0.00021405730928693498,
+          "bb_pct": 0.14819364909923913,
+          "mom5": -0.08256304116357338,
+          "cei10": 53.613062597994634,
+          "ofi10": -0.3,
+          "vwap": 0.5904946486155193,
+          "bbp": -0.0006859072702138924,
+          "close": 0.5897617340087891,
+          "macd_line": -0.00028978293104153785,
+          "macd_signal": -0.0001859125275823632,
+          "macd_hist": -0.00010387040345917465,
+          "macd_prev_hist": -0.00011168548063055284,
+          "stoch_k": 0.0,
+          "stoch_d": 1.7975970425138632,
+          "adx": 48.78292972162228,
+          "plus_di": 8.877895767396533,
+          "minus_di": 43.17625632938477,
+          "williams_r": -100.0,
+          "ichimoku_tenkan": 0.5901797115802765,
+          "ichimoku_kijun": 0.5910543203353882,
+          "ichimoku_senkou_a": 0.5906170159578323,
+          "ichimoku_senkou_b": 0.5908122062683105,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
+        }
+      },
+      "score_breakdown": [
+        {
+          "name": "4H_strong_uptrend",
+          "contrib": 3,
+          "reason": "close > ema50 > ema200 (4H)"
+        },
+        {
+          "name": "15m_below_ema20",
+          "contrib": -1,
+          "reason": "close < ema20 (15m)"
+        },
+        {
+          "name": "1H_rsi_bullish",
+          "contrib": 2,
+          "reason": "RSI=51.7"
+        },
+        {
+          "name": "1H_bb_below_mid",
+          "contrib": -1,
+          "reason": "%B=0.35"
+        },
+        {
+          "name": "1H_momentum_down",
+          "contrib": -2,
+          "reason": "mom5=-0.27%"
+        },
+        {
+          "name": "1H_bbp_bear",
+          "contrib": -1,
+          "reason": "BBP=-0.00019"
+        },
+        {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-80.1 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=61.5% (wilson_lower=35.5%) variant=v01_baseline bias=-3"
+        }
+      ],
+      "agents_for": [
+        "4H_strong_uptrend",
+        "1H_rsi_bullish",
+        "WilliamsR_oversold"
+      ],
+      "agents_against": [
+        "15m_below_ema20",
+        "1H_bb_below_mid",
+        "1H_momentum_down",
+        "1H_bbp_bear",
+        "MACD_bearish_accel",
+        "meta_strategy_agent"
+      ],
+      "agents_for_count": 3,
+      "agents_against_count": 6,
+      "volume_profile": {
+        "pair": "NZDUSD",
+        "as_of": "2026-05-03T20:26:21.554083+00:00",
+        "current_price": 0.5897617340087891,
+        "high": 0.5925574898719788,
+        "low": 0.5889281630516052,
+        "poc": 0.5897629082202911,
+        "vah": 0.5909242928028107,
+        "val": 0.5893273890018463,
+        "buckets": [
+          {
+            "price": 0.588964456319809,
+            "weight_pct": 0.5555555555555556
+          },
+          {
+            "price": 0.5890370428562164,
+            "weight_pct": 0.4166666666666667
+          },
+          {
+            "price": 0.5891096293926239,
+            "weight_pct": 0.9722222222222222
+          },
+          {
+            "price": 0.5891822159290314,
+            "weight_pct": 1.3888888888888888
+          },
+          {
+            "price": 0.5892548024654388,
+            "weight_pct": 1.8055555555555554
+          },
+          {
+            "price": 0.5893273890018463,
+            "weight_pct": 2.361111111111111
+          },
+          {
+            "price": 0.5893999755382537,
+            "weight_pct": 2.083333333333333
+          },
+          {
+            "price": 0.5894725620746613,
+            "weight_pct": 2.638888888888889
+          },
+          {
+            "price": 0.5895451486110688,
+            "weight_pct": 2.9166666666666665
+          },
+          {
+            "price": 0.5896177351474762,
+            "weight_pct": 4.583333333333333
+          },
+          {
+            "price": 0.5896903216838837,
+            "weight_pct": 2.9166666666666665
+          },
+          {
+            "price": 0.5897629082202911,
+            "weight_pct": 6.805555555555555
+          },
+          {
+            "price": 0.5898354947566986,
+            "weight_pct": 3.4722222222222223
+          },
+          {
+            "price": 0.5899080812931061,
+            "weight_pct": 1.9444444444444444
+          },
+          {
+            "price": 0.5899806678295135,
+            "weight_pct": 1.8055555555555554
+          },
+          {
+            "price": 0.590053254365921,
+            "weight_pct": 1.3888888888888888
+          },
+          {
+            "price": 0.5901258409023284,
+            "weight_pct": 1.6666666666666667
+          },
+          {
+            "price": 0.590198427438736,
+            "weight_pct": 2.083333333333333
+          },
+          {
+            "price": 0.5902710139751435,
+            "weight_pct": 2.2222222222222223
+          },
+          {
+            "price": 0.5903436005115509,
+            "weight_pct": 3.0555555555555554
+          },
+          {
+            "price": 0.5904161870479584,
+            "weight_pct": 4.722222222222222
+          },
+          {
+            "price": 0.5904887735843658,
+            "weight_pct": 3.6111111111111107
+          },
+          {
+            "price": 0.5905613601207733,
+            "weight_pct": 4.722222222222222
+          },
+          {
+            "price": 0.5906339466571808,
+            "weight_pct": 6.666666666666667
+          },
+          {
+            "price": 0.5907065331935882,
+            "weight_pct": 5.555555555555555
+          },
+          {
+            "price": 0.5907791197299957,
+            "weight_pct": 5.833333333333333
+          },
+          {
+            "price": 0.5908517062664032,
+            "weight_pct": 2.638888888888889
+          },
+          {
+            "price": 0.5909242928028107,
+            "weight_pct": 2.9166666666666665
+          },
+          {
+            "price": 0.5909968793392182,
+            "weight_pct": 1.8055555555555554
+          },
+          {
+            "price": 0.5910694658756256,
+            "weight_pct": 0.4166666666666667
+          },
+          {
+            "price": 0.5911420524120331,
+            "weight_pct": 0.2777777777777778
+          },
+          {
+            "price": 0.5912146389484405,
+            "weight_pct": 1.1111111111111112
+          },
+          {
+            "price": 0.591287225484848,
+            "weight_pct": 0.4166666666666667
+          },
+          {
+            "price": 0.5913598120212555,
+            "weight_pct": 0.2777777777777778
+          },
+          {
+            "price": 0.5914323985576629,
+            "weight_pct": 0.9722222222222222
+          },
+          {
+            "price": 0.5915049850940705,
+            "weight_pct": 0.5555555555555556
+          },
+          {
+            "price": 0.5915775716304779,
+            "weight_pct": 0.6944444444444444
+          },
+          {
+            "price": 0.5916501581668854,
+            "weight_pct": 0.8333333333333334
+          },
+          {
+            "price": 0.5917227447032929,
+            "weight_pct": 0.5555555555555556
+          },
+          {
+            "price": 0.5917953312397003,
+            "weight_pct": 0.5555555555555556
+          },
+          {
+            "price": 0.5918679177761078,
+            "weight_pct": 0.8333333333333334
+          },
+          {
+            "price": 0.5919405043125152,
+            "weight_pct": 1.1111111111111112
+          },
+          {
+            "price": 0.5920130908489227,
+            "weight_pct": 0.8333333333333334
+          },
+          {
+            "price": 0.5920856773853302,
+            "weight_pct": 1.25
+          },
+          {
+            "price": 0.5921582639217376,
+            "weight_pct": 0.6944444444444444
+          },
+          {
+            "price": 0.5922308504581452,
+            "weight_pct": 1.25
+          },
+          {
+            "price": 0.5923034369945526,
+            "weight_pct": 0.4166666666666667
+          },
+          {
+            "price": 0.5923760235309601,
+            "weight_pct": 0.5555555555555556
+          },
+          {
+            "price": 0.5924486100673676,
+            "weight_pct": 0.2777777777777778
+          },
+          {
+            "price": 0.592521196603775,
+            "weight_pct": 0.5555555555555556
+          }
+        ],
+        "big_players": [
+          {
+            "price": 0.5896177351474762,
+            "weight_pct": 4.583333333333333,
+            "kind": "support"
+          },
+          {
+            "price": 0.5897629082202911,
+            "weight_pct": 6.805555555555555,
+            "kind": "support"
+          },
+          {
+            "price": 0.5898354947566986,
+            "weight_pct": 3.4722222222222223,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5903436005115509,
+            "weight_pct": 3.0555555555555554,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5904161870479584,
+            "weight_pct": 4.722222222222222,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5904887735843658,
+            "weight_pct": 3.6111111111111107,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5905613601207733,
+            "weight_pct": 4.722222222222222,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5906339466571808,
+            "weight_pct": 6.666666666666667,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5907065331935882,
+            "weight_pct": 5.555555555555555,
+            "kind": "resistance"
+          },
+          {
+            "price": 0.5907791197299957,
+            "weight_pct": 5.833333333333333,
+            "kind": "resistance"
+          }
+        ],
+        "direction": "DOWN",
+        "forecast_to_utc5_midnight": {
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
+          "no_return_levels": [
+            {
+              "price": 0.5907791197299957,
+              "weight_pct": 5.833333333333333,
+              "kind": "resistance",
+              "side": "above"
+            },
+            {
+              "price": 0.5907065331935882,
+              "weight_pct": 5.555555555555555,
+              "kind": "resistance",
+              "side": "above"
+            },
+            {
+              "price": 0.5906339466571808,
+              "weight_pct": 6.666666666666667,
+              "kind": "resistance",
+              "side": "above"
+            }
+          ],
+          "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
+        }
+      },
+      "as_of": "2026-05-03T20:26:21.058624+00:00",
+      "session": "NY"
     },
     "EURGBP": {
       "pair": "EURGBP",
       "side": "SELL",
-      "probability": 0.5377,
-      "probability_pct": 53.8,
-      "score": -2,
-      "max_score": 53,
-      "recommended_hours": 1,
+      "probability": 0.5399,
+      "probability_pct": 54.0,
+      "score": -3,
+      "max_score": 75,
+      "recommended_hours": 2,
       "current_price": 0.8632500171661377,
       "indicators": {
         "4H": {
@@ -2373,7 +3246,23 @@
           "ofi10": -0.3,
           "vwap": 0.8628688365221023,
           "bbp": -0.0007771569425745195,
-          "close": 0.8632500171661377
+          "close": 0.8632500171661377,
+          "macd_line": -0.00010609716768605892,
+          "macd_signal": -0.0002441060740595279,
+          "macd_hist": 0.00013800890637346897,
+          "macd_prev_hist": 0.00014878688744706227,
+          "stoch_k": 61.24515172256445,
+          "stoch_d": 59.110488520748504,
+          "adx": 21.91056648236032,
+          "plus_di": 16.9975837908001,
+          "minus_di": 17.572282762651184,
+          "williams_r": -38.75484827743555,
+          "ichimoku_tenkan": 0.8630149960517883,
+          "ichimoku_kijun": 0.8628999888896942,
+          "ichimoku_senkou_a": 0.8629574924707413,
+          "ichimoku_senkou_b": 0.8642700016498566,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 57.114360113715094,
@@ -2387,7 +3276,23 @@
           "ofi10": -0.3,
           "vwap": 0.8628688365221023,
           "bbp": 6.36525928761067e-05,
-          "close": 0.8632500171661377
+          "close": 0.8632500171661377,
+          "macd_line": -0.00010595720605255377,
+          "macd_signal": -0.00024390026009868922,
+          "macd_hist": 0.00013794305404613545,
+          "macd_prev_hist": 0.0001487157684128337,
+          "stoch_k": 61.24515172256445,
+          "stoch_d": 59.110488520748504,
+          "adx": 21.91111344699215,
+          "plus_di": 16.997570364137502,
+          "minus_di": 17.572270482281137,
+          "williams_r": -38.75484827743555,
+          "ichimoku_tenkan": 0.8630149960517883,
+          "ichimoku_kijun": 0.8628999888896942,
+          "ichimoku_senkou_a": 0.8629574924707413,
+          "ichimoku_senkou_b": 0.8642700016498566,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 53.03938356164383,
@@ -2401,7 +3306,23 @@
           "ofi10": -0.1,
           "vwap": 0.8632795045773187,
           "bbp": 2.025865821286832e-05,
-          "close": 0.8632500171661377
+          "close": 0.8632500171661377,
+          "macd_line": 5.0768345641771795e-05,
+          "macd_signal": 8.102792285767962e-05,
+          "macd_hist": -3.0259577215907825e-05,
+          "macd_prev_hist": -3.1199960756942194e-05,
+          "stoch_k": 55.696393541572355,
+          "stoch_d": 43.03857954831246,
+          "adx": 31.48256006680476,
+          "plus_di": 11.957325984002606,
+          "minus_di": 25.227325709601132,
+          "williams_r": -44.303606458427645,
+          "ichimoku_tenkan": 0.8632050156593323,
+          "ichimoku_kijun": 0.8633100092411041,
+          "ichimoku_senkou_a": 0.8632575124502182,
+          "ichimoku_senkou_b": 0.8630149960517883,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -2431,26 +3352,38 @@
           "reason": "BBP=0.00006"
         },
         {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": -2,
           "reason": "SELL (rate_diff=-1.682 yield_diff=-1.48 cpi_diff=-0.89, conf=64.4%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=66.7% (wilson_lower=30.0%) variant=v18_fade_rsi bias=-3"
         }
       ],
       "agents_for": [
         "1H_rsi_bullish",
         "1H_bb_above_mid",
-        "1H_bbp_bull"
+        "1H_bbp_bull",
+        "Stoch_bullish"
       ],
       "agents_against": [
         "4H_strong_downtrend",
         "15m_below_ema20",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 3,
-      "agents_against_count": 3,
+      "agents_for_count": 4,
+      "agents_against_count": 4,
       "volume_profile": {
         "pair": "EURGBP",
-        "as_of": "2026-05-02T21:02:27.578128+00:00",
+        "as_of": "2026-05-03T20:26:22.202704+00:00",
         "current_price": 0.8632500171661377,
         "high": 0.8640599846839905,
         "low": 0.8619700074195862,
@@ -2718,7 +3651,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.863370292186737,
@@ -2742,17 +3675,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:27.400570+00:00",
+      "as_of": "2026-05-03T20:26:21.554170+00:00",
       "session": "NY"
     },
     "EURJPY": {
       "pair": "EURJPY",
       "side": "SELL",
-      "probability": 0.6291,
-      "probability_pct": 62.9,
-      "score": -7,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6051,
+      "probability_pct": 60.5,
+      "score": -8,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 184.06300354003906,
       "indicators": {
         "4H": {
@@ -2767,7 +3700,23 @@
           "ofi10": -0.3,
           "vwap": 184.07263310750324,
           "bbp": -0.8191827215688363,
-          "close": 184.06300354003906
+          "close": 184.06300354003906,
+          "macd_line": -0.12839368815005514,
+          "macd_signal": -0.19401907292298667,
+          "macd_hist": 0.06562538477293153,
+          "macd_prev_hist": 0.07610906789663804,
+          "stoch_k": 56.82664950548706,
+          "stoch_d": 70.78922136600005,
+          "adx": 40.284455101945085,
+          "plus_di": 11.799978249525577,
+          "minus_di": 33.532157110900215,
+          "williams_r": -43.17335049451294,
+          "ichimoku_tenkan": 184.11499786376953,
+          "ichimoku_kijun": 183.60299682617188,
+          "ichimoku_senkou_a": 183.8589973449707,
+          "ichimoku_senkou_b": 184.90900421142578,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 61.11636707663198,
@@ -2781,7 +3730,23 @@
           "ofi10": -0.3,
           "vwap": 184.07263310750326,
           "bbp": -0.15449754089399903,
-          "close": 184.06300354003906
+          "close": 184.06300354003906,
+          "macd_line": -0.12840253967854665,
+          "macd_signal": -0.1940320921992053,
+          "macd_hist": 0.06562955252065866,
+          "macd_prev_hist": 0.07611356935086619,
+          "stoch_k": 56.82664950548706,
+          "stoch_d": 70.78922136600005,
+          "adx": 40.284704459703505,
+          "plus_di": 11.799973982813123,
+          "minus_di": 33.53215807807703,
+          "williams_r": -43.17335049451294,
+          "ichimoku_tenkan": 184.11499786376953,
+          "ichimoku_kijun": 183.60299682617188,
+          "ichimoku_senkou_a": 183.8589973449707,
+          "ichimoku_senkou_b": 184.90900421142578,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 38.84894837476099,
@@ -2795,7 +3760,23 @@
           "ofi10": -0.2,
           "vwap": 184.1323336283366,
           "bbp": -0.06275858588941219,
-          "close": 184.06300354003906
+          "close": 184.06300354003906,
+          "macd_line": -0.03228767248347708,
+          "macd_signal": -0.018081076473751297,
+          "macd_hist": -0.014206596009725785,
+          "macd_prev_hist": -0.01716193706461084,
+          "stoch_k": 44.257139911331066,
+          "stoch_d": 44.665224599284706,
+          "adx": 40.0328736883456,
+          "plus_di": 11.570963132555992,
+          "minus_di": 19.876369961221904,
+          "williams_r": -55.742860088668934,
+          "ichimoku_tenkan": 184.0405044555664,
+          "ichimoku_kijun": 184.18900299072266,
+          "ichimoku_senkou_a": 184.11475372314453,
+          "ichimoku_senkou_b": 184.04049682617188,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -2835,14 +3816,30 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=40.3>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 2,
           "reason": "BUY (rate_diff=0.758 yield_diff=0.876 cpi_diff=2.93, conf=52.6%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 3,
+          "reason": "QUALIFIED cell, expected_wr=100.0% (wilson_lower=56.6%) variant=v18_fade_rsi bias=3"
         }
       ],
       "agents_for": [
         "1H_rsi_bullish",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
@@ -2850,13 +3847,15 @@
         "15m_below_ema20",
         "1H_bb_below_mid",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "Stoch_bearish"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 6,
+      "agents_for_count": 3,
+      "agents_against_count": 8,
       "volume_profile": {
         "pair": "EURJPY",
-        "as_of": "2026-05-02T21:02:28.052542+00:00",
+        "as_of": "2026-05-03T20:26:22.745201+00:00",
         "current_price": 184.06300354003906,
         "high": 184.45199584960938,
         "low": 183.69400024414062,
@@ -3119,7 +4118,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 184.23217712402345,
@@ -3143,17 +4142,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:27.848884+00:00",
+      "as_of": "2026-05-03T20:26:22.202826+00:00",
       "session": "NY"
     },
     "EURCHF": {
       "pair": "EURCHF",
       "side": "SELL",
-      "probability": 0.6113,
-      "probability_pct": 61.1,
-      "score": -6,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6051,
+      "probability_pct": 60.5,
+      "score": -8,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 0.9160299897193909,
       "indicators": {
         "4H": {
@@ -3168,7 +4167,23 @@
           "ofi10": -0.5,
           "vwap": 0.9165794968605041,
           "bbp": -0.0025613708148402026,
-          "close": 0.9160299897193909
+          "close": 0.9160299897193909,
+          "macd_line": -0.0006387254993549529,
+          "macd_signal": -0.0007069867701160142,
+          "macd_hist": 6.826127076106127e-05,
+          "macd_prev_hist": 6.5324143957588e-05,
+          "stoch_k": 26.85894436097633,
+          "stoch_d": 26.897350277731345,
+          "adx": 52.483320400641404,
+          "plus_di": 4.3203477017000935,
+          "minus_di": 17.395900474016432,
+          "williams_r": -73.14105563902368,
+          "ichimoku_tenkan": 0.916590005159378,
+          "ichimoku_kijun": 0.9165450036525726,
+          "ichimoku_senkou_a": 0.9165675044059753,
+          "ichimoku_senkou_b": 0.9195650219917297,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 23.265375632541847,
@@ -3182,7 +4197,23 @@
           "ofi10": -0.5,
           "vwap": 0.9165794968605041,
           "bbp": -0.0008899046160031343,
-          "close": 0.9160299897193909
+          "close": 0.9160299897193909,
+          "macd_line": -0.0006388101936426471,
+          "macd_signal": -0.0007071113326609062,
+          "macd_hist": 6.830113901825903e-05,
+          "macd_prev_hist": 6.536720317141024e-05,
+          "stoch_k": 26.85894436097633,
+          "stoch_d": 26.897350277731345,
+          "adx": 52.483812652995184,
+          "plus_di": 4.3203374002772605,
+          "minus_di": 17.395890587052566,
+          "williams_r": -73.14105563902368,
+          "ichimoku_tenkan": 0.916590005159378,
+          "ichimoku_kijun": 0.9165450036525726,
+          "ichimoku_senkou_a": 0.9165675044059753,
+          "ichimoku_senkou_b": 0.9195650219917297,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 45.122128525734226,
@@ -3196,7 +4227,23 @@
           "ofi10": 0.0,
           "vwap": 0.9159413327773412,
           "bbp": -0.0001521070142613823,
-          "close": 0.9160299897193909
+          "close": 0.9160299897193909,
+          "macd_line": -0.00016067867061142493,
+          "macd_signal": -0.00019288389383139578,
+          "macd_hist": 3.220522321997085e-05,
+          "macd_prev_hist": 2.7768364637593783e-05,
+          "stoch_k": 70.6511175898931,
+          "stoch_d": 67.75294244682,
+          "adx": 33.12858689969086,
+          "plus_di": 8.20782917640971,
+          "minus_di": 6.956905711954546,
+          "williams_r": -29.3488824101069,
+          "ichimoku_tenkan": 0.9158700108528137,
+          "ichimoku_kijun": 0.916159987449646,
+          "ichimoku_senkou_a": 0.9160149991512299,
+          "ichimoku_senkou_b": 0.916590005159378,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -3236,14 +4283,41 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=52.5>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "MACD_bullish_accel",
+          "contrib": 1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u0440\u0430\u0441\u0442\u0451\u0442"
+        },
+        {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_bear",
+          "contrib": -1,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 3,
           "reason": "BUY (rate_diff=2.068 yield_diff=2.821 cpi_diff=2.5, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=61.5% (wilson_lower=35.5%) variant=v01_baseline bias=1"
         }
       ],
       "agents_for": [
         "1H_rsi_oversold",
-        "fundamental_macro_tilt"
+        "MACD_bullish_accel",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
@@ -3251,13 +4325,16 @@
         "15m_below_ema20",
         "1H_bb_below_mid",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "Stoch_bearish",
+        "Ichimoku_bear"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 6,
+      "agents_for_count": 4,
+      "agents_against_count": 9,
       "volume_profile": {
         "pair": "EURCHF",
-        "as_of": "2026-05-02T21:02:28.473892+00:00",
+        "as_of": "2026-05-03T20:26:23.236776+00:00",
         "current_price": 0.9160299897193909,
         "high": 0.9178000092506409,
         "low": 0.9153800010681152,
@@ -3520,7 +4597,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.9158882027864457,
@@ -3544,17 +4621,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:28.309525+00:00",
+      "as_of": "2026-05-03T20:26:22.745316+00:00",
       "session": "NY"
     },
     "EURAUD": {
       "pair": "EURAUD",
       "side": "SELL",
-      "probability": 0.7121,
-      "probability_pct": 71.2,
-      "score": -12,
-      "max_score": 53,
-      "recommended_hours": 3,
+      "probability": 0.69,
+      "probability_pct": 69.0,
+      "score": -15,
+      "max_score": 75,
+      "recommended_hours": 4,
       "current_price": 1.6259499788284302,
       "indicators": {
         "4H": {
@@ -3569,7 +4646,23 @@
           "ofi10": -0.9,
           "vwap": 1.6297011693318684,
           "bbp": -0.005861365102421967,
-          "close": 1.6259499788284302
+          "close": 1.6259499788284302,
+          "macd_line": -0.00162625985658571,
+          "macd_signal": -0.0012313429622556205,
+          "macd_hist": -0.0003949168943300895,
+          "macd_prev_hist": -0.0004010597629886827,
+          "stoch_k": 10.011366865586815,
+          "stoch_d": 11.233399614222515,
+          "adx": 42.32143493544872,
+          "plus_di": 12.796084974870519,
+          "minus_di": 25.955525375502102,
+          "williams_r": -89.98863313441319,
+          "ichimoku_tenkan": 1.6288350224494934,
+          "ichimoku_kijun": 1.6293050050735474,
+          "ichimoku_senkou_a": 1.6290700137615204,
+          "ichimoku_senkou_b": 1.6337900161743164,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 26.003590664272892,
@@ -3583,7 +4676,23 @@
           "ofi10": -0.9,
           "vwap": 1.6297011693318684,
           "bbp": -0.0037177745260090767,
-          "close": 1.6259499788284302
+          "close": 1.6259499788284302,
+          "macd_line": -0.0016244697811218511,
+          "macd_signal": -0.0012287107583209326,
+          "macd_hist": -0.0003957590228009186,
+          "macd_prev_hist": -0.000401969229626078,
+          "stoch_k": 10.011366865586815,
+          "stoch_d": 11.233399614222515,
+          "adx": 42.32168764905443,
+          "plus_di": 12.796085113927372,
+          "minus_di": 25.95551352216736,
+          "williams_r": -89.98863313441319,
+          "ichimoku_tenkan": 1.6288350224494934,
+          "ichimoku_kijun": 1.6293050050735474,
+          "ichimoku_senkou_a": 1.6290700137615204,
+          "ichimoku_senkou_b": 1.6337900161743164,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 38.09456231225904,
@@ -3597,7 +4706,23 @@
           "ofi10": 0.0,
           "vwap": 1.6267441630363464,
           "bbp": -0.0014190421422233257,
-          "close": 1.6259499788284302
+          "close": 1.6259499788284302,
+          "macd_line": -0.000892936341700068,
+          "macd_signal": -0.0009718622897309538,
+          "macd_hist": 7.892594803088587e-05,
+          "macd_prev_hist": 8.706042040422806e-05,
+          "stoch_k": 31.3420221520395,
+          "stoch_d": 34.079148317838765,
+          "adx": 48.7495270859663,
+          "plus_di": 8.620888531709207,
+          "minus_di": 19.558468021675314,
+          "williams_r": -68.6579778479605,
+          "ichimoku_tenkan": 1.626450002193451,
+          "ichimoku_kijun": 1.6279850006103516,
+          "ichimoku_senkou_a": 1.6272175014019012,
+          "ichimoku_senkou_b": 1.6293050050735474,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -3642,6 +4767,26 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=42.3>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=10.0 D=11.2 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-90.0 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_strong_bear",
+          "contrib": -3,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan < Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": -2,
           "reason": "SELL (rate_diff=-2.162 yield_diff=-1.679 cpi_diff=0.13, conf=46.0%)"
@@ -3654,6 +4799,8 @@
       ],
       "agents_for": [
         "1H_rsi_oversold",
+        "Stoch_oversold",
+        "WilliamsR_oversold",
         "cot_speculator_contrarian"
       ],
       "agents_against": [
@@ -3664,13 +4811,15 @@
         "1H_below_vwap",
         "1H_bbp_bear",
         "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "Ichimoku_strong_bear",
         "fundamental_macro_tilt"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 8,
+      "agents_for_count": 4,
+      "agents_against_count": 10,
       "volume_profile": {
         "pair": "EURAUD",
-        "as_of": "2026-05-02T21:02:28.952760+00:00",
+        "as_of": "2026-05-03T20:26:23.747990+00:00",
         "current_price": 1.6259499788284302,
         "high": 1.6334999799728394,
         "low": 1.6251100301742554,
@@ -3933,7 +5082,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.6330804824829102,
@@ -3957,17 +5106,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:28.751636+00:00",
+      "as_of": "2026-05-03T20:26:23.236863+00:00",
       "session": "NY"
     },
     "EURCAD": {
       "pair": "EURCAD",
       "side": "SELL",
-      "probability": 0.7699,
-      "probability_pct": 77.0,
-      "score": -16,
-      "max_score": 53,
-      "recommended_hours": 3,
+      "probability": 0.7123,
+      "probability_pct": 71.2,
+      "score": -17,
+      "max_score": 75,
+      "recommended_hours": 4,
       "current_price": 1.5919899940490723,
       "indicators": {
         "4H": {
@@ -3982,7 +5131,23 @@
           "ofi10": -0.2,
           "vwap": 1.5936071753501893,
           "bbp": -0.003389719621204268,
-          "close": 1.5919899940490723
+          "close": 1.5919899940490723,
+          "macd_line": -0.0005248642656778824,
+          "macd_signal": -0.0003680510801706599,
+          "macd_hist": -0.00015681318550722243,
+          "macd_prev_hist": -8.61912914987571e-05,
+          "stoch_k": 10.19587677060446,
+          "stoch_d": 12.28595161009703,
+          "adx": 26.537432119543958,
+          "plus_di": 14.871539488796579,
+          "minus_di": 24.31810718745109,
+          "williams_r": -89.80412322939554,
+          "ichimoku_tenkan": 1.5950350165367126,
+          "ichimoku_kijun": 1.5950350165367126,
+          "ichimoku_senkou_a": 1.5950350165367126,
+          "ichimoku_senkou_b": 1.5957949757575989,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 44.3317658433682,
@@ -3996,7 +5161,23 @@
           "ofi10": -0.2,
           "vwap": 1.5936071753501893,
           "bbp": -0.0019756164018494005,
-          "close": 1.5919899940490723
+          "close": 1.5919899940490723,
+          "macd_line": -0.0005237768068713233,
+          "macd_signal": -0.0003664520226360736,
+          "macd_hist": -0.00015732478423524974,
+          "macd_prev_hist": -8.674380001705685e-05,
+          "stoch_k": 10.19587677060446,
+          "stoch_d": 12.28595161009703,
+          "adx": 26.537533398767152,
+          "plus_di": 14.871538801405867,
+          "minus_di": 24.318094331796814,
+          "williams_r": -89.80412322939554,
+          "ichimoku_tenkan": 1.5950350165367126,
+          "ichimoku_kijun": 1.5950350165367126,
+          "ichimoku_senkou_a": 1.5950350165367126,
+          "ichimoku_senkou_b": 1.5957949757575989,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 25.70641324823572,
@@ -4010,7 +5191,23 @@
           "ofi10": -0.3,
           "vwap": 1.593191667397817,
           "bbp": -0.0013599921980032015,
-          "close": 1.5919899940490723
+          "close": 1.5919899940490723,
+          "macd_line": -0.0007200197096450811,
+          "macd_signal": -0.0006033517156286395,
+          "macd_hist": -0.00011666799401644163,
+          "macd_prev_hist": -0.000134871370294029,
+          "stoch_k": 26.262342458055713,
+          "stoch_d": 25.432964658437765,
+          "adx": 67.99293599109255,
+          "plus_di": 2.6779375606837217,
+          "minus_di": 24.899377145546513,
+          "williams_r": -73.73765754194429,
+          "ichimoku_tenkan": 1.5921350121498108,
+          "ichimoku_kijun": 1.5942149758338928,
+          "ichimoku_senkou_a": 1.5931749939918518,
+          "ichimoku_senkou_b": 1.5950350165367126,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -4058,9 +5255,37 @@
           "name": "MTF_full_bear",
           "contrib": -3,
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
+        },
+        {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=10.2 D=12.3 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-89.8 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_bear",
+          "contrib": -1,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=60.0% (wilson_lower=23.1%) variant=v25_pro_trend bias=-2"
         }
       ],
-      "agents_for": [],
+      "agents_for": [
+        "Stoch_oversold",
+        "WilliamsR_oversold"
+      ],
       "agents_against": [
         "4H_strong_downtrend",
         "1H_downtrend",
@@ -4070,13 +5295,16 @@
         "1H_momentum_down",
         "1H_below_vwap",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "MACD_bearish_accel",
+        "Ichimoku_bear",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 0,
-      "agents_against_count": 9,
+      "agents_for_count": 2,
+      "agents_against_count": 12,
       "volume_profile": {
         "pair": "EURCAD",
-        "as_of": "2026-05-02T21:02:29.387252+00:00",
+        "as_of": "2026-05-03T20:26:24.299244+00:00",
         "current_price": 1.5919899940490723,
         "high": 1.5988600254058838,
         "low": 1.5912100076675415,
@@ -4339,7 +5567,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.5946525156497955,
@@ -4363,17 +5591,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:29.190159+00:00",
+      "as_of": "2026-05-03T20:26:23.748118+00:00",
       "session": "NY"
     },
     "EURNZD": {
       "pair": "EURNZD",
       "side": "SELL",
-      "probability": 0.6636,
-      "probability_pct": 66.4,
-      "score": -9,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6785,
+      "probability_pct": 67.8,
+      "score": -14,
+      "max_score": 75,
+      "recommended_hours": 4,
       "current_price": 1.987239956855774,
       "indicators": {
         "4H": {
@@ -4388,7 +5616,23 @@
           "ofi10": -0.2,
           "vwap": 1.988868329922358,
           "bbp": -0.0036618771962346752,
-          "close": 1.987239956855774
+          "close": 1.987239956855774,
+          "macd_line": -0.0013344526013459035,
+          "macd_signal": -0.0011495542114459871,
+          "macd_hist": -0.00018489838989991635,
+          "macd_prev_hist": -0.00029484597780256826,
+          "stoch_k": 27.96026403503039,
+          "stoch_d": 19.00572947301919,
+          "adx": 35.796745054361416,
+          "plus_di": 13.971247795808775,
+          "minus_di": 22.068433103343345,
+          "williams_r": -72.03973596496961,
+          "ichimoku_tenkan": 1.9888100028038025,
+          "ichimoku_kijun": 1.9885500073432922,
+          "ichimoku_senkou_a": 1.9886800050735474,
+          "ichimoku_senkou_b": 1.9944149255752563,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 37.39306556179307,
@@ -4402,7 +5646,23 @@
           "ofi10": -0.2,
           "vwap": 1.988868329922358,
           "bbp": -0.0016662178708630737,
-          "close": 1.987239956855774
+          "close": 1.987239956855774,
+          "macd_line": -0.0013321932150440752,
+          "macd_signal": -0.001146231860494634,
+          "macd_hist": -0.00018596135454944113,
+          "macd_prev_hist": -0.00029599394553397234,
+          "stoch_k": 27.96026403503039,
+          "stoch_d": 19.00572947301919,
+          "adx": 35.79720021945556,
+          "plus_di": 13.971244243813473,
+          "minus_di": 22.06841922655979,
+          "williams_r": -72.03973596496961,
+          "ichimoku_tenkan": 1.9888100028038025,
+          "ichimoku_kijun": 1.9885500073432922,
+          "ichimoku_senkou_a": 1.9886800050735474,
+          "ichimoku_senkou_b": 1.9944149255752563,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 57.05667451809835,
@@ -4416,7 +5676,23 @@
           "ofi10": 0.2,
           "vwap": 1.9861213227113086,
           "bbp": 0.00033128162686657525,
-          "close": 1.987239956855774
+          "close": 1.987239956855774,
+          "macd_line": -0.00047550782216077003,
+          "macd_signal": -0.0007605181659660603,
+          "macd_hist": 0.00028501034380529026,
+          "macd_prev_hist": 0.00024062772061346277,
+          "stoch_k": 96.95857129906626,
+          "stoch_d": 79.3415525942042,
+          "adx": 35.44356718015395,
+          "plus_di": 11.54648785705689,
+          "minus_di": 8.11532718939347,
+          "williams_r": -3.041428700933732,
+          "ichimoku_tenkan": 1.9862250089645386,
+          "ichimoku_kijun": 1.9871899485588074,
+          "ichimoku_senkou_a": 1.986707478761673,
+          "ichimoku_senkou_b": 1.9892500042915344,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -4451,13 +5727,34 @@
           "reason": "BBP=-0.00167"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=35.8>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_bear",
+          "contrib": -1,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": -1,
           "reason": "SELL (rate_diff=-0.482 yield_diff=-1.419 cpi_diff=0.0, conf=32.3%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=85.7% (wilson_lower=48.7%) variant=v118_contra_emph_meanrev bias=-1"
         }
       ],
       "agents_for": [
-        "15m_above_ema20"
+        "15m_above_ema20",
+        "Stoch_bullish"
       ],
       "agents_against": [
         "4H_strong_downtrend",
@@ -4465,13 +5762,16 @@
         "1H_rsi_bearish",
         "1H_bb_below_mid",
         "1H_bbp_bear",
-        "fundamental_macro_tilt"
+        "ADX_strong_downtrend",
+        "Ichimoku_bear",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 1,
-      "agents_against_count": 6,
+      "agents_for_count": 2,
+      "agents_against_count": 9,
       "volume_profile": {
         "pair": "EURNZD",
-        "as_of": "2026-05-02T21:02:29.853207+00:00",
+        "as_of": "2026-05-03T20:26:24.833288+00:00",
         "current_price": 1.987239956855774,
         "high": 1.9938100576400757,
         "low": 1.9846899509429932,
@@ -4739,7 +6039,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.9856931626796723,
@@ -4763,16 +6063,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:29.652399+00:00",
+      "as_of": "2026-05-03T20:26:24.299372+00:00",
       "session": "NY"
     },
     "GBPJPY": {
       "pair": "GBPJPY",
       "side": "SELL",
-      "probability": 0.5932,
-      "probability_pct": 59.3,
-      "score": -5,
-      "max_score": 53,
+      "probability": 0.5923,
+      "probability_pct": 59.2,
+      "score": -7,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 213.21200561523438,
       "indicators": {
@@ -4788,7 +6088,23 @@
           "ofi10": -0.5,
           "vwap": 213.2933507283529,
           "bbp": -0.7373529800907761,
-          "close": 213.21200561523438
+          "close": 213.21200561523438,
+          "macd_line": -0.12773641179822448,
+          "macd_signal": -0.1690758426616035,
+          "macd_hist": 0.04133943086337902,
+          "macd_prev_hist": 0.046452941018602895,
+          "stoch_k": 54.47103472069755,
+          "stoch_d": 64.17436566686384,
+          "adx": 38.65888849733261,
+          "plus_di": 10.58703710610234,
+          "minus_di": 31.436835638349425,
+          "williams_r": -45.52896527930245,
+          "ichimoku_tenkan": 213.3314971923828,
+          "ichimoku_kijun": 212.90650177001953,
+          "ichimoku_senkou_a": 213.11899948120117,
+          "ichimoku_senkou_b": 213.50299835205078,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 55.20630929249057,
@@ -4802,7 +6118,23 @@
           "ofi10": -0.5,
           "vwap": 213.2933507283529,
           "bbp": -0.16215351051781113,
-          "close": 213.21200561523438
+          "close": 213.21200561523438,
+          "macd_line": -0.12778222679762052,
+          "macd_signal": -0.16914321758861955,
+          "macd_hist": 0.04136099079099903,
+          "macd_prev_hist": 0.046476225731100246,
+          "stoch_k": 54.47103472069755,
+          "stoch_d": 64.17436566686384,
+          "adx": 38.659170121355864,
+          "plus_di": 10.587028680239328,
+          "minus_di": 31.436830970143518,
+          "williams_r": -45.52896527930245,
+          "ichimoku_tenkan": 213.3314971923828,
+          "ichimoku_kijun": 212.90650177001953,
+          "ichimoku_senkou_a": 213.11899948120117,
+          "ichimoku_senkou_b": 213.50299835205078,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 40.37184594953519,
@@ -4816,7 +6148,23 @@
           "ofi10": -0.2,
           "vwap": 213.26301752726235,
           "bbp": -0.0500797042266754,
-          "close": 213.21200561523438
+          "close": 213.21200561523438,
+          "macd_line": -0.05171684014911193,
+          "macd_signal": -0.04294015558164713,
+          "macd_hist": -0.008776684567464804,
+          "macd_prev_hist": -0.015043398238986726,
+          "stoch_k": 52.64790887453247,
+          "stoch_d": 48.28831218384317,
+          "adx": 49.64687552057083,
+          "plus_di": 13.833561115304294,
+          "minus_di": 27.496919935354807,
+          "williams_r": -47.35209112546753,
+          "ichimoku_tenkan": 213.14999389648438,
+          "ichimoku_kijun": 213.3249969482422,
+          "ichimoku_senkou_a": 213.23749542236328,
+          "ichimoku_senkou_b": 213.19200134277344,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -4856,14 +6204,30 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=38.7>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 4,
           "reason": "BUY (rate_diff=2.44 yield_diff=2.356 cpi_diff=3.82, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=75.0% (wilson_lower=40.9%) variant=v45_exp2h_score14 bias=2"
         }
       ],
       "agents_for": [
         "1H_rsi_bullish",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
@@ -4871,13 +6235,15 @@
         "15m_below_ema20",
         "1H_bb_below_mid",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "Stoch_bearish"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 6,
+      "agents_for_count": 3,
+      "agents_against_count": 8,
       "volume_profile": {
         "pair": "GBPJPY",
-        "as_of": "2026-05-02T21:02:30.305067+00:00",
+        "as_of": "2026-05-03T20:26:25.614156+00:00",
         "current_price": 213.21200561523438,
         "high": 213.65499877929688,
         "low": 212.7969970703125,
@@ -5140,7 +6506,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 213.1487777709961,
@@ -5152,17 +6518,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:30.097498+00:00",
+      "as_of": "2026-05-03T20:26:24.833447+00:00",
       "session": "NY"
     },
     "GBPCHF": {
       "pair": "GBPCHF",
       "side": "SELL",
-      "probability": 0.5189,
-      "probability_pct": 51.9,
-      "score": -1,
-      "max_score": 53,
-      "recommended_hours": 1,
+      "probability": 0.5531,
+      "probability_pct": 55.3,
+      "score": -4,
+      "max_score": 75,
+      "recommended_hours": 2,
       "current_price": 1.0611900091171265,
       "indicators": {
         "4H": {
@@ -5177,7 +6543,23 @@
           "ofi10": -0.1,
           "vwap": 1.0621513307094574,
           "bbp": -0.001783548215271713,
-          "close": 1.0611900091171265
+          "close": 1.0611900091171265,
+          "macd_line": -0.0006409266004729908,
+          "macd_signal": -0.0005314067418123899,
+          "macd_hist": -0.00010951985866060083,
+          "macd_prev_hist": -0.0001610834180865026,
+          "stoch_k": 26.72112018669778,
+          "stoch_d": 14.69907193847949,
+          "adx": 46.36485183485291,
+          "plus_di": 6.494176340892963,
+          "minus_di": 21.95500009341483,
+          "williams_r": -73.27887981330221,
+          "ichimoku_tenkan": 1.0620699524879456,
+          "ichimoku_kijun": 1.0621449947357178,
+          "ichimoku_senkou_a": 1.0621074736118317,
+          "ichimoku_senkou_b": 1.062600016593933,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 34.64690638160026,
@@ -5191,7 +6573,23 @@
           "ofi10": -0.1,
           "vwap": 1.0621513307094574,
           "bbp": -0.0008678156162482686,
-          "close": 1.0611900091171265
+          "close": 1.0611900091171265,
+          "macd_line": -0.0006412162634144014,
+          "macd_signal": -0.0005318327139985928,
+          "macd_hist": -0.00010938354941580864,
+          "macd_prev_hist": -0.00016093620444121383,
+          "stoch_k": 26.72112018669778,
+          "stoch_d": 14.699071938479479,
+          "adx": 46.36523724516555,
+          "plus_di": 6.494164283273265,
+          "minus_di": 21.954989085116193,
+          "williams_r": -73.27887981330221,
+          "ichimoku_tenkan": 1.0620699524879456,
+          "ichimoku_kijun": 1.0621449947357178,
+          "ichimoku_senkou_a": 1.0621074736118317,
+          "ichimoku_senkou_b": 1.062600016593933,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 48.83785407328681,
@@ -5205,7 +6603,23 @@
           "ofi10": 0.0,
           "vwap": 1.0609281698862711,
           "bbp": 1.7697327870713764e-05,
-          "close": 1.0611900091171265
+          "close": 1.0611900091171265,
+          "macd_line": -0.00026440543712391573,
+          "macd_signal": -0.0003399258640679196,
+          "macd_hist": 7.552042694400384e-05,
+          "macd_prev_hist": 4.6704686949415976e-05,
+          "stoch_k": 90.17667092379736,
+          "stoch_d": 64.53502713912268,
+          "adx": 35.11586539447181,
+          "plus_di": 7.904043619497552,
+          "minus_di": 8.869067563089217,
+          "williams_r": -9.82332907620264,
+          "ichimoku_tenkan": 1.0606849789619446,
+          "ichimoku_kijun": 1.0610349774360657,
+          "ichimoku_senkou_a": 1.0608599781990051,
+          "ichimoku_senkou_b": 1.0620699524879456,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -5240,27 +6654,51 @@
           "reason": "BBP=-0.00087"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=46.4>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bear",
+          "contrib": -3,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan < Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 5,
           "reason": "BUY (rate_diff=3.75 yield_diff=4.301 cpi_diff=3.39, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=56.2% (wilson_lower=33.2%) variant=v01_baseline bias=2"
         }
       ],
       "agents_for": [
         "15m_above_ema20",
-        "fundamental_macro_tilt"
+        "Stoch_bullish",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_downtrend",
         "1H_downtrend",
         "1H_rsi_bearish",
         "1H_bb_below_mid",
-        "1H_bbp_bear"
+        "1H_bbp_bear",
+        "ADX_strong_downtrend",
+        "Ichimoku_strong_bear"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 5,
+      "agents_for_count": 4,
+      "agents_against_count": 7,
       "volume_profile": {
         "pair": "GBPCHF",
-        "as_of": "2026-05-02T21:02:30.766123+00:00",
+        "as_of": "2026-05-03T20:26:26.176337+00:00",
         "current_price": 1.0611900091171265,
         "high": 1.0639599561691284,
         "low": 1.0601799488067627,
@@ -5523,7 +6961,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.0607469499111175,
@@ -5547,17 +6985,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:30.584035+00:00",
+      "as_of": "2026-05-03T20:26:25.614288+00:00",
       "session": "NY"
     },
     "GBPAUD": {
       "pair": "GBPAUD",
       "side": "SELL",
-      "probability": 0.6291,
-      "probability_pct": 62.9,
-      "score": -7,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6548,
+      "probability_pct": 65.5,
+      "score": -12,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 1.8839999437332153,
       "indicators": {
         "4H": {
@@ -5572,7 +7010,23 @@
           "ofi10": -0.9,
           "vwap": 1.888755331436793,
           "bbp": -0.004488242017495203,
-          "close": 1.8839999437332153
+          "close": 1.8839999437332153,
+          "macd_line": -0.001635242254814484,
+          "macd_signal": -0.0008941014016451548,
+          "macd_hist": -0.0007411408531693293,
+          "macd_prev_hist": -0.0008226363267962564,
+          "stoch_k": 9.587052678499994,
+          "stoch_d": 6.21135472393884,
+          "adx": 44.82050432101201,
+          "plus_di": 13.896716345886517,
+          "minus_di": 29.686798257746123,
+          "williams_r": -90.4129473215,
+          "ichimoku_tenkan": 1.8878350257873535,
+          "ichimoku_kijun": 1.8882150053977966,
+          "ichimoku_senkou_a": 1.888025015592575,
+          "ichimoku_senkou_b": 1.8893049955368042,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 19.428314251528548,
@@ -5586,7 +7040,23 @@
           "ofi10": -0.9,
           "vwap": 1.888755331436793,
           "bbp": -0.003873606717131217,
-          "close": 1.8839999437332153
+          "close": 1.8839999437332153,
+          "macd_line": -0.001633510627611079,
+          "macd_signal": -0.0008915551651072955,
+          "macd_hist": -0.0007419554625037834,
+          "macd_prev_hist": -0.0008235160710299125,
+          "stoch_k": 9.587052678499994,
+          "stoch_d": 6.21135472393884,
+          "adx": 44.82079283011491,
+          "plus_di": 13.896716019279587,
+          "minus_di": 29.686786356474627,
+          "williams_r": -90.4129473215,
+          "ichimoku_tenkan": 1.8878350257873535,
+          "ichimoku_kijun": 1.8882150053977966,
+          "ichimoku_senkou_a": 1.888025015592575,
+          "ichimoku_senkou_b": 1.8893049955368042,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 36.66587194362765,
@@ -5600,7 +7070,23 @@
           "ofi10": 0.2,
           "vwap": 1.8845193326473235,
           "bbp": -0.0012280912783086961,
-          "close": 1.8839999437332153
+          "close": 1.8839999437332153,
+          "macd_line": -0.0011136042363313337,
+          "macd_signal": -0.0012992298679655745,
+          "macd_hist": 0.00018562563163424081,
+          "macd_prev_hist": 0.0001629200074615366,
+          "stoch_k": 37.31150749521819,
+          "stoch_d": 33.33185059976573,
+          "adx": 55.274000286260794,
+          "plus_di": 9.61272341293096,
+          "minus_di": 22.474373641401385,
+          "williams_r": -62.68849250478181,
+          "ichimoku_tenkan": 1.8842400312423706,
+          "ichimoku_kijun": 1.8856199979782104,
+          "ichimoku_senkou_a": 1.8849300146102905,
+          "ichimoku_senkou_b": 1.8882150053977966,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -5638,10 +7124,37 @@
           "name": "MTF_full_bear",
           "contrib": -3,
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
+        },
+        {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=44.8>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=9.6 D=6.2 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-90.4 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_strong_bear",
+          "contrib": -3,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan < Kijun"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=70.0% (wilson_lower=39.7%) variant=v118_contra_emph_meanrev bias=-3"
         }
       ],
       "agents_for": [
-        "1H_rsi_oversold"
+        "1H_rsi_oversold",
+        "Stoch_oversold",
+        "WilliamsR_oversold"
       ],
       "agents_against": [
         "4H_downtrend",
@@ -5649,13 +7162,16 @@
         "15m_below_ema20",
         "1H_below_vwap",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "Ichimoku_strong_bear",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 1,
-      "agents_against_count": 6,
+      "agents_for_count": 3,
+      "agents_against_count": 9,
       "volume_profile": {
         "pair": "GBPAUD",
-        "as_of": "2026-05-02T21:02:31.265149+00:00",
+        "as_of": "2026-05-03T20:26:26.689961+00:00",
         "current_price": 1.8839999437332153,
         "high": 1.8934299945831299,
         "low": 1.8830000162124634,
@@ -5918,7 +7434,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.88373011469841,
@@ -5936,16 +7452,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:31.046548+00:00",
+      "as_of": "2026-05-03T20:26:26.176463+00:00",
       "session": "NY"
     },
     "GBPCAD": {
       "pair": "GBPCAD",
       "side": "SELL",
-      "probability": 0.6964,
-      "probability_pct": 69.6,
-      "score": -11,
-      "max_score": 53,
+      "probability": 0.6548,
+      "probability_pct": 65.5,
+      "score": -12,
+      "max_score": 75,
       "recommended_hours": 3,
       "current_price": 1.8444600105285645,
       "indicators": {
@@ -5961,7 +7477,23 @@
           "ofi10": -0.5,
           "vwap": 1.846841671069463,
           "bbp": -0.0018297649414302786,
-          "close": 1.8444600105285645
+          "close": 1.8444600105285645,
+          "macd_line": -0.00040162524297859825,
+          "macd_signal": 6.460099244486737e-05,
+          "macd_hist": -0.00046622623542346564,
+          "macd_prev_hist": -0.00045746310093360524,
+          "stoch_k": 12.940247303600957,
+          "stoch_d": 7.759680203348214,
+          "adx": 25.424340842553594,
+          "plus_di": 15.058259376289719,
+          "minus_di": 28.718897986261545,
+          "williams_r": -87.05975269639904,
+          "ichimoku_tenkan": 1.848039984703064,
+          "ichimoku_kijun": 1.848039984703064,
+          "ichimoku_senkou_a": 1.848039984703064,
+          "ichimoku_senkou_b": 1.8468899726867676,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 37.64344519679824,
@@ -5975,7 +7507,23 @@
           "ofi10": -0.5,
           "vwap": 1.846841671069463,
           "bbp": -0.0019425796230503334,
-          "close": 1.8444600105285645
+          "close": 1.8444600105285645,
+          "macd_line": -0.0004006738979700497,
+          "macd_signal": 6.599988236138254e-05,
+          "macd_hist": -0.00046667378033143225,
+          "macd_prev_hist": -0.0004579464312942147,
+          "stoch_k": 12.940247303600957,
+          "stoch_d": 7.759680203348214,
+          "adx": 25.42474098218773,
+          "plus_di": 15.058255555047898,
+          "minus_di": 28.7188823838942,
+          "williams_r": -87.05975269639904,
+          "ichimoku_tenkan": 1.848039984703064,
+          "ichimoku_kijun": 1.848039984703064,
+          "ichimoku_senkou_a": 1.848039984703064,
+          "ichimoku_senkou_b": 1.8468899726867676,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 28.264355262240613,
@@ -5989,7 +7537,23 @@
           "ofi10": -0.2,
           "vwap": 1.8455216765403748,
           "bbp": -0.0012342357756873756,
-          "close": 1.8444600105285645
+          "close": 1.8444600105285645,
+          "macd_line": -0.0009269975591457147,
+          "macd_signal": -0.0008675380232302601,
+          "macd_hist": -5.945953591545458e-05,
+          "macd_prev_hist": -0.00011218723343832783,
+          "stoch_k": 34.246709559423884,
+          "stoch_d": 27.57533275971839,
+          "adx": 63.990039778831154,
+          "plus_di": 4.525700473491192,
+          "minus_di": 24.59737904886697,
+          "williams_r": -65.75329044057611,
+          "ichimoku_tenkan": 1.844224989414215,
+          "ichimoku_kijun": 1.8463749885559082,
+          "ichimoku_senkou_a": 1.8452999889850616,
+          "ichimoku_senkou_b": 1.848039984703064,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -6029,12 +7593,39 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "MACD_bearish_accel",
+          "contrib": -1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0430\u0434\u0430\u0435\u0442"
+        },
+        {
+          "name": "Stoch_oversold",
+          "contrib": 2,
+          "reason": "Stoch K=12.9 D=7.8 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_oversold",
+          "contrib": 1,
+          "reason": "Williams %R=-87.1 < -80 \u2014 \u043f\u0435\u0440\u0435\u043f\u0440\u043e\u0434\u0430\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_bear",
+          "contrib": -1,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 2,
           "reason": "BUY (rate_diff=1.48 yield_diff=1.261 cpi_diff=1.1, conf=58.6%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=80.0% (wilson_lower=37.6%) variant=v02_score12 bias=-1"
         }
       ],
       "agents_for": [
+        "Stoch_oversold",
+        "WilliamsR_oversold",
         "fundamental_macro_tilt"
       ],
       "agents_against": [
@@ -6044,13 +7635,16 @@
         "1H_momentum_down",
         "1H_below_vwap",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "MACD_bearish_accel",
+        "Ichimoku_bear",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 1,
-      "agents_against_count": 7,
+      "agents_for_count": 3,
+      "agents_against_count": 10,
       "volume_profile": {
         "pair": "GBPCAD",
-        "as_of": "2026-05-02T21:02:31.713539+00:00",
+        "as_of": "2026-05-03T20:26:27.207084+00:00",
         "current_price": 1.8444600105285645,
         "high": 1.852869987487793,
         "low": 1.843209981918335,
@@ -6318,22 +7912,22 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [],
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:31.518693+00:00",
+      "as_of": "2026-05-03T20:26:26.690047+00:00",
       "session": "NY"
     },
     "GBPNZD": {
       "pair": "GBPNZD",
       "side": "SELL",
-      "probability": 0.6113,
-      "probability_pct": 61.1,
-      "score": -6,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6051,
+      "probability_pct": 60.5,
+      "score": -8,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 2.3020501136779785,
       "indicators": {
         "4H": {
@@ -6348,7 +7942,23 @@
           "ofi10": -0.3,
           "vwap": 2.3048928459485376,
           "bbp": -0.0019313976004422528,
-          "close": 2.3020501136779785
+          "close": 2.3020501136779785,
+          "macd_line": -0.0012699755619349773,
+          "macd_signal": -0.0007066132497137699,
+          "macd_hist": -0.0005633623122212074,
+          "macd_prev_hist": -0.0007436463390192467,
+          "stoch_k": 32.230488858828394,
+          "stoch_d": 19.096662994722696,
+          "adx": 32.185758676092384,
+          "plus_di": 17.268386736956206,
+          "minus_di": 18.35650571599879,
+          "williams_r": -67.7695111411716,
+          "ichimoku_tenkan": 2.3041549921035767,
+          "ichimoku_kijun": 2.304305076599121,
+          "ichimoku_senkou_a": 2.304230034351349,
+          "ichimoku_senkou_b": 2.306599974632263,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "1H": {
           "rsi14": 32.515175894097865,
@@ -6362,7 +7972,23 @@
           "ofi10": -0.3,
           "vwap": 2.3048928459485376,
           "bbp": -0.0018276412387523422,
-          "close": 2.3020501136779785
+          "close": 2.3020501136779785,
+          "macd_line": -0.0012676972828873367,
+          "macd_signal": -0.0007032631457064879,
+          "macd_hist": -0.0005644341371808489,
+          "macd_prev_hist": -0.0007448038721332869,
+          "stoch_k": 32.230488858828394,
+          "stoch_d": 19.096662994722685,
+          "adx": 32.186131586479654,
+          "plus_di": 17.268387113662726,
+          "minus_di": 18.356492200180952,
+          "williams_r": -67.7695111411716,
+          "ichimoku_tenkan": 2.3041549921035767,
+          "ichimoku_kijun": 2.304305076599121,
+          "ichimoku_senkou_a": 2.304230034351349,
+          "ichimoku_senkou_b": 2.306599974632263,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         },
         "15m": {
           "rsi14": 54.09158394224332,
@@ -6376,7 +8002,23 @@
           "ofi10": 0.0,
           "vwap": 2.3006503502527873,
           "bbp": 0.0005267060843618943,
-          "close": 2.3020501136779785
+          "close": 2.3020501136779785,
+          "macd_line": -0.0006858039009851602,
+          "macd_signal": -0.0011021434466045505,
+          "macd_hist": 0.0004163395456193903,
+          "macd_prev_hist": 0.0003488193380516112,
+          "stoch_k": 82.13242686838703,
+          "stoch_d": 72.6943393817526,
+          "adx": 43.4890080752705,
+          "plus_di": 20.986117348175206,
+          "minus_di": 7.086793997981188,
+          "williams_r": -17.867573131612964,
+          "ichimoku_tenkan": 2.3004499673843384,
+          "ichimoku_kijun": 2.3007800579071045,
+          "ichimoku_senkou_a": 2.3006150126457214,
+          "ichimoku_senkou_b": 2.304305076599121,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -6416,14 +8058,36 @@
           "reason": "BBP=-0.00183"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=32.2>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bear",
+          "contrib": -3,
+          "reason": "\u0426\u0435\u043d\u0430 \u043d\u0438\u0436\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan < Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 1,
           "reason": "BUY (rate_diff=1.2 yield_diff=0.061 cpi_diff=0.89, conf=32.1%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 3,
+          "reason": "QUALIFIED cell, expected_wr=100.0% (wilson_lower=70.1%) variant=v21_emph_mtf bias=3"
         }
       ],
       "agents_for": [
         "15m_above_ema20",
-        "fundamental_macro_tilt"
+        "Stoch_bullish",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_downtrend",
@@ -6431,13 +8095,15 @@
         "1H_rsi_bearish",
         "1H_bb_below_mid",
         "1H_below_vwap",
-        "1H_bbp_bear"
+        "1H_bbp_bear",
+        "ADX_strong_downtrend",
+        "Ichimoku_strong_bear"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 6,
+      "agents_for_count": 4,
+      "agents_against_count": 8,
       "volume_profile": {
         "pair": "GBPNZD",
-        "as_of": "2026-05-02T21:02:32.238183+00:00",
+        "as_of": "2026-05-03T20:26:27.748303+00:00",
         "current_price": 2.3020501136779785,
         "high": 2.310650110244751,
         "low": 2.297960042953491,
@@ -6705,7 +8371,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 2.2998635530471803,
@@ -6729,17 +8395,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:32.024395+00:00",
+      "as_of": "2026-05-03T20:26:27.207172+00:00",
       "session": "NY"
     },
     "AUDJPY": {
       "pair": "AUDJPY",
       "side": "BUY",
-      "probability": 0.5377,
-      "probability_pct": 53.8,
-      "score": 2,
-      "max_score": 53,
-      "recommended_hours": 1,
+      "probability": 0.5531,
+      "probability_pct": 55.3,
+      "score": 4,
+      "max_score": 75,
+      "recommended_hours": 2,
       "current_price": 113.16500091552734,
       "indicators": {
         "4H": {
@@ -6754,7 +8420,23 @@
           "ofi10": 0.3,
           "vwap": 112.91059964497883,
           "bbp": -0.10706705674253669,
-          "close": 113.16500091552734
+          "close": 113.16500091552734,
+          "macd_line": 0.026559452053490418,
+          "macd_signal": -0.03747439063805015,
+          "macd_hist": 0.06403384269154057,
+          "macd_prev_hist": 0.06867090438057129,
+          "stoch_k": 93.65122615803814,
+          "stoch_d": 91.63447111971794,
+          "adx": 23.48882913910488,
+          "plus_di": 18.700310102168963,
+          "minus_di": 27.116899915121273,
+          "williams_r": -6.348773841961853,
+          "ichimoku_tenkan": 112.93399810791016,
+          "ichimoku_kijun": 112.58300018310547,
+          "ichimoku_senkou_a": 112.75849914550781,
+          "ichimoku_senkou_b": 112.87049865722656,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 70.0672876514937,
@@ -6768,7 +8450,23 @@
           "ofi10": 0.3,
           "vwap": 112.91059964497883,
           "bbp": 0.1630680698067124,
-          "close": 113.16500091552734
+          "close": 113.16500091552734,
+          "macd_line": 0.02642543261877961,
+          "macd_signal": -0.03767146062641009,
+          "macd_hist": 0.06409689324518969,
+          "macd_prev_hist": 0.06873899682738116,
+          "stoch_k": 93.65122615803814,
+          "stoch_d": 91.63447111971794,
+          "adx": 23.48917229751344,
+          "plus_di": 18.700301523097195,
+          "minus_di": 27.116901936643334,
+          "williams_r": -6.348773841961853,
+          "ichimoku_tenkan": 112.93399810791016,
+          "ichimoku_kijun": 112.58300018310547,
+          "ichimoku_senkou_a": 112.75849914550781,
+          "ichimoku_senkou_b": 112.87049865722656,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 53.93933789532088,
@@ -6782,7 +8480,23 @@
           "ofi10": -0.6,
           "vwap": 113.15233332316082,
           "bbp": 0.05958239098274021,
-          "close": 113.16500091552734
+          "close": 113.16500091552734,
+          "macd_line": 0.03573587404152079,
+          "macd_signal": 0.05283390631290114,
+          "macd_hist": -0.017098032271380355,
+          "macd_prev_hist": -0.02130292863411056,
+          "stoch_k": 81.95611644916104,
+          "stoch_d": 68.79774367799608,
+          "adx": 35.87282154358784,
+          "plus_di": 11.409080377781148,
+          "minus_di": 32.15018769797636,
+          "williams_r": -18.04388355083895,
+          "ichimoku_tenkan": 113.07849884033203,
+          "ichimoku_kijun": 113.07999801635742,
+          "ichimoku_senkou_a": 113.07924842834473,
+          "ichimoku_senkou_b": 112.84299850463867,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -6817,9 +8531,29 @@
           "reason": "BBP=0.16307"
         },
         {
+          "name": "Stoch_overbought",
+          "contrib": -2,
+          "reason": "Stoch K=93.7 D=91.6 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-6.3 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 4,
           "reason": "BUY (rate_diff=2.92 yield_diff=2.555 cpi_diff=2.8, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=60.9% (wilson_lower=40.8%) variant=v10_exp2h bias=5"
         },
         {
           "name": "cot_speculator_contrarian",
@@ -6832,18 +8566,22 @@
         "1H_bb_above_mid",
         "1H_above_vwap",
         "1H_bbp_bull",
-        "fundamental_macro_tilt"
+        "Ichimoku_strong_bull",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
         "1H_rsi_overbought",
+        "Stoch_overbought",
+        "WilliamsR_overbought",
         "cot_speculator_contrarian"
       ],
-      "agents_for_count": 5,
-      "agents_against_count": 3,
+      "agents_for_count": 7,
+      "agents_against_count": 5,
       "volume_profile": {
         "pair": "AUDJPY",
-        "as_of": "2026-05-02T21:02:32.648320+00:00",
+        "as_of": "2026-05-03T20:26:28.244884+00:00",
         "current_price": 113.16500091552734,
         "high": 113.21299743652344,
         "low": 112.4729995727539,
@@ -7121,7 +8859,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 112.53959938049317,
@@ -7145,16 +8883,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:32.454733+00:00",
+      "as_of": "2026-05-03T20:26:27.748420+00:00",
       "session": "NY"
     },
     "CADJPY": {
       "pair": "CADJPY",
       "side": "BUY",
-      "probability": 0.5749,
-      "probability_pct": 57.5,
-      "score": 4,
-      "max_score": 53,
+      "probability": 0.5399,
+      "probability_pct": 54.0,
+      "score": 3,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 115.55799865722656,
       "indicators": {
@@ -7170,7 +8908,23 @@
           "ofi10": 0.5,
           "vwap": 115.48255004882813,
           "bbp": -0.3149474716342695,
-          "close": 115.55799865722656
+          "close": 115.55799865722656,
+          "macd_line": -0.04794022388166752,
+          "macd_signal": -0.09636947097827608,
+          "macd_hist": 0.04842924709660856,
+          "macd_prev_hist": 0.05218399816039687,
+          "stoch_k": 88.56033587648413,
+          "stoch_d": 88.44105093859201,
+          "adx": 26.66009698971253,
+          "plus_di": 13.96013417856446,
+          "minus_di": 20.359099826985645,
+          "williams_r": -11.439664123515868,
+          "ichimoku_tenkan": 115.42599868774414,
+          "ichimoku_kijun": 115.2239990234375,
+          "ichimoku_senkou_a": 115.32499885559082,
+          "ichimoku_senkou_b": 115.69300079345703,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 68.35157299197074,
@@ -7184,7 +8938,23 @@
           "ofi10": 0.5,
           "vwap": 115.48255004882813,
           "bbp": 0.004142044141957513,
-          "close": 115.55799865722656
+          "close": 115.55799865722656,
+          "macd_line": -0.04802726980918237,
+          "macd_signal": -0.09649747012319271,
+          "macd_hist": 0.04847020031401034,
+          "macd_prev_hist": 0.05222822645266807,
+          "stoch_k": 88.56033587648413,
+          "stoch_d": 88.44105093859201,
+          "adx": 26.660431098921755,
+          "plus_di": 13.960122002289381,
+          "minus_di": 20.35909511228563,
+          "williams_r": -11.439664123515868,
+          "ichimoku_tenkan": 115.42599868774414,
+          "ichimoku_kijun": 115.2239990234375,
+          "ichimoku_senkou_a": 115.32499885559082,
+          "ichimoku_senkou_b": 115.69300079345703,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 57.80146641054084,
@@ -7198,7 +8968,23 @@
           "ofi10": 0.0,
           "vwap": 115.54601631164553,
           "bbp": 0.021137893496671722,
-          "close": 115.55799865722656
+          "close": 115.55799865722656,
+          "macd_line": 0.02306586211091144,
+          "macd_signal": 0.028812943668366498,
+          "macd_hist": -0.005747081557455059,
+          "macd_prev_hist": -0.005305559867507373,
+          "stoch_k": 57.35203366058906,
+          "stoch_d": 65.1908210818609,
+          "adx": 11.304288599184392,
+          "plus_di": 13.42840352191942,
+          "minus_di": 13.388040507173447,
+          "williams_r": -42.64796633941094,
+          "ichimoku_tenkan": 115.54899978637695,
+          "ichimoku_kijun": 115.50650024414062,
+          "ichimoku_senkou_a": 115.52775001525879,
+          "ichimoku_senkou_b": 115.39649963378906,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -7228,9 +9014,24 @@
           "reason": "BBP=0.00414"
         },
         {
+          "name": "Stoch_overbought",
+          "contrib": -2,
+          "reason": "Stoch K=88.6 D=88.4 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-11.4 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 2,
           "reason": "BUY (rate_diff=0.96 yield_diff=1.095 cpi_diff=2.72, conf=58.5%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=85.7% (wilson_lower=48.7%) variant=v44_exp1h_score14 bias=5"
         }
       ],
       "agents_for": [
@@ -7238,16 +9039,19 @@
         "1H_rsi_bullish",
         "1H_bb_above_mid",
         "1H_bbp_bull",
-        "fundamental_macro_tilt"
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
-        "4H_strong_downtrend"
+        "4H_strong_downtrend",
+        "Stoch_overbought",
+        "WilliamsR_overbought"
       ],
-      "agents_for_count": 5,
-      "agents_against_count": 1,
+      "agents_for_count": 6,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "CADJPY",
-        "as_of": "2026-05-02T21:02:33.088769+00:00",
+        "as_of": "2026-05-03T20:26:28.685163+00:00",
         "current_price": 115.55799865722656,
         "high": 115.61599731445312,
         "low": 115.23600006103516,
@@ -7510,7 +9314,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 115.58939750671387,
@@ -7534,16 +9338,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:32.880535+00:00",
+      "as_of": "2026-05-03T20:26:28.244951+00:00",
       "session": "NY"
     },
     "CHFJPY": {
       "pair": "CHFJPY",
       "side": "SELL",
-      "probability": 0.6964,
-      "probability_pct": 69.6,
+      "probability": 0.6426,
+      "probability_pct": 64.3,
       "score": -11,
-      "max_score": 53,
+      "max_score": 75,
       "recommended_hours": 3,
       "current_price": 200.8249969482422,
       "indicators": {
@@ -7559,7 +9363,23 @@
           "ofi10": -0.3,
           "vwap": 200.80041732788087,
           "bbp": -0.4395667011198725,
-          "close": 200.8249969482422
+          "close": 200.8249969482422,
+          "macd_line": -0.007957428843980097,
+          "macd_signal": -0.056676163401982727,
+          "macd_hist": 0.04871873455800263,
+          "macd_prev_hist": 0.06803358984206663,
+          "stoch_k": 64.72685545674358,
+          "stoch_d": 78.47157234709671,
+          "adx": 22.168476286351137,
+          "plus_di": 14.446281703351994,
+          "minus_di": 22.997800897696038,
+          "williams_r": -35.27314454325642,
+          "ichimoku_tenkan": 200.76799774169922,
+          "ichimoku_kijun": 200.3530044555664,
+          "ichimoku_senkou_a": 200.5605010986328,
+          "ichimoku_senkou_b": 200.65350341796875,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 66.89465372288541,
@@ -7573,7 +9393,23 @@
           "ofi10": -0.3,
           "vwap": 200.80041732788087,
           "bbp": -0.07783964322675274,
-          "close": 200.8249969482422
+          "close": 200.8249969482422,
+          "macd_line": -0.007950159035715387,
+          "macd_signal": -0.056665472532693946,
+          "macd_hist": 0.04871531349697856,
+          "macd_prev_hist": 0.06802989509930743,
+          "stoch_k": 64.72685545674358,
+          "stoch_d": 78.47157234709671,
+          "adx": 22.168676587126,
+          "plus_di": 14.446277676505094,
+          "minus_di": 22.99779825654611,
+          "williams_r": -35.27314454325642,
+          "ichimoku_tenkan": 200.76799774169922,
+          "ichimoku_kijun": 200.3530044555664,
+          "ichimoku_senkou_a": 200.5605010986328,
+          "ichimoku_senkou_b": 200.65350341796875,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 29.75627838013159,
@@ -7587,7 +9423,23 @@
           "ofi10": -0.2,
           "vwap": 200.99988377889,
           "bbp": -0.13456139814229573,
-          "close": 200.8249969482422
+          "close": 200.8249969482422,
+          "macd_line": -0.018058611688303472,
+          "macd_signal": 0.016440985925336476,
+          "macd_hist": -0.03449959761363995,
+          "macd_prev_hist": -0.03282471153413583,
+          "stoch_k": 0.0,
+          "stoch_d": 14.333051675861954,
+          "adx": 44.37593629016583,
+          "plus_di": 6.2476325683844784,
+          "minus_di": 18.93275343834154,
+          "williams_r": -100.0,
+          "ichimoku_tenkan": 200.93350219726562,
+          "ichimoku_kijun": 201.0219955444336,
+          "ichimoku_senkou_a": 200.9777488708496,
+          "ichimoku_senkou_b": 200.68799591064453,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -7632,14 +9484,30 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": -2,
           "reason": "SELL (rate_diff=-1.31 yield_diff=-1.945 cpi_diff=0.43, conf=35.9%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": -2,
+          "reason": "PROBABLE cell, expected_wr=80.0% (wilson_lower=49.0%) variant=v09_exp1h bias=-1"
         }
       ],
       "agents_for": [
         "1H_rsi_bullish",
-        "1H_bb_above_mid"
+        "1H_bb_above_mid",
+        "Ichimoku_strong_bull"
       ],
       "agents_against": [
         "4H_strong_downtrend",
@@ -7648,13 +9516,15 @@
         "1H_momentum_down",
         "1H_bbp_bear",
         "MTF_full_bear",
-        "fundamental_macro_tilt"
+        "Stoch_bearish",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
-      "agents_for_count": 2,
-      "agents_against_count": 7,
+      "agents_for_count": 3,
+      "agents_against_count": 9,
       "volume_profile": {
         "pair": "CHFJPY",
-        "as_of": "2026-05-02T21:02:33.490142+00:00",
+        "as_of": "2026-05-03T20:26:29.228706+00:00",
         "current_price": 200.8249969482422,
         "high": 201.218994140625,
         "low": 200.31700134277344,
@@ -7917,7 +9787,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 201.17389450073244,
@@ -7941,17 +9811,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:33.328703+00:00",
+      "as_of": "2026-05-03T20:26:28.685266+00:00",
       "session": "NY"
     },
     "NZDJPY": {
       "pair": "NZDJPY",
-      "side": "SELL",
-      "probability": 0.5189,
-      "probability_pct": 51.9,
-      "score": -1,
-      "max_score": 53,
-      "recommended_hours": 1,
+      "side": "BUY",
+      "probability": 0.5399,
+      "probability_pct": 54.0,
+      "score": 3,
+      "max_score": 75,
+      "recommended_hours": 2,
       "current_price": 92.59600067138672,
       "indicators": {
         "4H": {
@@ -7966,7 +9836,23 @@
           "ofi10": 0.1,
           "vwap": 92.52664998372396,
           "bbp": -0.2472895362376022,
-          "close": 92.59600067138672
+          "close": 92.59600067138672,
+          "macd_line": -0.003024094951356915,
+          "macd_signal": -0.04297597235420218,
+          "macd_hist": 0.03995187740284527,
+          "macd_prev_hist": 0.050229073535984506,
+          "stoch_k": 67.46262198385315,
+          "stoch_d": 78.57751827428824,
+          "adx": 20.662584177364337,
+          "plus_di": 19.64428769663826,
+          "minus_di": 22.7923763902942,
+          "williams_r": -32.537378016146846,
+          "ichimoku_tenkan": 92.54650115966797,
+          "ichimoku_kijun": 92.30199813842773,
+          "ichimoku_senkou_a": 92.42424964904785,
+          "ichimoku_senkou_b": 92.53450012207031,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 65.05593416484506,
@@ -7980,7 +9866,23 @@
           "ofi10": 0.1,
           "vwap": 92.52664998372396,
           "bbp": -0.004104835979063637,
-          "close": 92.59600067138672
+          "close": 92.59600067138672,
+          "macd_line": -0.0031350415024462563,
+          "macd_signal": -0.04313911749770371,
+          "macd_hist": 0.04000407599525745,
+          "macd_prev_hist": 0.050285446588953085,
+          "stoch_k": 67.46262198385315,
+          "stoch_d": 78.57751827428824,
+          "adx": 20.662921321218125,
+          "plus_di": 19.644277296393515,
+          "minus_di": 22.792372902031556,
+          "williams_r": -32.537378016146846,
+          "ichimoku_tenkan": 92.54650115966797,
+          "ichimoku_kijun": 92.30199813842773,
+          "ichimoku_senkou_a": 92.42424964904785,
+          "ichimoku_senkou_b": 92.53450012207031,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 30.304831731563127,
@@ -7994,7 +9896,23 @@
           "ofi10": 0.0,
           "vwap": 92.68353322347005,
           "bbp": -0.050380603884050856,
-          "close": 92.59600067138672
+          "close": 92.59600067138672,
+          "macd_line": 0.0026413611307418705,
+          "macd_signal": 0.024386597853569194,
+          "macd_hist": -0.021745236722827323,
+          "macd_prev_hist": -0.021731116143886106,
+          "stoch_k": 11.463699096122072,
+          "stoch_d": 20.416005284694474,
+          "adx": 45.8532732033052,
+          "plus_di": 4.60643613938526,
+          "minus_di": 20.136167128460816,
+          "williams_r": -88.53630090387793,
+          "ichimoku_tenkan": 92.64750289916992,
+          "ichimoku_kijun": 92.69600296020508,
+          "ichimoku_senkou_a": 92.6717529296875,
+          "ichimoku_senkou_b": 92.49250030517578,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -8029,27 +9947,45 @@
           "reason": "BBP=-0.00410"
         },
         {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 3,
           "reason": "BUY (rate_diff=1.24 yield_diff=2.295 cpi_diff=2.93, conf=85.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=80.0% (wilson_lower=37.6%) variant=v82_full_mtf_emph_meanrev bias=2"
         }
       ],
       "agents_for": [
         "1H_rsi_bullish",
         "1H_bb_above_mid",
-        "fundamental_macro_tilt"
+        "Ichimoku_strong_bull",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_strong_downtrend",
         "15m_below_ema20",
         "1H_momentum_down",
-        "1H_bbp_bear"
+        "1H_bbp_bear",
+        "Stoch_bearish"
       ],
-      "agents_for_count": 3,
-      "agents_against_count": 4,
+      "agents_for_count": 5,
+      "agents_against_count": 5,
       "volume_profile": {
         "pair": "NZDJPY",
-        "as_of": "2026-05-02T21:02:33.912947+00:00",
+        "as_of": "2026-05-03T20:26:29.795142+00:00",
         "current_price": 92.59600067138672,
         "high": 92.81400299072266,
         "low": 92.19499969482422,
@@ -8312,7 +10248,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 92.78305282592774,
@@ -8336,17 +10272,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:33.749201+00:00",
+      "as_of": "2026-05-03T20:26:29.228831+00:00",
       "session": "NY"
     },
     "AUDCAD": {
       "pair": "AUDCAD",
       "side": "BUY",
-      "probability": 0.6113,
-      "probability_pct": 61.1,
-      "score": 6,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6051,
+      "probability_pct": 60.5,
+      "score": 8,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 0.9781200289726257,
       "indicators": {
         "4H": {
@@ -8361,7 +10297,23 @@
           "ofi10": 0.1,
           "vwap": 0.9774778346220654,
           "bbp": 0.0005799935287611468,
-          "close": 0.9781200289726257
+          "close": 0.9781200289726257,
+          "macd_line": 0.0005400647165697547,
+          "macd_signal": 0.00047939316063269285,
+          "macd_hist": 6.067155593706189e-05,
+          "macd_prev_hist": 0.00014674178619715218,
+          "stoch_k": 58.80454261923386,
+          "stoch_d": 65.17193239537023,
+          "adx": 28.761133373097927,
+          "plus_di": 14.240607197853222,
+          "minus_di": 12.649540307616189,
+          "williams_r": -41.19545738076614,
+          "ichimoku_tenkan": 0.9781050086021423,
+          "ichimoku_kijun": 0.9775899946689606,
+          "ichimoku_senkou_a": 0.9778475016355515,
+          "ichimoku_senkou_b": 0.9761050045490265,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 58.33340231959403,
@@ -8375,7 +10327,23 @@
           "ofi10": 0.1,
           "vwap": 0.9774778346220652,
           "bbp": 0.00023987614019327363,
-          "close": 0.9781200289726257
+          "close": 0.9781200289726257,
+          "macd_line": 0.0005396179460183115,
+          "macd_signal": 0.00047873621963375574,
+          "macd_hist": 6.088172638455574e-05,
+          "macd_prev_hist": 0.0001469687610781028,
+          "stoch_k": 58.80454261923386,
+          "stoch_d": 65.17193239537025,
+          "adx": 28.76136250236937,
+          "plus_di": 14.240602702619096,
+          "minus_di": 12.649537819166916,
+          "williams_r": -41.19545738076614,
+          "ichimoku_tenkan": 0.9781050086021423,
+          "ichimoku_kijun": 0.9775899946689606,
+          "ichimoku_senkou_a": 0.9778475016355515,
+          "ichimoku_senkou_b": 0.9761050045490265,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 18.38496698831895,
@@ -8389,7 +10357,23 @@
           "ofi10": -0.5,
           "vwap": 0.9789540032545727,
           "bbp": -0.0007134697137354262,
-          "close": 0.9781200289726257
+          "close": 0.9781200289726257,
+          "macd_line": -7.173912309954567e-05,
+          "macd_signal": 0.00015264344739737782,
+          "macd_hist": -0.00022438257049692349,
+          "macd_prev_hist": -0.00022190886259109663,
+          "stoch_k": 33.04852779412141,
+          "stoch_d": 33.429252475989976,
+          "adx": 37.12763625736039,
+          "plus_di": 2.8032234341261213,
+          "minus_di": 11.671328464465276,
+          "williams_r": -66.95147220587859,
+          "ichimoku_tenkan": 0.9784500002861023,
+          "ichimoku_kijun": 0.9788349866867065,
+          "ichimoku_senkou_a": 0.9786424934864044,
+          "ichimoku_senkou_b": 0.9775899946689606,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -8429,6 +10413,16 @@
           "reason": "BBP=0.00024"
         },
         {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 2,
           "reason": "BUY (rate_diff=1.96 yield_diff=1.46 cpi_diff=0.08, conf=63.2%)"
@@ -8440,17 +10434,19 @@
         "1H_rsi_bullish",
         "1H_bb_above_mid",
         "1H_bbp_bull",
+        "Ichimoku_strong_bull",
         "fundamental_macro_tilt"
       ],
       "agents_against": [
         "15m_below_ema20",
-        "1H_momentum_down"
+        "1H_momentum_down",
+        "Stoch_bearish"
       ],
-      "agents_for_count": 6,
-      "agents_against_count": 2,
+      "agents_for_count": 7,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "AUDCAD",
-        "as_of": "2026-05-02T21:02:34.465450+00:00",
+        "as_of": "2026-05-03T20:26:30.416702+00:00",
         "current_price": 0.9781200289726257,
         "high": 0.9805999994277954,
         "low": 0.9745799899101257,
@@ -8713,7 +10709,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.9799377983808517,
@@ -8737,17 +10733,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:34.219926+00:00",
+      "as_of": "2026-05-03T20:26:29.795260+00:00",
       "session": "NY"
     },
     "AUDCHF": {
       "pair": "AUDCHF",
       "side": "BUY",
-      "probability": 0.6636,
-      "probability_pct": 66.4,
-      "score": 9,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.6426,
+      "probability_pct": 64.3,
+      "score": 11,
+      "max_score": 75,
+      "recommended_hours": 3,
       "current_price": 0.5627700090408325,
       "indicators": {
         "4H": {
@@ -8762,7 +10758,23 @@
           "ofi10": 0.4,
           "vwap": 0.5621580004692077,
           "bbp": -3.043379925837808e-05,
-          "close": 0.5627700090408325
+          "close": 0.5627700090408325,
+          "macd_line": 0.00010543140715491006,
+          "macd_signal": -1.881002784095879e-05,
+          "macd_hist": 0.00012424143499586884,
+          "macd_prev_hist": 0.00014608917832042176,
+          "stoch_k": 79.04413375991585,
+          "stoch_d": 82.535914399925,
+          "adx": 22.81238315782686,
+          "plus_di": 8.990890146516481,
+          "minus_di": 12.652272525529987,
+          "williams_r": -20.95586624008415,
+          "ichimoku_tenkan": 0.5622600018978119,
+          "ichimoku_kijun": 0.5619499981403351,
+          "ichimoku_senkou_a": 0.5621050000190735,
+          "ichimoku_senkou_b": 0.5620000064373016,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 53.80301554786931,
@@ -8776,7 +10788,23 @@
           "ofi10": 0.4,
           "vwap": 0.5621580004692077,
           "bbp": 0.0002810687687986313,
-          "close": 0.5627700090408325
+          "close": 0.5627700090408325,
+          "macd_line": 0.00010475419010202991,
+          "macd_signal": -1.980585304712117e-05,
+          "macd_hist": 0.00012456004314915107,
+          "macd_prev_hist": 0.00014643326496937274,
+          "stoch_k": 79.04413375991585,
+          "stoch_d": 82.535914399925,
+          "adx": 22.81272210928534,
+          "plus_di": 8.990880172164111,
+          "minus_di": 12.652270749906915,
+          "williams_r": -20.95586624008415,
+          "ichimoku_tenkan": 0.5622600018978119,
+          "ichimoku_kijun": 0.5619499981403351,
+          "ichimoku_senkou_a": 0.5621050000190735,
+          "ichimoku_senkou_b": 0.5620000064373016,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 41.66629035899752,
@@ -8790,7 +10818,23 @@
           "ofi10": -0.7,
           "vwap": 0.562770829598109,
           "bbp": -3.337529222291469e-05,
-          "close": 0.5627700090408325
+          "close": 0.5627700090408325,
+          "macd_line": 0.00010624905515244087,
+          "macd_signal": 0.00017750884540646702,
+          "macd_hist": -7.125979025402615e-05,
+          "macd_prev_hist": -6.73593299564212e-05,
+          "stoch_k": 65.45533359823719,
+          "stoch_d": 64.2427964213898,
+          "adx": 39.42682486540748,
+          "plus_di": 3.3037441188359855,
+          "minus_di": 11.99092551673188,
+          "williams_r": -34.54466640176282,
+          "ichimoku_tenkan": 0.562514990568161,
+          "ichimoku_kijun": 0.5623649954795837,
+          "ichimoku_senkou_a": 0.5624399930238724,
+          "ichimoku_senkou_b": 0.5619800090789795,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -8825,6 +10869,16 @@
           "reason": "BBP=0.00028"
         },
         {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 5,
           "reason": "BUY (rate_diff=4.23 yield_diff=4.5 cpi_diff=2.37, conf=100.0%)"
@@ -8841,17 +10895,19 @@
         "1H_bb_above_mid",
         "1H_above_vwap",
         "1H_bbp_bull",
+        "Ichimoku_strong_bull",
         "fundamental_macro_tilt"
       ],
       "agents_against": [
         "15m_below_ema20",
+        "Stoch_bearish",
         "cot_speculator_contrarian"
       ],
-      "agents_for_count": 6,
-      "agents_against_count": 2,
+      "agents_for_count": 7,
+      "agents_against_count": 3,
       "volume_profile": {
         "pair": "AUDCHF",
-        "as_of": "2026-05-02T21:02:35.158339+00:00",
+        "as_of": "2026-05-03T20:26:30.952378+00:00",
         "current_price": 0.5627700090408325,
         "high": 0.5633400082588196,
         "low": 0.5606200098991394,
@@ -9114,7 +11170,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.5629864084720612,
@@ -9138,17 +11194,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:34.813682+00:00",
+      "as_of": "2026-05-03T20:26:30.416821+00:00",
       "session": "NY"
     },
     "AUDNZD": {
       "pair": "AUDNZD",
       "side": "BUY",
-      "probability": 0.7273,
-      "probability_pct": 72.7,
-      "score": 13,
-      "max_score": 53,
-      "recommended_hours": 3,
+      "probability": 0.7123,
+      "probability_pct": 71.2,
+      "score": 17,
+      "max_score": 75,
+      "recommended_hours": 4,
       "current_price": 1.2216299772262573,
       "indicators": {
         "4H": {
@@ -9163,7 +11219,23 @@
           "ofi10": -0.1,
           "vwap": 1.2201746642589568,
           "bbp": 0.0016779965621085413,
-          "close": 1.2216299772262573
+          "close": 1.2216299772262573,
+          "macd_line": 0.0003185365363143067,
+          "macd_signal": 0.00018898266735078116,
+          "macd_hist": 0.0001295538689635255,
+          "macd_prev_hist": 8.009080281349824e-05,
+          "stoch_k": 100.0,
+          "stoch_d": 85.919344303649,
+          "adx": 22.46154436302191,
+          "plus_di": 16.942303387304356,
+          "minus_di": 23.724614401709076,
+          "williams_r": -0.0,
+          "ichimoku_tenkan": 1.22010999917984,
+          "ichimoku_kijun": 1.2188900113105774,
+          "ichimoku_senkou_a": 1.2195000052452087,
+          "ichimoku_senkou_b": 1.2192000150680542,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 58.873789567906265,
@@ -9177,7 +11249,23 @@
           "ofi10": -0.1,
           "vwap": 1.2201746642589568,
           "bbp": 0.0013602712829281494,
-          "close": 1.2216299772262573
+          "close": 1.2216299772262573,
+          "macd_line": 0.0003185801153799961,
+          "macd_signal": 0.00018904677941391894,
+          "macd_hist": 0.00012953333596607715,
+          "macd_prev_hist": 8.006862406697635e-05,
+          "stoch_k": 100.0,
+          "stoch_d": 85.91934430364903,
+          "adx": 22.461762772460908,
+          "plus_di": 16.942299056200167,
+          "minus_di": 23.72460990331171,
+          "williams_r": -0.0,
+          "ichimoku_tenkan": 1.22010999917984,
+          "ichimoku_kijun": 1.2188900113105774,
+          "ichimoku_senkou_a": 1.2195000052452087,
+          "ichimoku_senkou_b": 1.2192000150680542,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 68.50968854621081,
@@ -9191,7 +11279,23 @@
           "ofi10": -0.2,
           "vwap": 1.2206824958324431,
           "bbp": 0.000878868810793243,
-          "close": 1.2216299772262573
+          "close": 1.2216299772262573,
+          "macd_line": 0.0002753833350810364,
+          "macd_signal": 0.0002228580009917489,
+          "macd_hist": 5.25253340892875e-05,
+          "macd_prev_hist": 2.4739042832962486e-05,
+          "stoch_k": 100.0,
+          "stoch_d": 89.1757943664863,
+          "adx": 30.861789182848444,
+          "plus_di": 13.13957425781983,
+          "minus_di": 29.134068123788275,
+          "williams_r": -0.0,
+          "ichimoku_tenkan": 1.22010999917984,
+          "ichimoku_kijun": 1.22010999917984,
+          "ichimoku_senkou_a": 1.22010999917984,
+          "ichimoku_senkou_b": 1.22010999917984,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -9241,9 +11345,34 @@
           "reason": "\u0432\u0441\u0435 3 TF \u0432\u044b\u0448\u0435 EMA"
         },
         {
+          "name": "MACD_bullish_accel",
+          "contrib": 1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u0440\u0430\u0441\u0442\u0451\u0442"
+        },
+        {
+          "name": "Stoch_overbought",
+          "contrib": -2,
+          "reason": "Stoch K=100.0 D=85.9 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "WilliamsR_overbought",
+          "contrib": -1,
+          "reason": "Williams %R=-0.0 > -20 \u2014 \u043f\u0435\u0440\u0435\u043a\u0443\u043f\u043b\u0435\u043d\u043d\u043e\u0441\u0442\u044c"
+        },
+        {
+          "name": "Ichimoku_strong_bull",
+          "contrib": 3,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 + Tenkan > Kijun"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 1,
           "reason": "BUY (rate_diff=1.68 yield_diff=0.26 cpi_diff=-0.13, conf=24.5%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 3,
+          "reason": "QUALIFIED cell, expected_wr=76.9% (wilson_lower=49.7%) variant=v09_exp1h bias=3"
         },
         {
           "name": "cot_speculator_contrarian",
@@ -9260,17 +11389,22 @@
         "1H_above_vwap",
         "1H_bbp_bull",
         "MTF_full_bull",
-        "fundamental_macro_tilt"
+        "MACD_bullish_accel",
+        "Ichimoku_strong_bull",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "1H_bb_overbought",
+        "Stoch_overbought",
+        "WilliamsR_overbought",
         "cot_speculator_contrarian"
       ],
-      "agents_for_count": 9,
-      "agents_against_count": 2,
+      "agents_for_count": 12,
+      "agents_against_count": 4,
       "volume_profile": {
         "pair": "AUDNZD",
-        "as_of": "2026-05-02T21:02:35.688338+00:00",
+        "as_of": "2026-05-03T20:26:31.473630+00:00",
         "current_price": 1.2216299772262573,
         "high": 1.2216299772262573,
         "low": 1.2185900211334229,
@@ -9533,7 +11667,7 @@
         ],
         "direction": "UP",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 1.2196540057659149,
@@ -9557,16 +11691,16 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u043d\u0438\u0436\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:35.475016+00:00",
+      "as_of": "2026-05-03T20:26:30.952468+00:00",
       "session": "NY"
     },
     "CADCHF": {
       "pair": "CADCHF",
       "side": "SELL",
-      "probability": 0.6291,
-      "probability_pct": 62.9,
-      "score": -7,
-      "max_score": 53,
+      "probability": 0.5663,
+      "probability_pct": 56.6,
+      "score": -5,
+      "max_score": 75,
       "recommended_hours": 2,
       "current_price": 0.5747799873352051,
       "indicators": {
@@ -9582,7 +11716,23 @@
           "ofi10": 0.0,
           "vwap": 0.5749053309361141,
           "bbp": -0.0008784906886114552,
-          "close": 0.5747799873352051
+          "close": 0.5747799873352051,
+          "macd_line": -0.000275069119885063,
+          "macd_signal": -0.0003217580889782997,
+          "macd_hist": 4.6688969093236726e-05,
+          "macd_prev_hist": 4.234939326725292e-05,
+          "stoch_k": 64.3305935726353,
+          "stoch_d": 64.95748951459798,
+          "adx": 28.316524619922344,
+          "plus_di": 9.337957555154732,
+          "minus_di": 10.985000943876766,
+          "williams_r": -35.669406427364706,
+          "ichimoku_tenkan": 0.5743300020694733,
+          "ichimoku_kijun": 0.5745300054550171,
+          "ichimoku_senkou_a": 0.5744300037622452,
+          "ichimoku_senkou_b": 0.5756900012493134,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 38.44246247552751,
@@ -9596,7 +11746,23 @@
           "ofi10": 0.0,
           "vwap": 0.5749053309361141,
           "bbp": -0.0003123698620978166,
-          "close": 0.5747799873352051
+          "close": 0.5747799873352051,
+          "macd_line": -0.00027553387645395944,
+          "macd_signal": -0.0003224415062360932,
+          "macd_hist": 4.690762978213378e-05,
+          "macd_prev_hist": 4.258554084592164e-05,
+          "stoch_k": 64.3305935726353,
+          "stoch_d": 64.95748951459795,
+          "adx": 28.31697310125923,
+          "plus_di": 9.337946851286823,
+          "minus_di": 10.984996340758205,
+          "williams_r": -35.669406427364706,
+          "ichimoku_tenkan": 0.5743300020694733,
+          "ichimoku_kijun": 0.5745300054550171,
+          "ichimoku_senkou_a": 0.5744300037622452,
+          "ichimoku_senkou_b": 0.5756900012493134,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 54.63930195403711,
@@ -9610,7 +11776,23 @@
           "ofi10": -0.1,
           "vwap": 0.5746391634146372,
           "bbp": -4.146129240123475e-05,
-          "close": 0.5747799873352051
+          "close": 0.5747799873352051,
+          "macd_line": 5.7647145525474563e-05,
+          "macd_signal": 5.912893768117493e-05,
+          "macd_hist": -1.4817921557003645e-06,
+          "macd_prev_hist": 1.2796856226612117e-05,
+          "stoch_k": 61.76535039663409,
+          "stoch_d": 63.4000235580188,
+          "adx": 33.494440501823405,
+          "plus_di": 5.292456959490659,
+          "minus_di": 3.2223552872994383,
+          "williams_r": -38.23464960336591,
+          "ichimoku_tenkan": 0.5747949779033661,
+          "ichimoku_kijun": 0.5742399990558624,
+          "ichimoku_senkou_a": 0.5745174884796143,
+          "ichimoku_senkou_b": 0.5743300020694733,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -9650,13 +11832,30 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "MACD_bullish_accel",
+          "contrib": 1,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u0440\u0430\u0441\u0442\u0451\u0442"
+        },
+        {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 4,
           "reason": "BUY (rate_diff=2.27 yield_diff=3.04 cpi_diff=2.29, conf=100.0%)"
+        },
+        {
+          "name": "meta_strategy_agent",
+          "contrib": 2,
+          "reason": "PROBABLE cell, expected_wr=83.3% (wilson_lower=43.6%) variant=v120_full_mtf_emph_trend_score16 bias=1"
         }
       ],
       "agents_for": [
-        "fundamental_macro_tilt"
+        "MACD_bullish_accel",
+        "fundamental_macro_tilt",
+        "meta_strategy_agent"
       ],
       "agents_against": [
         "4H_downtrend",
@@ -9665,13 +11864,14 @@
         "1H_rsi_bearish",
         "1H_bb_below_mid",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "Stoch_bearish"
       ],
-      "agents_for_count": 1,
-      "agents_against_count": 7,
+      "agents_for_count": 3,
+      "agents_against_count": 8,
       "volume_profile": {
         "pair": "CADCHF",
-        "as_of": "2026-05-02T21:02:36.300804+00:00",
+        "as_of": "2026-05-03T20:26:32.008852+00:00",
         "current_price": 0.5747799873352051,
         "high": 0.5759000182151794,
         "low": 0.5727599859237671,
@@ -9934,7 +12134,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.5754290133714676,
@@ -9958,17 +12158,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:36.018621+00:00",
+      "as_of": "2026-05-03T20:26:31.473713+00:00",
       "session": "NY"
     },
     "NZDCAD": {
       "pair": "NZDCAD",
       "side": "SELL",
-      "probability": 0.6636,
-      "probability_pct": 66.4,
-      "score": -9,
-      "max_score": 53,
-      "recommended_hours": 2,
+      "probability": 0.69,
+      "probability_pct": 69.0,
+      "score": -15,
+      "max_score": 75,
+      "recommended_hours": 4,
       "current_price": 0.8009099960327148,
       "indicators": {
         "4H": {
@@ -9983,7 +12183,23 @@
           "ofi10": -0.1,
           "vwap": 0.80100849767526,
           "bbp": -0.0001976068545244125,
-          "close": 0.8009099960327148
+          "close": 0.8009099960327148,
+          "macd_line": 0.00020438760265006906,
+          "macd_signal": 0.000251681790726964,
+          "macd_hist": -4.729418807689496e-05,
+          "macd_prev_hist": 1.4493519655838405e-06,
+          "stoch_k": 40.21031233137995,
+          "stoch_d": 41.6136493874256,
+          "adx": 35.49493525219861,
+          "plus_di": 15.678561683647171,
+          "minus_di": 22.974205758869864,
+          "williams_r": -59.78968766862005,
+          "ichimoku_tenkan": 0.8017149865627289,
+          "ichimoku_kijun": 0.80137500166893,
+          "ichimoku_senkou_a": 0.8015449941158295,
+          "ichimoku_senkou_b": 0.7997449934482574,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 54.24346398041027,
@@ -9997,7 +12213,23 @@
           "ofi10": -0.1,
           "vwap": 0.80100849767526,
           "bbp": -0.0002434987361785712,
-          "close": 0.8009099960327148
+          "close": 0.8009099960327148,
+          "macd_line": 0.00020400923545560445,
+          "macd_signal": 0.00025112540798533485,
+          "macd_hist": -4.71161725297304e-05,
+          "macd_prev_hist": 1.641603864061599e-06,
+          "stoch_k": 40.21031233137995,
+          "stoch_d": 41.6136493874256,
+          "adx": 35.49525850766856,
+          "plus_di": 15.678557662830391,
+          "minus_di": 22.97420038287787,
+          "williams_r": -59.78968766862005,
+          "ichimoku_tenkan": 0.8017149865627289,
+          "ichimoku_kijun": 0.80137500166893,
+          "ichimoku_senkou_a": 0.8015449941158295,
+          "ichimoku_senkou_b": 0.7997449934482574,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 30.1728124411256,
@@ -10011,7 +12243,23 @@
           "ofi10": -0.1,
           "vwap": 0.8019648303588232,
           "bbp": -0.0007768716247128493,
-          "close": 0.8009099960327148
+          "close": 0.8009099960327148,
+          "macd_line": -0.00024103407793552023,
+          "macd_signal": -3.677917870679077e-05,
+          "macd_hist": -0.00020425489922872947,
+          "macd_prev_hist": -0.00021987419242750056,
+          "stoch_k": 33.77078322702081,
+          "stoch_d": 23.534487345443413,
+          "adx": 57.81969905183088,
+          "plus_di": 4.239421675928657,
+          "minus_di": 37.410912691786145,
+          "williams_r": -66.22921677297919,
+          "ichimoku_tenkan": 0.8011450171470642,
+          "ichimoku_kijun": 0.801910012960434,
+          "ichimoku_senkou_a": 0.8015275150537491,
+          "ichimoku_senkou_b": 0.80137500166893,
+          "ichimoku_above_cloud": 0.0,
+          "ichimoku_below_cloud": 1.0
         }
       },
       "score_breakdown": [
@@ -10049,6 +12297,21 @@
           "name": "MTF_full_bear",
           "contrib": -3,
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
+        },
+        {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=35.5>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "MACD_bearish_cross",
+          "contrib": -2,
+          "reason": "MACD \u0433\u0438\u0441\u0442\u043e\u0433\u0440\u0430\u043c\u043c\u0430 \u043f\u0435\u0440\u0435\u0441\u0435\u043a\u043b\u0430 0 \u0432\u043d\u0438\u0437"
+        },
+        {
+          "name": "Stoch_bearish",
+          "contrib": -1,
+          "reason": "Stoch K < D (\u043c\u0435\u0434\u0432\u0435\u0436\u0438\u0439)"
         }
       ],
       "agents_for": [
@@ -10060,13 +12323,16 @@
         "1H_bb_below_mid",
         "1H_momentum_down",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend",
+        "MACD_bearish_cross",
+        "Stoch_bearish"
       ],
       "agents_for_count": 1,
-      "agents_against_count": 6,
+      "agents_against_count": 9,
       "volume_profile": {
         "pair": "NZDCAD",
-        "as_of": "2026-05-02T21:02:36.854025+00:00",
+        "as_of": "2026-05-03T20:26:32.490806+00:00",
         "current_price": 0.8009099960327148,
         "high": 0.8037499785423279,
         "low": 0.7990000247955322,
@@ -10329,7 +12595,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.8032274836301804,
@@ -10353,17 +12619,17 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:36.604948+00:00",
+      "as_of": "2026-05-03T20:26:32.008932+00:00",
       "session": "NY"
     },
     "NZDCHF": {
       "pair": "NZDCHF",
       "side": "SELL",
-      "probability": 0.5564,
-      "probability_pct": 55.6,
-      "score": -3,
-      "max_score": 53,
-      "recommended_hours": 1,
+      "probability": 0.5531,
+      "probability_pct": 55.3,
+      "score": -4,
+      "max_score": 75,
+      "recommended_hours": 2,
       "current_price": 0.46083998680114746,
       "indicators": {
         "4H": {
@@ -10378,7 +12644,23 @@
           "ofi10": 0.2,
           "vwap": 0.4607046648859977,
           "bbp": -0.0004138402438380595,
-          "close": 0.46083998680114746
+          "close": 0.46083998680114746,
+          "macd_line": -4.623409297160874e-05,
+          "macd_signal": -8.788498169526734e-05,
+          "macd_hist": 4.16508887236586e-05,
+          "macd_prev_hist": 4.760322448785738e-05,
+          "stoch_k": 79.1814848051761,
+          "stoch_d": 76.95128571586842,
+          "adx": 51.55344230602311,
+          "plus_di": 7.27737125430743,
+          "minus_di": 34.5812721732703,
+          "williams_r": -20.8185151948239,
+          "ichimoku_tenkan": 0.46005500853061676,
+          "ichimoku_kijun": 0.46035000681877136,
+          "ichimoku_senkou_a": 0.46020250767469406,
+          "ichimoku_senkou_b": 0.46000000834465027,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "1H": {
           "rsi14": 51.080933049809914,
@@ -10392,7 +12674,23 @@
           "ofi10": 0.2,
           "vwap": 0.46070466488599776,
           "bbp": -3.178195460351585e-05,
-          "close": 0.46083998680114746
+          "close": 0.46083998680114746,
+          "macd_line": -4.680750608060391e-05,
+          "macd_signal": -8.872817789487412e-05,
+          "macd_hist": 4.192067181427021e-05,
+          "macd_prev_hist": 4.789458301414866e-05,
+          "stoch_k": 79.1814848051761,
+          "stoch_d": 76.95128571586842,
+          "adx": 51.55396988232938,
+          "plus_di": 7.277358069041924,
+          "minus_di": 34.58126668484004,
+          "williams_r": -20.8185151948239,
+          "ichimoku_tenkan": 0.46005500853061676,
+          "ichimoku_kijun": 0.46035000681877136,
+          "ichimoku_senkou_a": 0.46020250767469406,
+          "ichimoku_senkou_b": 0.46000000834465027,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         },
         "15m": {
           "rsi14": 42.85669231739624,
@@ -10406,7 +12704,23 @@
           "ofi10": -0.4,
           "vwap": 0.4610463321208954,
           "bbp": -0.0001369688906028288,
-          "close": 0.46083998680114746
+          "close": 0.46083998680114746,
+          "macd_line": -1.5630251638532044e-05,
+          "macd_signal": 5.231994839552303e-05,
+          "macd_hist": -6.795020003405507e-05,
+          "macd_prev_hist": -7.406973988747264e-05,
+          "stoch_k": 70.0626423690205,
+          "stoch_d": 60.72070361933688,
+          "adx": 47.17466786245719,
+          "plus_di": 2.8185636036261155,
+          "minus_di": 31.84485353523959,
+          "williams_r": -29.9373576309795,
+          "ichimoku_tenkan": 0.4605250060558319,
+          "ichimoku_kijun": 0.46057000756263733,
+          "ichimoku_senkou_a": 0.4605475068092346,
+          "ichimoku_senkou_b": 0.46005500853061676,
+          "ichimoku_above_cloud": 1.0,
+          "ichimoku_below_cloud": 0.0
         }
       },
       "score_breakdown": [
@@ -10446,6 +12760,21 @@
           "reason": "\u0432\u0441\u0435 3 TF \u043d\u0438\u0436\u0435 EMA"
         },
         {
+          "name": "ADX_strong_downtrend",
+          "contrib": -3,
+          "reason": "ADX=51.6>30, -DI>+DI \u2014 \u0441\u0438\u043b\u044c\u043d\u044b\u0439 \u043d\u0438\u0441\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u0442\u0440\u0435\u043d\u0434"
+        },
+        {
+          "name": "Stoch_bullish",
+          "contrib": 1,
+          "reason": "Stoch K > D (\u0431\u044b\u0447\u0438\u0439)"
+        },
+        {
+          "name": "Ichimoku_bull",
+          "contrib": 1,
+          "reason": "\u0426\u0435\u043d\u0430 \u0432\u044b\u0448\u0435 \u043e\u0431\u043b\u0430\u043a\u0430 \u0418\u0448\u0438\u043c\u043e\u043a\u0443"
+        },
+        {
           "name": "fundamental_macro_tilt",
           "contrib": 4,
           "reason": "BUY (rate_diff=2.55 yield_diff=4.24 cpi_diff=2.5, conf=100.0%)"
@@ -10454,6 +12783,8 @@
       "agents_for": [
         "1H_rsi_bullish",
         "1H_bb_above_mid",
+        "Stoch_bullish",
+        "Ichimoku_bull",
         "fundamental_macro_tilt"
       ],
       "agents_against": [
@@ -10461,13 +12792,14 @@
         "1H_downtrend",
         "15m_below_ema20",
         "1H_bbp_bear",
-        "MTF_full_bear"
+        "MTF_full_bear",
+        "ADX_strong_downtrend"
       ],
-      "agents_for_count": 3,
-      "agents_against_count": 5,
+      "agents_for_count": 5,
+      "agents_against_count": 6,
       "volume_profile": {
         "pair": "NZDCHF",
-        "as_of": "2026-05-02T21:02:37.422670+00:00",
+        "as_of": "2026-05-03T20:26:33.005468+00:00",
         "current_price": 0.46083998680114746,
         "high": 0.46140000224113464,
         "low": 0.4587100148200989,
@@ -10730,7 +13062,7 @@
         ],
         "direction": "DOWN",
         "forecast_to_utc5_midnight": {
-          "deadline_utc": "2026-05-03T19:00:00+00:00",
+          "deadline_utc": "2026-05-04T19:00:00+00:00",
           "no_return_levels": [
             {
               "price": 0.46126550287008283,
@@ -10754,253 +13086,262 @@
           "explanation": "\u0426\u0435\u043d\u0430 \u043d\u0435 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u043a \u0432\u0435\u0440\u0445\u043d\u0438\u043c big-player \u0443\u0440\u043e\u0432\u043d\u044f\u043c \u0434\u043e 00:00 UTC+5"
         }
       },
-      "as_of": "2026-05-02T21:02:37.176779+00:00",
+      "as_of": "2026-05-03T20:26:32.490886+00:00",
       "session": "NY"
     }
   },
   "rankings": [
     {
-      "pair": "EURCAD",
-      "side": "SELL",
-      "probability_pct": 77.0,
-      "score": -16,
-      "recommended_hours": 3,
-      "agents_for_count": 0,
-      "agents_against_count": 9
-    },
-    {
       "pair": "EURUSD",
       "side": "SELL",
-      "probability_pct": 74.2,
-      "score": -14,
-      "recommended_hours": 3,
-      "agents_for_count": 0,
-      "agents_against_count": 9
+      "probability_pct": 72.3,
+      "score": -18,
+      "recommended_hours": 5,
+      "agents_for_count": 2,
+      "agents_against_count": 13
+    },
+    {
+      "pair": "EURCAD",
+      "side": "SELL",
+      "probability_pct": 71.2,
+      "score": -17,
+      "recommended_hours": 4,
+      "agents_for_count": 2,
+      "agents_against_count": 12
     },
     {
       "pair": "AUDNZD",
       "side": "BUY",
-      "probability_pct": 72.7,
-      "score": 13,
-      "recommended_hours": 3,
-      "agents_for_count": 9,
-      "agents_against_count": 2
+      "probability_pct": 71.2,
+      "score": 17,
+      "recommended_hours": 4,
+      "agents_for_count": 12,
+      "agents_against_count": 4
     },
     {
       "pair": "EURAUD",
       "side": "SELL",
-      "probability_pct": 71.2,
-      "score": -12,
-      "recommended_hours": 3,
-      "agents_for_count": 2,
-      "agents_against_count": 8
-    },
-    {
-      "pair": "GBPCAD",
-      "side": "SELL",
-      "probability_pct": 69.6,
-      "score": -11,
-      "recommended_hours": 3,
-      "agents_for_count": 1,
-      "agents_against_count": 7
-    },
-    {
-      "pair": "CHFJPY",
-      "side": "SELL",
-      "probability_pct": 69.6,
-      "score": -11,
-      "recommended_hours": 3,
-      "agents_for_count": 2,
-      "agents_against_count": 7
-    },
-    {
-      "pair": "EURNZD",
-      "side": "SELL",
-      "probability_pct": 66.4,
-      "score": -9,
-      "recommended_hours": 2,
-      "agents_for_count": 1,
-      "agents_against_count": 6
-    },
-    {
-      "pair": "AUDCHF",
-      "side": "BUY",
-      "probability_pct": 66.4,
-      "score": 9,
-      "recommended_hours": 2,
-      "agents_for_count": 6,
-      "agents_against_count": 2
+      "probability_pct": 69.0,
+      "score": -15,
+      "recommended_hours": 4,
+      "agents_for_count": 4,
+      "agents_against_count": 10
     },
     {
       "pair": "NZDCAD",
       "side": "SELL",
-      "probability_pct": 66.4,
-      "score": -9,
-      "recommended_hours": 2,
+      "probability_pct": 69.0,
+      "score": -15,
+      "recommended_hours": 4,
       "agents_for_count": 1,
-      "agents_against_count": 6
+      "agents_against_count": 9
+    },
+    {
+      "pair": "EURNZD",
+      "side": "SELL",
+      "probability_pct": 67.8,
+      "score": -14,
+      "recommended_hours": 4,
+      "agents_for_count": 2,
+      "agents_against_count": 9
     },
     {
       "pair": "USDCHF",
       "side": "BUY",
-      "probability_pct": 62.9,
-      "score": 7,
-      "recommended_hours": 2,
-      "agents_for_count": 5,
-      "agents_against_count": 2
-    },
-    {
-      "pair": "EURJPY",
-      "side": "SELL",
-      "probability_pct": 62.9,
-      "score": -7,
-      "recommended_hours": 2,
-      "agents_for_count": 2,
-      "agents_against_count": 6
+      "probability_pct": 65.5,
+      "score": 12,
+      "recommended_hours": 3,
+      "agents_for_count": 8,
+      "agents_against_count": 3
     },
     {
       "pair": "GBPAUD",
       "side": "SELL",
-      "probability_pct": 62.9,
-      "score": -7,
-      "recommended_hours": 2,
-      "agents_for_count": 1,
-      "agents_against_count": 6
+      "probability_pct": 65.5,
+      "score": -12,
+      "recommended_hours": 3,
+      "agents_for_count": 3,
+      "agents_against_count": 9
     },
     {
-      "pair": "CADCHF",
+      "pair": "GBPCAD",
       "side": "SELL",
-      "probability_pct": 62.9,
-      "score": -7,
-      "recommended_hours": 2,
-      "agents_for_count": 1,
-      "agents_against_count": 7
+      "probability_pct": 65.5,
+      "score": -12,
+      "recommended_hours": 3,
+      "agents_for_count": 3,
+      "agents_against_count": 10
+    },
+    {
+      "pair": "CHFJPY",
+      "side": "SELL",
+      "probability_pct": 64.3,
+      "score": -11,
+      "recommended_hours": 3,
+      "agents_for_count": 3,
+      "agents_against_count": 9
+    },
+    {
+      "pair": "AUDCHF",
+      "side": "BUY",
+      "probability_pct": 64.3,
+      "score": 11,
+      "recommended_hours": 3,
+      "agents_for_count": 7,
+      "agents_against_count": 3
     },
     {
       "pair": "AUDUSD",
       "side": "BUY",
-      "probability_pct": 61.1,
-      "score": 6,
-      "recommended_hours": 2,
-      "agents_for_count": 5,
-      "agents_against_count": 2
+      "probability_pct": 60.5,
+      "score": 8,
+      "recommended_hours": 3,
+      "agents_for_count": 7,
+      "agents_against_count": 3
+    },
+    {
+      "pair": "EURJPY",
+      "side": "SELL",
+      "probability_pct": 60.5,
+      "score": -8,
+      "recommended_hours": 3,
+      "agents_for_count": 3,
+      "agents_against_count": 8
     },
     {
       "pair": "EURCHF",
       "side": "SELL",
-      "probability_pct": 61.1,
-      "score": -6,
-      "recommended_hours": 2,
-      "agents_for_count": 2,
-      "agents_against_count": 6
+      "probability_pct": 60.5,
+      "score": -8,
+      "recommended_hours": 3,
+      "agents_for_count": 4,
+      "agents_against_count": 9
     },
     {
       "pair": "GBPNZD",
       "side": "SELL",
-      "probability_pct": 61.1,
-      "score": -6,
-      "recommended_hours": 2,
-      "agents_for_count": 2,
-      "agents_against_count": 6
+      "probability_pct": 60.5,
+      "score": -8,
+      "recommended_hours": 3,
+      "agents_for_count": 4,
+      "agents_against_count": 8
     },
     {
       "pair": "AUDCAD",
       "side": "BUY",
-      "probability_pct": 61.1,
-      "score": 6,
-      "recommended_hours": 2,
-      "agents_for_count": 6,
-      "agents_against_count": 2
+      "probability_pct": 60.5,
+      "score": 8,
+      "recommended_hours": 3,
+      "agents_for_count": 7,
+      "agents_against_count": 3
     },
     {
       "pair": "GBPJPY",
       "side": "SELL",
-      "probability_pct": 59.3,
-      "score": -5,
+      "probability_pct": 59.2,
+      "score": -7,
       "recommended_hours": 2,
-      "agents_for_count": 2,
-      "agents_against_count": 6
+      "agents_for_count": 3,
+      "agents_against_count": 8
     },
     {
       "pair": "GBPUSD",
       "side": "SELL",
-      "probability_pct": 57.5,
-      "score": -4,
+      "probability_pct": 56.6,
+      "score": -5,
       "recommended_hours": 2,
-      "agents_for_count": 1,
-      "agents_against_count": 5
-    },
-    {
-      "pair": "USDJPY",
-      "side": "BUY",
-      "probability_pct": 57.5,
-      "score": 4,
-      "recommended_hours": 2,
-      "agents_for_count": 6,
-      "agents_against_count": 2
-    },
-    {
-      "pair": "USDCAD",
-      "side": "BUY",
-      "probability_pct": 57.5,
-      "score": 4,
-      "recommended_hours": 2,
-      "agents_for_count": 5,
-      "agents_against_count": 1
-    },
-    {
-      "pair": "CADJPY",
-      "side": "BUY",
-      "probability_pct": 57.5,
-      "score": 4,
-      "recommended_hours": 2,
-      "agents_for_count": 5,
-      "agents_against_count": 1
-    },
-    {
-      "pair": "NZDCHF",
-      "side": "SELL",
-      "probability_pct": 55.6,
-      "score": -3,
-      "recommended_hours": 1,
       "agents_for_count": 3,
-      "agents_against_count": 5
+      "agents_against_count": 7
     },
     {
-      "pair": "EURGBP",
+      "pair": "CADCHF",
       "side": "SELL",
-      "probability_pct": 53.8,
-      "score": -2,
-      "recommended_hours": 1,
+      "probability_pct": 56.6,
+      "score": -5,
+      "recommended_hours": 2,
       "agents_for_count": 3,
-      "agents_against_count": 3
-    },
-    {
-      "pair": "AUDJPY",
-      "side": "BUY",
-      "probability_pct": 53.8,
-      "score": 2,
-      "recommended_hours": 1,
-      "agents_for_count": 5,
-      "agents_against_count": 3
+      "agents_against_count": 8
     },
     {
       "pair": "GBPCHF",
       "side": "SELL",
-      "probability_pct": 51.9,
-      "score": -1,
-      "recommended_hours": 1,
-      "agents_for_count": 2,
+      "probability_pct": 55.3,
+      "score": -4,
+      "recommended_hours": 2,
+      "agents_for_count": 4,
+      "agents_against_count": 7
+    },
+    {
+      "pair": "AUDJPY",
+      "side": "BUY",
+      "probability_pct": 55.3,
+      "score": 4,
+      "recommended_hours": 2,
+      "agents_for_count": 7,
       "agents_against_count": 5
     },
     {
-      "pair": "NZDJPY",
+      "pair": "NZDCHF",
       "side": "SELL",
-      "probability_pct": 51.9,
-      "score": -1,
+      "probability_pct": 55.3,
+      "score": -4,
+      "recommended_hours": 2,
+      "agents_for_count": 5,
+      "agents_against_count": 6
+    },
+    {
+      "pair": "USDJPY",
+      "side": "BUY",
+      "probability_pct": 54.0,
+      "score": 3,
+      "recommended_hours": 2,
+      "agents_for_count": 7,
+      "agents_against_count": 4
+    },
+    {
+      "pair": "USDCAD",
+      "side": "BUY",
+      "probability_pct": 54.0,
+      "score": 3,
+      "recommended_hours": 2,
+      "agents_for_count": 6,
+      "agents_against_count": 3
+    },
+    {
+      "pair": "EURGBP",
+      "side": "SELL",
+      "probability_pct": 54.0,
+      "score": -3,
+      "recommended_hours": 2,
+      "agents_for_count": 4,
+      "agents_against_count": 4
+    },
+    {
+      "pair": "CADJPY",
+      "side": "BUY",
+      "probability_pct": 54.0,
+      "score": 3,
+      "recommended_hours": 2,
+      "agents_for_count": 6,
+      "agents_against_count": 3
+    },
+    {
+      "pair": "NZDJPY",
+      "side": "BUY",
+      "probability_pct": 54.0,
+      "score": 3,
+      "recommended_hours": 2,
+      "agents_for_count": 5,
+      "agents_against_count": 5
+    },
+    {
+      "pair": "NZDUSD",
+      "side": "SELL",
+      "probability_pct": 52.7,
+      "score": -2,
       "recommended_hours": 1,
       "agents_for_count": 3,
-      "agents_against_count": 4
+      "agents_against_count": 6
     }
   ]
 }

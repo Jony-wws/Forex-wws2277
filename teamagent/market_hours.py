@@ -1,13 +1,22 @@
 """
 Forex market hours module.
 
-Forex trades 24/5 — opens Sunday 22:00 UTC (Sydney session) and closes
-Friday 22:00 UTC (NY session close). All times are computed in **UTC**;
-the dashboard renders them in UTC and UTC+5 for the user.
+Forex trades 24/5 — opens **Sunday 17:00 New-York-local time** (Sydney
+session) and closes **Friday 17:00 New-York-local time** (NY close).
 
-This module is intentionally dependency-free (only `datetime`) so it loads
-fast and can be imported by every trader / dashboard endpoint without
-adding latency.
+New York observes US daylight saving (EDT = UTC-4 from 2nd Sunday of
+March through 1st Sunday of November, EST = UTC-5 the rest of the
+year), so the same 5 pm NY moment is **21:00 UTC in summer** and
+**22:00 UTC in winter**. Hard-coding 22:00 UTC year-round (the previous
+implementation) made the countdown 1 hour off during DST. This module
+now anchors to `America/New_York` via `zoneinfo` and converts to UTC
+automatically.
+
+The dashboard renders times in UTC, NY local, and UTC+5 (user's local).
+
+This module is intentionally light-weight — only stdlib (`datetime`,
+`zoneinfo`) so it loads fast and can be imported by every trader /
+dashboard endpoint without adding latency.
 
 Public API:
   - is_market_open(at: datetime | None = None) -> bool
@@ -29,22 +38,25 @@ Public API:
       Snapshot for dashboard: {is_open, status_emoji, status_text,
       seconds_until_close, seconds_until_open, next_event_iso, ...}
 
-Convention used here (UTC):
-  - Open  = Sunday 22:00:00 UTC
-  - Close = Friday 22:00:00 UTC
+Convention used here (NY-local, DST-aware):
+  - Open  = Sunday 17:00 America/New_York  (= 21:00 UTC in EDT, 22:00 UTC in EST)
+  - Close = Friday 17:00 America/New_York  (= 21:00 UTC in EDT, 22:00 UTC in EST)
 This matches the standard FX wholesale week.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
-# Friday close: weekday=4 (Mon=0..Sun=6), hour=22:00 UTC
+_NY = ZoneInfo("America/New_York")
+
+# Friday close: weekday=4 (Mon=0..Sun=6), hour=17:00 New-York-local
 _FRIDAY_CLOSE_WEEKDAY = 4
-_FRIDAY_CLOSE_HOUR = 22
+_FRIDAY_CLOSE_HOUR_NY = 17
 
-# Sunday open: weekday=6, hour=22:00 UTC
+# Sunday open: weekday=6, hour=17:00 New-York-local
 _SUNDAY_OPEN_WEEKDAY = 6
-_SUNDAY_OPEN_HOUR = 22
+_SUNDAY_OPEN_HOUR_NY = 17
 
 
 def _utcnow() -> datetime:
@@ -60,54 +72,55 @@ def _ensure_utc(dt: datetime | None) -> datetime:
 
 
 def is_market_open(at: datetime | None = None) -> bool:
-    """True if Forex is open at the given UTC time.
+    """True if Forex is open at the given moment (DST-aware).
 
-    Open: Sunday 22:00 UTC → Friday 22:00 UTC.
-    Closed: Friday 22:00 UTC → Sunday 22:00 UTC.
+    Open: Sunday 17:00 NY-local → Friday 17:00 NY-local.
+    Closed: Friday 17:00 NY-local → Sunday 17:00 NY-local.
     """
-    t = _ensure_utc(at)
-    wd = t.weekday()  # Mon=0..Sun=6
+    t_utc = _ensure_utc(at)
+    t = t_utc.astimezone(_NY)
+    wd = t.weekday()  # Mon=0..Sun=6 — uses NY-local weekday
 
     # Saturday — fully closed
     if wd == 5:
         return False
 
-    # Friday — open until 22:00 UTC
+    # Friday — open until 17:00 NY-local
     if wd == _FRIDAY_CLOSE_WEEKDAY:
-        return t.hour < _FRIDAY_CLOSE_HOUR
+        return t.hour < _FRIDAY_CLOSE_HOUR_NY
 
-    # Sunday — open from 22:00 UTC
+    # Sunday — open from 17:00 NY-local
     if wd == _SUNDAY_OPEN_WEEKDAY:
-        return t.hour >= _SUNDAY_OPEN_HOUR
+        return t.hour >= _SUNDAY_OPEN_HOUR_NY
 
     # Mon..Thu — fully open
     return True
 
 
 def next_close(at: datetime | None = None) -> datetime:
-    """Next Friday 22:00 UTC ≥ given moment."""
-    t = _ensure_utc(at)
-    # Days to Friday from current weekday
-    days_ahead = (_FRIDAY_CLOSE_WEEKDAY - t.weekday()) % 7
-    target = (t + timedelta(days=days_ahead)).replace(
-        hour=_FRIDAY_CLOSE_HOUR, minute=0, second=0, microsecond=0)
-    if target <= t:
-        target += timedelta(days=7)
-    return target
+    """Next Friday 17:00 NY-local (returned as UTC) ≥ given moment."""
+    t_utc = _ensure_utc(at)
+    t_ny = t_utc.astimezone(_NY)
+    days_ahead = (_FRIDAY_CLOSE_WEEKDAY - t_ny.weekday()) % 7
+    target_ny = (t_ny + timedelta(days=days_ahead)).replace(
+        hour=_FRIDAY_CLOSE_HOUR_NY, minute=0, second=0, microsecond=0)
+    if target_ny <= t_ny:
+        target_ny += timedelta(days=7)
+    return target_ny.astimezone(timezone.utc)
 
 
 def next_open(at: datetime | None = None) -> datetime:
-    """Next Sunday 22:00 UTC ≥ given moment.
-    If market is currently open, returns the *previous* open boundary's
-    next instance (i.e. next Sunday 22:00 strictly in the future).
+    """Next Sunday 17:00 NY-local (returned as UTC) strictly > given moment.
+    DST-aware: in May the result is 21:00 UTC, in December 22:00 UTC.
     """
-    t = _ensure_utc(at)
-    days_ahead = (_SUNDAY_OPEN_WEEKDAY - t.weekday()) % 7
-    target = (t + timedelta(days=days_ahead)).replace(
-        hour=_SUNDAY_OPEN_HOUR, minute=0, second=0, microsecond=0)
-    if target <= t:
-        target += timedelta(days=7)
-    return target
+    t_utc = _ensure_utc(at)
+    t_ny = t_utc.astimezone(_NY)
+    days_ahead = (_SUNDAY_OPEN_WEEKDAY - t_ny.weekday()) % 7
+    target_ny = (t_ny + timedelta(days=days_ahead)).replace(
+        hour=_SUNDAY_OPEN_HOUR_NY, minute=0, second=0, microsecond=0)
+    if target_ny <= t_ny:
+        target_ny += timedelta(days=7)
+    return target_ny.astimezone(timezone.utc)
 
 
 def seconds_until_close(at: datetime | None = None) -> int:
@@ -179,8 +192,20 @@ def current_session(at: datetime | None = None) -> str:
     return "NY"
 
 
+_UTC_PLUS_5 = timezone(timedelta(hours=5))
+
+
+def _to_utc_plus_5_iso(dt: datetime) -> str:
+    """Convert a UTC datetime to UTC+5 ISO string for the user's local view."""
+    return dt.astimezone(_UTC_PLUS_5).strftime("%Y-%m-%d %H:%M (UTC+5)")
+
+
+def _to_ny_iso(dt: datetime) -> str:
+    return dt.astimezone(_NY).strftime("%Y-%m-%d %H:%M (NY)")
+
+
 def market_status(at: datetime | None = None) -> dict:
-    """Snapshot for dashboard."""
+    """Snapshot for dashboard. DST-aware. Includes UTC+5 user-local view."""
     t = _ensure_utc(at)
     is_open = is_market_open(t)
     if is_open:
@@ -188,6 +213,7 @@ def market_status(at: datetime | None = None) -> dict:
         secs = int((nc - t).total_seconds())
         return {
             "as_of_utc": t.isoformat(),
+            "as_of_utc_plus_5": _to_utc_plus_5_iso(t),
             "is_open": True,
             "status_emoji": "🟢",
             "status_text": "ОТКРЫТ",
@@ -196,6 +222,8 @@ def market_status(at: datetime | None = None) -> dict:
             "seconds_until_open": 0,
             "next_event": "close",
             "next_event_utc": nc.isoformat(),
+            "next_event_utc_plus_5": _to_utc_plus_5_iso(nc),
+            "next_event_ny": _to_ny_iso(nc),
             "next_event_text_ru": "закроется через",
             "max_safe_expiry_h": max_safe_expiry_hours(t),
         }
@@ -203,6 +231,7 @@ def market_status(at: datetime | None = None) -> dict:
     secs = int((no - t).total_seconds())
     return {
         "as_of_utc": t.isoformat(),
+        "as_of_utc_plus_5": _to_utc_plus_5_iso(t),
         "is_open": False,
         "status_emoji": "🔴",
         "status_text": "ЗАКРЫТ",
@@ -211,6 +240,8 @@ def market_status(at: datetime | None = None) -> dict:
         "seconds_until_open": secs,
         "next_event": "open",
         "next_event_utc": no.isoformat(),
+        "next_event_utc_plus_5": _to_utc_plus_5_iso(no),
+        "next_event_ny": _to_ny_iso(no),
         "next_event_text_ru": "откроется через",
         "max_safe_expiry_h": 0,
     }

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/intent.css">
 <script src="./lightweight-charts.standalone.production.js"></script>
+<script src="/static/fx-ux.js" defer></script>
 </head>
 <body class="intent-body">
 
@@ -40,6 +41,41 @@
   <a class="fx-tab" href="/agents"><span class="ico">🤖</span>Agents</a>
   <a class="fx-tab" href="/history"><span class="ico">📜</span>History</a>
 </nav>
+
+<!-- ═══ ФИНАЛЬНЫЕ ПРОГНОЗЫ ДЛЯ ВСЕХ 28 ПАР — индивидуальный подход ═══ -->
+<section id="final-signals-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🎯</span> ФИНАЛЬНЫЕ ПРОГНОЗЫ — все 28 пар</h2>
+    <span id="fs-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Каждая пара проходит <b data-explain="Probability">8 проверок</b> отдельно: вероятность ≥ 70%, рынок открыт,
+    нет news, своя стратегия для текущей сессии (<b data-explain="WR">WR ≥ 70%</b>),
+    ансамбль агентов согласен, макро/политический фон, свежесть данных.
+    <b style="color:#4afaa3">🟢 GO</b> — открывай на реальном счёте.
+    <b style="color:#ffce5e">🟡 GO_CAUTION</b> — можно с осторожностью.
+    <b style="color:#ff8090">🔴 WAIT</b> — нажми чтобы увидеть что блокирует.
+  </p>
+  <div id="fs-grid" class="fs-grid">
+    <div class="muted">Запрашиваю финальные прогнозы для всех 28 пар…</div>
+  </div>
+</section>
+
+<!-- ═══ AI-АНАЛИТИК — развёрнутый комментарий на русском (Pollinations free) ═══ -->
+<section id="ai-narrative-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🧠</span> AI-АНАЛИТИК — комментарий на русском</h2>
+    <span id="ai-narrative-source" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Свободный текст пишет реальная LLM (через бесплатный публичный API
+    Pollinations.ai — без ключей). Использует только факты из системы — никаких
+    выдумок. Если LLM упал — показывается честный детерминированный fallback.
+  </p>
+  <div id="ai-narrative-text" class="fs-card" style="white-space:pre-wrap;line-height:1.55;font-size:15px">
+    <span class="muted">Запрашиваю комментарий у AI-аналитика…</span>
+  </div>
+</section>
 
 <section class="fx-controls">
   <div class="fx-summary">
