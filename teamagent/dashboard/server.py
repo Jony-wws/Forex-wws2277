@@ -1072,14 +1072,8 @@ def api_system_audit():
 
 @app.get("/api/final-signal")
 def api_final_signal():
-    """ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ ПОЛЬЗОВАТЕЛЯ — единый сигнал, валидированный
-    через 8 проверок. По нему пользователь открывает сделку на РЕАЛЬНОМ счёте.
-
-    Берёт ТОП-1 из ``state/forecasts.json`` (тот же источник, что paper_trader)
-    и прогоняет: probability ≥ 70%, рынок открыт, нет news blackout, ячейка
-    meta_strategy ≥ PROBABLE, ансамбль агентов согласен с side, macro/political
-    не 🔴, state-файлы свежие. Возвращает ``GO`` / ``GO_CAUTION`` / ``WAIT``
-    с полным списком проверок и обоснованием на русском.
+    """ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ ПОЛЬЗОВАТЕЛЯ — ТОП-1 валидированный сигнал
+    с reasoning + alternates. Backwards-compatible (старая UI-секция).
     """
     try:
         from .. import final_signal as fs
@@ -1089,6 +1083,29 @@ def api_final_signal():
         return JSONResponse(fs.build())
     except Exception as e:
         log.exception(f"api_final_signal failed: {e}")
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
+@app.get("/api/final-signals")
+def api_final_signals():
+    """ФИНАЛЬНЫЙ ПРОГНОЗ — ВСЕ 28 ПАР с индивидуальной валидацией.
+
+    User explicit ask (2026-05-04): «финальный прогноз был всё 27 валюти … нужно
+    найти подод для каждого валюти и сессиях отденый подходит».
+
+    Каждая пара получает 8 проверок (probability/market/news/meta_strategy/
+    ensemble/macro/political/freshness) и индивидуальный verdict
+    GO / GO_CAUTION / WAIT. Сортировка GO → GO_CAUTION → WAIT, внутри по
+    probability убывающе.
+    """
+    try:
+        from .. import final_signal as fs
+    except ImportError:
+        from teamagent import final_signal as fs
+    try:
+        return JSONResponse(fs.build_all())
+    except Exception as e:
+        log.exception(f"api_final_signals failed: {e}")
         return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
 
 

@@ -508,8 +508,9 @@
         fetchJson(`/api/microstructure/${pair}`),
         fetchJson(`/api/forecast/${pair}`).catch(() => null),
       ]);
-      const inner = (ms.summary?.inner_facts || []).map(s => `<li>${escapeHtml(s)}</li>`).join("");
-      const outer = (ms.summary?.outer_view || []).map(s => `<li>${escapeHtml(s)}</li>`).join("");
+      const ux = window.FX_UX || { ru: x => x, ruPhrase: x => x, ruSummaryLine: x => x };
+      const inner = (ms.summary?.inner_facts || []).map(s => `<li>${escapeHtml(ux.ruSummaryLine(s))}</li>`).join("");
+      const outer = (ms.summary?.outer_view || []).map(s => `<li>${escapeHtml(ux.ruSummaryLine(s))}</li>`).join("");
       const cd = ms.cumulative_delta || {};
       const wy = ms.wyckoff || {};
       const hu = ms.hurst || {};
@@ -517,38 +518,38 @@
       const fvgs = (ms.fair_value_gaps || []).slice(0, 3);
       const sweeps = (ms.liquidity_sweeps || []).slice(0, 3);
       deepBody.innerHTML = `
-        <h3>${pair} · Market Intent</h3>
+        <h3>${pair} · Рыночный контекст (Market Intent)</h3>
         <div class="deep-section">
-          <h4>Что происходит ВНУТРИ рынка (inner)</h4>
+          <h4>Что происходит внутри рынка (ордер-флоу)</h4>
           <ul>${inner || "<li class='muted'>нет inner-фактов</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Что показывает СНАРУЖИ (outer)</h4>
+          <h4>Что показывает снаружи (режим и стадия)</h4>
           <ul>${outer || "<li class='muted'>нет outer-view</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Cumulative Delta</h4>
-          <div>bias: <b>${cd.bias || "—"}</b> · norm: <b>${toFixedSafe(cd.norm_pct, 0)}%</b> · divergence: <b>${cd.divergence ? "yes" : "no"}</b></div>
+          <h4 data-explain="Cumulative Delta">Кумулятивная дельта</h4>
+          <div>Перевес: <b>${ux.ru(cd.bias) || "—"}</b> · сила: <b>${toFixedSafe(cd.norm_pct, 0)}%</b> · расхождение с ценой: <b>${cd.divergence ? "да" : "нет"}</b></div>
         </div>
         <div class="deep-section">
-          <h4>Wyckoff stage</h4>
-          <div>stage: <b>${wy.stage || "—"}</b> · confidence: <b>${toFixedSafe(wy.confidence, 0)}%</b> · позиция: <b>${toFixedSafe(wy.position_in_range_pct, 0)}%</b></div>
+          <h4 data-explain="Wyckoff">Стадия Wyckoff</h4>
+          <div>стадия: <b>${ux.ru(wy.stage) || "—"}</b> · уверенность: <b>${toFixedSafe(wy.confidence, 0)}%</b> · позиция в диапазоне: <b>${toFixedSafe(wy.position_in_range_pct, 0)}%</b></div>
         </div>
         <div class="deep-section">
-          <h4>Hurst regime</h4>
-          <div>H = <b>${toFixedSafe(hu.H, 3)}</b> · ${hu.regime || "—"}</div>
+          <h4 data-explain="Hurst">Экспонента Хёрста (режим рынка)</h4>
+          <div>H = <b>${toFixedSafe(hu.H, 3)}</b> · режим: <b>${ux.ru(hu.regime) || "—"}</b></div>
         </div>
         <div class="deep-section">
-          <h4>Order blocks (последние ${obs.length})</h4>
-          <ul>${obs.map(o => `<li>${o.kind} @ ${fmtPrice(o.low)}–${fmtPrice(o.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="Order Block">Ордер-блоки (последние ${obs.length})</h4>
+          <ul>${obs.map(o => `<li>${ux.ru(o.kind)} @ ${fmtPrice(o.low)}–${fmtPrice(o.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Fair-value gaps</h4>
-          <ul>${fvgs.map(g => `<li>${g.kind} @ ${fmtPrice(g.low)}–${fmtPrice(g.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="FVG">Разрывы справедливой стоимости (FVG)</h4>
+          <ul>${fvgs.map(g => `<li>${ux.ru(g.kind)} @ ${fmtPrice(g.lo || g.low)}–${fmtPrice(g.hi || g.high)}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         <div class="deep-section">
-          <h4>Liquidity sweeps</h4>
-          <ul>${sweeps.map(s => `<li>${s.kind} → ${s.expectation || ""}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
+          <h4 data-explain="Liquidity Sweep">Снятие ликвидности</h4>
+          <ul>${sweeps.map(s => `<li>${ux.ru(s.kind)} → ${ux.ru(s.implication || s.expectation || "")}</li>`).join("") || "<li class='muted'>нет</li>"}</ul>
         </div>
         ${fc ? `
         <div class="deep-section">
@@ -649,4 +650,91 @@
   }
   refreshFinalSignal();
   setInterval(refreshFinalSignal, 30 * 1000);
+
+  // ─── МУЛЬТИ-СИГНАЛЫ: 28 финальных прогнозов (индивидуальный подход) ──
+  let _lastVerdicts = {};   // pair -> verdict — для WAIT->GO dingа
+  async function refreshFinalSignals() {
+    const grid = document.getElementById("fs-grid");
+    const pill = document.getElementById("fs-summary-pill");
+    if (!grid) return;
+    try {
+      const r = await fetch("/api/final-signals", { cache: "no-cache" })
+        .then(x => x.ok ? x.json() : Promise.reject(x.status));
+      if (!r || r.error) {
+        grid.innerHTML = `<div class="muted">Не удалось получить финальные прогнозы: ${r ? r.error : "?"}</div>`;
+        return;
+      }
+      const sigs = r.signals || [];
+      const sum = r.summary || {};
+
+      if (pill) {
+        pill.innerHTML =
+          `сессия «<b>${r.session_now_ru || "?"}</b>» · ` +
+          `<span class="fs-pill-go">🟢 ${sum.go || 0} GO</span> · ` +
+          `<span class="fs-pill-cau">🟡 ${sum.go_caution || 0}</span> · ` +
+          `<span class="fs-pill-wait">🔴 ${sum.wait || 0}</span> · ` +
+          `стратегии готовы: <b>${sum.qualified_cells_for_session || 0}/${sum.total || 28}</b>`;
+      }
+
+      // detect WAIT → GO transitions for the celebratory ding
+      let wokeUp = 0;
+      for (const s of sigs) {
+        const prev = _lastVerdicts[s.pair];
+        if (prev && prev !== "GO" && s.verdict === "GO") wokeUp++;
+        _lastVerdicts[s.pair] = s.verdict;
+      }
+      if (wokeUp > 0 && window.FX_UX && window.FX_UX.sound) {
+        window.FX_UX.sound.goDing();
+      }
+
+      grid.innerHTML = sigs.map(s => renderFinalCard(s)).join("");
+      // wire expand-on-click
+      grid.querySelectorAll(".fs-card").forEach(card => {
+        card.addEventListener("click", e => {
+          if (e.target.closest("[data-explain]")) return;
+          card.classList.toggle("is-expanded");
+        });
+      });
+    } catch (e) {
+      console.error("final-signals:", e);
+      grid.innerHTML = `<div class="muted">Ошибка: ${e}</div>`;
+    }
+  }
+  function renderFinalCard(s) {
+    const v = s.verdict || "WAIT";
+    const cls = v === "GO" ? "fs-card-go" : v === "GO_CAUTION" ? "fs-card-cau" : "fs-card-wait";
+    const probCls = v === "GO" ? "go" : v === "GO_CAUTION" ? "cau" : "wait";
+    const sideCls = (s.side || "").toLowerCase() === "buy" ? "fs-card-side-buy" : "fs-card-side-sell";
+    const sideRu = (s.side || "").toLowerCase() === "buy" ? "BUY (покупка)" : "SELL (продажа)";
+    const c = s.summary_counts || {};
+    const blocker = (v === "WAIT" && s.short_blocker)
+      ? `<div class="fs-card-blocker">⛔ блокирует: ${escapeHtml(s.short_blocker)}</div>` : "";
+    const checksHtml = (s.checks || []).map(ch => {
+      const dot = ch.status === "green" ? "🟢" : ch.status === "red" ? "🔴" : "🟡";
+      return `<li class="fs-${ch.status}">
+        <span>${dot}</span>
+        <span class="fs-cli-name">${escapeHtml(ch.name_ru)}</span>
+        <span class="fs-cli-detail">${escapeHtml(ch.detail_ru || "")}</span>
+      </li>`;
+    }).join("");
+    return `<div class="fs-card ${cls}" data-pair="${s.pair}">
+      <div class="fs-card-row1">
+        <span class="fs-card-pair">${s.pair}</span>
+        <span class="fs-card-side ${sideCls}">${sideRu}</span>
+      </div>
+      <div class="fs-card-row2">
+        <span class="fs-card-prob ${probCls}">${(s.probability_pct||0).toFixed(0)}%</span>
+        <span class="fs-card-expiry">экспайри ${s.expiry_hours || "?"}ч</span>
+      </div>
+      <div class="fs-card-verdict">${escapeHtml(s.verdict_ru || "")}</div>
+      ${blocker}
+      <div class="fs-card-checks">Проверки: 🟢${c.green||0} 🟡${c.yellow||0} 🔴${c.red||0}</div>
+      <div class="fs-card-tap">→ нажми чтобы развернуть все 8 проверок</div>
+      <div class="fs-card-expanded">
+        <ul>${checksHtml}</ul>
+      </div>
+    </div>`;
+  }
+  refreshFinalSignals();
+  setInterval(refreshFinalSignals, 30 * 1000);
 })();
