@@ -48,15 +48,22 @@ curl -sf --max-time 5 "$BASE/api/health" > /dev/null || { echo "ERROR: dashboard
 
 echo "== 3/5 reset $OUT =="
 rm -rf "$OUT"
-mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,daily,stability-forecast,volume-profile,meta-strategy}
+mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,daily,stability-forecast,volume-profile,meta-strategy,market-radar,market-regime,stability}
 
 echo "== 4/5 bake /api/* responses =="
+# Top-level endpoints. fundamentals / market-regime / weekly-loss-review /
+# wr-floor are referenced from app.js — without them the System tab logs
+# `SyntaxError: Unexpected token '<'` because the SPA fallback returns
+# index.html for the missing JSON path.
 for ep in forecasts market-radar cot open-trades closed-trades stats agents backtest health \
-          strategy-config market-status system-audit meta-strategy stability; do
+          strategy-config market-status system-audit meta-strategy stability \
+          fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
+          risk-metrics calibration; do
   curl -sf --max-time 12 "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
 done
 for ep in stakan/open-trades stakan/signals stakan/stats stakan/closed-trades \
-          daily/signals daily/stats daily/open-trades; do
+          daily/signals daily/stats daily/open-trades \
+          daily/closed-trades daily/paused; do
   curl -sf --max-time 12 "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"
 done
 for h in 1 6 24; do
