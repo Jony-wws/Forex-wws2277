@@ -93,33 +93,24 @@
   }
 
   // Build a UTC Date corresponding to a specific NY-local weekday + hour
-  // strictly AFTER `from`. Iterates day-by-day so DST transitions are handled
-  // by the runtime's tz database (no manual offsets).
+  // strictly AFTER `from`. We can't just iterate days and check
+  // `ny.hour < targetHourNy`, because the probe inherits `from`'s
+  // hour-of-day; if `from` is already past targetHourNy NY-local the
+  // condition can never be satisfied on any future iteration.
+  // Instead: for each of the next 14 calendar days, compute the
+  // candidate UTC moment of `targetHourNy:00 NY-local` on that NY-date
+  // and pick the first one strictly in the future. DST transitions are
+  // handled by the runtime's tz database via `_nyAnchorToUtc`.
   function _nextNyAnchor(from, targetWeekday, targetHourNy) {
-    let probe = new Date(from.getTime());
+    const nowMs = from.getTime();
     for (let i = 0; i < 14; i++) {
+      const probe = new Date(nowMs + i * 24 * 3600 * 1000);
       const ny = _nyParts(probe);
-      if (ny.weekday === targetWeekday && ny.hour < targetHourNy) {
-        // Snap to the NY anchor on this same NY-day. Build a UTC moment that
-        // lands exactly on targetHourNy:00:00 NY-local using a UTC offset
-        // computed via toISOString round-trip.
-        return _nyAnchorToUtc(ny, targetHourNy);
-      }
-      if (
-        ny.weekday === targetWeekday &&
-        ny.hour >= targetHourNy &&
-        i === 0
-      ) {
-        // Already past today's anchor — advance one day.
-        probe = new Date(probe.getTime() + 24 * 3600 * 1000);
-        continue;
-      }
-      // Not the right weekday yet — advance one day.
-      probe = new Date(probe.getTime() + 24 * 3600 * 1000);
-      // Normalise the probe time to noon NY to avoid skipping a target weekday
-      // due to DST gap-day arithmetic.
+      if (ny.weekday !== targetWeekday) continue;
+      const cand = _nyAnchorToUtc(ny, targetHourNy);
+      if (cand.getTime() > nowMs) return cand;
     }
-    return probe; // safety
+    return new Date(nowMs); // safety
   }
 
   // Convert {year, month, day} (NY-local) + targetHourNy → UTC Date instance.
