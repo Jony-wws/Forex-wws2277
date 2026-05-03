@@ -64,6 +64,8 @@ def _score_to_probability(score: int, max_score: int = 75) -> float:
 
 def evaluate_pair(pair: str) -> dict | None:
     """Полная оценка одной пары: TF 4H + 1H + 15m + Volume Profile + новости."""
+    # Single timestamp reused for session detection, news blackout, scanned_at.
+    now = datetime.now(timezone.utc)
     # данные
     bars_4h = yahoo.latest_bars(pair, "1h", 240)        # 240×1h ≈ 10 дней
     bars_1h = yahoo.latest_bars(pair, "1h", 100)
@@ -315,7 +317,6 @@ def evaluate_pair(pair: str) -> dict | None:
     # ───── PENALTY: news blackout ─────
     # high-impact новость ±30 мин: снижаем confidence обеих сторон,
     # уменьшая abs(score) на величину penalty (но не ниже нуля).
-    now = datetime.now(timezone.utc)
     if news.is_blackout(pair, now):
         penalty = min(config.NEWS_BLACKOUT_PENALTY, abs(score))
         delta = -penalty if score > 0 else (penalty if score < 0 else 0)
