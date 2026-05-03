@@ -28,6 +28,8 @@ from pathlib import Path
 
 from . import config, strategies
 from . import market_hours as mh
+from . import live_analyst as live_analyst_mod
+from . import regime as regime_mod
 from .data import yahoo
 
 # Адаптивный диапазон экспирации (по требованию пользователя 2026-05-01):
@@ -648,6 +650,27 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
         # Martingale: ставка зависит от текущего LOSS-стрика на этой паре
         stake_usd, mart_streak = _martingale_stake_for_pair(pair, closed_trades)
 
+        # Live-режим + playbook lookup (информативно, не блокирует сделку).
+        live_regime_label = None
+        playbook_cell_status = None
+        playbook_cell_wr = None
+        try:
+            ind_1h_block = (f.get("indicators") or {}).get("1H") or {}
+            # Compact regime hint from forecast indicators (no extra Yahoo call)
+            adx_v = ind_1h_block.get("adx", 0.0)
+            if adx_v >= 25:
+                live_regime_label = "trending_up" if (f.get("side") == "BUY") else "trending_down"
+            elif adx_v <= 15:
+                live_regime_label = "mean_reverting"
+            else:
+                live_regime_label = "mean_reverting"
+            cell = live_analyst_mod.lookup_playbook_cell(pair, chosen_session or f.get("session", ""), live_regime_label)
+            if cell:
+                playbook_cell_status = cell.get("status")
+                playbook_cell_wr = cell.get("wr_pct")
+        except Exception:
+            pass
+
         trade = {
             "id": str(uuid.uuid4())[:12],
             "pair": pair,
@@ -670,6 +693,9 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
             "strategy_source_at_open": chosen_source,  # "by_session" или "global_best"
             "backtest_30d_wr_pct_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("win_rate_pct"),
             "backtest_30d_trades_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("trades"),
+            "live_regime_at_open": live_regime_label,
+            "playbook_cell_status_at_open": playbook_cell_status,
+            "playbook_cell_wr_pct_at_open": playbook_cell_wr,
             "status": "open",
         }
         open_trades.append(trade)

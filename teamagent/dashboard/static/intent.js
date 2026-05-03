@@ -956,4 +956,102 @@
   }
   refreshAINarrative();
   setInterval(refreshAINarrative, 5 * 60 * 1000);  // matches server cache
+
+  // ─── ЖИВОЙ AI-АНАЛИТИК — мысли по 28 парам в реальном времени ───
+  function statusClass(status) {
+    return ({
+      STORM_PROOF: "la-status-storm",
+      QUALIFIED:   "la-status-qualif",
+      PROBABLE:    "la-status-prob",
+      FROZEN:      "la-status-frozen",
+      INSUFFICIENT:"la-status-insuff",
+    })[status] || "la-status-insuff";
+  }
+
+  function renderLiveAnalystCard(item) {
+    const fc = item.forecast || {};
+    const cell = item.playbook_cell;
+    const lr = item.live_regime || {};
+    const sess = item.session || "off";
+    const probTxt = (fc.probability_pct != null) ? `${fc.probability_pct}%` : "—";
+    const sideTxt = fc.side || "—";
+    const cellLine = cell
+      ? `<span class="${statusClass(cell.status)}">${cell.status}</span> WR ${cell.wr_pct ?? "—"}% (n=${cell.n_trades ?? 0})`
+      : `<span class="la-status-insuff">playbook нет</span>`;
+    return `
+      <div class="la-card">
+        <div class="la-head">
+          <span class="la-pair">${item.pair}</span>
+          <span class="la-verdict">${item.verdict_emoji || ""}</span>
+        </div>
+        <div class="la-meta">
+          <span>📍 ${sess}</span>
+          <span>📊 ${lr.label_ru || lr.regime || "—"}</span>
+          <span>H=${lr.hurst != null ? lr.hurst.toFixed(2) : "—"}</span>
+        </div>
+        <div class="la-meta">
+          <span>${sideTxt} ${probTxt}</span>
+          <span>${cellLine}</span>
+        </div>
+        <div class="la-narrative">${(item.narrative_ru || "").replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"})[c])}</div>
+      </div>
+    `;
+  }
+
+  async function refreshLiveAnalyst() {
+    const grid = document.getElementById("live-analyst-grid");
+    const summary = document.getElementById("live-analyst-summary");
+    if (!grid) return;
+    try {
+      const r = await fetch("/api/analyst", {cache: "no-store"});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const items = j.items || [];
+      // Render with regime + session sort: storm-proof first, qualified, probable, others
+      const order = {STORM_PROOF: 0, QUALIFIED: 1, PROBABLE: 2, FROZEN: 3, INSUFFICIENT: 4};
+      items.sort((a, b) => {
+        const sa = (a.playbook_cell || {}).status || "INSUFFICIENT";
+        const sb = (b.playbook_cell || {}).status || "INSUFFICIENT";
+        return (order[sa] ?? 5) - (order[sb] ?? 5);
+      });
+      grid.innerHTML = items.map(renderLiveAnalystCard).join("");
+      const counts = items.reduce((acc, it) => {
+        const s = (it.playbook_cell || {}).status || "INSUFFICIENT";
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {});
+      const total = items.length;
+      const open = items.filter(it => ["STORM_PROOF","QUALIFIED"].includes((it.playbook_cell || {}).status)).length;
+      if (summary) summary.textContent = `${open}/${total} зелёных, ${counts.PROBABLE || 0} probable, ${counts.FROZEN || 0} frozen`;
+    } catch (e) {
+      grid.innerHTML = `<div class="muted">Не могу получить /api/analyst: ${e}</div>`;
+    }
+  }
+  refreshLiveAnalyst();
+  setInterval(refreshLiveAnalyst, 30 * 1000);
+
+  // ─── ДНЕВНОЙ ТАРГЕТ 5 СДЕЛОК НА ПАРУ ───
+  async function refreshDailyTarget() {
+    const grid = document.getElementById("daily-target-grid");
+    const summary = document.getElementById("daily-target-summary");
+    if (!grid) return;
+    try {
+      const r = await fetch("/api/daily-target", {cache: "no-store"});
+      const j = await r.json();
+      const items = j.items || [];
+      items.sort((a, b) => b.count - a.count);
+      grid.innerHTML = items.map(it => `
+        <div class="dt-card">
+          <div class="dt-pair"><span>${it.pair}</span><span class="dt-count">${it.count}/${it.target}</span></div>
+          <div class="dt-bar"><div class="dt-fill ${it.on_target ? 'dt-on-target' : ''}" style="width:${it.pct.toFixed(0)}%"></div></div>
+          <div class="muted" style="font-size:11px">${it.on_target ? "✓ цель достигнута" : `жду еще ${it.missing}`}</div>
+        </div>
+      `).join("");
+      if (summary) summary.textContent = `${j.on_target_count}/${j.total_pairs} пар на 5+ за ${j.date_utc}`;
+    } catch (e) {
+      grid.innerHTML = `<div class="muted">Не могу получить /api/daily-target: ${e}</div>`;
+    }
+  }
+  refreshDailyTarget();
+  setInterval(refreshDailyTarget, 30 * 1000);
 })();
