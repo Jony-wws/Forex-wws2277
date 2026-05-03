@@ -4,8 +4,8 @@
 //   forecasts: каждые 60 сек (источник scaner — раз в 5 мин)
 //   volume profile: при выборе пары + ручное обновление
 
-const REFRESH_LIVE_MS = 30 * 1000;
-const REFRESH_FORECASTS_MS = 60 * 1000;
+const REFRESH_LIVE_MS = 15 * 1000;       // was 30s — user wants live updates
+const REFRESH_FORECASTS_MS = 30 * 1000;  // was 60s — user wants live updates
 
 const fmt = {
   pct: x => x == null ? "—" : (x).toFixed(1) + "%",

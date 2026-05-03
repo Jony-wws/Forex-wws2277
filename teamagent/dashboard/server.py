@@ -201,31 +201,89 @@ async def _fly_state_refresher():
     return asyncio.create_task(_tick())
 
 
+async def _fly_paper_trader_tick():
+    """Lightweight in-process paper-trader tick for Fly dashboard-only deployments.
+
+    The default Fly machine is 256 MB and skips the orchestrator (so paper_trader
+    isn't a separate subprocess). Without this tick, /api/open-trades stays empty
+    even when forecasts.json has 70%+ signals — exactly what the user reported.
+
+    cycle_once() reads forecasts.json + open_trades.json + closed_trades.json,
+    settles expired open trades against Yahoo, and opens new ones for any 70%+
+    signals (subject to news / correlation / ensemble filters). Runs every 60 sec
+    by default — opt out with FLY_PAPER_TRADER=0.
+    """
+    on_fly = os.environ.get("FLY_APP_NAME") is not None or Path("/data").is_dir()
+    if not on_fly:
+        return  # Devin VM has its own paper_trader; nothing to do here.
+    if os.environ.get("FLY_FULL") == "1":
+        return  # full mode runs paper_trader as subprocess.
+    if os.environ.get("FLY_PAPER_TRADER") == "0":
+        return  # explicit opt-out.
+
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    interval = int(os.environ.get("FLY_PAPER_TICK_SEC", "60"))
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fly-paper")
+
+    async def _tick():
+        loop = asyncio.get_running_loop()
+        # First tick: 45 sec after boot — give state-refresher and Yahoo cache
+        # a head start. cycle_once() is idempotent so running too early is safe,
+        # but we want forecasts.json to be fresh first.
+        await asyncio.sleep(45)
+        while True:
+            try:
+                from .. import paper_trader
+                result = await loop.run_in_executor(pool, paper_trader.cycle_once)
+                log.info(
+                    f"[fly-paper] tick: opened={result.get('opened')} "
+                    f"settled={result.get('settled')} "
+                    f"open_now={(result.get('stats') or {}).get('open')} "
+                    f"wr={(result.get('stats') or {}).get('win_rate_pct')}%"
+                )
+            except Exception as e:
+                log.exception(f"[fly-paper] tick failed: {e}")
+            await asyncio.sleep(interval)
+
+    return asyncio.create_task(_tick())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: seed state + spawn orchestrator/watchdog on startup,
     terminate them on shutdown. Works both in local dev and on Fly.io.
 
-    On Fly's default 256-MB machine (dashboard-only) we ALSO spin up a
-    lightweight in-process refresh task that re-runs ``forecast_scanner``
-    every 10 minutes — so the user doesn't see "state stale 13ч" warnings
-    when the hourly Devin-VM schedule misses a tick.
+    On Fly's default 256-MB machine (dashboard-only) we ALSO spin up TWO
+    lightweight in-process tasks:
+      1. _fly_state_refresher() — re-runs forecast_scanner every 10 min so
+         forecasts.json stays fresh between hourly Devin-VM schedules.
+      2. _fly_paper_trader_tick() — calls paper_trader.cycle_once() every
+         60 sec so trades are actually opened from the live forecasts and
+         expired ones are settled. Without this the dashboard shows 70%+
+         signals but no new trades — exactly the bug the user reported.
     """
     _seed_state_files()
     children = _spawn_supervisor_processes()
     refresh_task = None
+    paper_task = None
     try:
         refresh_task = await _fly_state_refresher()
     except Exception as e:
         log.exception(f"[fly-refresh] startup failed: {e}")
     try:
+        paper_task = await _fly_paper_trader_tick()
+    except Exception as e:
+        log.exception(f"[fly-paper] startup failed: {e}")
+    try:
         yield
     finally:
-        if refresh_task is not None:
-            try:
-                refresh_task.cancel()
-            except Exception:
-                pass
+        for task in (refresh_task, paper_task):
+            if task is not None:
+                try:
+                    task.cancel()
+                except Exception:
+                    pass
         for p in children:
             try:
                 p.terminate()

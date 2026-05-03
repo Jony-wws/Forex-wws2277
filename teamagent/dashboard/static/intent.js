@@ -765,7 +765,31 @@
     </div>`;
   }
   refreshFinalSignals();
-  setInterval(refreshFinalSignals, 30 * 1000);
+  setInterval(refreshFinalSignals, 15 * 1000);  // every 15s, was 30s
+
+  // ─── Live market-status badge — обновляется каждые 5 сек ───────────────
+  // Так пользователь видит «ОТКРЫТ / ЗАКРЫТ / откроется через X» в реальном
+  // времени без перезагрузки страницы. Без этого блока статус read-only из
+  // первого запроса /api/final-signals.global_context и не двигается.
+  async function refreshLiveMarketBadge() {
+    const pill = document.getElementById("fs-summary-pill");
+    if (!pill) return;
+    try {
+      const r = await fetch("/api/market-status", {cache: "no-store"});
+      const ms = await r.json();
+      const cur = pill.dataset.lastIs || "";
+      const now = ms.is_open ? "open" : "closed";
+      // Trigger a celebratory ding when market transitions closed → open.
+      if (cur === "closed" && now === "open" && window.FX_UX && window.FX_UX.sound) {
+        try { window.FX_UX.sound.goDing(); } catch (e) {}
+        // Also force a final-signals refresh so cards switch to GO immediately.
+        refreshFinalSignals();
+      }
+      pill.dataset.lastIs = now;
+    } catch (e) {}
+  }
+  refreshLiveMarketBadge();
+  setInterval(refreshLiveMarketBadge, 5 * 1000);
 
   // ─── AI-АНАЛИТИК: развёрнутый комментарий через Pollinations.ai (free) ──
   async function refreshAINarrative() {
