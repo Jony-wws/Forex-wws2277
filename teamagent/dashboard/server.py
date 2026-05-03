@@ -355,10 +355,20 @@ def agents_page():
     return RedirectResponse(url="/system#agents-section", status_code=302)
 
 
+@app.get("/trades")
+def trades_page():
+    """Единая страница 'Сделки' — все open + closed в одном месте.
+
+    Юзер просил: 'один единственный место где будет собрано все истории сделки
+    и все открытые сделки только одна мест на отдельном разделе'. Это оно.
+    """
+    return FileResponse(str(STATIC / "trades.html"))
+
+
 @app.get("/history")
 def history_page():
-    """Quick deep-link → /system со скроллом к закрытым сделкам / paper-stats."""
-    return RedirectResponse(url="/system#closed-trades-section", status_code=302)
+    """Раньше скроллилось внутрь /system; теперь сразу ведёт на единую /trades."""
+    return RedirectResponse(url="/trades", status_code=302)
 
 
 @app.get("/api/_debug")
