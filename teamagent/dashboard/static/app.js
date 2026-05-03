@@ -674,38 +674,58 @@ function _fmtCountdown(secs) {
 }
 
 // Client-side mirror of teamagent.market_hours so the static-mirror snapshots
-// can self-correct when they're stale. Forex week: Sun 22:00 UTC → Fri 22:00 UTC.
-// Without this, a static snapshot baked while the market was closed keeps
-// showing "Рынок закрыт" forever even after market re-opens.
+// can self-correct when they're stale. Forex week: Sunday 17:00 NY-local
+// (= 21:00 UTC summer / 22:00 UTC winter) → Friday 17:00 NY-local.
+// Uses Intl.DateTimeFormat('en-US', timeZone:'America/New_York') so that
+// US daylight-saving (EDT vs EST) is handled automatically — without this
+// the countdown was off by exactly 1 hour March-November.
+function _nyParts(at) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    weekday: "short", hour12: false,
+  });
+  const parts = {};
+  for (const p of fmt.formatToParts(at)) parts[p.type] = p.value;
+  // weekday Mon=0..Sun=6
+  const wdMap = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+  return {
+    weekday: wdMap[parts.weekday],
+    hour: parseInt(parts.hour, 10),
+    minute: parseInt(parts.minute, 10),
+    second: parseInt(parts.second, 10),
+  };
+}
+function _nextNyAnchor(now, targetWeekday, targetHourNy) {
+  // Walk forward minute-by-hour granularity until NY weekday/hour matches.
+  // Cheap: check at most ~7*24=168 hour-steps.
+  let cand = new Date(now.getTime());
+  for (let i = 0; i < 24 * 8; i++) {
+    cand = new Date(cand.getTime() + 60 * 60 * 1000);  // +1h
+    const p = _nyParts(cand);
+    if (p.weekday === targetWeekday && p.hour === targetHourNy) {
+      // Snap to the top of that NY hour
+      cand = new Date(cand.getTime() - p.minute * 60000 - p.second * 1000);
+      return cand;
+    }
+  }
+  return cand;  // safety
+}
 function clientMarketStatus(at) {
   const t = at instanceof Date ? at : new Date();
-  // toUTCString-based weekday: 0=Sun..6=Sat. Python convention is Mon=0..Sun=6,
-  // so map: Mon=0,Tue=1,Wed=2,Thu=3,Fri=4,Sat=5,Sun=6.
-  const jsDay = t.getUTCDay();         // 0=Sun..6=Sat
-  const py = (jsDay + 6) % 7;          // Mon=0..Sun=6
-  const hour = t.getUTCHours();
+  const ny = _nyParts(t);
   let isOpen;
-  if (py === 5) isOpen = false;                 // Saturday
-  else if (py === 4) isOpen = hour < 22;         // Friday until 22:00 UTC
-  else if (py === 6) isOpen = hour >= 22;        // Sunday from 22:00 UTC
-  else isOpen = true;                            // Mon-Thu
-  // seconds_until_open: next Sunday 22:00 UTC (or Sun 22:00 UTC same day).
-  let secsUntilOpen = 0;
-  let secsUntilClose = 0;
+  if (ny.weekday === 5) isOpen = false;                 // Saturday
+  else if (ny.weekday === 4) isOpen = ny.hour < 17;     // Friday until 17:00 NY
+  else if (ny.weekday === 6) isOpen = ny.hour >= 17;    // Sunday from 17:00 NY
+  else isOpen = true;                                   // Mon-Thu
+  let secsUntilOpen = 0, secsUntilClose = 0;
   if (!isOpen) {
-    const next = new Date(Date.UTC(
-      t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 22, 0, 0, 0));
-    // bump until weekday=Sun (jsDay=0) AND time > now
-    while (next.getUTCDay() !== 0 || next.getTime() <= t.getTime()) {
-      next.setUTCDate(next.getUTCDate() + 1);
-    }
-    secsUntilOpen = Math.max(0, Math.floor((next.getTime() - t.getTime()) / 1000));
+    const open = _nextNyAnchor(t, 6, 17);  // Sunday 17:00 NY
+    secsUntilOpen = Math.max(0, Math.floor((open.getTime() - t.getTime()) / 1000));
   } else {
-    const close = new Date(Date.UTC(
-      t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 22, 0, 0, 0));
-    while (close.getUTCDay() !== 5 || close.getTime() <= t.getTime()) { // Friday=5
-      close.setUTCDate(close.getUTCDate() + 1);
-    }
+    const close = _nextNyAnchor(t, 4, 17); // Friday 17:00 NY
     secsUntilClose = Math.max(0, Math.floor((close.getTime() - t.getTime()) / 1000));
   }
   return { is_open: isOpen, seconds_until_open: secsUntilOpen, seconds_until_close: secsUntilClose };

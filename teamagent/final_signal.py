@@ -146,16 +146,24 @@ class _GlobalContext:
             snap = mh.market_status(now)
             is_open = bool(snap.get("is_open"))
             secs_to_open = int(snap.get("seconds_until_open") or 0)
+            secs_to_close = int(snap.get("seconds_until_close") or 0)
+            next_event_local = snap.get("next_event_utc_plus_5") or ""
+            local_tag = f" ({next_event_local})" if next_event_local else ""
             if is_open:
                 self.market_ok = True
-                secs_to_close = int(snap.get("seconds_until_close") or 0)
-                self.market_detail = f"Рынок открыт. До закрытия: {_fmt_eta(secs_to_close)}."
+                self.market_detail = (
+                    f"Рынок открыт. До закрытия: {_fmt_eta(secs_to_close)}{local_tag}."
+                )
             elif 0 < secs_to_open <= 30 * 60:
                 self.market_ok = None
-                self.market_detail = f"Рынок откроется через {_fmt_eta(secs_to_open)}."
+                self.market_detail = (
+                    f"Рынок откроется через {_fmt_eta(secs_to_open)}{local_tag}."
+                )
             else:
                 self.market_ok = False
-                self.market_detail = f"Рынок закрыт. Откроется через {_fmt_eta(secs_to_open)}."
+                self.market_detail = (
+                    f"Рынок закрыт. Откроется через {_fmt_eta(secs_to_open)}{local_tag}."
+                )
         except Exception as e:
             self.market_detail = f"Не удалось проверить: {e}"
 
