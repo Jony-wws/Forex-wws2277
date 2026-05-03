@@ -665,6 +665,52 @@ async function refreshMarketStatus() {
   } catch (e) { console.error("market-status:", e); }
 }
 
+function _fmtCountdown(secs) {
+  if (!secs || secs <= 0) return "";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 24) return `${Math.floor(h/24)}д ${h%24}ч`;
+  return `${h}ч ${m}м`;
+}
+
+// Client-side mirror of teamagent.market_hours so the static-mirror snapshots
+// can self-correct when they're stale. Forex week: Sun 22:00 UTC → Fri 22:00 UTC.
+// Without this, a static snapshot baked while the market was closed keeps
+// showing "Рынок закрыт" forever even after market re-opens.
+function clientMarketStatus(at) {
+  const t = at instanceof Date ? at : new Date();
+  // toUTCString-based weekday: 0=Sun..6=Sat. Python convention is Mon=0..Sun=6,
+  // so map: Mon=0,Tue=1,Wed=2,Thu=3,Fri=4,Sat=5,Sun=6.
+  const jsDay = t.getUTCDay();         // 0=Sun..6=Sat
+  const py = (jsDay + 6) % 7;          // Mon=0..Sun=6
+  const hour = t.getUTCHours();
+  let isOpen;
+  if (py === 5) isOpen = false;                 // Saturday
+  else if (py === 4) isOpen = hour < 22;         // Friday until 22:00 UTC
+  else if (py === 6) isOpen = hour >= 22;        // Sunday from 22:00 UTC
+  else isOpen = true;                            // Mon-Thu
+  // seconds_until_open: next Sunday 22:00 UTC (or Sun 22:00 UTC same day).
+  let secsUntilOpen = 0;
+  let secsUntilClose = 0;
+  if (!isOpen) {
+    const next = new Date(Date.UTC(
+      t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 22, 0, 0, 0));
+    // bump until weekday=Sun (jsDay=0) AND time > now
+    while (next.getUTCDay() !== 0 || next.getTime() <= t.getTime()) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
+    secsUntilOpen = Math.max(0, Math.floor((next.getTime() - t.getTime()) / 1000));
+  } else {
+    const close = new Date(Date.UTC(
+      t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate(), 22, 0, 0, 0));
+    while (close.getUTCDay() !== 5 || close.getTime() <= t.getTime()) { // Friday=5
+      close.setUTCDate(close.getUTCDate() + 1);
+    }
+    secsUntilClose = Math.max(0, Math.floor((close.getTime() - t.getTime()) / 1000));
+  }
+  return { is_open: isOpen, seconds_until_open: secsUntilOpen, seconds_until_close: secsUntilClose };
+}
+
 function _fwCard(grid, key, hours, label, fw) {
   const wr = fw.weighted_expected_wr_pct;
   const lo = fw.wilson_lower_pct_95;
@@ -675,12 +721,26 @@ function _fwCard(grid, key, hours, label, fw) {
   const activeH = fw.active_hours_in_window || 0;
   const eligible = fw.forecasts_eligible_now || 0;
   const qualified = fw.active_qualified_pairs_count || 0;
+  // Client-side override when the snapshot is stale: if the snapshot says
+  // "market closed" but at THIS moment the market is actually open, then
+  // the snapshot is from an older state and we should NOT show "Рынок закрыт".
+  // We recompute is_market_open client-side using simple Sun22:00→Fri22:00 UTC
+  // rules so the static mirror (which is a frozen JSON file) stays correct
+  // across the entire week without requiring a re-bake every hour.
+  const cms = clientMarketStatus();
+  let mode = fw.display_mode || "active";
+  if (mode === "market_closed" && cms.is_open) mode = "active";
+  if (mode === "active" && !cms.is_open && (fw.active_hours_in_window || 0) <= 0)
+    mode = "market_closed";
+  const marketClosed = mode === "market_closed";
+  // Use client-side seconds_until_open when available (correct as of NOW).
+  const secsToOpen = cms.seconds_until_open || fw.seconds_until_open || 0;
 
   let cls = "fw-card";
-  if (lo >= 65 && wr >= 70) cls += " fw-card-best";
+  if (marketClosed) cls += " fw-card-closed";
+  else if (lo >= 65 && wr >= 70) cls += " fw-card-best";
   else if (wr < 60 || lo < 50) cls += " fw-card-warn";
 
-  // обновляем in-place если уже есть
   let card = grid.querySelector(`[data-fwkey="${key}"]`);
   if (!card) {
     card = document.createElement("div");
@@ -699,10 +759,23 @@ function _fwCard(grid, key, hours, label, fw) {
   }
   card.className = cls;
   card.querySelector(".fw-title").textContent = label;
-  card.querySelector(".fw-wr").textContent = `${wr.toFixed(1)}% ${verdict.emoji || ""}`;
-  card.querySelector(".fw-ci").textContent = `95% CI [${lo.toFixed(1)}% ; ${up.toFixed(1)}%]`;
-  card.querySelector(".fw-readiness-bar > .fill").style.width = `${Math.max(0, Math.min(100, ready))}%`;
-  card.querySelector(".fw-r-value").textContent = `${ready.toFixed(0)}/100`;
+
+  if (marketClosed) {
+    // Show "MARKET CLOSED" instead of a confusing red 0.0%.
+    const eta = _fmtCountdown(secsToOpen);
+    card.querySelector(".fw-wr").innerHTML =
+      `<span class="fw-closed-icon">🌙</span> Рынок закрыт`;
+    card.querySelector(".fw-ci").textContent = eta
+      ? `откроется через ${eta}`
+      : "ждём открытия";
+    card.querySelector(".fw-readiness-bar > .fill").style.width = "0%";
+    card.querySelector(".fw-r-value").textContent = "—";
+  } else {
+    card.querySelector(".fw-wr").textContent = `${wr.toFixed(1)}% ${verdict.emoji || ""}`;
+    card.querySelector(".fw-ci").textContent = `95% CI [${lo.toFixed(1)}% ; ${up.toFixed(1)}%]`;
+    card.querySelector(".fw-readiness-bar > .fill").style.width = `${Math.max(0, Math.min(100, ready))}%`;
+    card.querySelector(".fw-r-value").textContent = `${ready.toFixed(0)}/100`;
+  }
   const meta = card.querySelector(".fw-meta");
   meta.innerHTML = `
     <span>qualified <b>${qualified}</b>/28</span>
@@ -731,6 +804,26 @@ async function refreshStabilityForecast() {
     if (diag) {
       const lines = [];
       const fw = r24;
+      // Staleness warning — if the snapshot we fetched was generated > 30 min
+      // ago, the user is looking at stale data (typical when the static CDN
+      // mirror was baked hours back). This is what made the user think the
+      // 0%/0% on 1h/6h was a bug — it was just an outdated snapshot.
+      if (fw.as_of_utc) {
+        const ageSec = Math.max(0, Math.floor((Date.now() - new Date(fw.as_of_utc).getTime()) / 1000));
+        if (ageSec > 30 * 60) {
+          const ageMin = Math.floor(ageSec / 60);
+          const ageH = Math.floor(ageMin / 60);
+          const ago = ageH > 0 ? `${ageH}ч ${ageMin % 60}м` : `${ageMin}м`;
+          lines.push(
+            `<span class="diag-line diag-stale">` +
+            `🕐 <b>Данные из снэпшота</b> — обновлено ${ago} назад. ` +
+            `Для live-данных открой ` +
+            `<a href="https://fxinvestment-dhaftcbe.fly.dev/" target="_blank" ` +
+            `rel="noopener">live-версию на Fly.io</a>.` +
+            `</span>`
+          );
+        }
+      }
       lines.push(`<b>Прогноз на 24ч:</b> ${fw.verdict?.text_ru || ""}`);
       for (const d of (fw.diagnosis_ru || [])) {
         lines.push(`<span class="diag-line">• ${d}</span>`);

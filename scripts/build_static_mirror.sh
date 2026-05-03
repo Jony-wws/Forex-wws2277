@@ -56,7 +56,7 @@ echo "== 4/5 bake /api/* responses =="
 # `SyntaxError: Unexpected token '<'` because the SPA fallback returns
 # index.html for the missing JSON path.
 for ep in forecasts market-radar cot open-trades closed-trades stats agents backtest health \
-          strategy-config market-status system-audit meta-strategy stability \
+          strategy-config market-status system-audit system-health meta-strategy stability \
           fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
           risk-metrics calibration; do
   curl -sf --max-time 12 "$BASE/api/$ep" > "$OUT/api/${ep}.json" || echo "  WARN $ep"

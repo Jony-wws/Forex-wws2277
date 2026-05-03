@@ -1012,6 +1012,216 @@ def api_system_audit():
         )
 
 
+@app.get("/api/system-health")
+def api_system_health():
+    """Две сводки в одном вызове — то что user-у нужно для понимания
+    "что система чувствует прямо сейчас":
+
+    1. ``errors_report`` — самодиагностика: красные проверки из system_audit,
+       устаревшие state-файлы, мёртвые heartbeat-ы, неоткрытые сделки при
+       подходящих forecasts и т.д. Это то на что система должна РЕАГИРОВАТЬ
+       (сама перезапустить агент, переcбилдить static-mirror, etc.).
+
+    2. ``facts_report`` — данные-факты: текущий рынок открыт/закрыт, сколько
+       forecasts ≥70%, сколько qualified пар, сколько открытых сделок,
+       последние закрытые с PnL. Это то на основе чего система ПРИНИМАЕТ
+       решения (открывать сделку или нет, сколько часов expiry и т.п.).
+
+    Все источники — те же файлы, что и существующие endpoints, чтобы фронт
+    мог брать ВСЁ из одного запроса вместо 5–7 round-trip-ов и быть
+    уверенным, что разные блоки UI рисуются по согласованным данным.
+    """
+    now = datetime.now(timezone.utc)
+    errors: list[dict] = []
+    warnings: list[dict] = []
+    facts: dict = {}
+
+    # ── 1) market status — single source for everything market-related ──
+    try:
+        from .. import market_hours as mh
+    except ImportError:
+        from teamagent import market_hours as mh
+    market = mh.market_status(now)
+    facts["market"] = {
+        "is_open": market["is_open"],
+        "session": market["session"],
+        "status_text": market["status_text"],
+        "seconds_until_open": market["seconds_until_open"],
+        "seconds_until_close": market["seconds_until_close"],
+        "next_event": market["next_event"],
+        "next_event_utc": market["next_event_utc"],
+        "max_safe_expiry_h": market["max_safe_expiry_h"],
+    }
+
+    # ── 2) state files freshness (errors if stale, warnings on near-stale) ──
+    freshness_thresholds_sec = {
+        "forecasts.json": 600,            # scanner runs every 5 min
+        "paper_stats.json": 1800,         # paper_trader writes every trade
+        "closed_trades.json": 86400 * 3,  # closed trades may be sparse
+        "strategy_config_locked.json": 86400 * 7,
+        "backtest_30d.json": 7200,
+        "meta_strategy.json": 86400 * 2,
+    }
+    state_files: dict[str, dict] = {}
+    for fname, max_age in freshness_thresholds_sec.items():
+        p = config.STATE_DIR / fname
+        if not p.exists():
+            entry = {"present": False, "age_sec": None, "stale": True}
+            state_files[fname] = entry
+            errors.append({
+                "code": "STATE_FILE_MISSING",
+                "file": fname,
+                "message_ru": f"Отсутствует обязательный state-файл {fname}",
+                "self_fix_ru": "Запусти `bash scripts/start_all.sh` — агенты пересоздадут файл.",
+            })
+            continue
+        age = max(0.0, (now.timestamp() - p.stat().st_mtime))
+        stale = age > max_age
+        entry = {"present": True, "age_sec": int(age), "stale": stale}
+        state_files[fname] = entry
+        if stale:
+            warnings.append({
+                "code": "STATE_FILE_STALE",
+                "file": fname,
+                "age_sec": int(age),
+                "max_age_sec": max_age,
+                "message_ru": f"State-файл {fname} устарел ({int(age/60)} мин назад, лимит {max_age//60} мин).",
+                "self_fix_ru": "Перезапусти агента — `bash scripts/start_all.sh`.",
+            })
+    facts["state_files"] = state_files
+
+    # ── 3) heartbeats — dead agents ──
+    hb_components = []
+    hb_dead_count = 0
+    for name, fname in [
+        ("forecast_scanner", "heartbeat_forecast_scanner.json"),
+        ("paper_trader", "heartbeat_paper_trader.json"),
+        ("orchestrator", "heartbeat_orchestrator.json"),
+        ("watchdog", "heartbeat_watchdog.json"),
+        ("state_committer", "heartbeat_state_committer.json"),
+    ]:
+        hb = _load(config.STATE_DIR / fname, None)
+        if not hb or "ts" not in hb:
+            hb_components.append({"name": name, "alive": False, "last_seen": None})
+            hb_dead_count += 1
+            errors.append({
+                "code": "AGENT_DEAD",
+                "agent": name,
+                "message_ru": f"Агент {name} не пишет heartbeat — возможно убит.",
+                "self_fix_ru": "Watchdog должен авто-перезапустить; если нет — `bash scripts/start_all.sh`.",
+            })
+            continue
+        try:
+            ts = datetime.fromisoformat(hb["ts"])
+            age = (now - ts).total_seconds()
+            alive = age < config.AGENT_DEAD_AFTER_SEC
+            hb_components.append({"name": name, "alive": alive, "age_sec": int(age)})
+            if not alive:
+                hb_dead_count += 1
+                warnings.append({
+                    "code": "AGENT_STALE_HEARTBEAT",
+                    "agent": name,
+                    "age_sec": int(age),
+                    "message_ru": f"Heartbeat агента {name} {int(age/60)} мин назад (лимит {config.AGENT_DEAD_AFTER_SEC//60} мин).",
+                    "self_fix_ru": "Watchdog авто-перезапустит при следующем сканировании.",
+                })
+        except Exception:
+            hb_components.append({"name": name, "alive": False, "last_seen": hb.get("ts")})
+    facts["heartbeats"] = {"components": hb_components, "dead_count": hb_dead_count}
+
+    # ── 4) forecasts / paper-trader counts — used by all decision-making ──
+    snap = _load(config.STATE_DIR / "forecasts.json", {"forecasts": {}, "rankings": []})
+    rankings = snap.get("rankings") or []
+    eligible_70 = [r for r in rankings if (r.get("probability_pct") or 0) >= 70]
+    open_trades = _load(config.STATE_DIR / "open_trades.json", [])
+    closed_trades = _load(config.STATE_DIR / "closed_trades.json", [])
+    paper_stats = _load(config.STATE_DIR / "paper_stats.json", {})
+    facts["forecasts"] = {
+        "total_pairs": len(snap.get("forecasts") or {}),
+        "scanned_at": snap.get("scanned_at"),
+        "eligible_70_count": len(eligible_70),
+        "top_buy": next((r for r in rankings if r.get("side") == "BUY"), None),
+        "top_sell": next((r for r in rankings if r.get("side") == "SELL"), None),
+    }
+    facts["paper_trader"] = {
+        "open_count": len(open_trades),
+        "closed_count": len(closed_trades),
+        "win_rate_pct": paper_stats.get("win_rate_pct"),
+        "total_pnl_usd": paper_stats.get("total_pnl_usd"),
+        "wins": paper_stats.get("wins"),
+        "losses": paper_stats.get("losses"),
+    }
+
+    # ── 5) "система видит eligible но рынок закрыт" — диагностический warning ──
+    if not market["is_open"] and len(eligible_70) > 0:
+        warnings.append({
+            "code": "ELIGIBLE_FORECAST_BUT_MARKET_CLOSED",
+            "message_ru": (
+                f"Сейчас {len(eligible_70)} forecasts ≥70%, но рынок закрыт — "
+                f"новые сделки откроются после {market['next_event_utc']} UTC."
+            ),
+            "self_fix_ru": "Это нормально — paper_trader не открывает сделки на закрытом рынке.",
+        })
+    elif market["is_open"] and len(eligible_70) > 0 and len(open_trades) == 0:
+        warnings.append({
+            "code": "ELIGIBLE_FORECAST_NO_OPEN_TRADES",
+            "message_ru": (
+                f"{len(eligible_70)} eligible forecasts но 0 открытых сделок — "
+                "возможно блокирует correlation-filter или news_blackout."
+            ),
+            "self_fix_ru": "Проверь paper_trader логи — `tail teamagent/logs/paper_trader.log`.",
+        })
+
+    # ── 6) consolidated audit summary (calls run_audit but only takes counts) ──
+    try:
+        try:
+            from .. import system_audit as sa
+        except ImportError:
+            from teamagent import system_audit as sa
+        audit = sa.run_audit()
+        facts["audit_summary"] = {
+            "overall_status": audit.get("overall_status"),
+            "summary": audit.get("summary"),
+            "verdict_ru": audit.get("verdict_ru"),
+        }
+        for cat in audit.get("categories") or []:
+            for chk in cat.get("checks") or []:
+                if chk.get("status") == "red":
+                    errors.append({
+                        "code": "AUDIT_RED",
+                        "check": chk.get("name"),
+                        "category": cat.get("key"),
+                        "message_ru": chk.get("message_ru") or chk.get("message") or "",
+                        "self_fix_ru": "См. `/api/system-audit` для деталей.",
+                    })
+    except Exception as e:
+        warnings.append({
+            "code": "AUDIT_FAILED",
+            "message_ru": f"system_audit бросил {type(e).__name__}: {e}",
+            "self_fix_ru": "Открой /api/system-audit — там подробный traceback.",
+        })
+
+    return JSONResponse({
+        "as_of_utc": now.isoformat(),
+        "errors_report": {
+            "count": len(errors),
+            "items": errors,
+        },
+        "warnings_report": {
+            "count": len(warnings),
+            "items": warnings,
+        },
+        "facts_report": facts,
+        "verdict_ru": (
+            "✅ Все системы зелёные." if not errors and not warnings
+            else f"⚠️ {len(errors)} ошибка/-ок и {len(warnings)} предупреждение/-й — "
+                 "система должна сама среагировать."
+            if errors else
+            f"🟡 {len(warnings)} предупреждение/-й — диагностика только."
+        ),
+    })
+
+
 @app.get("/api/health")
 def api_health():
     """Общий health-check всех процессов."""
