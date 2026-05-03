@@ -944,6 +944,65 @@ function tick() {
   refreshMetaStrategy();
   refreshAgentReports();
   refreshCoverageMatrix();
+  refreshFinalSignal();
+}
+
+// ───── ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ МЕНЯ ─────
+async function refreshFinalSignal() {
+  const body = document.getElementById("final-signal-body");
+  const badge = document.getElementById("fs-verdict-badge");
+  if (!body) return;
+  try {
+    const r = await api("/api/final-signal");
+    if (!r || r.error) {
+      body.innerHTML = `<div class="muted">Не удалось получить сигнал.</div>`;
+      return;
+    }
+    const verdictClass =
+      r.verdict === "GO" ? "fs-go" :
+      r.verdict === "GO_CAUTION" ? "fs-cau" :
+      "fs-wait";
+    const checksHtml = (r.checks || []).map(c => {
+      const dot =
+        c.status === "green" ? "🟢" :
+        c.status === "red"   ? "🔴" :
+                                "🟡";
+      return `<li class="fs-check fs-${c.status}">
+        <span class="fs-dot">${dot}</span>
+        <span class="fs-name">${c.name_ru}</span>
+        <span class="fs-detail muted small">${c.detail_ru || ""}</span>
+      </li>`;
+    }).join("");
+    const sumPair = r.pair
+      ? `<div class="fs-pair">${r.pair} <span class="fs-side fs-side-${(r.side || "").toLowerCase()}">${r.side_ru || r.side || ""}</span></div>`
+      : "";
+    const sumProb = `<div class="fs-prob">${(r.probability_pct || 0).toFixed(0)}%</div>`;
+    const sumExp = r.expiry_hours ? `<div class="fs-expiry">экспайри ${r.expiry_hours}ч</div>` : "";
+    const altHtml = (r.alternates || []).slice(0, 3).map(a =>
+      `<span class="fs-alt-pill">${a.pair} ${a.side} ${(a.probability_pct || 0).toFixed(0)}%</span>`
+    ).join(" ");
+    body.innerHTML = `
+      <div class="fs-row ${verdictClass}">
+        <div class="fs-pick">${sumPair}${sumProb}${sumExp}</div>
+        <div class="fs-verdict">${r.verdict_ru || "—"}</div>
+      </div>
+      <div class="fs-reasoning small muted">${r.reasoning_ru || ""}</div>
+      <div class="fs-checks-title small muted">8 проверок:</div>
+      <ul class="fs-checks">${checksHtml}</ul>
+      ${altHtml ? `<div class="fs-alts small"><b>Запасные кандидаты:</b> ${altHtml}</div>` : ""}
+      <div class="fs-meta small muted">
+        Сессия сейчас: <b>${r.session_now_ru || "?"}</b> ·
+        источник: <code>/api/final-signal</code>
+      </div>`;
+    if (badge) {
+      const c = r.summary_counts || {};
+      badge.textContent = `${r.verdict || "?"} · 🟢${c.green||0} 🟡${c.yellow||0} 🔴${c.red||0}`;
+      badge.className = "badge-stable fs-badge-" + (r.verdict === "GO" ? "go" : r.verdict === "GO_CAUTION" ? "cau" : "wait");
+    }
+  } catch (e) {
+    console.error("final-signal:", e);
+    body.innerHTML = `<div class="muted">Ошибка: ${e}</div>`;
+  }
 }
 
 // ───── 5 AGENTS' NARRATIVE REPORTS (Russian) ─────

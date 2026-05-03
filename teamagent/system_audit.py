@@ -86,13 +86,34 @@ _REQUIRED_LIST_FILES: list[str] = [
     "open_trades.json",
 ]
 
-# Свежесть в секундах (если файл существует и старше — 🟡 или 🔴)
-_FRESHNESS_THRESHOLDS_SEC: dict[str, tuple[int, int]] = {
-    # filename: (warn_sec, critical_sec)
-    "forecasts.json":             (15 * 60,  60 * 60),  # scanner раз в 5 мин
-    "paper_stats.json":           (30 * 60,  120 * 60),
-    "stakan_stats.json":          (30 * 60,  120 * 60),
-}
+# Свежесть в секундах (если файл существует и старше — 🟡 или 🔴).
+# Развёртывание Fly.io работает в DASHBOARD-ONLY режиме (см. AGENTS.md
+# "Deployment & permanent URL"): forecast_scanner / paper_trader НЕ запущены
+# на Fly-машине, state-файлы обновляются часовым Devin-расписанием
+# `sched-083b11171a0841668f4608b075d769b5`. Поэтому пороги:
+#  • на Fly / dashboard-only — вычисляем из расчёта 1 обновление в час
+#    (yellow > 90 мин, red > 4 часов);
+#  • на полноценной Devin-VM (start_all.sh запускает scanner каждые 5 мин)
+#    — оригинальные жёсткие пороги.
+import os as _os
+_DASHBOARD_ONLY = (
+    _os.environ.get("DASHBOARD_ONLY") == "1"
+    or bool(_os.environ.get("FLY_APP_NAME"))
+    or bool(_os.environ.get("FLY_MACHINE_ID"))
+)
+if _DASHBOARD_ONLY:
+    _FRESHNESS_THRESHOLDS_SEC: dict[str, tuple[int, int]] = {
+        "forecasts.json":   (90 * 60,  4 * 60 * 60),
+        "paper_stats.json": (120 * 60, 6 * 60 * 60),
+        "stakan_stats.json":(120 * 60, 6 * 60 * 60),
+    }
+else:
+    _FRESHNESS_THRESHOLDS_SEC: dict[str, tuple[int, int]] = {
+        # filename: (warn_sec, critical_sec)
+        "forecasts.json":             (15 * 60,  60 * 60),  # scanner раз в 5 мин
+        "paper_stats.json":           (30 * 60,  120 * 60),
+        "stakan_stats.json":          (30 * 60,  120 * 60),
+    }
 
 
 # ───── helpers ─────

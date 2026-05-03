@@ -1249,3 +1249,61 @@ button#manual-refresh:hover {
 .cov-cell.cov-yellow { background: rgba(234, 179, 8, 0.18); color: #fde68a; }
 .cov-cell.cov-red    { background: rgba(239, 68, 68, 0.20); color: #fca5a5; }
 .cov-cell.cov-gray   { background: rgba(120, 120, 120, 0.16); color: #94a3b8; }
+
+/* ═══ ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ МЕНЯ ═══ */
+.final-signal-hero { border-color: rgba(99, 102, 241, 0.45); }
+.fs-body { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.fs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(20,24,36,0.55));
+  border: 1px solid rgba(99,102,241,0.30);
+}
+.fs-row.fs-go    { border-color: rgba(34,197,94,0.55); background: linear-gradient(135deg, rgba(34,197,94,0.16), rgba(20,24,36,0.55)); }
+.fs-row.fs-cau   { border-color: rgba(234,179,8,0.55); background: linear-gradient(135deg, rgba(234,179,8,0.14), rgba(20,24,36,0.55)); }
+.fs-row.fs-wait  { border-color: rgba(239,68,68,0.55); background: linear-gradient(135deg, rgba(239,68,68,0.16), rgba(20,24,36,0.55)); }
+.fs-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fs-pair { font-size: 22px; font-weight: 700; }
+.fs-side {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.fs-side-buy  { background: rgba(34,197,94,0.22); color: #86efac; }
+.fs-side-sell { background: rgba(239,68,68,0.22); color: #fca5a5; }
+.fs-prob { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fs-expiry { font-size: 13px; opacity: 0.85; padding: 3px 10px; background: rgba(255,255,255,0.06); border-radius: 8px; }
+.fs-verdict { flex: 1; font-size: 15px; font-weight: 600; line-height: 1.4; min-width: 200px; }
+.fs-reasoning { line-height: 1.5; }
+.fs-checks-title { margin-top: 4px; }
+.fs-checks { list-style: none; padding: 0; margin: 4px 0 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 6px; }
+.fs-check {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.fs-check.fs-green  { border-color: rgba(34,197,94,0.30); background: rgba(34,197,94,0.06); }
+.fs-check.fs-yellow { border-color: rgba(234,179,8,0.30); background: rgba(234,179,8,0.06); }
+.fs-check.fs-red    { border-color: rgba(239,68,68,0.40); background: rgba(239,68,68,0.08); }
+.fs-dot { grid-row: 1 / span 2; font-size: 14px; padding-top: 1px; }
+.fs-name { font-weight: 600; font-size: 13px; }
+.fs-detail { grid-column: 2; line-height: 1.35; }
+.fs-alts { padding: 8px 0; }
+.fs-alt-pill { display: inline-block; padding: 3px 9px; margin: 2px 4px 2px 0; background: rgba(255,255,255,0.06); border-radius: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.fs-meta code { background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px; }
+.fs-badge-go   { background: rgba(34,197,94,0.20); color: #86efac; }
+.fs-badge-cau  { background: rgba(234,179,8,0.20); color: #fde68a; }
+.fs-badge-wait { background: rgba(239,68,68,0.20); color: #fca5a5; }

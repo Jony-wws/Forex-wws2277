@@ -158,16 +158,74 @@ def _spawn_supervisor_processes() -> list[subprocess.Popen]:
     return children
 
 
+async def _fly_state_refresher():
+    """Lightweight forecast-scanner loop for the Fly dashboard-only deployment.
+
+    Default Fly-machine mode skips the heavy orchestrator (см. AGENTS.md
+    "Deployment & permanent URL"). Без этого forecasts.json только
+    обновляется раз в час Devin-расписанием — пользователь видит "залежалость
+    state" в /api/system-audit. Тут раз в 10 минут запускаем scan_all_pairs
+    asynchronously (в thread pool, чтобы не блокировать FastAPI).
+    """
+    on_fly = os.environ.get("FLY_APP_NAME") is not None or Path("/data").is_dir()
+    if not on_fly:
+        return  # Devin VM has its own scanner; nothing to do here.
+    if os.environ.get("FLY_FULL") == "1" or os.environ.get("FLY_MINIMAL") == "1":
+        return  # full mode already runs scanner as subprocess.
+    if os.environ.get("FLY_DASHBOARD_REFRESH") == "0":
+        return  # explicit opt-out.
+
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    interval = int(os.environ.get("FLY_REFRESH_SEC", str(10 * 60)))
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fly-refresh")
+
+    async def _tick():
+        loop = asyncio.get_running_loop()
+        try:
+            from .. import forecast_scanner
+        except ImportError:
+            from teamagent import forecast_scanner
+        # First refresh: 30 sec after boot — give the request loop time to
+        # serve initial requests before saturating Yahoo.
+        await asyncio.sleep(30)
+        while True:
+            try:
+                log.info("[fly-refresh] scan_all_pairs() starting")
+                await loop.run_in_executor(pool, forecast_scanner.scan_all_pairs)
+                log.info("[fly-refresh] scan_all_pairs() done")
+            except Exception as e:
+                log.exception(f"[fly-refresh] failed: {e}")
+            await asyncio.sleep(interval)
+
+    return asyncio.create_task(_tick())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: seed state + spawn orchestrator/watchdog on startup,
     terminate them on shutdown. Works both in local dev and on Fly.io.
+
+    On Fly's default 256-MB machine (dashboard-only) we ALSO spin up a
+    lightweight in-process refresh task that re-runs ``forecast_scanner``
+    every 10 minutes — so the user doesn't see "state stale 13ч" warnings
+    when the hourly Devin-VM schedule misses a tick.
     """
     _seed_state_files()
     children = _spawn_supervisor_processes()
+    refresh_task = None
+    try:
+        refresh_task = await _fly_state_refresher()
+    except Exception as e:
+        log.exception(f"[fly-refresh] startup failed: {e}")
     try:
         yield
     finally:
+        if refresh_task is not None:
+            try:
+                refresh_task.cancel()
+            except Exception:
+                pass
         for p in children:
             try:
                 p.terminate()
@@ -1010,6 +1068,28 @@ def api_system_audit():
             {"error": f"{type(e).__name__}: {e}", "overall_status": "red"},
             status_code=500,
         )
+
+
+@app.get("/api/final-signal")
+def api_final_signal():
+    """ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ ПОЛЬЗОВАТЕЛЯ — единый сигнал, валидированный
+    через 8 проверок. По нему пользователь открывает сделку на РЕАЛЬНОМ счёте.
+
+    Берёт ТОП-1 из ``state/forecasts.json`` (тот же источник, что paper_trader)
+    и прогоняет: probability ≥ 70%, рынок открыт, нет news blackout, ячейка
+    meta_strategy ≥ PROBABLE, ансамбль агентов согласен с side, macro/political
+    не 🔴, state-файлы свежие. Возвращает ``GO`` / ``GO_CAUTION`` / ``WAIT``
+    с полным списком проверок и обоснованием на русском.
+    """
+    try:
+        from .. import final_signal as fs
+    except ImportError:
+        from teamagent import final_signal as fs
+    try:
+        return JSONResponse(fs.build())
+    except Exception as e:
+        log.exception(f"api_final_signal failed: {e}")
+        return JSONResponse({"error": f"{type(e).__name__}: {e}"}, status_code=500)
 
 
 @app.get("/api/agent-reports")
