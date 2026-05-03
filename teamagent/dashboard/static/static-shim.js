@@ -41,9 +41,13 @@
   // ─────────────────────────────────────────────────────────────────────────
   // Live FastAPI backend (Fly.io). Override before this script loads via
   //   <script>window.FX_LIVE_BACKEND="https://your-host";</script>
+  // The build script (scripts/build_static_mirror.sh) bakes the current
+  // Fly subdomain into the HTML at build time. The hard-coded fallback
+  // below is a last resort; update it on every Fly redeploy that returns
+  // a new subdomain (Fly free tier rotates them on every machine recreate).
   const LIVE_BACKEND =
     (typeof window.FX_LIVE_BACKEND === "string" && window.FX_LIVE_BACKEND) ||
-    "https://fxinvestment.fly.dev";
+    "https://fxinvestment-lbtxlhtb.fly.dev";
 
   // Per-request timeout for the live-backend probe. Keep short so a dead Fly
   // doesn't tax the user — we'll fall through to the baked JSON anyway.
