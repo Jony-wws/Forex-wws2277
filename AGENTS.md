@@ -264,7 +264,18 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-vsxcxrqj.fly.dev/`**
+**`https://fxinvestment-dhaftcbe.fly.dev/`**
+
+(superseded `fxinvestment-vsxcxrqj.fly.dev`, which went dead 2026-05-03;
+re-deployed via `deploy backend` from `Jony-wws/Forex-wws2277`.)
+
+### STATIC CDN MIRROR (mobile-friendly, instant) — secondary
+
+**`https://static-build-fukmtgwy.devinapps.com/`**
+
+(superseded `static-build-seanlntw.devinapps.com`; re-baked with the PR #6
+fixes — 146 `/api/*` JSON files, vendored `lightweight-charts`, scanner
+`now`-bug fix.)
 
 - No login. No password. Just open it.
 - Routes:
