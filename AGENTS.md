@@ -264,7 +264,7 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-mjfdsshe.fly.dev/`**
+**`https://fxinvestment-vsxcxrqj.fly.dev/`**
 
 - No login. No password. Just open it.
 - Routes:

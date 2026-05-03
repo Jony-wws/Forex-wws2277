@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build a static (CDN-friendly) mirror of the FX INVESTMENT dashboard.
 #
-# Why: the Fly.io free-tier deploy (https://fxinvestment-mjfdsshe.fly.dev/) is
+# Why: the Fly.io free-tier deploy (https://fxinvestment-vsxcxrqj.fly.dev/) is
 # unreachable from some mobile carriers / regions even with VPN — the user
 # explicitly hit ERR_HTTP2_PROTOCOL_ERROR / "site can't be reached" on Android
 # Chrome. A static deploy on devinapps.com (Cloudflare CDN) bypasses that:
