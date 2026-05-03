@@ -834,16 +834,29 @@
   function ensureMarketBadgeEl() {
     let badge = document.getElementById("fx-market-badge");
     if (badge) return badge;
-    const host = document.querySelector(".fs-multi-header") || document.body;
+    // Prefer the always-visible top toolbar (fx-toolbar) so the badge is
+    // never hidden by collapsing sections. Fall back to fs-multi-header
+    // and finally body.
+    const host =
+      document.querySelector(".fx-toolbar") ||
+      document.querySelector(".fs-multi-header") ||
+      document.body;
     badge = document.createElement("div");
     badge.id = "fx-market-badge";
     badge.className = "fx-market-badge";
     badge.style.cssText =
-      "display:inline-flex;align-items:center;gap:8px;padding:6px 12px;" +
-      "border-radius:999px;background:rgba(255,255,255,.06);" +
-      "border:1px solid rgba(255,255,255,.12);font-size:13px;line-height:1;" +
-      "margin-left:auto;white-space:nowrap;";
-    host.appendChild(badge);
+      "display:inline-flex;align-items:center;gap:8px;padding:8px 14px;" +
+      "border-radius:999px;background:rgba(74,250,163,.12);" +
+      "border:1px solid rgba(74,250,163,.45);font-size:14px;line-height:1;" +
+      "white-space:nowrap;color:#e9f7ee;font-weight:600;" +
+      "box-shadow:0 0 0 2px rgba(74,250,163,.06) inset;";
+    // For fx-toolbar (flex row) we want the badge on the left of the clock,
+    // so prepend rather than append.
+    if (host.classList && host.classList.contains("fx-toolbar")) {
+      host.insertBefore(badge, host.firstChild);
+    } else {
+      host.appendChild(badge);
+    }
     return badge;
   }
   async function refreshLiveMarketBadge() {
@@ -886,6 +899,16 @@
 
     // Render the live badge.
     const dotColor = isOpen ? "#4afaa3" : "#ff8090";
+    // Dynamically switch the pill background to match status.
+    if (isOpen) {
+      badge.style.background = "rgba(74,250,163,.14)";
+      badge.style.borderColor = "rgba(74,250,163,.55)";
+      badge.style.color = "#e9f7ee";
+    } else {
+      badge.style.background = "rgba(255,128,144,.14)";
+      badge.style.borderColor = "rgba(255,128,144,.55)";
+      badge.style.color = "#ffe9ec";
+    }
     const eventLabel = ms.next_event_text_ru ||
       (isOpen ? "закроется через" : "откроется через");
     const eventSecs = isOpen
@@ -895,12 +918,12 @@
       source === "live"
         ? '<span style="opacity:.6;font-size:11px">live</span>'
         : source === "client_side_shim"
-        ? '<span style="opacity:.6;font-size:11px">по часам устройства</span>'
+        ? '<span style="opacity:.6;font-size:11px">часы устр-ва</span>'
         : '<span style="opacity:.6;font-size:11px">кэш</span>';
     badge.innerHTML =
-      `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;` +
-      `background:${dotColor};box-shadow:0 0 8px ${dotColor}"></span>` +
-      `<b>${ms.status_text || (isOpen ? "ОТКРЫТ" : "ЗАКРЫТ")}</b>` +
+      `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;` +
+      `background:${dotColor};box-shadow:0 0 10px ${dotColor}"></span>` +
+      `<b>${isOpen ? "🟢 РЫНОК ОТКРЫТ" : "🔴 РЫНОК ЗАКРЫТ"}</b>` +
       `<span style="opacity:.7">·</span>` +
       `<span>${eventLabel} <b>${fmtCountdown(eventSecs)}</b></span>` +
       `<span style="opacity:.7">·</span>` +
