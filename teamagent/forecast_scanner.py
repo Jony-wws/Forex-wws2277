@@ -322,6 +322,30 @@ def evaluate_pair(pair: str) -> dict | None:
         delta = -penalty if score > 0 else (penalty if score < 0 else 0)
         vote("news_blackout", delta, f"high-impact новость ±30 мин — снижаем abs(score) на {penalty}")
 
+    # ───── BLOCK K — Event-attribution boost (added 2026-05-04) ─────
+    # Source: HISTORY/event_attribution_365d/ (built by teamagent.events.*).
+    # When a persistent-driver event (US GDP/PCE/NFP/CPI/PPI, CB rate decision,
+    # CB press conf, COT extreme) is in ±6h of `now` AND the (pair × session ×
+    # event_type) cell has frequency≥2 in the 365-day archive, we add a
+    # weighted score: base × concordance × persistence, signed by the historic
+    # dominant direction for that event-currency. Capped ±8 to prevent any
+    # one news cluster overwhelming the technical stack.
+    try:
+        from .events import live_weights as ev_lw
+        sess_now = _current_session(now.hour)
+        ev_delta, ev_reason = ev_lw.event_score_contribution(pair, sess_now, now)
+        if ev_delta != 0 and ev_reason:
+            vote("event_attribution", ev_delta, ev_reason)
+        # Soft trap penalty on known whipsaw cells (≥50% trap-rate). NEVER
+        # blocks the trade (free 70% gate stays free) — only nudges |score|
+        # down a couple of points so probability_pct doesn't reach 70 on
+        # marginal signals in known-bad cells.
+        trap_delta, trap_reason = ev_lw.trap_score_penalty(pair, sess_now, score)
+        if trap_delta != 0 and trap_reason:
+            vote("trap_filter", trap_delta, trap_reason)
+    except Exception as e:
+        log.warning(f"forecast_scanner: event_attribution integration failed for {pair}: {e}")
+
     # ───── итог ─────
     if score == 0:
         return None  # нейтрально, не показываем
