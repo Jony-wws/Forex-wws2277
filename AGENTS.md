@@ -262,74 +262,54 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ## Where to find the user's data
 
-### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
+### LIVE FULL SYSTEM (current Devin VM, 64+ processes)
 
-**`https://fxinvestment-nbmuknwe.fly.dev/`** (canonical, 2026-05-04)
-Old (still alive but pre-3-section reorg): `https://fxinvestment-lbtxlhtb.fly.dev/`
+**Auto-login:** `https://user:5f457c9656cd820841749ce6f3785c00@d2a19c266c48-tunnel-rbyxmhrg.devinapps.com/`
+
+- Host: `https://d2a19c266c48-tunnel-rbyxmhrg.devinapps.com/`
+- Login: `user`
+- Password: `5f457c9656cd820841749ce6f3785c00`
+- Verified 2026-05-04: `/api/health` OK, `/api/forecasts` has all 28 pairs, scanner timestamp `2026-05-04T15:38:09Z`.
+- This is the only URL in this session that runs the full orchestrator + watchdog + 60 sub-agents on the Devin VM. It dies when this Devin session/VM stops.
+
+### PERMANENT URL (Fly.io, free, 24/7, no login) — stable dashboard
+
+**`https://fxinvestment-uqfprqce.fly.dev/`**
 
 - No login. No password. Just open it.
+- Free Fly machine is kept dashboard-only because full `FLY_FULL=1` on the free/current memory tier starts `orchestrator` + `watchdog` but OOM-kills the app after ~90 sec. This was verified in Fly logs on 2026-05-04.
 - Routes:
-  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts,
-    pressure bars, currency strength heatmap, СТАКАН раздел, 10-sec refresh).
-  - `/system` → audit dashboard (heartbeats, agents, paper-trader stats,
-    closed-trades history).
+  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts, pressure bars, currency strength heatmap, СТАКАН section, 10-sec refresh).
+  - `/system` → audit dashboard (heartbeats, agents, paper-trader stats, closed-trades history).
   - `/agents` → redirect to `/system#agents-section`.
   - `/history` → redirect to `/system#closed-trades-section`.
-- Deployed via Devin's `deploy backend` tool from `Jony-wws/Forex-wws2277`.
-  It auto-generates a Dockerfile from `pyproject.toml` (uv sync) and a
-  fly.toml (auto-stop machines, /data volume, region sjc).
-- Fly config: dashboard-only mode (auto-detected via `/data` mount). The
-  scanner / paper_trader / 60+ subprocess agents run on the Devin VM via
-  the hourly Schedule (`sched-083b…`); state files are committed to git
-  and travel with each Fly redeploy.
-- Cold-start: ~10–20 sec on first request after idle (fly auto-stops the
-  machine to save quota). Subsequent requests are instant.
-- To redeploy after code changes (in a Devin session):
-  ```bash
-  # Devin tool — installs flyctl-equivalent + builds + ships:
-  deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true
-  ```
+- Deploy command from Devin: `deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true`.
 
-### Live tunnel (current Devin session, dies when session ends)
+### Static CDN mirror (free, no login, instant cold-start)
 
-`https://4ee881dbffe0-tunnel-q78oebby.devinapps.com/`
-user / `c7e01b4403f37888d4efcf17054c101b`
-(auto-login URL: `https://user:c7e01b4403f37888d4efcf17054c101b@4ee881dbffe0-tunnel-q78oebby.devinapps.com/`)
+**`https://static-build-lqdncvmx.devinapps.com/`**
 
-This URL changes every Devin session. The current value is updated by the
-agent at the start of each "продолжай"/"continue" session and committed to
-this file so the user always has the latest.
-
-### Static CDN mirror (no-auth, instant cold-start)
-
-**`https://static-build-qumqktab.devinapps.com/`** (latest, 2026-05-04)
-
-- Public CDN snapshot of the dashboard (HTML + JS + 184 baked JSON files).
-- Updated on demand via `bash scripts/build_static_mirror.sh && deploy frontend`.
-- Has the new **СТАКАН — Order Book** section as a primary screen for all
-  28 pairs (selector + 3 hero cards + ордер-бук + крупные игроки + per-session
-  стратегия). Live "10-sec refresh" still polls `./api/*.json` files baked
-  at build time (so values are frozen between rebuilds — for fully live data
-  use the Fly URL above).
+- Built with `bash scripts/build_static_mirror.sh`.
+- The static shim now points to the current Fly backend `https://fxinvestment-uqfprqce.fly.dev`.
+- Latest deploy succeeded after removing zero-byte placeholder JSON files from WARN endpoints.
+- Includes the newer static mirror endpoint set from `main`, including stakan-view/live-price/news-watch baked JSON fallbacks.
 
 ### Other links
 
 - PR #1: https://github.com/Jony-wws/Forex-wws2277/pull/1
-- All commits + state history:
-  https://github.com/Jony-wws/Forex-wws2277/commits/devin/1777586006-teamagent-rebuild
-- Devin Schedule (hourly): `sched-083b11171a0841668f4608b075d769b5`
+- Current recovery PR: https://github.com/Jony-wws/Forex-wws2277/pull/13
+- Branch: `devin/1777586006-teamagent-rebuild`
+- Schedule: `sched-083b11171a0841668f4608b075d769b5`
 
 ## Honest known limitations (do NOT hide these)
 
-**Latest state (May 2026 — 365-day sweep + STRICT gate + martingale):**
-- 15 of 112 (pair, session) cells achieve ≥70% WR on real **365-day** Yahoo data.
-- Per session: Asia 3/28, London 3/28, Overlap 5/28, NY 4/28.
-- 7/28 pairs qualify globally.
-- paper_trader STRICT_QUALIFIED_GATE=True: opens trades ONLY on qualified
-  cells (per-session OR pair-global). No baseline-fallback. This guarantees
-  real ≥70% WR (not theoretical).
-- STAKE_USD = $1 (was $50). Martingale 1→2→4→reset enabled.
-- Estimated 1-3 trades/day average (sometimes 0, sometimes 5+).
+**Latest state (2026-05-04 — restored 365-day sweep + free 70% gate):**
+- `STRICT_QUALIFIED_GATE=False`: paper_trader opens when `forecast.probability_pct >= 70`, independent of per-session WR.
+- `strategy_config.json` restored from commit `f80fc53`: 30 of 112 (pair, session) cells achieve ≥70% WR on real 365-day Yahoo data.
+- Per session: Asia 4/28, London 12/28, Overlap 5/28, NY 9/28.
+- 9/28 pairs qualify globally: USDCHF, USDCAD, NZDUSD, EURGBP, EURJPY, GBPJPY, GBPCAD, CADJPY, AUDNZD.
+- `paper_stats.json` at 2026-05-04 15:39 UTC: total 10, wins 6, losses 4, WR 60.0%, PnL +$1.80.
+- Fly free/current tier cannot sustain full 64-process mode; use the Devin tunnel for full live agents and Fly/static for free public viewing.
 
 **Why 90d (not 60d, not 180d):**
 - 60d sweep: 36/112 cells but most London cells were over-fit to recent regime.

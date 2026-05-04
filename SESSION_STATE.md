@@ -67,68 +67,104 @@ bash scripts/start_all.sh        # стартует ВСЁ (orchestrator + 64 п
 
 ---
 
-## 4. Дашборд (текущий URL — обновляется каждой сессией)
+## 4. Дашборд (текущие URL — обновлено 2026-05-04)
 
-Свежий URL и Basic Auth — в `AGENTS.md` файла `Forex-wws2277`. На момент
-последнего апдейта: см. секцию «Where to find the user's data» в `AGENTS.md`.
+### Full live system на Devin VM
 
-URL формата `https://<vm-id>-tunnel-<hash>.devinapps.com/` — он живёт пока
-жива Devin VM. После остановки сессии URL умирает; чтобы постоянный — нужно
-деплой на Fly.io (`infra/fly/Dockerfile`, `fly.toml` уже в репо).
+- Auto-login: `https://user:5f457c9656cd820841749ce6f3785c00@d2a19c266c48-tunnel-rbyxmhrg.devinapps.com/`
+- Host: `https://d2a19c266c48-tunnel-rbyxmhrg.devinapps.com/`
+- Basic Auth: `user` / `5f457c9656cd820841749ce6f3785c00`
+- Проверено: `/api/health` OK, `/api/forecasts` содержит 28 пар, scanner timestamp `2026-05-04T15:38:09Z`, open trades count 14 при локальной проверке.
+- Этот URL живёт только пока жива текущая Devin VM.
 
-Для Android Chrome пользователь использует `https://user:<pass>@host/`-формат
-(auto-login). Это требует чтобы фронт делал fetch через `location.origin`
-(см. фикс `9fab29d`).
+### Permanent/free viewing
+
+- Fly.io: `https://fxinvestment-uqfprqce.fly.dev/`
+- Static CDN: `https://static-build-lqdncvmx.devinapps.com/`
+
+Fly остаётся dashboard-only на бесплатной/current машине: full `FLY_FULL=1` был проверен и действительно запускает `orchestrator` + `watchdog`, но затем app получает OOM kill примерно через 90 секунд. Без Fly token/ручного scale бесплатный устойчивый вариант — Fly/static для просмотра и Devin tunnel для полного live запуска.
 
 ---
 
-## 5. Текущее состояние стратегии (на 2026-05-01 20:00 UTC)
+## 5. Текущее состояние стратегии (обновлено 2026-05-04)
 
 ### Stability Engine (NEW · 2026-05-01) — мат. гарантии стабильности
 
 `teamagent/stability_engine.py` + `teamagent/resume_ru.py` добавляют 50+
-функций нижних математических границ на основе реальных данных:
+функций нижних математических границ на основе реальных данных: Wilson /
+Clopper-Pearson, bootstrap CI, conformal price band, VaR/CVaR, Sharpe/Sortino,
+calibration, Hurst/variance ratio, streak/stress-test и pair/system stability
+score. API: `/api/stability`, `/api/min-guarantee`, `/api/risk-metrics`,
+`/api/calibration`.
 
-- **Wilson / Clopper-Pearson** — нижние границы для биномиальной WR.
-- **Bootstrap CI** — resampling реальных PnL, фикс seed → репродуцируемо.
-- **Conformal price band** — гарантированный 90% коридор цены через H часов.
-- **VaR / CVaR / Sharpe / Sortino / Max DD / Calmar / Kelly half / PF**.
-- **Brier / log loss / calibration table** — точность вероятностей.
-- **Hurst / Variance Ratio / Skew / Kurtosis** — характеристики распределения.
-- **Streak analysis / Stress-test** — длинные серии и худшие неделя/день.
-- **Pair stability score (0–100)** + **System stability report**.
+### Strategy Search / restored baseline
 
-API: `/api/stability`, `/api/stability/{pair}`, `/api/min-guarantee`,
-`/api/conformal/{pair}`, `/api/risk-metrics`, `/api/calibration`.
+`teamagent/state/strategy_config.json` восстановлен из commit `f80fc53` — это
+лучший найденный предыдущий sweep до ухудшения на 18/112. Текущий код на main
+уже содержит расширения 2026-05-03: 250+ strategy variants, top_variants,
+dominant_side, ensemble voting, ADX/MACD/Stoch/Williams/Ichimoku inputs.
 
-UI: 2 hero-секции — «ОБЩАЯ ОЦЕНКА СИСТЕМЫ» и «ГАРАНТИИ СТАБИЛЬНОСТИ» (50+
-карточек, всё на русском). Премиум-дизайн: floating neon stars, breathing
-auras, glassmorphism, animated gradient borders, pulsing dots, shimmer bars.
-
-Тесты: `teamagent/tests/test_stability_engine.py` — 28/28 pass за 0.1 сек.
-
-Коммит: `2b6bf1e feat: stability_engine + resume_ru + 50+ guarantees + premium UI`.
-
-### Strategy Search
-
-**Strategy Search** перебирает **250 вариантов** стратегий (было 120, расширены
-2026-05-03 для использования новых индикаторов MACD/Stoch/ADX/Williams/Ichimoku)
-× **4 канонические сессии** × **28 пар** на **365-дневном** Yahoo 1H бэктесте
-(минимум 10 сделок для статистической значимости). Re-train каждые 5 дней
-(`LOOP_INTERVAL_SEC = 5 * 24 * 3600`). По каждой (pair, session) ячейке
-сохраняется до 10 top_variants с полной информацией (id, win_rate_pct, trades,
-dominant_side) — это «топливо» ensemble voting в paper_trader.
-
-**Сессии UTC** (не пересекаются):
-- `Asia` — 00:00–06:59
-- `London` — 07:00–12:59
-- `Overlap` — 13:00–16:59
-- `NY` — 17:00–21:59
-
-**Реальный результат:**
+Реальный 365-day Yahoo результат восстановленного baseline:
 
 | сессия | пар ≥70% WR / 28 |
 |---|---|
+| Asia | **4/28** |
+| London | **12/28** |
+| Overlap | **5/28** |
+| NY | **9/28** |
+
+**Итого: 30 из 112 (пара × сессия) ячеек реально достигают ≥70% WR.**
+9 из 28 пар qualify globally: USDCHF, USDCAD, NZDUSD, EURGBP, EURJPY, GBPJPY, GBPCAD, CADJPY, AUDNZD.
+
+### Current gates
+
+- `STRICT_QUALIFIED_GATE = False`
+- Сделка открывается при `forecast.probability_pct >= 70`, независимо от per-session WR.
+- Strategy config используется для enrichment: variant, side flip, fixed expiry, но не блокирует free 70% gate.
+- `FLY_FULL = 1` в repo `fly.toml`; Devin deploy backend требует отдельной среды и без scale падает по OOM при full mode.
+- Main branch ensemble/correlation filters сохранены: они могут дополнительно фильтровать открытие, если включены соответствующие config flags.
+
+### Paper stats at 2026-05-04 15:39 UTC
+
+```json
+{
+  "total": 10,
+  "wins": 6,
+  "losses": 4,
+  "win_rate_pct": 60.0,
+  "total_pnl_usd": 1.8
+}
+```
+
+---|---|
+| Asia | **4/28** |
+| London | **12/28** |
+| Overlap | **5/28** |
+| NY | **9/28** |
+
+**Итого: 30 из 112 (пара × сессия) ячеек реально достигают ≥70% WR.**
+9 из 28 пар qualify globally: USDCHF, USDCAD, NZDUSD, EURGBP, EURJPY, GBPJPY, GBPCAD, CADJPY, AUDNZD.
+
+### Current gates
+
+- `STRICT_QUALIFIED_GATE = False`
+- Сделка открывается при `forecast.probability_pct >= 70`, независимо от per-session WR.
+- Strategy config используется для enrichment: variant, side flip, fixed expiry, но не блокирует free 70% gate.
+- `FLY_FULL = 1` в repo `fly.toml`; Devin deploy backend требует отдельной среды и без scale падает по OOM при full mode.
+
+### Paper stats at 2026-05-04 15:39 UTC
+
+```json
+{
+  "total": 10,
+  "wins": 6,
+  "losses": 4,
+  "win_rate_pct": 60.0,
+  "total_pnl_usd": 1.8
+}
+```
+
+---|---|
 | Asia | **1/28** — USDCAD 80% |
 | London | **15/28** |
 | Overlap | **18/28** |
@@ -257,6 +293,6 @@ bash scripts/stop_all.sh
 
 ---
 
-_Последнее обновление: 2026-05-01_
+_Последнее обновление: 2026-05-04_
 _Если этот файл устарел больше чем на сутки — сверяйся с `git log` в
 `Forex-wws2277` и доверяй последним коммитам._

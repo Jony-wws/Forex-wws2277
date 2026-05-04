@@ -97,6 +97,8 @@ for p in $PAIRS; do
   curl -sf --max-time 8  "$BASE/api/news-watch/$p?hours_ahead=5" > "$OUT/api/news-watch/${p}.json" 2>/dev/null || true
 done
 
+find "$OUT/api" -type f -size 0 -delete
+
 echo "== 5/5 copy + patch HTML/JS/CSS =="
 cp "$SRC/intent.html"  "$OUT/index.html"
 cp "$SRC/index.html"   "$OUT/system.html"
