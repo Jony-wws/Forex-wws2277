@@ -11,11 +11,12 @@ description: |
 
 ## Live URL (canonical)
 
-`https://fxinvestment-jwodwfwy.fly.dev/` (с 2026-05-04 — STAKAN-only UI на
-ветке PR #14; станет окончательно канонической после merge в
-`devin/1777586006-teamagent-rebuild`).
+`https://fxinvestment-ytjmvlnz.fly.dev/` (с 2026-05-04 — STAKAN-only UI на
+ветке PR #14 после правок «никогда ОЖИДАНИЕ, всегда ≥70%»; станет
+окончательно канонической после merge в `devin/1777586006-teamagent-rebuild`).
 
 Старые:
+- `https://fxinvestment-jwodwfwy.fly.dev/` (pre-«no-ОЖИДАНИЕ» STAKAN-only)
 - `https://fxinvestment-nbmuknwe.fly.dev/` (pre-stakan-only)
 - `https://fxinvestment-lbtxlhtb.fly.dev/` (pre-3-section reorg)
 
