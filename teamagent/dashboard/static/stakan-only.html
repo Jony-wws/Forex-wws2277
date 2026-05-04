@@ -42,6 +42,8 @@
     <span id="so-pair-session">сессия —</span>
     <span class="so-sep">·</span>
     <span id="so-pair-asof">forecast —</span>
+    <span class="so-sep">·</span>
+    <span id="so-pair-fresh" title="Yahoo mid-price; ±5–20 пипсов от broker (TradingView/MT5)">—</span>
   </div>
 </section>
 
@@ -81,6 +83,30 @@
   </div>
 
   <div class="so-verdict-reason" id="so-verdict-reason">—</div>
+
+  <!-- ПЛАН СДЕЛКИ — явный срок и время истечения по UTC+5 -->
+  <div class="so-trade-plan" id="so-trade-plan">
+    <div class="so-tp-row">
+      <span class="so-tp-lbl">Открыть на:</span>
+      <span class="so-tp-val" id="so-tp-duration">5 часов</span>
+    </div>
+    <div class="so-tp-row">
+      <span class="so-tp-lbl">Истечёт в:</span>
+      <span class="so-tp-val" id="so-tp-expiry">—</span>
+    </div>
+    <div class="so-tp-row">
+      <span class="so-tp-lbl">Цена сейчас:</span>
+      <span class="so-tp-val" id="so-tp-price">—</span>
+    </div>
+    <div class="so-tp-row">
+      <span class="so-tp-lbl">Цель к 00:00 UTC+5:</span>
+      <span class="so-tp-val" id="so-tp-goal">—</span>
+    </div>
+    <div class="so-tp-row" id="so-tp-news-row" hidden>
+      <span class="so-tp-lbl">⚠️ Новости впереди:</span>
+      <span class="so-tp-val" id="so-tp-news">—</span>
+    </div>
+  </div>
 
   <!-- Баланс покупатели vs продавцы (визуализация) -->
   <div class="so-bs">

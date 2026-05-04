@@ -781,6 +781,7 @@ def _institutional_verdict(
     )
     is_medium = agreement_pct >= 60 and voted_count >= 2 and not is_strong
 
+    fav_word_short = "ВВЕРХ" if favorite_side == "buyers" else "ВНИЗ"
     if is_strong:
         verdict_strength = "strong"
         if favorite_side == "buyers":
@@ -793,6 +794,8 @@ def _institutional_verdict(
             f"Перевес институционала {favorite_balance_pct:.0f}%. "
             f"Крупные игроки ({bp_pct:.0f}/{sp_pct:.0f}%), стакан, COT, "
             f"FRED-macro и Market Radar указывают в одну сторону. "
+            f"На горизонте 24ч до 00:00 UTC+5 рынок выбрал направление {fav_word_short} — "
+            f"мелкие колебания внутри сессии это шум, прогноз отработает за ~5 часов. "
             f"Рынок не даёт возможности идти против. Вероятность {prob_pct:.0f}%."
         )
     elif is_medium:
@@ -804,7 +807,8 @@ def _institutional_verdict(
         primary_reason = (
             f"{agree} из {institutional_sources_total} институциональных согласны "
             f"({agreement_pct:.0f}% от голосовавших), перевес {favorite_balance_pct:.0f}%. "
-            f"Перевес умеренный — направление есть, импульс {favorite_side}. "
+            f"Импульс крупных игроков направлен {fav_word_short} — направление до 00:00 UTC+5 есть, "
+            f"но запас прочности средний. Прогноз отработает за ~5 часов. "
             f"Вероятность {prob_pct:.0f}%."
         )
     else:
@@ -818,8 +822,8 @@ def _institutional_verdict(
             f"{institutional_sources_total} источников "
             f"({agreement_pct:.0f}% от голосовавших, voted={voted_count}). "
             f"Перевес слабый ({favorite_balance_pct:.0f}%) — но направление "
-            f"всё-таки в сторону {favorite_side}. Вероятность {prob_pct:.0f}% — "
-            f"допустимо лишь как лёгкая позиция."
+            f"всё-таки {fav_word_short} (24ч-горизонт). Прогноз ~5 часов, вероятность "
+            f"{prob_pct:.0f}% — допустимо лишь как лёгкая позиция."
         )
 
     if in_blackout:

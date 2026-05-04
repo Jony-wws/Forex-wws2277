@@ -26,7 +26,9 @@
     priceTimer: null,
     summaryTimer: null,
     lastPrice: null,
-    pairVerdict: new Map(),  // pair -> { verdict, color }
+    lastPriceAt: null,            // ms (Yahoo bar timestamp)
+    pairVerdict: new Map(),       // pair -> { verdict, color }
+    lastOrderBookPair: null,      // чтобы не прыгать при рефреше той же пары
   };
 
   // ── helpers ──────────────────────────────────────────────────────
@@ -46,6 +48,34 @@
   function fmtHours(h) {
     if (h == null || !isFinite(h)) return "—";
     return Number(h).toFixed(1) + " ч";
+  }
+  // Система живёт в UTC+5 — это «relock-time» рынка по институциональным сигналам.
+  function toUtc5(date) {
+    if (!(date instanceof Date)) return null;
+    return new Date(date.getTime() + 5 * 3600 * 1000);
+  }
+  function fmtUtc5HMS(date) {
+    const d = toUtc5(date);
+    if (!d) return "—";
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
+    const ss = String(d.getUTCSeconds()).padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  }
+  function fmtUtc5HM(date) {
+    const d = toUtc5(date);
+    if (!d) return "—";
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+  function fmtAgo(ms) {
+    if (ms == null) return "—";
+    const sec = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (sec < 60) return `${sec} с назад`;
+    const m = Math.floor(sec / 60);
+    if (m < 60) return `${m} мин назад`;
+    return `${Math.floor(m / 60)} ч назад`;
   }
 
   async function jget(url) {
@@ -72,9 +102,15 @@
 
   function tickClock() {
     const el = document.getElementById("so-clock");
-    if (!el) return;
-    const d = new Date();
-    el.textContent = d.toUTCString().split(" ")[4] + " UTC";
+    if (el) {
+      const now = new Date();
+      el.textContent = `${fmtUtc5HMS(now)} UTC+5  ·  ${now.toUTCString().split(" ")[4]} UTC`;
+    }
+    // freshness badge для цены
+    const fresh = document.getElementById("so-pair-fresh");
+    if (fresh) {
+      fresh.textContent = state.lastPriceAt ? `Yahoo · ${fmtAgo(state.lastPriceAt)}` : "—";
+    }
   }
   setInterval(tickClock, 1000);
   tickClock();
@@ -177,6 +213,27 @@
         ? `${fmtPrice(v.no_return_level)} (${fmtPips(v.no_return_pips)})`
         : "—";
 
+    // ── План сделки: 5 часов / истечение в HH:MM UTC+5 / цена / цель ────────
+    const TRADE_HOURS = 5;
+    const expEl = document.getElementById("so-tp-expiry");
+    const dpEl = document.getElementById("so-tp-duration");
+    const tpPriceEl = document.getElementById("so-tp-price");
+    const tpGoalEl = document.getElementById("so-tp-goal");
+    if (dpEl) dpEl.textContent = `${TRADE_HOURS} часов (бинарный)`;
+    if (expEl) {
+      const exp = new Date(Date.now() + TRADE_HOURS * 3600 * 1000);
+      const hhUtc = String(exp.getUTCHours()).padStart(2, "0");
+      const mmUtc = String(exp.getUTCMinutes()).padStart(2, "0");
+      expEl.textContent = `${fmtUtc5HM(exp)} UTC+5  ·  ${hhUtc}:${mmUtc} UTC`;
+    }
+    if (tpPriceEl) tpPriceEl.textContent = fmtPrice(d && d.current_price);
+    if (tpGoalEl) {
+      tpGoalEl.textContent =
+        v.target_by_midnight != null
+          ? `${fmtPrice(v.target_by_midnight)} (${fmtPips(v.target_pips_to_midnight)})`
+          : "—";
+    }
+
     // Buyers vs sellers bar
     const bp = Number((v && v.buyers_pct) || 50);
     const sp = Number((v && v.sellers_pct) || 50);
@@ -269,11 +326,23 @@
         </div>`
       );
     }
+    // Сохраняем scrollTop до перерисовки — иначе страница прыгает наверх.
+    const prevScroll = body.scrollTop;
+    const pairChanged = state.lastOrderBookPair !== state.selectedPair;
     body.innerHTML = rows.join("");
-    // автоскролл к текущей цене
-    const curRow = body.querySelector(".so-ob-row.cur");
-    if (curRow && curRow.scrollIntoView) {
-      try { curRow.scrollIntoView({ block: "center", behavior: "instant" }); } catch (_) {}
+    // Автоскролл К ТЕКУЩЕЙ ЦЕНЕ ТОЛЬКО ПРИ СМЕНЕ ПАРЫ.
+    // На повторных рефрешах сохраняем позицию юзера.
+    if (pairChanged) {
+      const curRow = body.querySelector(".so-ob-row.cur");
+      if (curRow) {
+        // scrollTop внутри контейнера стакана без скролла всей страницы.
+        const target = curRow.offsetTop - (body.clientHeight - curRow.clientHeight) / 2;
+        body.scrollTop = Math.max(0, target);
+      }
+      state.lastOrderBookPair = state.selectedPair;
+    } else {
+      // Позиция юзера в стакане остаётся.
+      body.scrollTop = prevScroll;
     }
   }
 
@@ -309,7 +378,7 @@
     document.getElementById("so-pair-session").textContent =
       `сессия ${(d && d.current_session) || "—"}`;
     document.getElementById("so-pair-asof").textContent =
-      d && d.forecast_as_of ? `forecast ${new Date(d.forecast_as_of).toUTCString().split(" ")[4]} UTC` : "forecast —";
+      d && d.forecast_as_of ? `forecast ${fmtUtc5HM(new Date(d.forecast_as_of))} UTC+5` : "forecast —";
   }
 
   // ── Refresh detail ───────────────────────────────────────────────
@@ -344,7 +413,40 @@
         probEl.className = "so-chip-prob " + (d.verdict.side === "BUY" ? "buy" : "sell");
       }
     }
+    // ── Новости впереди (±5ч и ±24ч) ────────────────────────────────────────
+    refreshNews();
     setStatus("на связи · обновляется каждые 10с", "ok");
+  }
+
+  // ── Refresh news watch ───────────────────────────────────────────
+  async function refreshNews() {
+    const r = await jget(`/api/news-watch/${state.selectedPair}?hours_ahead=24`);
+    const row = document.getElementById("so-tp-news-row");
+    const txt = document.getElementById("so-tp-news");
+    if (!row || !txt) return;
+    const events = (r && r.events) || [];
+    if (!events.length) {
+      row.hidden = true;
+      return;
+    }
+    // вычисляем "через N часов" по полю time (ISO UTC)
+    const now = Date.now();
+    const enriched = events.map((e) => {
+      const t = e.time ? new Date(e.time).getTime() : null;
+      const h = t ? (t - now) / 3600000 : 99;
+      return { ...e, _h: h };
+    }).filter((e) => e._h >= 0).sort((a, b) => a._h - b._h);
+    if (!enriched.length) {
+      row.hidden = true;
+      return;
+    }
+    const within5 = enriched.filter((e) => e._h <= 5);
+    const top = enriched[0];
+    const tDate = new Date(top.time);
+    const hAhead = top._h.toFixed(1);
+    const what = top.title || top.event || "high-impact";
+    txt.textContent = `${what} · через ${hAhead}ч (в ${fmtUtc5HM(tDate)} UTC+5) · ${within5.length} в 5ч / ${enriched.length} в 24ч`;
+    row.hidden = false;
   }
 
   // ── Refresh live price (5 sec) ───────────────────────────────────
@@ -355,6 +457,14 @@
     const priceEl = document.getElementById("so-pair-price");
     const deltaEl = document.getElementById("so-pair-delta");
     if (priceEl) priceEl.textContent = fmtPrice(cur);
+    // Отметка времени бара для бейджика «обновлено N с назад»
+    if (r.bar_time) {
+      const t = new Date(r.bar_time);
+      if (!isNaN(t.getTime())) state.lastPriceAt = t.getTime();
+    } else if (r.ts) {
+      const t = new Date(r.ts);
+      if (!isNaN(t.getTime())) state.lastPriceAt = t.getTime();
+    }
     const dpips = r.change_5m_pips;
     if (deltaEl && dpips != null) {
       const sign = dpips > 0 ? "+" : "";

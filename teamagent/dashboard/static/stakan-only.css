@@ -282,6 +282,38 @@ body {
 .so-verdict[data-color="yellow_buy"]  .so-verdict-reason,
 .so-verdict[data-color="yellow_sell"] .so-verdict-reason { border-left-color: #ffce5e; }
 
+/* План сделки — явный срок и время истечения */
+.so-trade-plan {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(74, 250, 163, 0.25);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(74,250,163,0.06), rgba(0,0,0,0));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+}
+@media (max-width: 600px) {
+  .so-trade-plan { grid-template-columns: 1fr; }
+}
+.so-tp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+}
+.so-tp-lbl { color: #9aa9bf; }
+.so-tp-val {
+  color: #e6edf6;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#so-tp-news-row .so-tp-val { color: #ffce5e; }
+
+.so-verdict[data-color="red"] .so-trade-plan { border-color: rgba(255, 105, 121, 0.30); background: linear-gradient(180deg, rgba(255,105,121,0.06), rgba(0,0,0,0)); }
+.so-verdict[data-color="yellow_buy"] .so-trade-plan,
+.so-verdict[data-color="yellow_sell"] .so-trade-plan { border-color: rgba(255, 206, 94, 0.25); background: linear-gradient(180deg, rgba(255,206,94,0.05), rgba(0,0,0,0)); }
+
 /* Покупатели vs Продавцы — горизонтальная полоса */
 .so-bs { margin-top: 8px; }
 .so-bs-bar {
