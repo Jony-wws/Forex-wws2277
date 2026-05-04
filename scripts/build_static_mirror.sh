@@ -48,7 +48,7 @@ curl -sf --max-time 5 "$BASE/api/health" > /dev/null || { echo "ERROR: dashboard
 
 echo "== 3/5 reset $OUT =="
 rm -rf "$OUT"
-mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,daily,stability-forecast,volume-profile,meta-strategy,market-radar,market-regime,stability,regime,analyst}
+mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,stakan-view,live-price,news-watch,daily,stability-forecast,volume-profile,meta-strategy,market-radar,market-regime,regime,analyst,stability}
 
 echo "== 4/5 bake /api/* responses =="
 # Top-level endpoints. fundamentals / market-regime / weekly-loss-review /
@@ -59,7 +59,7 @@ for ep in forecasts market-radar cot open-trades closed-trades stats agents back
           strategy-config market-status system-audit system-health meta-strategy stability \
           fundamentals market-regime weekly-loss-review wr-floor min-guarantee \
           risk-metrics calibration agent-reports coverage-matrix final-signal final-signals ai-narrative \
-          playbook analyst daily-target; do
+          playbook analyst daily-target stakan-view; do
   # /api/agent-reports does live RSS fetches — give it more time.
   # /api/final-signal in turn calls all_reports() so it also needs a long timeout.
   # /api/analyst calls regime classification on 28 pairs — needs ~60-90s.
@@ -92,7 +92,11 @@ for p in $PAIRS; do
   curl -sf --max-time 8  "$BASE/api/forecast/$p"        > "$OUT/api/forecast/${p}.json" 2>/dev/null || true
   curl -sf --max-time 8  "$BASE/api/microstructure/$p"  > "$OUT/api/microstructure/${p}.json" 2>/dev/null || true
   curl -sf --max-time 8  "$BASE/api/volume-profile/$p"  > "$OUT/api/volume-profile/${p}.json" 2>/dev/null || true
+  curl -sf --max-time 12 "$BASE/api/stakan-view/$p"     > "$OUT/api/stakan-view/${p}.json" 2>/dev/null || true
+  curl -sf --max-time 6  "$BASE/api/live-price/$p"      > "$OUT/api/live-price/${p}.json" 2>/dev/null || true
+  curl -sf --max-time 8  "$BASE/api/news-watch/$p?hours_ahead=5" > "$OUT/api/news-watch/${p}.json" 2>/dev/null || true
 done
+
 find "$OUT/api" -type f -size 0 -delete
 
 echo "== 5/5 copy + patch HTML/JS/CSS =="

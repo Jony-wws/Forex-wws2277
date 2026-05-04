@@ -4,8 +4,8 @@
 //   forecasts: каждые 60 сек (источник scaner — раз в 5 мин)
 //   volume profile: при выборе пары + ручное обновление
 
-const REFRESH_LIVE_MS = 30 * 1000;
-const REFRESH_FORECASTS_MS = 60 * 1000;
+const REFRESH_LIVE_MS = 15 * 1000;       // was 30s — user wants live updates
+const REFRESH_FORECASTS_MS = 30 * 1000;  // was 60s — user wants live updates
 
 const fmt = {
   pct: x => x == null ? "—" : (x).toFixed(1) + "%",
@@ -665,6 +665,72 @@ async function refreshMarketStatus() {
   } catch (e) { console.error("market-status:", e); }
 }
 
+function _fmtCountdown(secs) {
+  if (!secs || secs <= 0) return "";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 24) return `${Math.floor(h/24)}д ${h%24}ч`;
+  return `${h}ч ${m}м`;
+}
+
+// Client-side mirror of teamagent.market_hours so the static-mirror snapshots
+// can self-correct when they're stale. Forex week: Sunday 17:00 NY-local
+// (= 21:00 UTC summer / 22:00 UTC winter) → Friday 17:00 NY-local.
+// Uses Intl.DateTimeFormat('en-US', timeZone:'America/New_York') so that
+// US daylight-saving (EDT vs EST) is handled automatically — without this
+// the countdown was off by exactly 1 hour March-November.
+function _nyParts(at) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    weekday: "short", hour12: false,
+  });
+  const parts = {};
+  for (const p of fmt.formatToParts(at)) parts[p.type] = p.value;
+  // weekday Mon=0..Sun=6
+  const wdMap = { Mon:0, Tue:1, Wed:2, Thu:3, Fri:4, Sat:5, Sun:6 };
+  return {
+    weekday: wdMap[parts.weekday],
+    hour: parseInt(parts.hour, 10),
+    minute: parseInt(parts.minute, 10),
+    second: parseInt(parts.second, 10),
+  };
+}
+function _nextNyAnchor(now, targetWeekday, targetHourNy) {
+  // Walk forward minute-by-hour granularity until NY weekday/hour matches.
+  // Cheap: check at most ~7*24=168 hour-steps.
+  let cand = new Date(now.getTime());
+  for (let i = 0; i < 24 * 8; i++) {
+    cand = new Date(cand.getTime() + 60 * 60 * 1000);  // +1h
+    const p = _nyParts(cand);
+    if (p.weekday === targetWeekday && p.hour === targetHourNy) {
+      // Snap to the top of that NY hour
+      cand = new Date(cand.getTime() - p.minute * 60000 - p.second * 1000);
+      return cand;
+    }
+  }
+  return cand;  // safety
+}
+function clientMarketStatus(at) {
+  const t = at instanceof Date ? at : new Date();
+  const ny = _nyParts(t);
+  let isOpen;
+  if (ny.weekday === 5) isOpen = false;                 // Saturday
+  else if (ny.weekday === 4) isOpen = ny.hour < 17;     // Friday until 17:00 NY
+  else if (ny.weekday === 6) isOpen = ny.hour >= 17;    // Sunday from 17:00 NY
+  else isOpen = true;                                   // Mon-Thu
+  let secsUntilOpen = 0, secsUntilClose = 0;
+  if (!isOpen) {
+    const open = _nextNyAnchor(t, 6, 17);  // Sunday 17:00 NY
+    secsUntilOpen = Math.max(0, Math.floor((open.getTime() - t.getTime()) / 1000));
+  } else {
+    const close = _nextNyAnchor(t, 4, 17); // Friday 17:00 NY
+    secsUntilClose = Math.max(0, Math.floor((close.getTime() - t.getTime()) / 1000));
+  }
+  return { is_open: isOpen, seconds_until_open: secsUntilOpen, seconds_until_close: secsUntilClose };
+}
+
 function _fwCard(grid, key, hours, label, fw) {
   const wr = fw.weighted_expected_wr_pct;
   const lo = fw.wilson_lower_pct_95;
@@ -675,12 +741,26 @@ function _fwCard(grid, key, hours, label, fw) {
   const activeH = fw.active_hours_in_window || 0;
   const eligible = fw.forecasts_eligible_now || 0;
   const qualified = fw.active_qualified_pairs_count || 0;
+  // Client-side override when the snapshot is stale: if the snapshot says
+  // "market closed" but at THIS moment the market is actually open, then
+  // the snapshot is from an older state and we should NOT show "Рынок закрыт".
+  // We recompute is_market_open client-side using simple Sun22:00→Fri22:00 UTC
+  // rules so the static mirror (which is a frozen JSON file) stays correct
+  // across the entire week without requiring a re-bake every hour.
+  const cms = clientMarketStatus();
+  let mode = fw.display_mode || "active";
+  if (mode === "market_closed" && cms.is_open) mode = "active";
+  if (mode === "active" && !cms.is_open && (fw.active_hours_in_window || 0) <= 0)
+    mode = "market_closed";
+  const marketClosed = mode === "market_closed";
+  // Use client-side seconds_until_open when available (correct as of NOW).
+  const secsToOpen = cms.seconds_until_open || fw.seconds_until_open || 0;
 
   let cls = "fw-card";
-  if (lo >= 65 && wr >= 70) cls += " fw-card-best";
+  if (marketClosed) cls += " fw-card-closed";
+  else if (lo >= 65 && wr >= 70) cls += " fw-card-best";
   else if (wr < 60 || lo < 50) cls += " fw-card-warn";
 
-  // обновляем in-place если уже есть
   let card = grid.querySelector(`[data-fwkey="${key}"]`);
   if (!card) {
     card = document.createElement("div");
@@ -699,10 +779,23 @@ function _fwCard(grid, key, hours, label, fw) {
   }
   card.className = cls;
   card.querySelector(".fw-title").textContent = label;
-  card.querySelector(".fw-wr").textContent = `${wr.toFixed(1)}% ${verdict.emoji || ""}`;
-  card.querySelector(".fw-ci").textContent = `95% CI [${lo.toFixed(1)}% ; ${up.toFixed(1)}%]`;
-  card.querySelector(".fw-readiness-bar > .fill").style.width = `${Math.max(0, Math.min(100, ready))}%`;
-  card.querySelector(".fw-r-value").textContent = `${ready.toFixed(0)}/100`;
+
+  if (marketClosed) {
+    // Show "MARKET CLOSED" instead of a confusing red 0.0%.
+    const eta = _fmtCountdown(secsToOpen);
+    card.querySelector(".fw-wr").innerHTML =
+      `<span class="fw-closed-icon">🌙</span> Рынок закрыт`;
+    card.querySelector(".fw-ci").textContent = eta
+      ? `откроется через ${eta}`
+      : "ждём открытия";
+    card.querySelector(".fw-readiness-bar > .fill").style.width = "0%";
+    card.querySelector(".fw-r-value").textContent = "—";
+  } else {
+    card.querySelector(".fw-wr").textContent = `${wr.toFixed(1)}% ${verdict.emoji || ""}`;
+    card.querySelector(".fw-ci").textContent = `95% CI [${lo.toFixed(1)}% ; ${up.toFixed(1)}%]`;
+    card.querySelector(".fw-readiness-bar > .fill").style.width = `${Math.max(0, Math.min(100, ready))}%`;
+    card.querySelector(".fw-r-value").textContent = `${ready.toFixed(0)}/100`;
+  }
   const meta = card.querySelector(".fw-meta");
   meta.innerHTML = `
     <span>qualified <b>${qualified}</b>/28</span>
@@ -731,6 +824,26 @@ async function refreshStabilityForecast() {
     if (diag) {
       const lines = [];
       const fw = r24;
+      // Staleness warning — if the snapshot we fetched was generated > 30 min
+      // ago, the user is looking at stale data (typical when the static CDN
+      // mirror was baked hours back). This is what made the user think the
+      // 0%/0% on 1h/6h was a bug — it was just an outdated snapshot.
+      if (fw.as_of_utc) {
+        const ageSec = Math.max(0, Math.floor((Date.now() - new Date(fw.as_of_utc).getTime()) / 1000));
+        if (ageSec > 30 * 60) {
+          const ageMin = Math.floor(ageSec / 60);
+          const ageH = Math.floor(ageMin / 60);
+          const ago = ageH > 0 ? `${ageH}ч ${ageMin % 60}м` : `${ageMin}м`;
+          lines.push(
+            `<span class="diag-line diag-stale">` +
+            `🕐 <b>Данные из снэпшота</b> — обновлено ${ago} назад. ` +
+            `Для live-данных открой ` +
+            `<a href="https://fxinvestment-dhaftcbe.fly.dev/" target="_blank" ` +
+            `rel="noopener">live-версию на Fly.io</a>.` +
+            `</span>`
+          );
+        }
+      }
       lines.push(`<b>Прогноз на 24ч:</b> ${fw.verdict?.text_ru || ""}`);
       for (const d of (fw.diagnosis_ru || [])) {
         lines.push(`<span class="diag-line">• ${d}</span>`);
@@ -849,6 +962,177 @@ function tick() {
   refreshStabilityForecast();
   refreshAudit();
   refreshMetaStrategy();
+  refreshAgentReports();
+  refreshCoverageMatrix();
+  refreshFinalSignal();
+}
+
+// ───── ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ МЕНЯ ─────
+async function refreshFinalSignal() {
+  const body = document.getElementById("final-signal-body");
+  const badge = document.getElementById("fs-verdict-badge");
+  if (!body) return;
+  try {
+    const r = await api("/api/final-signal");
+    if (!r || r.error) {
+      body.innerHTML = `<div class="muted">Не удалось получить сигнал.</div>`;
+      return;
+    }
+    const verdictClass =
+      r.verdict === "GO" ? "fs-go" :
+      r.verdict === "GO_CAUTION" ? "fs-cau" :
+      "fs-wait";
+    const checksHtml = (r.checks || []).map(c => {
+      const dot =
+        c.status === "green" ? "🟢" :
+        c.status === "red"   ? "🔴" :
+                                "🟡";
+      return `<li class="fs-check fs-${c.status}">
+        <span class="fs-dot">${dot}</span>
+        <span class="fs-name">${c.name_ru}</span>
+        <span class="fs-detail muted small">${c.detail_ru || ""}</span>
+      </li>`;
+    }).join("");
+    const sumPair = r.pair
+      ? `<div class="fs-pair">${r.pair} <span class="fs-side fs-side-${(r.side || "").toLowerCase()}">${r.side_ru || r.side || ""}</span></div>`
+      : "";
+    const sumProb = `<div class="fs-prob">${(r.probability_pct || 0).toFixed(0)}%</div>`;
+    const sumExp = r.expiry_hours ? `<div class="fs-expiry">экспайри ${r.expiry_hours}ч</div>` : "";
+    const altHtml = (r.alternates || []).slice(0, 3).map(a =>
+      `<span class="fs-alt-pill">${a.pair} ${a.side} ${(a.probability_pct || 0).toFixed(0)}%</span>`
+    ).join(" ");
+    body.innerHTML = `
+      <div class="fs-row ${verdictClass}">
+        <div class="fs-pick">${sumPair}${sumProb}${sumExp}</div>
+        <div class="fs-verdict">${r.verdict_ru || "—"}</div>
+      </div>
+      <div class="fs-reasoning small muted">${r.reasoning_ru || ""}</div>
+      <div class="fs-checks-title small muted">8 проверок:</div>
+      <ul class="fs-checks">${checksHtml}</ul>
+      ${altHtml ? `<div class="fs-alts small"><b>Запасные кандидаты:</b> ${altHtml}</div>` : ""}
+      <div class="fs-meta small muted">
+        Сессия сейчас: <b>${r.session_now_ru || "?"}</b> ·
+        источник: <code>/api/final-signal</code>
+      </div>`;
+    if (badge) {
+      const c = r.summary_counts || {};
+      badge.textContent = `${r.verdict || "?"} · 🟢${c.green||0} 🟡${c.yellow||0} 🔴${c.red||0}`;
+      badge.className = "badge-stable fs-badge-" + (r.verdict === "GO" ? "go" : r.verdict === "GO_CAUTION" ? "cau" : "wait");
+    }
+  } catch (e) {
+    console.error("final-signal:", e);
+    body.innerHTML = `<div class="muted">Ошибка: ${e}</div>`;
+  }
+}
+
+// ───── 5 AGENTS' NARRATIVE REPORTS (Russian) ─────
+async function refreshAgentReports() {
+  const grid = document.getElementById("agent-reports-grid");
+  if (!grid) return;
+  try {
+    const r = await api("/api/agent-reports");
+    if (!r || !r.reports) {
+      grid.innerHTML = `<div class="muted">Нет данных от агентов.</div>`;
+      return;
+    }
+    const order = [
+      ["technical",   "📊"],
+      ["fundamental", "🏦"],
+      ["news",        "📰"],
+      ["macro",       "🌍"],
+      ["political",   "🏛️"],
+    ];
+    const html = order.map(([k, icon]) => {
+      const rep = r.reports[k];
+      if (!rep) return "";
+      const verdict = rep.verdict_ru || "—";
+      const verClass =
+        verdict.startsWith("🟢") ? "ar-green" :
+        verdict.startsWith("🟡") ? "ar-yellow" :
+        verdict.startsWith("🟠") ? "ar-orange" :
+        verdict.startsWith("🔴") ? "ar-red" : "";
+      const hl = (rep.highlights_ru || []).slice(0, 6).map(
+        h => `<li>${h.replace(/^•\s*/, "")}</li>`
+      ).join("");
+      const errs = (rep.errors || []).slice(0, 2).map(
+        e => `<div class="ar-err">⚠️ ${e}</div>`
+      ).join("");
+      const age = rep.as_of_utc
+        ? `обновлено ${_humanAgo(rep.as_of_utc)}` : "";
+      return `<div class="ar-card ${verClass}">
+        <div class="ar-head">
+          <span class="ar-icon">${icon}</span>
+          <span class="ar-title">${rep.title_ru || k}</span>
+        </div>
+        <div class="ar-verdict">${verdict}</div>
+        <ul class="ar-points">${hl || "<li class='muted'>(данных нет)</li>"}</ul>
+        ${errs}
+        <div class="ar-source muted small">
+          <b>Источник:</b> ${rep.source || "—"} <span class="ar-age">${age}</span>
+        </div>
+      </div>`;
+    }).join("");
+    grid.innerHTML = html;
+    const sumBadge = document.getElementById("ar-overall-badge");
+    if (sumBadge && r.summary) {
+      sumBadge.textContent = r.summary.verdict_ru || "—";
+      sumBadge.className = "badge-stable";
+    }
+  } catch (e) {
+    console.error("agent-reports:", e);
+    grid.innerHTML = `<div class="muted">Не удалось загрузить отчёты: ${e}</div>`;
+  }
+}
+
+function _humanAgo(iso) {
+  try {
+    const d = new Date(iso);
+    const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+    if (sec < 90) return `${sec}с назад`;
+    const min = Math.floor(sec / 60);
+    if (min < 90) return `${min}м назад`;
+    const h = Math.floor(min / 60);
+    return `${h}ч ${min % 60}м назад`;
+  } catch (_) { return iso; }
+}
+
+// ───── COVERAGE MATRIX 28×4 ─────
+async function refreshCoverageMatrix() {
+  const tbody = document.querySelector("#coverage-matrix-table tbody");
+  const summaryEl = document.getElementById("cov-summary");
+  const badge = document.getElementById("cov-overall-badge");
+  if (!tbody) return;
+  try {
+    const r = await api("/api/coverage-matrix");
+    if (!r || !r.matrix) {
+      tbody.innerHTML = `<tr><td colspan="5" class="muted">Матрица недоступна.</td></tr>`;
+      return;
+    }
+    const rows = r.matrix.map(row => {
+      const cells = ["Asia", "London", "Overlap", "NY"].map(s => {
+        const c = row.cells[s];
+        if (!c || c.color === "gray")
+          return `<td class="cov-cell cov-gray" title="нет данных">⚫</td>`;
+        const wr = c.win_rate_pct != null ? c.win_rate_pct.toFixed(0) + "%" : "—";
+        const wlo = c.wilson_lower_pct != null ? c.wilson_lower_pct.toFixed(0) + "%" : "—";
+        const n = c.trades || 0;
+        const cls = "cov-cell cov-" + (c.color || "gray");
+        const tip = `${s}: ${c.status || ""}  WR=${wr}  Wilson↓=${wlo}  n=${n}  variant=${c.variant || "—"}`;
+        return `<td class="${cls}" title="${tip}">${wr}<small>(${n})</small></td>`;
+      }).join("");
+      return `<tr><td class="cov-pair"><b>${row.pair}</b></td>${cells}</tr>`;
+    }).join("");
+    tbody.innerHTML = rows || `<tr><td colspan="5" class="muted">Пусто.</td></tr>`;
+    if (summaryEl && r.summary) {
+      summaryEl.textContent = r.summary.verdict_ru || "";
+    }
+    if (badge && r.summary) {
+      badge.textContent = `🟢 ${r.summary.qualified}  🟡 ${r.summary.probable}  🔴 ${r.summary.frozen}`;
+    }
+  } catch (e) {
+    console.error("coverage-matrix:", e);
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Ошибка: ${e}</td></tr>`;
+  }
 }
 
 // ───── MASTER STRATEGY AGENT (5h cycle) ─────

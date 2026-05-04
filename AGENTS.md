@@ -91,7 +91,7 @@ Stop everything: `bash scripts/stop_all.sh`.
 | `data/yahoo.py` | `fetch(pair, interval, period)` + `latest_price()` + `settlement_price()` with TTL cache |
 | `data/dukascopy.py` | `get_30d_1m(pair)` — yfinance fallback for the bi5 archive |
 | `data/news.py` | `is_blackout(pair, when, ±30min)` — ForexFactory RSS, high-impact only |
-| `indicators.py` | RSI, EMA, ATR, Bollinger %B, Momentum, CEI, OFI, VWAP, BBP, `all_indicators()` |
+| `indicators.py` | RSI, EMA, ATR, Bollinger %B, Momentum, CEI, OFI, VWAP, BBP, **MACD, Stochastic, ADX (+DI/-DI), Williams %R, Ichimoku Cloud** (added 2026-05-03), `all_indicators()` |
 | `volume_profile.py` | POC/VAH/VAL + big_players (≥80th pctl) + `forecast_to_utc5_midnight` (no_return_levels) |
 | `forecast_scanner.py` | `evaluate_pair(pair)` returns one unified forecast (the "PROGNOZY-28" source) |
 | `paper_trader.py` | binary $50/85% trades, 1-4h expiry, settles on real Yahoo close. Gated by backtest WR. |
@@ -168,6 +168,50 @@ Stop everything: `bash scripts/stop_all.sh`.
     direction, identifies pairs with WR ≤ 40% (≥3 trades). Surfaces the
     "blind spots" of the current strategy on the dashboard.
 
+12. **6 new indicators (2026-05-03 — WR maximization sprint)**:
+    `indicators.py` exposes MACD (line/signal/hist + prev_hist for crossings),
+    Stochastic (%K/%D), ADX (+DI/-DI), Williams %R, and Ichimoku Cloud
+    (Tenkan/Kijun/Senkou A/B + above/below cloud flags). They are part of the
+    flat dict returned by `all_indicators()` and used by both `forecast_scanner`
+    (BLOCK H2-H6 votes) and `strategies` (BLOCK I-M score contribution).
+
+13. **ADX regime filter (2026-05-03)**: `forecast_scanner.BLOCK H2` halves the
+    score (-60%) when ADX < 15 (flat market), and adds ±3 bonus on strong
+    trends (ADX > 30 with confirming +DI/-DI). `strategies.Strategy.require_adx_above`
+    is a new optional gate — when set, the variant refuses to open trades while
+    1H ADX is below threshold (used by v121-v140 ADX-gated variants).
+
+14. **Ensemble voting (2026-05-03)**: `paper_trader._strategy_qualified()` now
+    uses a quorum of the top variants stored per (pair, session). Filter:
+    `WR ≥ ENSEMBLE_MIN_VARIANT_WR` (65%) and `trades ≥ ENSEMBLE_MIN_VARIANT_TRADES`
+    (8). Each surviving variant votes BUY/SELL via `strategies.evaluate()` on
+    the current indicator snapshot; falls back to the variant's `dominant_side`
+    from backtest if `evaluate()` returns None on the current bar. Quorum:
+    ≥5 variants → 4/5 agreement, 3-4 → 3/N, 2 → 2/2, 1 → only if WR ≥ 75%, 0 → no
+    trade. When ensemble explicitly disagrees the gate returns False (STRICT
+    ensemble gate). Toggle via `config.ENSEMBLE_ENABLED`.
+
+15. **Correlation filter (2026-05-03)**: `paper_trader.CURRENCY_BLOCKS` maps
+    each base currency (EUR/GBP/JPY/CHF/AUD/CAD/NZD/USD) to the set of pairs
+    that contain it. `_exceeds_correlation_limit()` blocks opening a new pair
+    if `≥ MAX_SAME_CURRENCY_BLOCK` (default 2) trades are already open in any
+    overlapping currency block — kills cluster losses on macro shocks.
+
+16. **250 strategy variants (2026-05-03)**: VARIANTS expanded from 120 to 250.
+    New families: v121-v140 ADX-gated, v141-v155 Ichimoku-focused, v156-v170
+    MACD-focused, v171-v185 Stochastic-focused, v186-v210 ultra-strict combos
+    (ADX>25/30 + full-MTF + indicator emphasis), v211-v250 per-session
+    optimised (Asia/London/Overlap/NY).
+
+17. **strategy_search top=10 + dominant_side**: per-(pair, session) results
+    now keep up to 10 top_variants (was 5) and stamp each with
+    `dominant_side` (BUY/SELL/None) computed from the backtest, so the
+    ensemble has a fallback vote when `evaluate()` returns None on the
+    current bar. Re-run via `python -m teamagent.strategy_search --top 10`.
+
+18. **MAX_EXPIRY_HOURS = 5 (was 4)** since 2026-05-03 — Ichimoku and ADX
+    trend variants need an extra hour for the trend to play out.
+
 ## Optional API keys (env vars)
 
 The 3 LLM agents are no-op if these aren't set; the rest of the system still
@@ -235,23 +279,25 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 - No login. No password. Just open it.
 - Free Fly machine is kept dashboard-only because full `FLY_FULL=1` on the free/current memory tier starts `orchestrator` + `watchdog` but OOM-kills the app after ~90 sec. This was verified in Fly logs on 2026-05-04.
 - Routes:
-  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts, pressure bars, currency strength heatmap).
+  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts, pressure bars, currency strength heatmap, СТАКАН section, 10-sec refresh).
   - `/system` → audit dashboard (heartbeats, agents, paper-trader stats, closed-trades history).
   - `/agents` → redirect to `/system#agents-section`.
   - `/history` → redirect to `/system#closed-trades-section`.
 - Deploy command from Devin: `deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true`.
 
-### Static CDN mirror (free, no login)
+### Static CDN mirror (free, no login, instant cold-start)
 
 **`https://static-build-lqdncvmx.devinapps.com/`**
 
 - Built with `bash scripts/build_static_mirror.sh`.
 - The static shim now points to the current Fly backend `https://fxinvestment-uqfprqce.fly.dev`.
 - Latest deploy succeeded after removing zero-byte placeholder JSON files from WARN endpoints.
+- Includes the newer static mirror endpoint set from `main`, including stakan-view/live-price/news-watch baked JSON fallbacks.
 
-### PR / history
+### Other links
 
 - PR #1: https://github.com/Jony-wws/Forex-wws2277/pull/1
+- Current recovery PR: https://github.com/Jony-wws/Forex-wws2277/pull/13
 - Branch: `devin/1777586006-teamagent-rebuild`
 - Schedule: `sched-083b11171a0841668f4608b075d769b5`
 

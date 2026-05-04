@@ -101,17 +101,22 @@ def _walk_with_precomputed(
     snapshots: list,
     strategy: strategies.Strategy,
     session_window: tuple[int, int] | None = None,
-) -> tuple[int, int, int, float]:
+) -> tuple[int, int, int, float, int, int]:
     """Прогоняет стратегию по уже посчитанным снимкам.
 
     session_window=(start_h, end_h) — если задан, открываем НОВЫЕ сделки
     только когда ts.hour ∈ [start, end). Закрытие истёкших сделок происходит
     в любой час (даже вне сессии — это просто settle на реальной цене Yahoo).
+
+    Возвращает (total, wins, losses, pnl, n_buy_trades, n_sell_trades) —
+    последние два используются для вычисления dominant_side в ensemble (2026-05-03).
     """
     open_trades: list[dict] = []
     wins = 0
     losses = 0
     pnl = 0.0
+    n_buy = 0
+    n_sell = 0
 
     for ts, close_p, ind_4h, ind_1h, ind_15m in snapshots:
         # settle expired
@@ -149,6 +154,11 @@ def _walk_with_precomputed(
             continue
         side, score, rec_h, prob = out
 
+        if side == "BUY":
+            n_buy += 1
+        else:
+            n_sell += 1
+
         open_trades.append({
             "side": side,
             "entry": close_p,
@@ -156,21 +166,31 @@ def _walk_with_precomputed(
         })
 
     total = wins + losses
-    return total, wins, losses, pnl
+    return total, wins, losses, pnl, n_buy, n_sell
 
 
 def _eval_all_variants(snapshots: list, session_window: tuple[int, int] | None = None,
-                        top: int = 5) -> tuple[dict | None, list[dict]]:
+                        top: int = 10) -> tuple[dict | None, list[dict]]:
     """Прогоняет ВСЕ VARIANTS по snapshots (опционально с session filter).
 
     Возвращает (best_qualified_or_top, all_rows_sorted) где
     best — лучший вариант с trades≥MIN_TRADES_FOR_VALID и WR≥70 если есть,
            иначе вариант с лучшим WR (как best-effort), иначе None.
+
+    Каждый row содержит `dominant_side` (BUY/SELL/None) для ensemble voting.
     """
     rows = []
     for v in strategies.VARIANTS:
-        trades, wins, losses, pnl = _walk_with_precomputed(snapshots, v, session_window=session_window)
+        trades, wins, losses, pnl, n_buy, n_sell = _walk_with_precomputed(
+            snapshots, v, session_window=session_window
+        )
         wr = (wins / trades * 100.0) if trades > 0 else None
+        if n_buy > n_sell:
+            dominant_side = "BUY"
+        elif n_sell > n_buy:
+            dominant_side = "SELL"
+        else:
+            dominant_side = None
         rows.append({
             "variant": v.id,
             "label": v.label,
@@ -179,6 +199,9 @@ def _eval_all_variants(snapshots: list, session_window: tuple[int, int] | None =
             "losses": losses,
             "pnl_usd": round(pnl, 2),
             "win_rate_pct": round(wr, 1) if wr is not None else None,
+            "n_buy_trades": n_buy,
+            "n_sell_trades": n_sell,
+            "dominant_side": dominant_side,
         })
 
     valid = [r for r in rows if r["trades"] >= MIN_TRADES_FOR_VALID and r["win_rate_pct"] is not None]
@@ -194,7 +217,7 @@ def _eval_all_variants(snapshots: list, session_window: tuple[int, int] | None =
     return valid[0], valid[:top]
 
 
-def search_pair(pair: str, top: int = 5) -> dict:
+def search_pair(pair: str, top: int = 10) -> dict:
     pre = _precompute(pair)
     if pre is None:
         return {
@@ -276,7 +299,7 @@ def search_pair(pair: str, top: int = 5) -> dict:
     }
 
 
-def search_all(top: int = 5) -> dict:
+def search_all(top: int = 10) -> dict:
     results = {}
     for i, pair in enumerate(config.PAIRS, 1):
         # heartbeat per-pair чтобы watchdog не считал процесс мёртвым
@@ -443,7 +466,7 @@ def _maybe_lock_baseline(out: dict) -> None:
     log.info(f"strategy_search: closed {qualified} qualified cells locked as baseline → {LOCKED_FILE}")
 
 
-def _do_one_run(top: int = 5) -> dict:
+def _do_one_run(top: int = 10) -> dict:
     log.info("strategy_search: starting full sweep")
     out = search_all(top=top)
     OUTPUT_FILE.write_text(json.dumps(out, indent=2, ensure_ascii=False))
@@ -460,7 +483,7 @@ def _config_age_sec() -> float:
     return time.time() - OUTPUT_FILE.stat().st_mtime
 
 
-def run_loop(top: int = 5) -> None:
+def run_loop(top: int = 10) -> None:
     """Цикл: при старте, если strategy_config.json свежий (моложе SKIP_*) —
     пропускаем sweep и просто heartbeat. Иначе запускаем sweep сразу.
     Далее sweep раз в LOOP_INTERVAL_SEC."""
@@ -514,7 +537,7 @@ def _relock() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--top", type=int, default=5, help="how many top variants to keep per pair")
+    ap.add_argument("--top", type=int, default=10, help="how many top variants to keep per pair (default 10 for ensemble voting)")
     ap.add_argument("--loop", action="store_true",
                     help="run as a daemon (refresh every LOOP_INTERVAL_SEC = 5 days)")
     ap.add_argument("--relock", action="store_true",

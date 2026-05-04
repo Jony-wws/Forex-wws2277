@@ -88,14 +88,55 @@ Fly остаётся dashboard-only на бесплатной/current машин
 
 ## 5. Текущее состояние стратегии (обновлено 2026-05-04)
 
+### Stability Engine (NEW · 2026-05-01) — мат. гарантии стабильности
+
+`teamagent/stability_engine.py` + `teamagent/resume_ru.py` добавляют 50+
+функций нижних математических границ на основе реальных данных: Wilson /
+Clopper-Pearson, bootstrap CI, conformal price band, VaR/CVaR, Sharpe/Sortino,
+calibration, Hurst/variance ratio, streak/stress-test и pair/system stability
+score. API: `/api/stability`, `/api/min-guarantee`, `/api/risk-metrics`,
+`/api/calibration`.
+
 ### Strategy Search / restored baseline
 
-`teamagent/state/strategy_config.json` восстановлен из commit `f80fc53` — это лучший найденный предыдущий sweep до ухудшения на 18/112.
+`teamagent/state/strategy_config.json` восстановлен из commit `f80fc53` — это
+лучший найденный предыдущий sweep до ухудшения на 18/112. Текущий код на main
+уже содержит расширения 2026-05-03: 250+ strategy variants, top_variants,
+dominant_side, ensemble voting, ADX/MACD/Stoch/Williams/Ichimoku inputs.
 
-Реальный 365-day Yahoo результат:
+Реальный 365-day Yahoo результат восстановленного baseline:
 
 | сессия | пар ≥70% WR / 28 |
 |---|---|
+| Asia | **4/28** |
+| London | **12/28** |
+| Overlap | **5/28** |
+| NY | **9/28** |
+
+**Итого: 30 из 112 (пара × сессия) ячеек реально достигают ≥70% WR.**
+9 из 28 пар qualify globally: USDCHF, USDCAD, NZDUSD, EURGBP, EURJPY, GBPJPY, GBPCAD, CADJPY, AUDNZD.
+
+### Current gates
+
+- `STRICT_QUALIFIED_GATE = False`
+- Сделка открывается при `forecast.probability_pct >= 70`, независимо от per-session WR.
+- Strategy config используется для enrichment: variant, side flip, fixed expiry, но не блокирует free 70% gate.
+- `FLY_FULL = 1` в repo `fly.toml`; Devin deploy backend требует отдельной среды и без scale падает по OOM при full mode.
+- Main branch ensemble/correlation filters сохранены: они могут дополнительно фильтровать открытие, если включены соответствующие config flags.
+
+### Paper stats at 2026-05-04 15:39 UTC
+
+```json
+{
+  "total": 10,
+  "wins": 6,
+  "losses": 4,
+  "win_rate_pct": 60.0,
+  "total_pnl_usd": 1.8
+}
+```
+
+---|---|
 | Asia | **4/28** |
 | London | **12/28** |
 | Overlap | **5/28** |
@@ -136,15 +177,21 @@ Fly остаётся dashboard-only на бесплатной/current машин
 сессии): EURUSD, GBPUSD, USDCHF, NZDCAD, CADCHF, CHFJPY, NZDJPY (примерный
 список; сверять с `state/strategy_config.json`).
 
-**Paper-trader gate** (per-session):
+**Paper-trader gate** (per-session, обновлён 2026-05-03):
 1. `forecast.probability_pct ≥ 70` (live signal)
-2. `strategy_config[pair].by_session[current_session].qualifies_70pct == True`
-   (per-session WR ≥70% на 60-дневном бэктесте)
-3. фолбэк на `strategy_config[pair].best_variant` если он сам qualifies (без
-   session-фильтра)
-4. сигнал должен пройти фильтры выбранного варианта (|score|, prob, session)
+2. **Корреляционный фильтр**: НЕ открываем 3+ сделок на одну базовую валюту
+   (например EURUSD + EURGBP + EURJPY уже = 3 на EUR — block). Cap из
+   `config.MAX_SAME_CURRENCY_BLOCK = 2`.
+3. **Ensemble voting** (если `config.ENSEMBLE_ENABLED`): из top_variants той
+   ячейки фильтруем по WR ≥ 65% и trades ≥ 8, затем считаем голоса BUY/SELL.
+   Открываем только при кворуме (≥4/5, 3/3, 2/2). Иначе — STRICT отказ.
+4. Fallback (если ensemble=None / выключен): per-session qualified variant.
+5. Финальный fallback: `strategy_config[pair].best_variant` если он qualifies
+   глобально, иначе baseline-направление с macro-фильтром.
+6. сигнал должен пройти фильтры выбранного варианта (|score|, prob, session,
+   `require_adx_above` для ADX-gated вариантов).
 
-Если ни (2), ни (3) — пара/сессия **frozen**, сделка не открывается.
+Если ни ensemble, ни (2)-(5) — пара/сессия **frozen**, сделка не открывается.
 
 ---
 

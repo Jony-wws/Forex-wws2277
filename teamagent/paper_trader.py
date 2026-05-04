@@ -28,6 +28,8 @@ from pathlib import Path
 
 from . import config, strategies
 from . import market_hours as mh
+from . import live_analyst as live_analyst_mod
+from . import regime as regime_mod
 from .data import yahoo
 
 # Адаптивный диапазон экспирации (по требованию пользователя 2026-05-01):
@@ -71,6 +73,41 @@ MIN_TRADES = 5
 # fallback на backtest_30d.json если strategy_config ещё не рассчитан
 BACKTEST_MIN_WR_PCT = 70.0
 BACKTEST_MIN_TRADES = 5
+
+# ───── Корреляционный фильтр (2026-05-03) ─────
+# Каждая валюта в Forex входит в несколько пар. Если открыты обе сделки
+# (например EURUSD и EURGBP), они часто двигаются вместе → один и тот же
+# макро-шок убивает обе. Ограничиваем число одновременно открытых сделок
+# в одном валютном "блоке".
+CURRENCY_BLOCKS: dict[str, set[str]] = {
+    "EUR": {"EURUSD", "EURGBP", "EURJPY", "EURCHF", "EURAUD", "EURCAD", "EURNZD"},
+    "GBP": {"GBPUSD", "GBPJPY", "GBPCHF", "GBPAUD", "GBPCAD", "GBPNZD", "EURGBP"},
+    "JPY": {"USDJPY", "EURJPY", "GBPJPY", "AUDJPY", "CADJPY", "CHFJPY", "NZDJPY"},
+    "CHF": {"USDCHF", "EURCHF", "GBPCHF", "AUDCHF", "CADCHF", "NZDCHF", "CHFJPY"},
+    "AUD": {"AUDUSD", "EURAUD", "GBPAUD", "AUDCAD", "AUDCHF", "AUDNZD", "AUDJPY"},
+    "CAD": {"USDCAD", "EURCAD", "GBPCAD", "AUDCAD", "CADCHF", "CADJPY", "NZDCAD"},
+    "NZD": {"NZDUSD", "EURNZD", "GBPNZD", "AUDNZD", "NZDCAD", "NZDCHF", "NZDJPY"},
+    "USD": {"EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"},
+}
+
+
+def _exceeds_correlation_limit(open_trades: list[dict], new_pair: str) -> tuple[bool, str | None]:
+    """True если открытие new_pair нарушит лимит на валютный блок.
+
+    Возвращает (exceed, currency_name|None). Берём cap из config:
+    config.MAX_SAME_CURRENCY_BLOCK (по умолчанию 2).
+    """
+    cap = int(getattr(config, "MAX_SAME_CURRENCY_BLOCK", 2))
+    for currency, pairs_in_block in CURRENCY_BLOCKS.items():
+        if new_pair not in pairs_in_block:
+            continue
+        count = sum(
+            1 for t in open_trades
+            if t.get("pair") in pairs_in_block and t.get("status") == "open"
+        )
+        if count >= cap:
+            return True, currency
+    return False, None
 
 
 def _load(path: Path, default):
@@ -180,22 +217,141 @@ def _backtest_qualified(pair: str, backtest: dict) -> tuple[bool, dict]:
     return True, {"trades": trades, "win_rate_pct": wr}
 
 
+def _ensemble_decide(top_variants: list[dict], ts: datetime,
+                     ind_4h: dict, ind_1h: dict, ind_15m: dict,
+                     ) -> dict | None:
+    """Ensemble voting (2026-05-03 user request to maximise WR ≥ 90%).
+
+    Берём `top_variants` из strategy_search-а (до 10 штук per cell), фильтруем
+    по WR ≥ config.ENSEMBLE_MIN_VARIANT_WR и trades ≥ config.ENSEMBLE_MIN_VARIANT_TRADES,
+    затем для каждого вызываем strategies.evaluate() на текущих индикаторах.
+    Подсчитываем голоса BUY/SELL и применяем правила:
+      - 0 вариантов: torging blocked (None)
+      - 1: проходит только если WR ≥ 75% (single-variant fallback)
+      - 2: оба должны согласиться (2/2)
+      - 3-4: ≥3 согласия
+      - ≥5: ≥4 согласия (4/5)
+
+    Возвращает dict с ключами {side, n_agree, n_total, agreed_variants,
+    win_rate_pct, expiry_h, source} или None если голосование не прошло.
+    """
+    if not top_variants:
+        return None
+    min_wr = float(getattr(config, "ENSEMBLE_MIN_VARIANT_WR", 65.0))
+    min_trades = int(getattr(config, "ENSEMBLE_MIN_VARIANT_TRADES", 8))
+    variants_map = strategies.variants_by_id()
+
+    eligible: list[dict] = []
+    for tv in top_variants:
+        wr = tv.get("win_rate_pct")
+        tr = tv.get("trades") or 0
+        if wr is None or wr < min_wr or tr < min_trades:
+            continue
+        v = variants_map.get(tv.get("variant"))
+        if v is None:
+            continue
+        eligible.append({"variant": v, "tv": tv})
+
+    if not eligible:
+        return None
+
+    # Для каждого варианта определяем какую сторону он бы открыл сейчас.
+    decisions: list[dict] = []
+    for e in eligible:
+        v = e["variant"]
+        try:
+            out = strategies.evaluate(v, ts, ind_4h, ind_1h, ind_15m)
+        except Exception:
+            out = None
+        if out is None:
+            # Если evaluate() сам не открывает (фильтры не пройдены) —
+            # пробуем dominant_side из бэктеста как fallback голос.
+            dom = (e["tv"] or {}).get("dominant_side")
+            if dom in ("BUY", "SELL"):
+                decisions.append({
+                    "variant_id": v.id, "side": dom, "via": "dominant_side",
+                    "wr": e["tv"].get("win_rate_pct"),
+                })
+            continue
+        side, score, expiry_h, prob = out
+        decisions.append({
+            "variant_id": v.id, "side": side, "score": score,
+            "expiry_h": expiry_h, "via": "evaluate",
+            "wr": e["tv"].get("win_rate_pct"),
+        })
+
+    if not decisions:
+        return None
+
+    n_total = len(decisions)
+    n_buy = sum(1 for d in decisions if d["side"] == "BUY")
+    n_sell = sum(1 for d in decisions if d["side"] == "SELL")
+    side = "BUY" if n_buy > n_sell else ("SELL" if n_sell > n_buy else None)
+    if side is None:
+        return {
+            "side": None, "n_agree": max(n_buy, n_sell), "n_total": n_total,
+            "n_buy": n_buy, "n_sell": n_sell,
+            "agreed_variants": [], "reason": "tied vote",
+        }
+    n_agree = n_buy if side == "BUY" else n_sell
+
+    # Применяем порог согласия в зависимости от количества вариантов
+    if n_total >= 5:
+        required = 4
+    elif n_total >= 3:
+        required = 3
+    elif n_total == 2:
+        required = 2
+    else:
+        # 1 вариант — пропускаем только если WR ≥ 75% (одиночный)
+        required = 1
+        single_wr = decisions[0].get("wr") or 0
+        if single_wr < 75.0:
+            return {
+                "side": None, "n_agree": n_agree, "n_total": n_total,
+                "agreed_variants": [],
+                "reason": f"single variant но WR={single_wr:.1f}% < 75%",
+            }
+
+    if n_agree < required:
+        return {
+            "side": None, "n_agree": n_agree, "n_total": n_total,
+            "agreed_variants": [],
+            "reason": f"ensemble: только {n_agree}/{n_total} за {side}, "
+                      f"требуется {required}",
+        }
+
+    agreed = [d for d in decisions if d["side"] == side]
+    # WR/expiry — берём от лидера согласившегося голосования (по WR)
+    agreed.sort(key=lambda d: -(d.get("wr") or 0))
+    leader = agreed[0]
+    return {
+        "side": side,
+        "n_agree": n_agree,
+        "n_total": n_total,
+        "n_buy": n_buy,
+        "n_sell": n_sell,
+        "agreed_variants": [d["variant_id"] for d in agreed],
+        "leader_variant_id": leader["variant_id"],
+        "leader_wr_pct": leader.get("wr"),
+        "expiry_h": leader.get("expiry_h"),
+        "required_agreement": required,
+    }
+
+
 def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
                          baseline_side: str, rsi_1h: float | None,
-                         strategy_cfg: dict) -> tuple[bool, dict]:
-    """Облегчённый гейт (по явной просьбе пользователя 2026-05-01):
+                         strategy_cfg: dict,
+                         forecast: dict | None = None) -> tuple[bool, dict]:
+    """Гейт для открытия сделки. С 2026-05-03 поддерживает ENSEMBLE voting.
 
-    Сделка открывается, как только `forecast.probability_pct >= 70` (это
-    единственный hard-gate, верхняя ветка caller-а уже это проверила).
-    Дополнительно:
-    - Если у пары есть per-session backtest вариант с qualifies_70pct=True,
-      используем его сторону (с учётом contrarian/fade_extreme_rsi flip)
-      и его fixed_expiry_h. Это ОБОГАЩЕНИЕ, а не блокировка.
-    - Если такого варианта нет — используем `baseline_side` напрямую.
-
-    Старая жёсткая логика (требовать |score|>=N + per-session ≥70% + variant.session_utc
-    в окне) ОТКЛЮЧЕНА. Пользователь явно потребовал торговать как только prob ≥ 70%
-    независимо от сессии и от backtest WR конкретной ячейки.
+    Поведение:
+    - Если в strategy_cfg для (pair, session) есть top_variants и
+      config.ENSEMBLE_ENABLED — применяем ensemble voting (см.
+      `_ensemble_decide`). Если ensemble дал согласованную сторону — открываем
+      на этой стороне.
+    - Иначе fall-through на исходный механизм (per-session qualified variant
+      → flip rules → baseline-fallback с macro-фильтром или STRICT gate).
     """
     sess_name = strategies.detect_session(ts.hour)
     if sess_name is None:
@@ -209,6 +365,50 @@ def _strategy_qualified(pair: str, ts: datetime, score: float, prob_pct: float,
     by_session = p.get("by_session") or {}
     session_cfg = by_session.get(sess_name) or {}
     variants_map = strategies.variants_by_id()
+
+    # ───── Ensemble voting (2026-05-03) ─────
+    # Если включено и в session_cfg есть top_variants — пробуем согласованное
+    # решение нескольких лучших вариантов. Победил консенсус ≥4/5 (или 3/3,
+    # 2/2) — открываем сделку на согласованной стороне. Иначе — fallthrough
+    # на исходный single-variant механизм ниже.
+    if getattr(config, "ENSEMBLE_ENABLED", False) and forecast is not None:
+        top_variants = session_cfg.get("top_variants") or []
+        ind_block = forecast.get("indicators") or {}
+        ind_4h = ind_block.get("4H") or {}
+        ind_1h = ind_block.get("1H") or {}
+        ind_15m = ind_block.get("15m") or {}
+        if ind_4h and ind_1h and ind_15m:
+            ens = _ensemble_decide(top_variants, ts, ind_4h, ind_1h, ind_15m)
+            if ens is not None and ens.get("side") in ("BUY", "SELL"):
+                return True, {
+                    "session": sess_name,
+                    "side": ens["side"],
+                    "gate_mode": "ensemble",
+                    "ensemble": {
+                        "n_agree": ens.get("n_agree"),
+                        "n_total": ens.get("n_total"),
+                        "n_buy": ens.get("n_buy"),
+                        "n_sell": ens.get("n_sell"),
+                        "agreed_variants": ens.get("agreed_variants"),
+                        "leader_variant_id": ens.get("leader_variant_id"),
+                        "leader_wr_pct": ens.get("leader_wr_pct"),
+                        "required_agreement": ens.get("required_agreement"),
+                    },
+                    "variant": ens.get("leader_variant_id"),
+                    "win_rate_pct": ens.get("leader_wr_pct"),
+                }
+            if ens is not None and ens.get("side") is None:
+                # Голосование явно отклонило сделку — НЕ торгуем (STRICT
+                # ensemble gate per user 2026-05-03 request).
+                return False, {
+                    "reason": ens.get("reason", "ensemble disagreement"),
+                    "session": sess_name,
+                    "ensemble": {
+                        "n_agree": ens.get("n_agree"),
+                        "n_total": ens.get("n_total"),
+                    },
+                }
+            # ens is None: top_variants пустой / все отфильтрованы — fall through
 
     chosen = None
     chosen_source = None
@@ -378,6 +578,17 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
         if _is_open_for_pair(open_trades, pair):
             continue
 
+        # Корреляционный фильтр (2026-05-03): не открываем 3+ сделок на одну
+        # базовую валюту (например EURUSD + EURGBP + EURJPY). Cap из
+        # config.MAX_SAME_CURRENCY_BLOCK (по умолчанию 2).
+        excess, currency = _exceeds_correlation_limit(open_trades, pair)
+        if excess:
+            log.info(
+                f"SKIP {pair} — корреляционный лимит: открыто ≥"
+                f"{config.MAX_SAME_CURRENCY_BLOCK} сделок в блоке {currency}"
+            )
+            continue
+
         f = forecasts.get(pair)
         if not f:
             continue
@@ -394,6 +605,7 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
             baseline_side=f.get("side", "BUY"),
             rsi_1h=rsi_1h,
             strategy_cfg=strategy_cfg or {},
+            forecast=f,
         )
         if not ok:
             log.info(f"SKIP {pair} prob={r['probability_pct']}% — gate: {why}")
@@ -438,6 +650,27 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
         # Martingale: ставка зависит от текущего LOSS-стрика на этой паре
         stake_usd, mart_streak = _martingale_stake_for_pair(pair, closed_trades)
 
+        # Live-режим + playbook lookup (информативно, не блокирует сделку).
+        live_regime_label = None
+        playbook_cell_status = None
+        playbook_cell_wr = None
+        try:
+            ind_1h_block = (f.get("indicators") or {}).get("1H") or {}
+            # Compact regime hint from forecast indicators (no extra Yahoo call)
+            adx_v = ind_1h_block.get("adx", 0.0)
+            if adx_v >= 25:
+                live_regime_label = "trending_up" if (f.get("side") == "BUY") else "trending_down"
+            elif adx_v <= 15:
+                live_regime_label = "mean_reverting"
+            else:
+                live_regime_label = "mean_reverting"
+            cell = live_analyst_mod.lookup_playbook_cell(pair, chosen_session or f.get("session", ""), live_regime_label)
+            if cell:
+                playbook_cell_status = cell.get("status")
+                playbook_cell_wr = cell.get("wr_pct")
+        except Exception:
+            pass
+
         trade = {
             "id": str(uuid.uuid4())[:12],
             "pair": pair,
@@ -460,6 +693,9 @@ def _open_new_trades(open_trades: list[dict], snapshot: dict, backtest: dict,
             "strategy_source_at_open": chosen_source,  # "by_session" или "global_best"
             "backtest_30d_wr_pct_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("win_rate_pct"),
             "backtest_30d_trades_at_open": (backtest.get("pairs") or {}).get(pair, {}).get("trades"),
+            "live_regime_at_open": live_regime_label,
+            "playbook_cell_status_at_open": playbook_cell_status,
+            "playbook_cell_wr_pct_at_open": playbook_cell_wr,
             "status": "open",
         }
         open_trades.append(trade)

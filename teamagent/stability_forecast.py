@@ -276,10 +276,33 @@ def forecast_window(hours_ahead: int = 24,
         closed_hours=closed_hours,
     )
 
+    market_snap = mh.market_status(now)
+    market_open_now = bool(market_snap.get("is_open"))
+
+    # display_mode lets the UI render meaningfully even when the raw WR is 0
+    # because the entire window is "Closed" (weekend / Sunday before 22:00 UTC /
+    # Friday after 22:00 UTC). Without this hint the front-end shows a red
+    # "0.0%" pill which looks like a bug — but it's literally "no trades will
+    # happen because forex is closed in this window".
+    if total_active_hours <= 0:
+        display_mode = "market_closed"
+    elif total_weighted_trades < 100:
+        display_mode = "low_data"
+    else:
+        display_mode = "active"
+
     return {
         "as_of_utc": now.isoformat(),
         "hours_ahead": hours_ahead,
-        "market_status": mh.market_status(now),
+        "market_status": market_snap,
+        "market_open_now": market_open_now,
+        "seconds_until_open": int(market_snap.get("seconds_until_open") or 0),
+        "seconds_until_close": int(market_snap.get("seconds_until_close") or 0),
+        "next_open_utc": market_snap.get("next_event_utc")
+            if not market_open_now else None,
+        "next_close_utc": market_snap.get("next_event_utc")
+            if market_open_now else None,
+        "display_mode": display_mode,
         "sessions_in_window": sessions_data,
         "closed_hours_in_window": round(closed_hours, 2),
         "active_hours_in_window": round(total_active_hours, 2),

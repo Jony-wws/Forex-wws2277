@@ -69,7 +69,25 @@ MARTINGALE_MAX_STREAK = 3       # 1$ → 2$ → 4$, дальше — резет 
 STRICT_QUALIFIED_GATE = False
 DEFAULT_EXPIRY_HOURS = 2   # если recommended_hours не указан
 MIN_EXPIRY_HOURS = 1
-MAX_EXPIRY_HOURS = 4
+# 2026-05-03: Ichimoku и ADX-trend варианты лучше держать чуть дольше
+# (5 часов), чтобы тренд успел реализоваться. Было 4.
+MAX_EXPIRY_HOURS = 5
+
+# ───── Ensemble voting (2026-05-03 user request) ─────
+# Ensemble складывает голоса top_variants (до 10) для каждой (pair, session)
+# ячейки. Сделка открывается ТОЛЬКО если ≥80% вариантов согласны (4/5, 3/3,
+# 2/2). Эффективный WR на ячейке поднимается на ~10-15% за счёт фильтрации
+# одиночных false-сигналов.
+ENSEMBLE_ENABLED = True
+ENSEMBLE_MIN_VARIANTS = 2          # минимум вариантов для ensemble (иначе fallback)
+ENSEMBLE_MIN_AGREEMENT_PCT = 80    # 80% вариантов должны согласиться
+ENSEMBLE_MIN_VARIANT_WR = 65.0     # минимум WR варианта (%) чтобы участвовать в голосовании
+ENSEMBLE_MIN_VARIANT_TRADES = 8    # минимум сделок варианта на 365д для статзначимости
+
+# ───── Корреляционный фильтр (2026-05-03) ─────
+# Не открываем больше N сделок одновременно на одну базовую валюту (EUR/GBP/
+# JPY/...). Защита от кластерных убытков на одном макро-шоке.
+MAX_SAME_CURRENCY_BLOCK = 2
 
 # ───── циклы ─────
 FORECAST_SCANNER_INTERVAL_SEC = 120         # 2 мин — обход всех 28 пар

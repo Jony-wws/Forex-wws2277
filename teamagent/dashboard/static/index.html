@@ -8,6 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/intent.css">
+<script src="/static/fx-ux.js" defer></script>
 </head>
 <body class="fx-shell-body">
 
@@ -33,10 +34,10 @@
 </header>
 
 <nav class="fx-tabs" aria-label="Sections">
-  <a class="fx-tab" href="/intent"><span class="ico">📈</span>Market Intent</a>
-  <a class="fx-tab active" href="/system" id="tab-system"><span class="ico">🩺</span>System</a>
-  <a class="fx-tab" href="/agents" id="tab-agents"><span class="ico">🤖</span>Agents</a>
-  <a class="fx-tab" href="/history" id="tab-history"><span class="ico">📜</span>History</a>
+  <a class="fx-tab" href="/intent"><span class="ico">📈</span>Прогнозы</a>
+  <a class="fx-tab" href="/trades" id="tab-trades"><span class="ico">💼</span>Сделки</a>
+  <a class="fx-tab active" href="/system" id="tab-system"><span class="ico">🩺</span>Система</a>
+  <a class="fx-tab" href="/agents" id="tab-agents"><span class="ico">🤖</span>Агенты</a>
 </nav>
 
 <!-- legacy clock IDs kept inside main for compatibility with app.js -->
@@ -76,6 +77,26 @@
     </div>
   </section>
 
+  <!-- ═══ ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ ПОЛЬЗОВАТЕЛЯ — единый сигнал для реальной сделки ═══ -->
+  <section id="final-signal-section" class="card glass premium-card hero-card final-signal-hero">
+    <h2 class="hero-title">
+      <span class="ms-emoji">🎯</span>
+      ФИНАЛЬНЫЙ ПРОГНОЗ ДЛЯ МЕНЯ
+      <span class="live-pulse" title="один сигнал — для открытия на реальном счёте"></span>
+      <span id="fs-verdict-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      <b>Один</b> сигнал, агрегированный из всего что считает система: PROGNOZY-28 +
+      рынок-часов + news-blackout + meta_strategy ячейка + ансамбль агентов +
+      macro/political отчёты. Если все 8 проверок зелёные — система рекомендует
+      <b>открыть сделку на реальном счёте</b>. Если есть красные — говорит почему
+      подождать.
+    </div>
+    <div id="final-signal-body" class="fs-body">
+      <div class="muted">Запрашиваю финальный сигнал…</div>
+    </div>
+  </section>
+
   <!-- ═══ ДОКАЗАТЕЛЬСТВА КОРРЕКТНОСТИ САМОЙ СИСТЕМЫ ═══ -->
   <section id="audit-section" class="card glass premium-card hero-card audit-hero">
     <h2 class="hero-title">
@@ -96,6 +117,55 @@
       <div class="muted">Загружаю аудит…</div>
     </div>
     <div id="audit-verdict" class="audit-verdict muted small"></div>
+  </section>
+
+  <!-- ═══ 5 АГЕНТОВ-АНАЛИТИКОВ (часовой отчёт, всё на русском) ═══ -->
+  <section id="agent-reports-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span class="ms-emoji">🧭</span>
+      ОТЧЁТЫ 5 АГЕНТОВ-АНАЛИТИКОВ
+      <span class="live-pulse" title="часовое обновление, кэш 5 мин"></span>
+      <span id="ar-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      <b>5 независимых каналов</b>: технический · фундаментальный · новости ·
+      макро · политический. Каждый читает <b>реальные открытые источники</b>
+      (Yahoo · FRED · ForexFactory · Reuters · BBC) и пишет вердикт на русском.
+      Если источник упал — отчёт честно говорит "недоступен", не выдумывает
+      данные. Все 5 в <code>/api/agent-reports</code> — единый источник правды.
+    </div>
+    <div id="agent-reports-grid" class="ar-grid">
+      <div class="muted">Запрашиваю отчёты у агентов…</div>
+    </div>
+  </section>
+
+  <!-- ═══ COVERAGE MATRIX 28 × 4 ═══ -->
+  <section id="coverage-matrix-section" class="card glass premium-card hero-card">
+    <h2 class="hero-title">
+      <span class="ms-emoji">🗺️</span>
+      ПОКРЫТИЕ СТРАТЕГИЯМИ 28 × 4
+      <span class="live-pulse" title="индивидуальный подход к каждой (паре, сессии)"></span>
+      <span id="cov-overall-badge" class="badge-stable">…</span>
+    </h2>
+    <div class="muted small">
+      28 валютных пар × 4 сессии = <b>112 ячеек</b>. Каждая ячейка — отдельная
+      стратегия, найденная sweep-ом из 250 вариантов на реальных Yahoo-свечах.
+      <span class="cov-leg cov-leg-q">🟢 ≥70% WR</span>
+      <span class="cov-leg cov-leg-p">🟡 60-70%</span>
+      <span class="cov-leg cov-leg-f">🔴 <60%</span>
+      <span class="cov-leg cov-leg-m">⚫ нет данных</span>
+      Источник: <code>state/meta_strategy.json</code> (strategy_meta_agent
+      обновляет каждые 5ч).
+    </div>
+    <div class="cov-table-wrapper">
+      <table id="coverage-matrix-table">
+        <thead><tr>
+          <th>Пара</th><th>Asia</th><th>London</th><th>Overlap</th><th>NY</th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="muted">Загружаю матрицу…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="cov-summary" class="muted small"></div>
   </section>
 
   <section id="forecast-stability-section" class="card glass premium-card stability-hero">
