@@ -336,13 +336,31 @@ def _load(path: Path, default):
 
 @app.get("/")
 def root():
-    """FX INVESTMENT — cinematic per-pair market intent landing.
-    Use /system для полного аудита/heartbeats."""
-    return FileResponse(str(STATIC / "intent.html"))
+    """СТАКАН-only — минимальный сайт: только селектор пары + БОЛЬШОЙ ВЕРДИКТ
+    (КУПИТЬ / ПРОДАТЬ / ОЖИДАНИЕ) + visual orderbook + крупные игроки + live-цена.
+
+    Институциональный движок (см. `stakan_view._institutional_verdict`) под капотом
+    использует ВСЕ источники: VP big-players (×4), no-return levels (×3), COT (×3),
+    Market Radar (×3), FRED-macro (×2), 11-vote stakan-консенсус (×3), VP impulse
+    (×2). Розничные индикаторы (EMA/ADX/MACD) — только ×0.5. News blackout = veto.
+
+    Старые UI:
+      - /intent — кинематографическая FX INVESTMENT-панель
+      - /system — полный системный дашборд / heartbeats
+      - /trades — все сделки в одном месте
+    """
+    return FileResponse(str(STATIC / "stakan-only.html"))
+
+
+@app.get("/stakan")
+def stakan_only_page():
+    """Алиас для главной страницы — СТАКАН-only."""
+    return FileResponse(str(STATIC / "stakan-only.html"))
 
 
 @app.get("/intent")
 def intent_page():
+    """Кинематографическая FX INVESTMENT-панель (legacy, доступна по прямой ссылке)."""
     return FileResponse(str(STATIC / "intent.html"))
 
 
