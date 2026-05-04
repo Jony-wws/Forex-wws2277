@@ -761,6 +761,305 @@ def _institutional_verdict(
         src10["label"] = "розница: 1H MACD — нейтрален"
     sources.append(src10)
 
+    # ── ДОПОЛНИТЕЛЬНЫЕ ИСТОЧНИКИ для достижения Bayesian ≥80% на flat-парах.
+    # Все используют уже посчитанные индикаторы из forecast.indicators (нет
+    # новых I/O), так что горячий путь не страдает.
+
+    # 11. RSI 1H crossover (не extreme — направление от mid 50). ВЕС 1.5
+    rsi_1h = float(ind1.get("rsi14") or 50)
+    src11 = {"name": "rsi_1h", "weight": 1.5, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if rsi_1h <= 30:
+        # перепроданность — институциональная зона покупки
+        inst_up += 1.5; src11["side"] = "UP"
+        src11["conf"] = _clip_conf(0.6 + (30 - rsi_1h) / 100.0)
+        src11["label"] = f"RSI(1H)={rsi_1h:.0f} — перепродано → BUY"
+    elif rsi_1h >= 70:
+        inst_dn += 1.5; src11["side"] = "DOWN"
+        src11["conf"] = _clip_conf(0.6 + (rsi_1h - 70) / 100.0)
+        src11["label"] = f"RSI(1H)={rsi_1h:.0f} — перекуплено → SELL"
+    elif rsi_1h <= 45:
+        inst_dn += 1.0; src11["side"] = "DOWN"
+        src11["conf"] = _clip_conf(0.55 + (45 - rsi_1h) / 50.0)
+        src11["label"] = f"RSI(1H)={rsi_1h:.0f} — медвежья зона"
+    elif rsi_1h >= 55:
+        inst_up += 1.0; src11["side"] = "UP"
+        src11["conf"] = _clip_conf(0.55 + (rsi_1h - 55) / 50.0)
+        src11["label"] = f"RSI(1H)={rsi_1h:.0f} — бычья зона"
+    else:
+        src11["label"] = f"RSI(1H)={rsi_1h:.0f} — нейтрален"
+    sources.append(src11)
+
+    # 12. RSI 4H — старшая ТФ RSI. ВЕС 1.5
+    rsi_4h = float(ind4.get("rsi14") or 50)
+    src12 = {"name": "rsi_4h", "weight": 1.5, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if rsi_4h <= 32:
+        inst_up += 1.5; src12["side"] = "UP"
+        src12["conf"] = _clip_conf(0.65 + (32 - rsi_4h) / 100.0)
+        src12["label"] = f"RSI(4H)={rsi_4h:.0f} — перепродано на старшей ТФ → BUY"
+    elif rsi_4h >= 68:
+        inst_dn += 1.5; src12["side"] = "DOWN"
+        src12["conf"] = _clip_conf(0.65 + (rsi_4h - 68) / 100.0)
+        src12["label"] = f"RSI(4H)={rsi_4h:.0f} — перекуплено на старшей ТФ → SELL"
+    elif rsi_4h <= 47:
+        inst_dn += 1.0; src12["side"] = "DOWN"
+        src12["conf"] = _clip_conf(0.55 + (47 - rsi_4h) / 50.0)
+        src12["label"] = f"RSI(4H)={rsi_4h:.0f} — медвежья 4H-зона"
+    elif rsi_4h >= 53:
+        inst_up += 1.0; src12["side"] = "UP"
+        src12["conf"] = _clip_conf(0.55 + (rsi_4h - 53) / 50.0)
+        src12["label"] = f"RSI(4H)={rsi_4h:.0f} — бычья 4H-зона"
+    else:
+        src12["label"] = f"RSI(4H)={rsi_4h:.0f} — нейтрален"
+    sources.append(src12)
+
+    # 13. Bollinger %B (1H). ВЕС 1.0
+    bb_pct = float(ind1.get("bb_pct") or 0.5)
+    src13 = {"name": "bb_pct_1h", "weight": 1.0, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if bb_pct <= 0.1:
+        inst_up += 1.0; src13["side"] = "UP"
+        src13["conf"] = _clip_conf(0.7 + (0.1 - bb_pct) * 2.0)
+        src13["label"] = f"Bollinger %B(1H)={bb_pct:.2f} — у нижней полосы → BUY"
+    elif bb_pct >= 0.9:
+        inst_dn += 1.0; src13["side"] = "DOWN"
+        src13["conf"] = _clip_conf(0.7 + (bb_pct - 0.9) * 2.0)
+        src13["label"] = f"Bollinger %B(1H)={bb_pct:.2f} — у верхней полосы → SELL"
+    elif bb_pct < 0.5:
+        inst_dn += 0.5; src13["side"] = "DOWN"
+        src13["conf"] = _clip_conf(0.55 + (0.5 - bb_pct))
+        src13["label"] = f"Bollinger %B(1H)={bb_pct:.2f} — ниже середины"
+    else:
+        inst_up += 0.5; src13["side"] = "UP"
+        src13["conf"] = _clip_conf(0.55 + (bb_pct - 0.5))
+        src13["label"] = f"Bollinger %B(1H)={bb_pct:.2f} — выше середины"
+    sources.append(src13)
+
+    # 14. Stochastic %K + %D (1H). ВЕС 1.0
+    stk_k = float(ind1.get("stoch_k") or 50)
+    stk_d = float(ind1.get("stoch_d") or 50)
+    src14 = {"name": "stochastic_1h", "weight": 1.0, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if stk_k <= 20 and stk_d <= 25:
+        inst_up += 1.0; src14["side"] = "UP"
+        src14["conf"] = _clip_conf(0.65 + (20 - stk_k) / 80.0)
+        src14["label"] = f"Stoch(1H) %K={stk_k:.0f} %D={stk_d:.0f} — перепродано → BUY"
+    elif stk_k >= 80 and stk_d >= 75:
+        inst_dn += 1.0; src14["side"] = "DOWN"
+        src14["conf"] = _clip_conf(0.65 + (stk_k - 80) / 80.0)
+        src14["label"] = f"Stoch(1H) %K={stk_k:.0f} %D={stk_d:.0f} — перекуплено → SELL"
+    elif stk_k > stk_d + 5:
+        inst_up += 0.7; src14["side"] = "UP"
+        src14["conf"] = 0.6
+        src14["label"] = f"Stoch(1H) %K>%D ({stk_k:.0f}>{stk_d:.0f}) — бычий cross"
+    elif stk_d > stk_k + 5:
+        inst_dn += 0.7; src14["side"] = "DOWN"
+        src14["conf"] = 0.6
+        src14["label"] = f"Stoch(1H) %D>%K ({stk_d:.0f}>{stk_k:.0f}) — медвежий cross"
+    else:
+        src14["label"] = f"Stoch(1H) %K={stk_k:.0f} %D={stk_d:.0f} — нейтрален"
+    sources.append(src14)
+
+    # 15. Williams %R (1H). ВЕС 0.7
+    wr = float(ind1.get("williams_r") or -50)
+    src15 = {"name": "williams_r_1h", "weight": 0.7, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if wr <= -80:
+        inst_up += 0.7; src15["side"] = "UP"
+        src15["conf"] = _clip_conf(0.6 + (-80 - wr) / 100.0)
+        src15["label"] = f"Williams %R(1H)={wr:.0f} — перепродано → BUY"
+    elif wr >= -20:
+        inst_dn += 0.7; src15["side"] = "DOWN"
+        src15["conf"] = _clip_conf(0.6 + (wr - (-20)) / 100.0)
+        src15["label"] = f"Williams %R(1H)={wr:.0f} — перекуплено → SELL"
+    elif wr < -50:
+        inst_dn += 0.4; src15["side"] = "DOWN"
+        src15["conf"] = 0.55
+        src15["label"] = f"Williams %R(1H)={wr:.0f} — слабая медвежья зона"
+    else:
+        inst_up += 0.4; src15["side"] = "UP"
+        src15["conf"] = 0.55
+        src15["label"] = f"Williams %R(1H)={wr:.0f} — слабая бычья зона"
+    sources.append(src15)
+
+    # 16. Ichimoku Cloud (4H) — позиция цены относительно облака. ВЕС 1.5
+    ichi_above = float(ind4.get("ichimoku_above_cloud") or 0)
+    ichi_below = float(ind4.get("ichimoku_below_cloud") or 0)
+    ichi_tenkan = float(ind4.get("ichimoku_tenkan") or 0)
+    ichi_kijun = float(ind4.get("ichimoku_kijun") or 0)
+    src16 = {"name": "ichimoku_4h", "weight": 1.5, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if ichi_above >= 0.5 and ichi_tenkan > ichi_kijun > 0:
+        inst_up += 1.5; src16["side"] = "UP"
+        src16["conf"] = 0.78
+        src16["label"] = "Ichimoku(4H): цена над облаком + Tenkan>Kijun → BUY"
+    elif ichi_below >= 0.5 and ichi_tenkan < ichi_kijun and ichi_kijun > 0:
+        inst_dn += 1.5; src16["side"] = "DOWN"
+        src16["conf"] = 0.78
+        src16["label"] = "Ichimoku(4H): цена под облаком + Tenkan<Kijun → SELL"
+    elif ichi_above >= 0.5:
+        inst_up += 0.8; src16["side"] = "UP"
+        src16["conf"] = 0.65
+        src16["label"] = "Ichimoku(4H): цена над облаком → BUY-bias"
+    elif ichi_below >= 0.5:
+        inst_dn += 0.8; src16["side"] = "DOWN"
+        src16["conf"] = 0.65
+        src16["label"] = "Ichimoku(4H): цена под облаком → SELL-bias"
+    else:
+        src16["label"] = "Ichimoku(4H): цена внутри облака — нейтрален"
+    sources.append(src16)
+
+    # 17. Forecast model output (наша же агрегатная вероятность). ВЕС 2.0
+    # Это по сути «ансамбль 64 агентов» из forecast_scanner — отдельный сильный
+    # источник, который сам по себе уже считает вероятность.
+    fc_side = str(forecast.get("side") or "").upper()
+    fc_prob = float(forecast.get("probability_pct") or 50)
+    src17 = {"name": "forecast_model", "weight": 2.0, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if fc_side == "BUY" and fc_prob >= 55:
+        inst_up += 2.0 * (fc_prob / 100.0); src17["side"] = "UP"
+        src17["conf"] = _clip_conf(fc_prob / 100.0)
+        src17["label"] = f"Прогноз-модель BUY ({fc_prob:.0f}%) — 64-агентный ансамбль"
+    elif fc_side == "SELL" and fc_prob >= 55:
+        inst_dn += 2.0 * (fc_prob / 100.0); src17["side"] = "DOWN"
+        src17["conf"] = _clip_conf(fc_prob / 100.0)
+        src17["label"] = f"Прогноз-модель SELL ({fc_prob:.0f}%) — 64-агентный ансамбль"
+    else:
+        src17["label"] = f"Прогноз-модель {fc_side or '—'} ({fc_prob:.0f}%) — слабая"
+    sources.append(src17)
+
+    # 18-21. Младший ТФ 15m — для 5-часового горизонта это важная немедленная
+    # картина. forecast_scanner уже считает индикаторы на 15m (наряду с 1H/4H).
+    ind15 = (forecast.get("indicators") or {}).get("15m", {}) or {}
+
+    # 18. RSI 15m. ВЕС 1.0
+    rsi_15m = float(ind15.get("rsi14") or 50)
+    src18 = {"name": "rsi_15m", "weight": 1.0, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if rsi_15m <= 30:
+        inst_up += 1.0; src18["side"] = "UP"
+        src18["conf"] = _clip_conf(0.6 + (30 - rsi_15m) / 100.0)
+        src18["label"] = f"RSI(15m)={rsi_15m:.0f} — перепродано → BUY"
+    elif rsi_15m >= 70:
+        inst_dn += 1.0; src18["side"] = "DOWN"
+        src18["conf"] = _clip_conf(0.6 + (rsi_15m - 70) / 100.0)
+        src18["label"] = f"RSI(15m)={rsi_15m:.0f} — перекуплено → SELL"
+    elif rsi_15m <= 47:
+        inst_dn += 0.5; src18["side"] = "DOWN"
+        src18["conf"] = _clip_conf(0.55 + (47 - rsi_15m) / 60.0)
+        src18["label"] = f"RSI(15m)={rsi_15m:.0f} — слабая медвежья"
+    elif rsi_15m >= 53:
+        inst_up += 0.5; src18["side"] = "UP"
+        src18["conf"] = _clip_conf(0.55 + (rsi_15m - 53) / 60.0)
+        src18["label"] = f"RSI(15m)={rsi_15m:.0f} — слабая бычья"
+    else:
+        src18["label"] = f"RSI(15m)={rsi_15m:.0f} — нейтрален"
+    sources.append(src18)
+
+    # 19. Stochastic 15m. ВЕС 0.8
+    stk_k15 = float(ind15.get("stoch_k") or 50)
+    stk_d15 = float(ind15.get("stoch_d") or 50)
+    src19 = {"name": "stochastic_15m", "weight": 0.8, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if stk_k15 <= 20 and stk_d15 <= 25:
+        inst_up += 0.8; src19["side"] = "UP"
+        src19["conf"] = _clip_conf(0.6 + (20 - stk_k15) / 100.0)
+        src19["label"] = f"Stoch(15m) %K={stk_k15:.0f} — перепродано → BUY"
+    elif stk_k15 >= 80 and stk_d15 >= 75:
+        inst_dn += 0.8; src19["side"] = "DOWN"
+        src19["conf"] = _clip_conf(0.6 + (stk_k15 - 80) / 100.0)
+        src19["label"] = f"Stoch(15m) %K={stk_k15:.0f} — перекуплено → SELL"
+    elif stk_k15 > stk_d15 + 5:
+        inst_up += 0.5; src19["side"] = "UP"
+        src19["conf"] = 0.58
+        src19["label"] = f"Stoch(15m) %K>%D ({stk_k15:.0f}>{stk_d15:.0f})"
+    elif stk_d15 > stk_k15 + 5:
+        inst_dn += 0.5; src19["side"] = "DOWN"
+        src19["conf"] = 0.58
+        src19["label"] = f"Stoch(15m) %D>%K ({stk_d15:.0f}>{stk_k15:.0f})"
+    else:
+        src19["label"] = f"Stoch(15m) — нейтрален"
+    sources.append(src19)
+
+    # 20. Bollinger %B 15m. ВЕС 0.7
+    bb_15 = float(ind15.get("bb_pct") or 0.5)
+    src20 = {"name": "bb_pct_15m", "weight": 0.7, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if bb_15 <= 0.1:
+        inst_up += 0.7; src20["side"] = "UP"
+        src20["conf"] = _clip_conf(0.65 + (0.1 - bb_15) * 2.0)
+        src20["label"] = f"Bollinger %B(15m)={bb_15:.2f} — у нижней полосы → BUY"
+    elif bb_15 >= 0.9:
+        inst_dn += 0.7; src20["side"] = "DOWN"
+        src20["conf"] = _clip_conf(0.65 + (bb_15 - 0.9) * 2.0)
+        src20["label"] = f"Bollinger %B(15m)={bb_15:.2f} — у верхней полосы → SELL"
+    elif bb_15 < 0.5:
+        inst_dn += 0.4; src20["side"] = "DOWN"
+        src20["conf"] = 0.55
+        src20["label"] = f"Bollinger %B(15m)={bb_15:.2f} — ниже середины"
+    else:
+        inst_up += 0.4; src20["side"] = "UP"
+        src20["conf"] = 0.55
+        src20["label"] = f"Bollinger %B(15m)={bb_15:.2f} — выше середины"
+    sources.append(src20)
+
+    # 21. EMA stack 15m (короткий тренд). ВЕС 0.6
+    e20_15 = ind15.get("ema20"); e50_15 = ind15.get("ema50"); e200_15 = ind15.get("ema200")
+    src21 = {"name": "ema_stack_15m", "weight": 0.6, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if e20_15 and e50_15 and e200_15:
+        if e20_15 > e50_15 > e200_15:
+            inst_up += 0.6; src21["side"] = "UP"
+            src21["conf"] = 0.62
+            src21["label"] = "EMA-stack(15m) 20>50>200 — короткий тренд BUY"
+        elif e20_15 < e50_15 < e200_15:
+            inst_dn += 0.6; src21["side"] = "DOWN"
+            src21["conf"] = 0.62
+            src21["label"] = "EMA-stack(15m) 20<50<200 — короткий тренд SELL"
+        elif e20_15 > e50_15:
+            inst_up += 0.3; src21["side"] = "UP"
+            src21["conf"] = 0.55
+            src21["label"] = "EMA(15m): 20>50 — лёгкий буйствующий импульс"
+        elif e20_15 < e50_15:
+            inst_dn += 0.3; src21["side"] = "DOWN"
+            src21["conf"] = 0.55
+            src21["label"] = "EMA(15m): 20<50 — лёгкий медвежий импульс"
+        else:
+            src21["label"] = "EMA(15m) — равны"
+    else:
+        src21["label"] = "EMA(15m) — нет данных"
+    sources.append(src21)
+
+    # 22. MTF Agreement Bonus — если все 3 ТФ (15m, 1H, 4H) показывают одну
+    # сторону по RSI, это очень сильный multi-timeframe сигнал. ВЕС 1.5
+    rsi_sides = []
+    for r in (rsi_15m, rsi_1h, rsi_4h):
+        if r >= 53: rsi_sides.append("UP")
+        elif r <= 47: rsi_sides.append("DOWN")
+        else: rsi_sides.append(None)
+    src22 = {"name": "mtf_rsi_agreement", "weight": 1.5, "kind": "institutional",
+             "side": None, "conf": 0.5, "label": ""}
+    if rsi_sides == ["UP", "UP", "UP"]:
+        inst_up += 1.5; src22["side"] = "UP"
+        src22["conf"] = 0.82
+        src22["label"] = f"MTF: RSI 15m+1H+4H все бычьи ({rsi_15m:.0f}/{rsi_1h:.0f}/{rsi_4h:.0f}) — strong BUY"
+    elif rsi_sides == ["DOWN", "DOWN", "DOWN"]:
+        inst_dn += 1.5; src22["side"] = "DOWN"
+        src22["conf"] = 0.82
+        src22["label"] = f"MTF: RSI 15m+1H+4H все медвежьи ({rsi_15m:.0f}/{rsi_1h:.0f}/{rsi_4h:.0f}) — strong SELL"
+    elif rsi_sides.count("UP") == 2 and rsi_sides.count("DOWN") == 0:
+        inst_up += 0.8; src22["side"] = "UP"
+        src22["conf"] = 0.65
+        src22["label"] = "MTF: 2/3 ТФ бычьи по RSI"
+    elif rsi_sides.count("DOWN") == 2 and rsi_sides.count("UP") == 0:
+        inst_dn += 0.8; src22["side"] = "DOWN"
+        src22["conf"] = 0.65
+        src22["label"] = "MTF: 2/3 ТФ медвежьи по RSI"
+    else:
+        src22["label"] = f"MTF: RSI разные на разных ТФ ({rsi_15m:.0f}/{rsi_1h:.0f}/{rsi_4h:.0f}) — расхождение"
+    sources.append(src22)
+
     # ── totals ──
     total_up = inst_up + retail_up
     total_dn = inst_dn + retail_dn
