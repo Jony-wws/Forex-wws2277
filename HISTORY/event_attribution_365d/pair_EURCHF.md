@@ -14,6 +14,7 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 
 | event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
 |---|---:|---:|---|---:|---:|---:|
+| eu_cpi | 2 | -29.8 | up | 50% | 17% | 50% |
 | cb_rate_decision | 1 | +37.7 | down | 100% | 79% | 0% |
 
 ## Overlap (13-16 UTC)

@@ -332,7 +332,9 @@ def evaluate_pair(pair: str) -> dict | None:
     # one news cluster overwhelming the technical stack.
     try:
         from .events import live_weights as ev_lw
-        sess_now = _current_session(now.hour)
+        # Use analysis-session taxonomy (Asia/London/Overlap/NY) covering all
+        # 24 hours, so artefact lookups hit even at hours not in config.SESSIONS.
+        sess_now = ev_lw._hour_to_analysis_session(now.hour)
         ev_delta, ev_reason = ev_lw.event_score_contribution(pair, sess_now, now)
         if ev_delta != 0 and ev_reason:
             vote("event_attribution", ev_delta, ev_reason)
@@ -345,6 +347,34 @@ def evaluate_pair(pair: str) -> dict | None:
             vote("trap_filter", trap_delta, trap_reason)
     except Exception as e:
         log.warning(f"forecast_scanner: event_attribution integration failed for {pair}: {e}")
+
+    # ───── BLOCK L — Phase-8 trained knowledge (added 2026-05-04) ─────
+    # Three layers of learned 365-day patterns from `state/learned_rules.json`:
+    #   1. learned_rule_score: high-conviction (pair × session × event_type)
+    #      cells (concordance ≥ 75%, frequency ≥ 4) → strong boost ±16 max.
+    #   2. pair_session_bias_score: persistent (pair × session) directional
+    #      drift over the year, fires only at concordance ≥ 70% / n ≥ 100
+    #      → small constant nudge ±2 even with no event in window.
+    #   3. multi_event_cluster_amplifier: when ≥ 2 persistent events co-fire
+    #      and agree on direction → extra +4 to +8 in agreed direction.
+    # All three never block trades — they only refine probability_pct.
+    try:
+        from .events import live_weights as ev_lw
+        sess_now = ev_lw._hour_to_analysis_session(now.hour)
+        # Layer 1: high-conviction event rule (the strongest)
+        learned_delta, learned_reason = ev_lw.learned_rule_score(pair, sess_now, now)
+        if learned_delta != 0 and learned_reason:
+            vote("learned_rule", learned_delta, learned_reason)
+        # Layer 2: persistent pair-session drift
+        bias_delta, bias_reason = ev_lw.pair_session_bias_score(pair, sess_now)
+        if bias_delta != 0 and bias_reason:
+            vote("pair_session_bias", bias_delta, bias_reason)
+        # Layer 3: multi-event cluster amplifier
+        cluster_delta, cluster_reason = ev_lw.multi_event_cluster_amplifier(pair, sess_now, now)
+        if cluster_delta != 0 and cluster_reason:
+            vote("multi_event_cluster", cluster_delta, cluster_reason)
+    except Exception as e:
+        log.warning(f"forecast_scanner: learned_rules integration failed for {pair}: {e}")
 
     # ───── итог ─────
     if score == 0:

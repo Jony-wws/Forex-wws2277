@@ -11,6 +11,7 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 | event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
 |---|---:|---:|---|---:|---:|---:|
 | cb_rate_decision | 4 | -6.4 | up | 75% | 75% | 50% |
+| au_unemp | 4 | +75.2 | down | 100% | 61% | 25% |
 
 **Frequent trap setups (≥50% reversal):**
 
