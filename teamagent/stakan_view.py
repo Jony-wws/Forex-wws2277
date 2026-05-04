@@ -504,24 +504,33 @@ def _institutional_verdict(
     sp_pct = float(bs.get("sellers_pct") or 50)
     fav_bs = bs.get("favorite")
 
+    def _clip_conf(p: float) -> float:
+        # уверенность одного источника в его собственной стороне ∈ [0.55, 0.95]
+        # 0.50 = source ничего не говорит, тогда side=None и в Байес не идёт.
+        return max(0.55, min(0.95, p))
+
     # 1. VP big-players balance — ВЕС 4 (главный институциональный сигнал)
     src1 = {"name": "big_players_vp", "weight": 4.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if fav_bs == "buyers" and bp_pct >= 65:
         inst_up += 4.0 * (bp_pct / 100.0); src1["side"] = "UP"
+        src1["conf"] = _clip_conf(bp_pct / 100.0)  # 65% → 0.65, 87% → 0.87, 95% → 0.95
         src1["label"] = (
             f"крупные игроки {bp_pct:.0f}% ниже цены — мощная институциональная поддержка"
         )
     elif fav_bs == "sellers" and sp_pct >= 65:
         inst_dn += 4.0 * (sp_pct / 100.0); src1["side"] = "DOWN"
+        src1["conf"] = _clip_conf(sp_pct / 100.0)
         src1["label"] = (
             f"крупные игроки {sp_pct:.0f}% выше цены — мощное институциональное сопротивление"
         )
     elif fav_bs == "buyers" and bp_pct >= 55:
         inst_up += 4.0 * 0.5; src1["side"] = "UP"
+        src1["conf"] = _clip_conf(bp_pct / 100.0)  # 55% → 0.55
         src1["label"] = f"крупные игроки {bp_pct:.0f}% снизу — умеренная поддержка"
     elif fav_bs == "sellers" and sp_pct >= 55:
         inst_dn += 4.0 * 0.5; src1["side"] = "DOWN"
+        src1["conf"] = _clip_conf(sp_pct / 100.0)
         src1["label"] = f"крупные игроки {sp_pct:.0f}% сверху — умеренное сопротивление"
     else:
         src1["label"] = f"баланс крупных {bp_pct:.0f}/{sp_pct:.0f}% — нейтрален"
@@ -530,18 +539,21 @@ def _institutional_verdict(
     # 2. VP no-return levels — ВЕС 3
     nr_levels = (vp.get("forecast_to_utc5_midnight") or {}).get("no_return_levels") or []
     src2 = {"name": "no_return_levels", "weight": 3.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if nr_levels:
         below = [lv for lv in nr_levels if float(lv.get("price") or 0) < cur]
         above = [lv for lv in nr_levels if float(lv.get("price") or 0) > cur]
         if below and not above:
             inst_up += 3.0; src2["side"] = "UP"
+            # 1 уровень → 0.7, 2+ → 0.8, 4+ → 0.85
+            src2["conf"] = _clip_conf(0.65 + min(len(below), 4) * 0.05)
             src2["label"] = (
                 f"no-return уровень снизу — цена не возвращается, ждём роста "
                 f"({len(below)} уровней)"
             )
         elif above and not below:
             inst_dn += 3.0; src2["side"] = "DOWN"
+            src2["conf"] = _clip_conf(0.65 + min(len(above), 4) * 0.05)
             src2["label"] = (
                 f"no-return уровень сверху — цена не возвращается, ждём снижения "
                 f"({len(above)} уровней)"
@@ -559,12 +571,14 @@ def _institutional_verdict(
             ratio_up = sup_w / tot
             if ratio_up >= 0.65:
                 inst_up += 3.0 * ratio_up; src2["side"] = "UP"
+                src2["conf"] = _clip_conf(ratio_up)
                 src2["label"] = (
                     f"институциональные уровни поддержки доминируют "
                     f"({sup_w:.0f}% vs {res_w:.0f}%)"
                 )
             elif ratio_up <= 0.35:
                 inst_dn += 3.0 * (1.0 - ratio_up); src2["side"] = "DOWN"
+                src2["conf"] = _clip_conf(1.0 - ratio_up)
                 src2["label"] = (
                     f"институциональное сопротивление доминирует "
                     f"({res_w:.0f}% vs {sup_w:.0f}%)"
@@ -583,10 +597,14 @@ def _institutional_verdict(
     cot_str = float(cot_sig.get("strength_pct") or cot_sig.get("strength") or 0)
     cot_z = cot_sig.get("combined_z") or cot_sig.get("z_score") or cot_sig.get("z")
     src3 = {"name": "cot_positioning", "weight": 3.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
+    # уверенность COT по |z| и strength_pct: |z|=1 → 0.65, |z|=2 → 0.85, |z|=3 → 0.92
+    cot_z_abs = abs(float(cot_z)) if isinstance(cot_z, (int, float)) else 0.0
+    cot_conf_raw = max(cot_str / 100.0, 0.5 + cot_z_abs * 0.15)
     if cot_side == "BUY":
         w = max(0.5, min(1.0, cot_str / 100.0)) if cot_str else 0.5
         inst_up += 3.0 * w; src3["side"] = "UP"
+        src3["conf"] = _clip_conf(cot_conf_raw)
         src3["label"] = (
             f"COT BUY (strength {cot_str:.0f}%, z={cot_z:.2f})"
             if isinstance(cot_z, (int, float)) and cot_str
@@ -595,6 +613,7 @@ def _institutional_verdict(
     elif cot_side == "SELL":
         w = max(0.5, min(1.0, cot_str / 100.0)) if cot_str else 0.5
         inst_dn += 3.0 * w; src3["side"] = "DOWN"
+        src3["conf"] = _clip_conf(cot_conf_raw)
         src3["label"] = (
             f"COT SELL (strength {cot_str:.0f}%, z={cot_z:.2f})"
             if isinstance(cot_z, (int, float)) and cot_str
@@ -606,15 +625,19 @@ def _institutional_verdict(
 
     # 4. Market Radar overall_score — ВЕС 3
     src4 = {"name": "market_radar", "weight": 3.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if radar_score is not None and abs(float(radar_score)) >= 5:
         rs = float(radar_score)
         w = min(1.0, abs(rs) / 50.0)
+        # |radar|=5 → 0.6, =20 → 0.74, =50 → 0.9
+        radar_conf = _clip_conf(0.5 + min(abs(rs) / 50.0, 1.0) * 0.4)
         if rs > 0:
             inst_up += 3.0 * w; src4["side"] = "UP"
+            src4["conf"] = radar_conf
             src4["label"] = f"Market Radar +{rs:.0f} (20-сканер консенсус) — BUY"
         else:
             inst_dn += 3.0 * w; src4["side"] = "DOWN"
+            src4["conf"] = radar_conf
             src4["label"] = f"Market Radar {rs:.0f} (20-сканер консенсус) — SELL"
     else:
         rs_txt = f"{radar_score:.0f}" if radar_score is not None else "—"
@@ -627,14 +650,18 @@ def _institutional_verdict(
     fnd_tilt = float(fnd.get("tilt_score") or fnd.get("tilt_pct") or fnd.get("tilt") or 0)
     fnd_conf = float(fnd.get("confidence_pct") or 0)
     src5 = {"name": "fred_macro", "weight": 2.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
+    # уверенность FRED: max(собственный confidence_pct, 0.5 + |tilt|/80*0.4)
+    fred_conf_raw = max(fnd_conf / 100.0, 0.5 + min(abs(fnd_tilt) / 80.0, 1.0) * 0.4)
     if fnd_side == "BUY":
         w = min(1.0, max(0.4, abs(fnd_tilt) / 80.0))
         inst_up += 2.0 * w; src5["side"] = "UP"
+        src5["conf"] = _clip_conf(fred_conf_raw)
         src5["label"] = f"FRED macro BUY (tilt {fnd_tilt:+.1f}, conf {fnd_conf:.0f}%)"
     elif fnd_side == "SELL":
         w = min(1.0, max(0.4, abs(fnd_tilt) / 80.0))
         inst_dn += 2.0 * w; src5["side"] = "DOWN"
+        src5["conf"] = _clip_conf(fred_conf_raw)
         src5["label"] = f"FRED macro SELL (tilt {fnd_tilt:+.1f}, conf {fnd_conf:.0f}%)"
     else:
         src5["label"] = "FRED macro — нейтрален"
@@ -647,14 +674,16 @@ def _institutional_verdict(
     stk_yes = int(stk_votes.get("yes") or 0)
     stk_total = int(stk_votes.get("total") or 0)
     src6 = {"name": "stakan_votes", "weight": 3.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if stk_dir in ("BUY", "SELL") and stk_total > 0:
         ratio = stk_yes / stk_total
         if stk_dir == "BUY":
             inst_up += 3.0 * ratio; src6["side"] = "UP"
+            src6["conf"] = _clip_conf(ratio)
             src6["label"] = f"стакан-консенсус BUY ({stk_yes}/{stk_total} голосов)"
         else:
             inst_dn += 3.0 * ratio; src6["side"] = "DOWN"
+            src6["conf"] = _clip_conf(ratio)
             src6["label"] = f"стакан-консенсус SELL ({stk_yes}/{stk_total} голосов)"
     else:
         skip = stk.get("skip_reason") or "нет данных"
@@ -664,12 +693,14 @@ def _institutional_verdict(
     # 7. VP direction (volume momentum) — ВЕС 2
     vpd = vp.get("direction")
     src7 = {"name": "vp_direction", "weight": 2.0, "kind": "institutional",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if vpd == "UP":
         inst_up += 2.0; src7["side"] = "UP"
+        src7["conf"] = 0.65  # объёмный импульс — умеренный сигнал
         src7["label"] = "VP импульс — UP"
     elif vpd == "DOWN":
         inst_dn += 2.0; src7["side"] = "DOWN"
+        src7["conf"] = 0.65
         src7["label"] = "VP импульс — DOWN"
     else:
         src7["label"] = f"VP импульс — {vpd or '—'}"
@@ -679,13 +710,15 @@ def _institutional_verdict(
     ind4 = (forecast.get("indicators") or {}).get("4H", {}) or {}
     e20 = ind4.get("ema20"); e50 = ind4.get("ema50"); e200 = ind4.get("ema200")
     src8 = {"name": "ema_stack_4h", "weight": 0.5, "kind": "retail",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if e20 and e50 and e200:
         if e20 > e50 > e200:
             retail_up += 0.5; src8["side"] = "UP"
+            src8["conf"] = 0.6   # розничный источник — слабая уверенность
             src8["label"] = "розница: 4H EMA-stack 20>50>200 — BUY"
         elif e20 < e50 < e200:
             retail_dn += 0.5; src8["side"] = "DOWN"
+            src8["conf"] = 0.6
             src8["label"] = "розница: 4H EMA-stack 20<50<200 — SELL"
         else:
             src8["label"] = "розница: 4H EMA-stack — смешан"
@@ -698,12 +731,14 @@ def _institutional_verdict(
     plus_di = float(ind4.get("plus_di") or 0)
     minus_di = float(ind4.get("minus_di") or 0)
     src9 = {"name": "adx_trend", "weight": 0.5, "kind": "retail",
-            "side": None, "label": ""}
+            "side": None, "conf": 0.5, "label": ""}
     if adx >= 25 and plus_di > minus_di + 3:
         retail_up += 0.5; src9["side"] = "UP"
+        src9["conf"] = _clip_conf(0.55 + min(adx / 100.0, 0.4))  # ADX 25 → 0.6, 50 → 0.75
         src9["label"] = f"розница: ADX={adx:.0f} +DI>{minus_di:.0f}-DI — BUY"
     elif adx >= 25 and minus_di > plus_di + 3:
         retail_dn += 0.5; src9["side"] = "DOWN"
+        src9["conf"] = _clip_conf(0.55 + min(adx / 100.0, 0.4))
         src9["label"] = f"розница: ADX={adx:.0f} -DI>{plus_di:.0f}+DI — SELL"
     else:
         src9["label"] = f"розница: ADX={adx:.0f} — слабый/смешанный"
@@ -713,12 +748,14 @@ def _institutional_verdict(
     ind1 = (forecast.get("indicators") or {}).get("1H", {}) or {}
     macd_h = float(ind1.get("macd_hist") or 0)
     src10 = {"name": "macd_1h", "weight": 0.5, "kind": "retail",
-             "side": None, "label": ""}
+             "side": None, "conf": 0.5, "label": ""}
     if macd_h > 0:
         retail_up += 0.5; src10["side"] = "UP"
+        src10["conf"] = 0.58
         src10["label"] = f"розница: 1H MACD>0 ({macd_h:.4f}) — BUY"
     elif macd_h < 0:
         retail_dn += 0.5; src10["side"] = "DOWN"
+        src10["conf"] = 0.58
         src10["label"] = f"розница: 1H MACD<0 ({macd_h:.4f}) — SELL"
     else:
         src10["label"] = "розница: 1H MACD — нейтрален"
@@ -733,15 +770,31 @@ def _institutional_verdict(
     institutional_sources_total = len(inst_sources)
     inst_voted = [s for s in inst_sources if s["side"] in ("UP", "DOWN")]
 
-    # ── Принудительно выбираем сторону. Никогда не возвращаем «ОЖИДАНИЕ».
-    # Tie-break при total_up == total_dn: используем сторону forecast или BUY.
-    if total_up > total_dn:
+    # ── Bayesian-комбинирование уверенностей всех проголосовавших источников
+    # (включая retail, у них вес/уверенность ниже). Это и есть «реальный поиск
+    # фаворита» — не взвешенная сумма голосов, а композитная вероятность.
+    #
+    # Каждый источник со side=UP даёт log-odds = log(conf/(1-conf)).
+    # Каждый источник со side=DOWN даёт log-odds = log((1-conf)/conf) = -log(...).
+    # Складываем log-odds, получаем суммарный log-odds в пользу UP, оттуда
+    # P(UP) = sigmoid(sum) = 1 / (1 + exp(-sum)).
+    voted_all = [s for s in sources if s["side"] in ("UP", "DOWN") and s.get("conf", 0.5) > 0.5]
+    log_odds_up = 0.0
+    for s in voted_all:
+        c = max(0.51, min(0.95, float(s.get("conf") or 0.55)))
+        lo = math.log(c / (1.0 - c))
+        log_odds_up += lo if s["side"] == "UP" else -lo
+    p_up = 1.0 / (1.0 + math.exp(-log_odds_up)) if voted_all else 0.5
+
+    if p_up >= 0.5:
         favorite_side = "buyers"
-    elif total_dn > total_up:
-        favorite_side = "sellers"
+        favorite_p = p_up
     else:
-        fc_side = str(forecast.get("side") or "BUY").upper()
-        favorite_side = "sellers" if fc_side == "SELL" else "buyers"
+        favorite_side = "sellers"
+        favorite_p = 1.0 - p_up
+
+    # `favorite_balance_pct` — Bayesian-вероятность фаворита, ∈ [50, 95]%.
+    favorite_balance_pct = round(favorite_p * 100.0, 1)
 
     if favorite_side == "buyers":
         agree = sum(1 for s in inst_voted if s["side"] == "UP")
@@ -749,11 +802,6 @@ def _institutional_verdict(
     else:
         agree = sum(1 for s in inst_voted if s["side"] == "DOWN")
         disagree = sum(1 for s in inst_voted if s["side"] == "UP")
-
-    favorite_balance_pct = (
-        round(max(total_up, total_dn) / total * 100.0, 1) if total > 0 else 50.0
-    )
-    # Согласие = доля «за» среди тех источников, что вообще проголосовали.
     voted_count = agree + disagree
     agreement_pct = (
         round(agree / voted_count * 100.0, 1) if voted_count > 0 else 0.0
@@ -761,27 +809,45 @@ def _institutional_verdict(
 
     in_blackout, blackout_reason = _check_news_blackout(pair, news_blackouts)
 
-    # ── Вероятность успеха в [70, 92] (математическое ожидание сигнала).
-    # База от перевеса: 50% → 70%, 100% → 92%.
-    base_prob = 70.0 + max(0.0, (favorite_balance_pct - 50.0)) * 0.44
-    # Бонус от согласия среди голосовавших.
-    agree_bonus = (agreement_pct / 100.0) * 6.0
-    # Бонус за количество проголосовавших источников (макс 5 → +2.5).
-    voted_bonus = min(float(voted_count), 5.0) * 0.5
-    # Штраф за news blackout — снижаем уверенность (но не ниже 70%).
+    # Вероятность успеха = Bayesian favorite_balance_pct, ограниченная [70, 92].
+    # При news blackout снижаем на 5%.
     blackout_penalty = 5.0 if in_blackout else 0.0
     prob_pct = max(
         70.0,
-        min(92.0, round(base_prob + agree_bonus + voted_bonus - blackout_penalty, 1)),
+        min(92.0, round(favorite_balance_pct - blackout_penalty, 1)),
     )
 
-    # ── Вердикт: всегда КУПИТЬ или ПРОДАТЬ. Три уровня силы.
-    is_strong = (
-        agreement_pct >= 80 and favorite_balance_pct >= 65 and voted_count >= 3
+    # ── Вердикт по Bayesian favorite_balance_pct:
+    # ≥80% → strong (КУПИТЬ/ПРОДАТЬ — зелёный/красный)
+    # 65-80% → medium (СКОРЕЕ)
+    # <65%  → weak (ВОЗМОЖНО)
+    is_strong = favorite_balance_pct >= 80.0 and voted_count >= 2
+    is_medium = (
+        not is_strong and favorite_balance_pct >= 65.0 and voted_count >= 1
     )
-    is_medium = agreement_pct >= 60 and voted_count >= 2 and not is_strong
+
+    # ── Топ-3 источника, которые тащат вердикт (для reason_ru).
+    fav_dir = "UP" if favorite_side == "buyers" else "DOWN"
+    contrib = []
+    for s in voted_all:
+        c = float(s.get("conf") or 0.55)
+        lo = abs(math.log(c / (1.0 - c)))
+        sign = +1 if s["side"] == fav_dir else -1
+        contrib.append((sign * lo, s, c))
+    pro = sorted([x for x in contrib if x[0] > 0], key=lambda x: -x[0])[:3]
+    con = sorted([x for x in contrib if x[0] < 0], key=lambda x: x[0])[:2]
+    top_pro_names = [
+        f"{s.get('name', '?')}={int(round(c * 100))}%" for _, s, c in pro
+    ]
+    top_con_names = [
+        f"{s.get('name', '?')}={int(round(c * 100))}%" for _, s, c in con
+    ]
 
     fav_word_short = "ВВЕРХ" if favorite_side == "buyers" else "ВНИЗ"
+    pro_txt = ", ".join(top_pro_names) if top_pro_names else "источники не голосуют"
+    con_txt = (
+        f" Против: {', '.join(top_con_names)}." if top_con_names else ""
+    )
     if is_strong:
         verdict_strength = "strong"
         if favorite_side == "buyers":
@@ -789,14 +855,13 @@ def _institutional_verdict(
         else:
             verdict, verdict_color = "ПРОДАТЬ", "red"
         primary_reason = (
-            f"{agree} из {institutional_sources_total} институциональных "
-            f"источников согласны ({agreement_pct:.0f}% от голосовавших). "
-            f"Перевес институционала {favorite_balance_pct:.0f}%. "
-            f"Крупные игроки ({bp_pct:.0f}/{sp_pct:.0f}%), стакан, COT, "
-            f"FRED-macro и Market Radar указывают в одну сторону. "
+            f"Реальный фаворит — {fav_word_short} с уверенностью "
+            f"{favorite_balance_pct:.0f}% (Bayesian-комбинация {len(voted_all)} "
+            f"независимых источников). Топ за: {pro_txt}.{con_txt} "
+            f"Институционал {agree}/{institutional_sources_total} согласны. "
             f"На горизонте 24ч до 00:00 UTC+5 рынок выбрал направление {fav_word_short} — "
             f"мелкие колебания внутри сессии это шум, прогноз отработает за ~5 часов. "
-            f"Рынок не даёт возможности идти против. Вероятность {prob_pct:.0f}%."
+            f"Вероятность {prob_pct:.0f}%."
         )
     elif is_medium:
         verdict_strength = "medium"
@@ -805,11 +870,12 @@ def _institutional_verdict(
         else:
             verdict, verdict_color = "СКОРЕЕ ПРОДАТЬ", "yellow_sell"
         primary_reason = (
-            f"{agree} из {institutional_sources_total} институциональных согласны "
-            f"({agreement_pct:.0f}% от голосовавших), перевес {favorite_balance_pct:.0f}%. "
-            f"Импульс крупных игроков направлен {fav_word_short} — направление до 00:00 UTC+5 есть, "
-            f"но запас прочности средний. Прогноз отработает за ~5 часов. "
-            f"Вероятность {prob_pct:.0f}%."
+            f"Фаворит — {fav_word_short}, но Bayesian-вероятность только "
+            f"{favorite_balance_pct:.0f}% (нужно ≥80% для сильного сигнала). "
+            f"Топ за: {pro_txt}.{con_txt} "
+            f"Институционал {agree}/{institutional_sources_total} согласны. "
+            f"Направление до 00:00 UTC+5 есть, но без полной поддержки. "
+            f"Прогноз ~5 часов. Вероятность {prob_pct:.0f}%."
         )
     else:
         verdict_strength = "weak"
@@ -818,12 +884,12 @@ def _institutional_verdict(
         else:
             verdict, verdict_color = "ВОЗМОЖНО ПРОДАТЬ", "yellow_sell"
         primary_reason = (
-            f"Институционал расходится: {agree} из "
-            f"{institutional_sources_total} источников "
-            f"({agreement_pct:.0f}% от голосовавших, voted={voted_count}). "
-            f"Перевес слабый ({favorite_balance_pct:.0f}%) — но направление "
-            f"всё-таки {fav_word_short} (24ч-горизонт). Прогноз ~5 часов, вероятность "
-            f"{prob_pct:.0f}% — допустимо лишь как лёгкая позиция."
+            f"Источники расходятся: Bayesian-вероятность фаворита {fav_word_short} "
+            f"всего {favorite_balance_pct:.0f}% (нужно ≥80% для сильного сигнала). "
+            f"Топ за: {pro_txt}.{con_txt} "
+            f"Институционал {agree}/{institutional_sources_total} согласны. "
+            f"Прогноз ~5 часов, вероятность {prob_pct:.0f}% — лёгкая позиция, "
+            f"явного 80%-фаворита рынок не даёт."
         )
 
     if in_blackout:
