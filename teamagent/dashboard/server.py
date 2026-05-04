@@ -779,6 +779,83 @@ def api_stakan_view_all():
     return stakan_view_mod.build_all_summary()
 
 
+# ─── Лёгкий live-price endpoint для 5-секундного refresh (2026-05-04) ─────────
+# Пользователь явно попросил «текущая цена обновляется каждые 5 секунд». Чтобы
+# не дёргать тяжёлый /api/stakan-view/{pair} (агрегирует volume_profile +
+# forecast + macro + COT) каждые 5 сек на каждом клиенте — отдаём ТОЛЬКО цену
+# из Yahoo с in-process TTL-кэшем (3 сек). Это эквивалент TradingView ticker.
+_LIVE_PRICE_CACHE: dict[str, dict] = {}
+_LIVE_PRICE_TTL_SEC = 3.0
+
+@app.get("/api/live-price/{pair}")
+def api_live_price(pair: str):
+    """{ pair, price, change_1m, change_5m, change_1h, ts, source }.
+    TTL-кэш 3 сек: если 5 клиентов опрашивают каждые 5 сек, реально дёргаем Yahoo
+    максимум раз в 3 сек.
+    """
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    now_ts = time.time()
+    cached = _LIVE_PRICE_CACHE.get(pair)
+    if cached and now_ts - cached["_cached_at"] < _LIVE_PRICE_TTL_SEC:
+        return cached["data"]
+    try:
+        df = yahoo.fetch(pair, interval="1m", period="1d")
+        if df is None or df.empty:
+            data_obj = {"pair": pair, "price": None, "error": "no_data"}
+        else:
+            close_series = df["Close"]
+            last = float(close_series.iloc[-1])
+            def _delta_pips(idx_back: int) -> float | None:
+                if len(close_series) <= idx_back:
+                    return None
+                prev = float(close_series.iloc[-1 - idx_back])
+                pip_size = 0.01 if "JPY" in pair else 0.0001
+                return round((last - prev) / pip_size, 1)
+            data_obj = {
+                "pair": pair,
+                "price": last,
+                "change_1m_pips": _delta_pips(1),
+                "change_5m_pips": _delta_pips(5),
+                "change_1h_pips": _delta_pips(60),
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "source": "yahoo_1m",
+                "bar_time": str(close_series.index[-1]) if len(close_series) else None,
+            }
+    except Exception as e:
+        data_obj = {"pair": pair, "price": None, "error": str(e)}
+    _LIVE_PRICE_CACHE[pair] = {"_cached_at": now_ts, "data": data_obj}
+    return data_obj
+
+
+@app.get("/api/news-watch/{pair}")
+def api_news_watch(pair: str, hours_ahead: int = 5):
+    """Высокоимпактные новости/макроданные в горизонте 1–5 часов для пары.
+    Если есть событие в горизонте сделки — UI показывает красное предупреждение.
+    Источник: ForexFactory RSS (free, no API key).
+    """
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    try:
+        from ..data import news as news_mod
+        events = news_mod.upcoming_high_impact(pair, hours_ahead=hours_ahead)
+        return {
+            "pair": pair,
+            "hours_ahead": hours_ahead,
+            "as_of": datetime.now(timezone.utc).isoformat(),
+            "count": len(events),
+            "events": events,
+            "warning": (
+                f"⚠️ через ≤{hours_ahead}ч выходит {len(events)} high-impact "
+                f"событий по {pair} — могут развернуть прогноз"
+            ) if events else None,
+        }
+    except Exception as e:
+        return {"pair": pair, "error": str(e), "events": []}
+
+
 # ────────── Strategy "Стакан" (parallel system, added 2026-05-01) ──────────
 
 @app.get("/api/stakan/open-trades")

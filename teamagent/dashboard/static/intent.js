@@ -1515,4 +1515,208 @@
   } catch (_) {}
   refreshStakanView();
   skState.timer = setInterval(refreshStakanView, SK_REFRESH_MS);
+
+  // ─── 2026-05-04: 5-секундный live-price refresh для текущей пары ─────────
+  // Пользователь явно просил «текущая цена обновляется каждые 5 секунд».
+  // Тяжёлый /api/stakan-view/{pair} остаётся 10s; сюда тащим только цену.
+  const SK_PRICE_REFRESH_MS = 5_000;
+  let _skLastLivePrice = null;
+  async function _skRefreshLivePrice() {
+    const pair = skState.selectedPair;
+    if (!pair) return;
+    const r = await _skFetch(`/api/live-price/${pair}`);
+    if (!r || !r.price) return;
+    const priceEl = document.getElementById("sk-pair-price");
+    const pulseEl = document.getElementById("sk-pair-pulse");
+    const pulseTxt = document.getElementById("sk-pair-pulse-txt");
+    const deltaEl = document.getElementById("sk-pair-pulse-delta");
+    if (priceEl) priceEl.textContent = _skFmtPrice(r.price);
+    if (pulseEl) {
+      pulseEl.classList.remove("up","down");
+      if (_skLastLivePrice != null && r.price !== _skLastLivePrice) {
+        pulseEl.classList.add(r.price > _skLastLivePrice ? "up" : "down");
+      }
+    }
+    _skLastLivePrice = r.price;
+    if (pulseTxt) {
+      const ts = r.ts ? new Date(r.ts).toLocaleTimeString("ru-RU") : "";
+      pulseTxt.textContent = `live ${ts}`;
+    }
+    if (deltaEl) {
+      const d1 = r.change_1m_pips;
+      const d5 = r.change_5m_pips;
+      const sign1 = (d1 > 0 ? "+" : "");
+      const sign5 = (d5 > 0 ? "+" : "");
+      deltaEl.innerHTML =
+        `<span class="${d1 > 0 ? 'pos' : d1 < 0 ? 'neg' : ''}">1м ${sign1}${d1 ?? "—"}</span> · ` +
+        `<span class="${d5 > 0 ? 'pos' : d5 < 0 ? 'neg' : ''}">5м ${sign5}${d5 ?? "—"}</span>`;
+    }
+  }
+  _skRefreshLivePrice();
+  setInterval(_skRefreshLivePrice, SK_PRICE_REFRESH_MS);
+
+  // ─── 2026-05-04: news-watch — предупреждение о high-impact событиях ──────
+  async function _skRefreshNewsWatch() {
+    const pair = skState.selectedPair;
+    if (!pair) return;
+    const warnEl = document.getElementById("sk-news-warning");
+    const warnTxt = document.getElementById("sk-news-warning-text");
+    if (!warnEl) return;
+    const r = await _skFetch(`/api/news-watch/${pair}?hours_ahead=5`);
+    if (!r || r.error) {
+      warnEl.hidden = true;
+      return;
+    }
+    if ((r.events || []).length === 0) {
+      warnEl.hidden = true;
+      return;
+    }
+    const lines = (r.events || []).slice(0, 3).map(ev => {
+      const t = new Date(ev.time).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+      return `${t} — ${ev.title}`;
+    }).join(" · ");
+    warnTxt.textContent = `Внимание · ${r.events.length} high-impact событий ≤5ч: ${lines}. Если откроешь сделку — может развернуть.`;
+    warnEl.hidden = false;
+  }
+  _skRefreshNewsWatch();
+  setInterval(_skRefreshNewsWatch, 60_000); // news refreshed every minute (RSS-cached 15 min anyway)
+
+  // ─── 2026-05-04: СОСТОЯНИЕ СИСТЕМЫ — health/heartbeat каждые 5 сек ───────
+  async function refreshSystemHealth() {
+    const grid = document.getElementById("sh-grid");
+    if (!grid) return;
+    const r = await _skFetch("/api/health");
+    if (!r || !r.components) {
+      grid.innerHTML = `<div class="sh-empty">не удалось получить /api/health</div>`;
+      return;
+    }
+    const comps = r.components || {};
+    const entries = Object.entries(comps);
+    const alive = entries.filter(([_, v]) => v && v.alive).length;
+    const dead = entries.length - alive;
+    grid.innerHTML = entries.map(([name, v]) => {
+      const ok = !!(v && v.alive);
+      const ageSec = v && v.age_sec != null ? v.age_sec : null;
+      const ageTxt = ageSec == null ? "—" :
+        ageSec < 60 ? `${ageSec}s` :
+        ageSec < 3600 ? `${Math.round(ageSec/60)}m` :
+        `${(ageSec/3600).toFixed(1)}h`;
+      const cls = ok ? "sh-card sh-ok" : "sh-card sh-bad";
+      const dot = ok ? "🟢" : "🔴";
+      return `<div class="${cls}">
+        <div class="sh-dot">${dot}</div>
+        <div class="sh-name">${name}</div>
+        <div class="sh-age">${ok ? "жив" : "мёртв"} · ${ageTxt}</div>
+        ${v && v.pid ? `<div class="sh-pid muted">pid ${v.pid}</div>` : ""}
+      </div>`;
+    }).join("");
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setTxt("sh-total", entries.length);
+    setTxt("sh-alive", alive);
+    setTxt("sh-dead", dead);
+    setTxt("sh-pt-open", (r.paper_trader_summary || {}).open_count ?? "—");
+    setTxt("sh-stk-open", (r.stakan_summary || {}).open_count ?? "—");
+    setTxt("sh-closed", ((r.paper_trader_summary || {}).closed_count ?? 0) + ((r.stakan_summary || {}).closed_count ?? 0));
+    const pill = document.getElementById("sh-summary-pill");
+    if (pill) pill.textContent = `${alive}/${entries.length} живы · ${dead} мертвы`;
+    const warn = document.getElementById("sh-warnings");
+    if (warn) {
+      const deadList = entries.filter(([_, v]) => !v || !v.alive);
+      if (deadList.length > 0) {
+        warn.innerHTML = `<div class="sh-warn">⚠️ Мёртвые: ${deadList.map(([n]) => n).join(", ")}</div>`;
+      } else {
+        warn.innerHTML = "";
+      }
+    }
+  }
+  refreshSystemHealth();
+  setInterval(refreshSystemHealth, 5_000);
+
+  // ─── 2026-05-04: АВТО-СДЕЛКИ ОТ СТАКАНА — paper_trader_stakan ────────────
+  async function refreshStakanAutoTrades() {
+    const openTbody = document.getElementById("mt-stk-open-tbody");
+    const closedTbody = document.getElementById("mt-stk-closed-tbody");
+    if (!openTbody && !closedTbody) return;
+    const [stats, openR, closedR] = await Promise.all([
+      _skFetch("/api/stakan/stats"),
+      _skFetch("/api/stakan/open-trades"),
+      _skFetch("/api/stakan/closed-trades?limit=20"),
+    ]);
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    if (stats) {
+      setTxt("mt-stk-open", stats.open ?? 0);
+      setTxt("mt-stk-closed", stats.closed ?? 0);
+      setTxt("mt-stk-wins", stats.wins ?? 0);
+      setTxt("mt-stk-losses", stats.losses ?? 0);
+      setTxt("mt-stk-wr", stats.win_rate_pct != null ? `${Number(stats.win_rate_pct).toFixed(1)}%` : "—");
+      setTxt("mt-stk-pnl", stats.total_pnl != null ? `${Number(stats.total_pnl).toFixed(2)}$` : "—");
+      const pill = document.getElementById("mt-stk-pill");
+      if (pill) pill.textContent = `WR ${stats.win_rate_pct != null ? Number(stats.win_rate_pct).toFixed(0)+"%" : "—"} · ${stats.closed ?? 0} закр.`;
+    }
+    if (openR && openTbody) {
+      const trades = openR.trades || [];
+      if (trades.length === 0) {
+        openTbody.innerHTML = `<tr><td colspan="7" class="mt-empty">сейчас нет открытых авто-сделок от стакана</td></tr>`;
+      } else {
+        openTbody.innerHTML = trades.map(t => {
+          const side = t.side || "";
+          const sideCls = side === "BUY" ? "mt-buy" : "mt-sell";
+          const opened = t.opened_at ? new Date(t.opened_at).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
+          const expires = t.expires_at ? new Date(t.expires_at).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "—";
+          const cur = t.current_price != null ? _skFmtPrice(t.current_price) : "—";
+          const pnl = t.unrealized_pnl != null ? `${Number(t.unrealized_pnl).toFixed(2)}$` : "—";
+          return `<tr>
+            <td>${t.pair}</td>
+            <td class="${sideCls}">${side}</td>
+            <td>${opened}</td>
+            <td>${_skFmtPrice(t.entry_price)}</td>
+            <td>${expires}</td>
+            <td>${cur}</td>
+            <td>${pnl}</td>
+          </tr>`;
+        }).join("");
+      }
+    }
+    if (closedR && closedTbody) {
+      const trades = (closedR.trades || closedR || []).slice(0, 20);
+      if (trades.length === 0) {
+        closedTbody.innerHTML = `<tr><td colspan="7" class="mt-empty">пока нет закрытых авто-сделок от стакана</td></tr>`;
+      } else {
+        closedTbody.innerHTML = trades.map(t => {
+          const side = t.side || "";
+          const sideCls = side === "BUY" ? "mt-buy" : "mt-sell";
+          const opened = t.opened_at ? new Date(t.opened_at).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
+          const closed = t.closed_at ? new Date(t.closed_at).toLocaleString("ru-RU", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "—";
+          const result = t.result || "?";
+          const resCls = result === "WIN" ? "mt-green" : result === "LOSS" ? "mt-red" : "muted";
+          const pnl = t.pnl != null ? `${Number(t.pnl).toFixed(2)}$` : "—";
+          return `<tr>
+            <td>${t.pair}</td>
+            <td class="${sideCls}">${side}</td>
+            <td>${opened}</td>
+            <td>${closed}</td>
+            <td>${t.strategy_id || "—"}</td>
+            <td class="${resCls}"><b>${result}</b></td>
+            <td>${pnl}</td>
+          </tr>`;
+        }).join("");
+      }
+    }
+  }
+  refreshStakanAutoTrades();
+  setInterval(refreshStakanAutoTrades, 10_000);
+
+  // When user picks a different pair, immediately refresh price + news + stakan
+  // (the existing setInterval still runs in parallel).
+  const _origPicker = _skRefreshDetail;
+  // (no override needed — _skRefreshDetail reads skState.selectedPair which the
+  //  picker click handler updates; price loop reads same; just ensure first
+  //  click triggers fresh price.)
+  document.addEventListener("click", (e) => {
+    const btn = e.target && e.target.closest && e.target.closest(".sk-chip");
+    if (btn && btn.dataset.pair) {
+      _skRefreshLivePrice();
+      _skRefreshNewsWatch();
+    }
+  });
 })();

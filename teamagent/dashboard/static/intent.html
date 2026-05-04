@@ -42,86 +42,19 @@
   <a class="fx-tab" href="/agents"><span class="ico">🤖</span>Агенты</a>
 </nav>
 
-<!-- ═══ ЕДИНОЕ МЕСТО: СДЕЛКИ — открытые + история + WR в одном разделе ═══ -->
-<!-- Раньше пользователь должен был ходить на /trades. Теперь это главный экран. -->
-<section id="main-trades-section" class="fs-multi-section">
-  <div class="fs-multi-header">
-    <h2><span style="font-size:22px">💼</span> СДЕЛКИ — открытые + история в одном месте</h2>
-    <span id="mt-summary-pill" class="fs-summary-pill">…</span>
-  </div>
-  <p class="fs-multi-help">
-    Сразу здесь, на главной — все сделки которые система <b>открыла сама</b> после прогноза
-    (paper-trader, free-70%-gate, $1 ставка, 1–5 ч экспирация, мартингейл 1→2→4→reset).
-    Никуда переходить не нужно: ниже сводка, открытые сейчас, последние закрытые и WR по парам.
-    Полная история (100+) — на странице <a href="/trades" style="color:#9ee2ff">/trades</a>.
-  </p>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Reorg 2026-05-04: пользователь явно попросил оставить ТОЛЬКО 3 раздела:
+    1) ОСНОВНОЙ ПРОГНОЗ — СТАКАН (главный, наверху)
+    2) ИСТОРИЯ + АВТО-СДЕЛКИ
+    3) СОСТОЯНИЕ СИСТЕМЫ
+  Старые разделы (final-signals, ai-narrative, live-analyst, daily-target,
+  fx-controls, fx-grid, fx-deep) обёрнуты в <div hidden> ниже — DOM intact,
+  JS-инициализация не падает, но визуально пользователь видит только 3 секции.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
 
-  <div class="mt-stats" id="mt-stats">
-    <div class="mt-stat"><div class="mt-lbl">Всего</div><div class="mt-val" id="mt-total">…</div></div>
-    <div class="mt-stat"><div class="mt-lbl">Открыто</div><div class="mt-val mt-amber" id="mt-open">…</div></div>
-    <div class="mt-stat"><div class="mt-lbl">WIN</div><div class="mt-val mt-green" id="mt-wins">…</div></div>
-    <div class="mt-stat"><div class="mt-lbl">LOSS</div><div class="mt-val mt-red" id="mt-losses">…</div></div>
-    <div class="mt-stat"><div class="mt-lbl">Win Rate</div><div class="mt-val" id="mt-wr">…</div></div>
-    <div class="mt-stat"><div class="mt-lbl">PnL</div><div class="mt-val" id="mt-pnl">…</div></div>
-  </div>
-
-  <div class="mt-section">
-    <h3>🔓 Открыты сейчас <span class="mt-pill" id="mt-open-count">0</span></h3>
-    <div class="mt-help">
-      Каждая сделка открывается автоматически paper-trader-ом, как только probability ≥ 70%
-      и пара/сессия проходит strict-quorum ансамбль (или fallback на baseline). Live-цена
-      обновляется каждые 30 сек.
-    </div>
-    <div class="mt-table-wrap">
-      <table class="mt-table">
-        <thead>
-          <tr>
-            <th>Пара</th><th>Сторона</th><th>Цена входа</th><th>Открыта</th>
-            <th>До экспирации</th><th>Текущая</th><th>Pips</th><th>Прогноз PnL</th>
-          </tr>
-        </thead>
-        <tbody id="mt-open-tbody">
-          <tr><td colspan="8" class="mt-empty">загружаю открытые сделки…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="mt-section">
-    <h3>📜 Последние закрытые <span class="mt-pill" id="mt-closed-count">0</span></h3>
-    <div class="mt-help">
-      10 последних закрытых сделок. Полная история на /trades. WIN/LOSS — по реальной
-      цене Yahoo Finance на момент экспирации (без симуляторов).
-    </div>
-    <div class="mt-table-wrap">
-      <table class="mt-table">
-        <thead>
-          <tr>
-            <th>Пара</th><th>Сторона</th><th>Открыта</th><th>Закрыта</th>
-            <th>Вероятность</th><th>Стратегия</th><th>Результат</th><th>PnL</th>
-          </tr>
-        </thead>
-        <tbody id="mt-closed-tbody">
-          <tr><td colspan="8" class="mt-empty">загружаю историю…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="mt-section">
-    <h3>📊 Win Rate по парам <span class="mt-pill" id="mt-bypair-meta">…</span></h3>
-    <div class="mt-help">
-      Какие пары надёжно зарабатывают, какие сливают. Зелёным — WR ≥ 70%, красным — &lt; 50%.
-      Это honest-разрез истории: если пара красная — strategy-search её фактически замораживает,
-      и paper-trader перестаёт её открывать (free-70%-gate + ансамбль это ловят).
-    </div>
-    <div class="mt-bypair" id="mt-bypair-grid">
-      <div class="mt-empty">подсчитываю…</div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══ СТАКАН · ORDER BOOK / MARKET DEPTH (2026-05-04) ═══ -->
+<!-- ═══ РАЗДЕЛ 1 · ОСНОВНОЙ ПРОГНОЗ — СТАКАН (2026-05-04) ═══ -->
 <!--
   Главный новый раздел: для каждой из 28 валют показываем стакан,
   крупных игроков, баланс покупатели vs продавцы, направление на 24 часа
@@ -130,14 +63,14 @@
 -->
 <section id="stakan-view-section" class="fs-multi-section">
   <div class="fs-multi-header">
-    <h2><span style="font-size:22px">📊</span> СТАКАН — Order Book · 28 валют · live 10s</h2>
+    <h2><span style="font-size:22px">📊</span> ОСНОВНОЙ ПРОГНОЗ — СТАКАН · 28 валют</h2>
     <span id="sk-summary-pill" class="fs-summary-pill">…</span>
   </div>
   <p class="fs-multi-help">
-    Главный визуальный раздел: <b>стакан, крупные игроки, кто фаворит — покупатели или продавцы</b>,
-    направление на <b>24 часа</b> и основной прогноз на <b>1–5 часов</b> с целью и no-return уровнем.
-    Все 28 пар в селекторе сверху, обновляется каждые <b>10 секунд</b>. Никаких симуляторов —
-    только Yahoo Finance live + ForexFactory + FRED + COT.
+    Это <b>главный прогноз</b> для intraday-торговли: что рынок сделает <b>до 00:00 UTC+5</b>
+    и <b>основной прогноз 1–5 часов</b> от стакана + крупных игроков + 24h-bias.
+    <b style="color:#9ee2ff">Цена обновляется каждые 5 сек</b> · стакан и big-players каждые 10 сек.
+    Никаких симуляторов — только Yahoo Finance live + ForexFactory + FRED + COT.
   </p>
 
   <!-- Grid-селектор всех 28 пар -->
@@ -149,6 +82,11 @@
   <div class="sk-pair-header" id="sk-pair-header">
     <div class="sk-pair-name" id="sk-pair-name">EURUSD</div>
     <div class="sk-pair-price" id="sk-pair-price">—</div>
+    <div class="sk-pair-pulse" id="sk-pair-pulse" title="live price update каждые 5 сек">
+      <span class="sk-pulse-dot"></span>
+      <span class="sk-pulse-txt" id="sk-pair-pulse-txt">live · 5s</span>
+      <span class="sk-pulse-delta" id="sk-pair-pulse-delta">—</span>
+    </div>
     <div class="sk-pair-sub" id="sk-pair-sub">сессия — · стратегия — · WR —</div>
     <div class="sk-pair-badges">
       <span class="sk-badge" id="sk-badge-side">…</span>
@@ -156,6 +94,12 @@
       <span class="sk-badge" id="sk-badge-bias">…</span>
       <span class="sk-badge" id="sk-badge-session">…</span>
     </div>
+  </div>
+
+  <!-- Предупреждение о новостях / макроданных в горизонте сделки 1–5ч -->
+  <div class="sk-news-warning" id="sk-news-warning" hidden>
+    <span class="sk-nw-icon">⚠️</span>
+    <span class="sk-nw-text" id="sk-news-warning-text">…</span>
   </div>
 
   <!-- 3 hero-карточки: 24h bias · 1-5h main forecast · buyers/sellers -->
@@ -238,6 +182,154 @@
   </div>
 </section>
 
+
+<!-- ═══ РАЗДЕЛ 2 (после стакана): СДЕЛКИ + АВТО-СДЕЛКИ ОТ СТАКАНА ═══ -->
+<section id="main-trades-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">💼</span> СДЕЛКИ — открытые + история в одном месте</h2>
+    <span id="mt-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Сразу здесь, на главной — все сделки которые система <b>открыла сама</b> после прогноза
+    (paper-trader, free-70%-gate, $1 ставка, 1–5 ч экспирация, мартингейл 1→2→4→reset).
+    Никуда переходить не нужно: ниже сводка, открытые сейчас, последние закрытые и WR по парам.
+    Полная история (100+) — на странице <a href="/trades" style="color:#9ee2ff">/trades</a>.
+  </p>
+
+  <div class="mt-stats" id="mt-stats">
+    <div class="mt-stat"><div class="mt-lbl">Всего</div><div class="mt-val" id="mt-total">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Открыто</div><div class="mt-val mt-amber" id="mt-open">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">WIN</div><div class="mt-val mt-green" id="mt-wins">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">LOSS</div><div class="mt-val mt-red" id="mt-losses">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Win Rate</div><div class="mt-val" id="mt-wr">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">PnL</div><div class="mt-val" id="mt-pnl">…</div></div>
+  </div>
+
+  <div class="mt-section">
+    <h3>🔓 Открыты сейчас <span class="mt-pill" id="mt-open-count">0</span></h3>
+    <div class="mt-help">
+      Каждая сделка открывается автоматически paper-trader-ом, как только probability ≥ 70%
+      и пара/сессия проходит strict-quorum ансамбль (или fallback на baseline). Live-цена
+      обновляется каждые 30 сек.
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr>
+            <th>Пара</th><th>Сторона</th><th>Цена входа</th><th>Открыта</th>
+            <th>До экспирации</th><th>Текущая</th><th>Pips</th><th>Прогноз PnL</th>
+          </tr>
+        </thead>
+        <tbody id="mt-open-tbody">
+          <tr><td colspan="8" class="mt-empty">загружаю открытые сделки…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-section">
+    <h3>📜 Последние закрытые <span class="mt-pill" id="mt-closed-count">0</span></h3>
+    <div class="mt-help">
+      10 последних закрытых сделок. Полная история на /trades. WIN/LOSS — по реальной
+      цене Yahoo Finance на момент экспирации (без симуляторов).
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr>
+            <th>Пара</th><th>Сторона</th><th>Открыта</th><th>Закрыта</th>
+            <th>Вероятность</th><th>Стратегия</th><th>Результат</th><th>PnL</th>
+          </tr>
+        </thead>
+        <tbody id="mt-closed-tbody">
+          <tr><td colspan="8" class="mt-empty">загружаю историю…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-section">
+    <h3>📊 Win Rate по парам <span class="mt-pill" id="mt-bypair-meta">…</span></h3>
+    <div class="mt-help">
+      Какие пары надёжно зарабатывают, какие сливают. Зелёным — WR ≥ 70%, красным — &lt; 50%.
+      Это honest-разрез истории: если пара красная — strategy-search её фактически замораживает,
+      и paper-trader перестаёт её открывать (free-70%-gate + ансамбль это ловят).
+    </div>
+    <div class="mt-bypair" id="mt-bypair-grid">
+      <div class="mt-empty">подсчитываю…</div>
+    </div>
+  </div>
+
+  <!-- ─── АВТО-СДЕЛКИ ОТ СТАКАНА (paper_trader_stakan) ─── -->
+  <div class="mt-section mt-stakan-section">
+    <h3>🤖 Авто-сделки от СТАКАНА <span class="mt-pill" id="mt-stk-pill">…</span></h3>
+    <div class="mt-help">
+      Эти сделки система открывает <b>сама автоматически</b> когда стакан показывает
+      сильное преимущество одной стороны (≥60% покупателей или продавцов) +
+      согласие 24h-bias и 1–5h-forecast. Источник —
+      <code>paper_trader_stakan</code>, открыто/закрыто &nbsp;
+      <a href="/api/stakan/open-trades" target="_blank" style="color:#9ee2ff">/api/stakan/open-trades</a>,
+      <a href="/api/stakan/closed-trades" target="_blank" style="color:#9ee2ff">/api/stakan/closed-trades</a>.
+    </div>
+    <div class="mt-stk-stats" id="mt-stk-stats">
+      <div class="mt-stat"><div class="mt-lbl">Открыто</div><div class="mt-val mt-amber" id="mt-stk-open">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">Закрыто</div><div class="mt-val" id="mt-stk-closed">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">WIN</div><div class="mt-val mt-green" id="mt-stk-wins">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">LOSS</div><div class="mt-val mt-red" id="mt-stk-losses">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">Win Rate</div><div class="mt-val" id="mt-stk-wr">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">PnL</div><div class="mt-val" id="mt-stk-pnl">…</div></div>
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr><th>Пара</th><th>Сторона</th><th>Открыта</th><th>Цена входа</th><th>Истекает</th><th>Текущая</th><th>Прогноз PnL</th></tr>
+        </thead>
+        <tbody id="mt-stk-open-tbody">
+          <tr><td colspan="7" class="mt-empty">загружаю авто-сделки от стакана…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4 style="margin-top:14px">📜 Последние закрытые автоматом (стакан)</h4>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr><th>Пара</th><th>Сторона</th><th>Открыта</th><th>Закрыта</th><th>Стратегия</th><th>Результат</th><th>PnL</th></tr>
+        </thead>
+        <tbody id="mt-stk-closed-tbody">
+          <tr><td colspan="7" class="mt-empty">загружаю историю авто-сделок…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ РАЗДЕЛ 3 · СОСТОЯНИЕ СИСТЕМЫ — health / heartbeats / процессы ═══ -->
+<section id="system-health-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🩺</span> СОСТОЯНИЕ СИСТЕМЫ — все компоненты live</h2>
+    <span id="sh-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Видно сразу: <b>работает ли всё</b>. Каждый компонент пишет heartbeat-файл; зелёный —
+    жив (last_seen &lt; 10 мин), красный — мёртв. Если что-то не так — система предупредит здесь.
+    Обновляется каждые <b>5 секунд</b>. Источник — <code>/api/health</code>.
+  </p>
+  <div class="sh-grid" id="sh-grid">
+    <div class="sh-empty">опрашиваю heartbeat-и компонентов…</div>
+  </div>
+  <div class="sh-summary">
+    <div class="sh-stat"><div class="sh-lbl">Всего</div><div class="sh-val" id="sh-total">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Живы</div><div class="sh-val sh-green" id="sh-alive">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Мёртвы</div><div class="sh-val sh-red" id="sh-dead">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Open trades (paper)</div><div class="sh-val" id="sh-pt-open">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Open trades (стакан)</div><div class="sh-val" id="sh-stk-open">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Закрыто всего</div><div class="sh-val" id="sh-closed">…</div></div>
+  </div>
+  <div class="sh-warnings" id="sh-warnings"></div>
+</section>
+
+<!-- HIDDEN since 2026-05-04: пользователь оставил только 3 секции, но JS-инициализация всё ещё ссылается на эти DOM-узлы. -->
+<div id="legacy-hidden-sections" hidden style="display:none !important" aria-hidden="true">
 <!-- ═══ ФИНАЛЬНЫЕ ПРОГНОЗЫ ДЛЯ ВСЕХ 28 ПАР — индивидуальный подход ═══ -->
 <section id="final-signals-section" class="fs-multi-section">
   <div class="fs-multi-header">
@@ -350,6 +442,8 @@
   <button class="fx-deep-close" aria-label="Close">×</button>
   <div id="fx-deep-body"></div>
 </dialog>
+</div>
+
 
 <footer class="fx-footer">
   <span>FX INVESTMENT · powered by TeamAgent · auto-refresh каждые 10s</span>

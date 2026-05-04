@@ -49,7 +49,7 @@
   // a new subdomain (Fly free tier rotates them on every machine recreate).
   const LIVE_BACKEND =
     (typeof window.FX_LIVE_BACKEND === "string" && window.FX_LIVE_BACKEND) ||
-    "https://fxinvestment-lbtxlhtb.fly.dev";
+    "https://fxinvestment-nbmuknwe.fly.dev";
 
   // Per-request timeout for the live-backend probe. Keep short so a dead Fly
   // doesn't tax the user — we'll fall through to the baked JSON anyway.
