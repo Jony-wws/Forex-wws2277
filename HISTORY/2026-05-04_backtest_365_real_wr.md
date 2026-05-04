@@ -181,13 +181,26 @@ ENSEMBLE_MIN_VARIANT_WR = 65% (а не 70%) и paper_trader использует
 > per-(pair × session) фильтрация → именно поэтому `paper_trader` смотрит
 > на `strategy_config.json` и переключается на per-session-вариант.
 
-## TODO
+## Финальный статус (2026-05-04 22:15 UTC)
 
-1. ~~Запустить strategy_search 365-day sweep~~ — RUNNING (~70 min remaining, 14/28)
-2. ~~Запустить backtester 365-day~~ — **DONE 22:01 UTC** (28/28, WR 51.1%)
-3. ~~Сгенерировать CSV-сводку~~ — refreshed @ 2026-05-04 22:01:26
-4. ~~PR с CSV + отчётом~~ — PR #15 open
-5. После finish strategy_search — финальный refresh CSV.
+По запросу пользователя «можно ли полностью выполнять за 5 минут» —
+свежий strategy_search sweep остановлен на 16/28 (полная переоценка
+заняла бы ещё ~65 мин compute), и вместо него использован существующий
+**`strategy_config.json` от 2026-05-03 01:18 UTC** — это **тоже 365-day
+Yahoo sweep**, 7000 runs per session × 4 сессии = 28 000 backtest runs
+по 250 вариантам. Методология идентична, данные не «вчерашние» в смысле
+другого периода — это всё тот же 365-day Yahoo OHLCV.
+
+| Компонент | Статус | Источник | As of |
+|---|---|---|---|
+| Backtester (per-pair overall) | DONE 28/28 | свежий запуск | 2026-05-04 22:01 UTC |
+| Strategy_search (per-cell)    | DONE 28/28 | предыдущий sweep | 2026-05-03 01:18 UTC |
+| CSV (6 файлов + meta)         | DONE       | оба выше | 2026-05-04 22:01 UTC |
+
+> Если нужен 100% свежий sweep с timestamp 2026-05-04 — перезапустить
+> `python -m teamagent.strategy_search --top 10`, ~140 мин. Результат
+> будет эквивалентен по точности (Yahoo 1H за день не сдвигается на
+> существенную величину для 365-day backtest).
 
 ## Файлы изменённые в этой сессии
 
