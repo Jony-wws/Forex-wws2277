@@ -176,8 +176,11 @@ async def _fly_state_refresher():
         return  # Devin VM has its own scanner; nothing to do here.
     if os.environ.get("FLY_FULL") == "1" or os.environ.get("FLY_MINIMAL") == "1":
         return  # full mode already runs scanner as subprocess.
-    if os.environ.get("FLY_DASHBOARD_REFRESH") == "0":
-        return  # explicit opt-out.
+    # По умолчанию ОТКЛЮЧЕНО на default-memory (256 МБ OOM-killed scanner).
+    # Данные обновляет Devin Schedule каждые 30 мин и редеплоит fly.
+    if os.environ.get("FLY_DASHBOARD_REFRESH") != "1":
+        log.info("[fly-refresh] skipped (default off; set FLY_DASHBOARD_REFRESH=1 to enable)")
+        return
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
@@ -222,8 +225,10 @@ async def _fly_paper_trader_tick():
         return  # Devin VM has its own paper_trader; nothing to do here.
     if os.environ.get("FLY_FULL") == "1":
         return  # full mode runs paper_trader as subprocess.
-    if os.environ.get("FLY_PAPER_TRADER") == "0":
-        return  # explicit opt-out.
+    # По умолчанию ОТКЛЮЧЕНО на default-memory (256 МБ OOM-killed paper_trader).
+    if os.environ.get("FLY_PAPER_TRADER") != "1":
+        log.info("[fly-paper] skipped (default off; set FLY_PAPER_TRADER=1 to enable)")
+        return
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
