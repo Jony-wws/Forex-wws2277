@@ -287,9 +287,12 @@
     root.addEventListener("click", () => openDeep(pair));
     grid.appendChild(root);
 
-    // Chart (lightweight-charts)
+    // Chart (lightweight-charts) — guarded if library failed to load
     let chart = null, series = null;
     try {
+      if (typeof LightweightCharts === "undefined") {
+        throw new Error("LightweightCharts library not loaded");
+      }
       chart = LightweightCharts.createChart(root.querySelector("[data-chart]"), {
         layout: { background: { color: "transparent" }, textColor: "rgba(149,163,196,.7)", fontSize: 9 },
         grid: { vertLines: { color: "rgba(124,92,255,.06)" }, horzLines: { color: "rgba(124,92,255,.06)" } },
