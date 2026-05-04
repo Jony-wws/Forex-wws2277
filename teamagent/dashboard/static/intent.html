@@ -121,6 +121,123 @@
   </div>
 </section>
 
+<!-- ═══ СТАКАН · ORDER BOOK / MARKET DEPTH (2026-05-04) ═══ -->
+<!--
+  Главный новый раздел: для каждой из 28 валют показываем стакан,
+  крупных игроков, баланс покупатели vs продавцы, направление на 24 часа
+  и основной прогноз 1–5 часов с целью + no-return уровнем. Live-обновление
+  каждые 10 секунд (как TradingView). Источник — /api/stakan-view/{pair}.
+-->
+<section id="stakan-view-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">📊</span> СТАКАН — Order Book · 28 валют · live 10s</h2>
+    <span id="sk-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Главный визуальный раздел: <b>стакан, крупные игроки, кто фаворит — покупатели или продавцы</b>,
+    направление на <b>24 часа</b> и основной прогноз на <b>1–5 часов</b> с целью и no-return уровнем.
+    Все 28 пар в селекторе сверху, обновляется каждые <b>10 секунд</b>. Никаких симуляторов —
+    только Yahoo Finance live + ForexFactory + FRED + COT.
+  </p>
+
+  <!-- Grid-селектор всех 28 пар -->
+  <div class="sk-pair-picker" id="sk-pair-picker" role="tablist" aria-label="Выбор валютной пары">
+    <div class="sk-empty">загружаю 28 валют…</div>
+  </div>
+
+  <!-- Шапка выбранной пары: цена, сессия, бейджи -->
+  <div class="sk-pair-header" id="sk-pair-header">
+    <div class="sk-pair-name" id="sk-pair-name">EURUSD</div>
+    <div class="sk-pair-price" id="sk-pair-price">—</div>
+    <div class="sk-pair-sub" id="sk-pair-sub">сессия — · стратегия — · WR —</div>
+    <div class="sk-pair-badges">
+      <span class="sk-badge" id="sk-badge-side">…</span>
+      <span class="sk-badge" id="sk-badge-prob">…</span>
+      <span class="sk-badge" id="sk-badge-bias">…</span>
+      <span class="sk-badge" id="sk-badge-session">…</span>
+    </div>
+  </div>
+
+  <!-- 3 hero-карточки: 24h bias · 1-5h main forecast · buyers/sellers -->
+  <div class="sk-hero-grid">
+    <div class="sk-hero" id="sk-hero-24h">
+      <div class="sk-hero-title">Прогноз на 24 часа</div>
+      <div class="sk-hero-arrow" id="sk-24h-arrow">…</div>
+      <div class="sk-hero-direction" id="sk-24h-direction">…</div>
+      <div class="sk-hero-conf" id="sk-24h-conf">уверенность —</div>
+      <div class="sk-hero-bar"><div class="sk-hero-bar-fill" id="sk-24h-bar"></div></div>
+      <ul class="sk-hero-reasons" id="sk-24h-reasons"></ul>
+    </div>
+
+    <div class="sk-hero sk-hero-main" id="sk-hero-5h">
+      <div class="sk-hero-title">ОСНОВНОЙ ПРОГНОЗ 1–5 часов</div>
+      <div class="sk-hero-side" id="sk-5h-side">…</div>
+      <div class="sk-hero-row"><span>Вход</span><b id="sk-5h-entry">—</b></div>
+      <div class="sk-hero-row"><span>Цель</span><b id="sk-5h-target">—</b></div>
+      <div class="sk-hero-row"><span>No-return</span><b id="sk-5h-noreturn">—</b></div>
+      <div class="sk-hero-row"><span>Горизонт</span><b id="sk-5h-hours">—</b></div>
+      <div class="sk-hero-row"><span>Вероятность</span><b id="sk-5h-prob">—</b></div>
+      <div class="sk-hero-explain" id="sk-5h-explain">—</div>
+    </div>
+
+    <div class="sk-hero" id="sk-hero-bs">
+      <div class="sk-hero-title">Покупатели vs Продавцы</div>
+      <div class="sk-bs-bar">
+        <div class="sk-bs-buy" id="sk-bs-buy">50%</div>
+        <div class="sk-bs-sell" id="sk-bs-sell">50%</div>
+      </div>
+      <div class="sk-bs-fav" id="sk-bs-fav">баланс</div>
+      <div class="sk-bs-help">
+        Считаем по volume profile + big-players (≥80-percentile объёма) ниже/выше текущей цены.
+        Чем больше доля — тем сильнее давление этой стороны.
+      </div>
+    </div>
+  </div>
+
+  <!-- Стакан + крупные игроки -->
+  <div class="sk-mid-grid">
+    <div class="sk-orderbook" id="sk-orderbook">
+      <div class="sk-ob-header">
+        <h3>Стакан · Volume Profile</h3>
+        <div class="sk-ob-legend">
+          <span class="sk-ob-pin sk-ob-poc">POC</span>
+          <span class="sk-ob-pin sk-ob-vah">VAH</span>
+          <span class="sk-ob-pin sk-ob-val">VAL</span>
+          <span class="sk-ob-pin sk-ob-cur">текущая</span>
+        </div>
+      </div>
+      <div class="sk-ob-body" id="sk-ob-body">
+        <div class="sk-empty">строю стакан…</div>
+      </div>
+    </div>
+
+    <div class="sk-bigplayers" id="sk-bigplayers">
+      <h3>🐋 Крупные игроки</h3>
+      <p class="sk-bigplayers-help">
+        Уровни с объёмом ≥80-percentile за последние ~24 часа — там «киты»
+        оставили свои ордера. Поддержка <span style="color:#4afaa3">снизу</span>,
+        сопротивление <span style="color:#ff8090">сверху</span>.
+      </p>
+      <div class="sk-bp-list" id="sk-bp-list">
+        <div class="sk-empty">ищу институциональные уровни…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-session strategy table: «особый подход» по каждой сессии -->
+  <div class="sk-strategy" id="sk-strategy">
+    <h3>Особый подход — стратегия по сессиям</h3>
+    <p class="sk-strategy-help">
+      Своя стратегия для каждой сессии (Asia · London · Overlap · NY) на 365-дневном
+      backtest. Зелёный — WR ≥ 70% (paper-trader будет открывать). Жёлтый — 60–70%
+      (нужен ансамбль). Красный — &lt; 60% (заморожен).
+    </p>
+    <div class="sk-strategy-grid" id="sk-strategy-grid">
+      <div class="sk-empty">…</div>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ ФИНАЛЬНЫЕ ПРОГНОЗЫ ДЛЯ ВСЕХ 28 ПАР — индивидуальный подход ═══ -->
 <section id="final-signals-section" class="fs-multi-section">
   <div class="fs-multi-header">

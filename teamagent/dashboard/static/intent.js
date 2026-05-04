@@ -1211,4 +1211,308 @@
   }
   refreshMainTrades();
   setInterval(refreshMainTrades, 30 * 1000);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // СТАКАН · Order Book section (2026-05-04)
+  // ═══════════════════════════════════════════════════════════════════════
+  // Новый главный раздел: 28 валют в селекторе, для каждой — стакан, крупные
+  // игроки, баланс buyers/sellers, прогноз на 24 часа, основной прогноз
+  // 1–5 часов с целью + no-return уровнем. Live-обновление каждые 10 сек.
+  // Источник — /api/stakan-view/{pair} и /api/stakan-view (всё компактно).
+  const SK_DEFAULT_PAIR = "EURUSD";
+  const SK_REFRESH_MS = 10_000;
+  const SK_PAIRS_28 = [
+    "EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD",
+    "EURGBP","EURJPY","EURCHF","EURAUD","EURCAD","EURNZD",
+    "GBPJPY","GBPCHF","GBPAUD","GBPCAD","GBPNZD",
+    "AUDJPY","CADJPY","CHFJPY","NZDJPY",
+    "AUDCAD","AUDCHF","AUDNZD","CADCHF","NZDCAD","NZDCHF",
+  ];
+
+  const skState = {
+    selectedPair: SK_DEFAULT_PAIR,
+    summary: null,    // /api/stakan-view -> all 28
+    detail: null,     // /api/stakan-view/{pair}
+    timer: null,
+  };
+
+  function _skFmtPrice(p) {
+    if (p == null || !isFinite(p)) return "—";
+    const n = Number(p);
+    return n >= 50 ? n.toFixed(3) : n.toFixed(5);
+  }
+  function _skFmtPct(p, d=1) {
+    if (p == null || !isFinite(p)) return "—";
+    return Number(p).toFixed(d) + "%";
+  }
+  function _skFmtPips(p) {
+    if (p == null || !isFinite(p)) return "—";
+    return Number(p).toFixed(0) + " pips";
+  }
+  async function _skFetch(url) {
+    try {
+      const r = await fetch(abs(url), { cache: "no-store", credentials: "include" });
+      if (!r.ok) throw new Error(`${url} → ${r.status}`);
+      return await r.json();
+    } catch (e) {
+      console.warn("sk-fetch failed", url, e);
+      return null;
+    }
+  }
+
+  function _skRenderPicker() {
+    const grid = document.getElementById("sk-pair-picker");
+    if (!grid) return;
+    const items = (skState.summary && skState.summary.items) || [];
+    const byPair = new Map(items.map(it => [it.pair, it]));
+    const html = SK_PAIRS_28.map(p => {
+      const it = byPair.get(p) || {};
+      const side = it.side || "";
+      const prob = it.probability_pct;
+      const wr = it.session_wr_pct;
+      const isQual = !!it.session_qualifies_70pct;
+      const cls = [
+        "sk-chip",
+        p === skState.selectedPair ? "active" : "",
+        side === "BUY" ? "side-buy" : side === "SELL" ? "side-sell" : "",
+        isQual ? "qual" : "",
+      ].filter(Boolean).join(" ");
+      const probTxt = prob != null ? _skFmtPct(prob, 0) : "—";
+      const wrTxt = wr != null ? `WR ${_skFmtPct(wr, 0)}` : "WR —";
+      return `<button class="${cls}" data-pair="${p}" role="tab" aria-selected="${p === skState.selectedPair}">
+        <span class="sk-chip-pair">${p}</span>
+        <span class="sk-chip-side">${side || "·"}</span>
+        <span class="sk-chip-prob">${probTxt}</span>
+        <span class="sk-chip-wr">${wrTxt}</span>
+      </button>`;
+    }).join("");
+    grid.innerHTML = html;
+    grid.querySelectorAll(".sk-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        skState.selectedPair = btn.dataset.pair;
+        try { localStorage.setItem("sk_pair", skState.selectedPair); } catch (_) {}
+        _skRefreshDetail();
+        // re-render picker active state immediately
+        grid.querySelectorAll(".sk-chip").forEach(b => {
+          b.classList.toggle("active", b.dataset.pair === skState.selectedPair);
+          b.setAttribute("aria-selected", b.dataset.pair === skState.selectedPair);
+        });
+      });
+    });
+    const summary = document.getElementById("sk-summary-pill");
+    if (summary && skState.summary) {
+      const sess = skState.summary.current_session || "—";
+      const qualCount = items.filter(x => x.session_qualifies_70pct).length;
+      summary.textContent = `сессия ${sess} · ${qualCount}/${items.length} ≥70% WR`;
+    }
+  }
+
+  function _skRenderHeader(d) {
+    const f = d.forecast || {};
+    const strat = d.per_session_strategy || {};
+    document.getElementById("sk-pair-name").textContent = d.pair;
+    document.getElementById("sk-pair-price").textContent = _skFmtPrice(d.current_price);
+    const wr = strat.win_rate_pct;
+    const wrTxt = wr != null ? _skFmtPct(wr) : "—";
+    document.getElementById("sk-pair-sub").textContent =
+      `сессия ${d.current_session || "—"} · стратегия ${strat.best_variant || "—"} · WR ${wrTxt}`;
+
+    const sideEl = document.getElementById("sk-badge-side");
+    const probEl = document.getElementById("sk-badge-prob");
+    const biasEl = document.getElementById("sk-badge-bias");
+    const sessEl = document.getElementById("sk-badge-session");
+
+    sideEl.textContent = f.side ? `сигнал ${f.side}` : "сигнал —";
+    sideEl.className = "sk-badge " + (f.side === "BUY" ? "buy" : f.side === "SELL" ? "sell" : "");
+    probEl.textContent = `prob ${_skFmtPct(f.probability_pct, 0)}`;
+    probEl.className = "sk-badge " + ((f.probability_pct ?? 0) >= 70 ? "ok" : "warn");
+    const bias = (d.bias_24h && d.bias_24h.direction) || "—";
+    biasEl.textContent = `24h ${bias}`;
+    biasEl.className = "sk-badge " + (bias === "UP" ? "buy" : bias === "DOWN" ? "sell" : "");
+    sessEl.textContent = strat.qualifies_70pct ? "QUALIFIED 70%+" : "не qualified";
+    sessEl.className = "sk-badge " + (strat.qualifies_70pct ? "ok" : "warn");
+  }
+
+  function _skRender24h(d) {
+    const b = d.bias_24h || {};
+    const arrow = document.getElementById("sk-24h-arrow");
+    const dir = document.getElementById("sk-24h-direction");
+    const conf = document.getElementById("sk-24h-conf");
+    const bar = document.getElementById("sk-24h-bar");
+    const reasons = document.getElementById("sk-24h-reasons");
+    const direction = b.direction || "FLAT";
+    const c = Number(b.confidence_pct ?? 50);
+    if (direction === "UP") {
+      arrow.textContent = "▲";
+      arrow.className = "sk-hero-arrow up";
+      dir.textContent = "РОСТ";
+    } else if (direction === "DOWN") {
+      arrow.textContent = "▼";
+      arrow.className = "sk-hero-arrow down";
+      dir.textContent = "ПАДЕНИЕ";
+    } else {
+      arrow.textContent = "—";
+      arrow.className = "sk-hero-arrow flat";
+      dir.textContent = "ФЛЭТ";
+    }
+    conf.textContent = `уверенность ${c.toFixed(0)}%`;
+    bar.style.width = `${Math.max(0, Math.min(100, c))}%`;
+    bar.className = "sk-hero-bar-fill " + (direction === "UP" ? "up" : direction === "DOWN" ? "down" : "");
+    const why = b.reasoning || [];
+    reasons.innerHTML = why.map(w => `<li>${w}</li>`).join("");
+  }
+
+  function _skRender5h(d) {
+    const m = d.main_forecast_5h || {};
+    const sideEl = document.getElementById("sk-5h-side");
+    sideEl.textContent = m.side || "—";
+    sideEl.className = "sk-hero-side " + (m.side === "BUY" ? "buy" : m.side === "SELL" ? "sell" : "");
+    document.getElementById("sk-5h-entry").textContent = _skFmtPrice(m.entry_price);
+    document.getElementById("sk-5h-target").textContent =
+      m.target_price != null ? `${_skFmtPrice(m.target_price)} (${_skFmtPips(m.target_pips)})` : "—";
+    document.getElementById("sk-5h-noreturn").textContent =
+      m.no_return_price != null ? `${_skFmtPrice(m.no_return_price)} (${_skFmtPips(m.no_return_pips)})` : "—";
+    document.getElementById("sk-5h-hours").textContent = m.hours != null ? `${m.hours} ч` : "—";
+    document.getElementById("sk-5h-prob").textContent = _skFmtPct(m.probability_pct, 0);
+    document.getElementById("sk-5h-explain").textContent = m.explain_ru || "—";
+  }
+
+  function _skRenderBuyersSellers(d) {
+    const bs = d.buyers_vs_sellers || {};
+    const buy = Number(bs.buyers_pct ?? 50);
+    const sell = Number(bs.sellers_pct ?? 50);
+    const buyEl = document.getElementById("sk-bs-buy");
+    const sellEl = document.getElementById("sk-bs-sell");
+    buyEl.style.flex = `${buy} 0 0`;
+    sellEl.style.flex = `${sell} 0 0`;
+    buyEl.textContent = `${buy.toFixed(0)}% покупают`;
+    sellEl.textContent = `${sell.toFixed(0)}% продают`;
+    const fav = document.getElementById("sk-bs-fav");
+    if (bs.favorite === "buyers") {
+      fav.textContent = "🟢 фаворит — покупатели";
+      fav.className = "sk-bs-fav fav-buy";
+    } else if (bs.favorite === "sellers") {
+      fav.textContent = "🔴 фаворит — продавцы";
+      fav.className = "sk-bs-fav fav-sell";
+    } else {
+      fav.textContent = "🟡 баланс — паритет";
+      fav.className = "sk-bs-fav fav-neutral";
+    }
+  }
+
+  function _skRenderOrderBook(d) {
+    const body = document.getElementById("sk-ob-body");
+    const vp = d.volume_profile || {};
+    const buckets = (vp.buckets || []).slice();
+    if (!buckets.length) {
+      body.innerHTML = `<div class="sk-empty">нет данных volume profile</div>`;
+      return;
+    }
+    // sort price descending so highest at top
+    buckets.sort((a, b) => Number(b.price) - Number(a.price));
+    const cur = Number(vp.current_price ?? d.current_price ?? 0);
+    const poc = Number(vp.poc ?? -1);
+    const vah = Number(vp.vah ?? -1);
+    const val = Number(vp.val ?? -1);
+    const maxW = buckets.reduce((m, b) => Math.max(m, Number(b.weight_pct) || 0), 0) || 1;
+
+    let curInjected = false;
+    const rows = buckets.map((b, i) => {
+      const price = Number(b.price);
+      const w = Number(b.weight_pct || 0);
+      const widthPct = (w / maxW) * 100;
+      const isAbove = price > cur;
+      const tag = price === poc ? `<span class="sk-ob-pin sk-ob-poc">POC</span>` :
+                  price === vah ? `<span class="sk-ob-pin sk-ob-vah">VAH</span>` :
+                  price === val ? `<span class="sk-ob-pin sk-ob-val">VAL</span>` : "";
+      const next = buckets[i + 1];
+      let curRow = "";
+      if (!curInjected && next && cur <= price && cur >= Number(next.price)) {
+        curRow = `<div class="sk-ob-cur-line"><span>${_skFmtPrice(cur)}</span><span class="sk-ob-pin sk-ob-cur">текущая</span></div>`;
+        curInjected = true;
+      }
+      return `<div class="sk-ob-row ${isAbove ? "above" : "below"}">
+        <div class="sk-ob-price">${_skFmtPrice(price)} ${tag}</div>
+        <div class="sk-ob-bar"><div class="sk-ob-bar-fill" style="width:${widthPct.toFixed(1)}%"></div></div>
+        <div class="sk-ob-pct">${w.toFixed(2)}%</div>
+      </div>${curRow}`;
+    }).join("");
+    body.innerHTML = rows || `<div class="sk-empty">нет уровней</div>`;
+  }
+
+  function _skRenderBigPlayers(d) {
+    const list = document.getElementById("sk-bp-list");
+    const bps = (d.volume_profile && d.volume_profile.big_players) || [];
+    if (!bps.length) {
+      list.innerHTML = `<div class="sk-empty">сейчас нет ярких уровней (≥80-percentile объёма)</div>`;
+      return;
+    }
+    const cur = Number(d.current_price || 0);
+    const sorted = bps.slice().sort((a, b) => Number(b.weight_pct) - Number(a.weight_pct));
+    list.innerHTML = sorted.slice(0, 12).map(bp => {
+      const above = Number(bp.price) > cur;
+      const cls = above ? "sk-bp sk-bp-resist" : "sk-bp sk-bp-support";
+      const label = above ? "сопротивление" : "поддержка";
+      return `<div class="${cls}">
+        <div class="sk-bp-row1"><span class="sk-bp-label">${label}</span><b>${_skFmtPrice(bp.price)}</b></div>
+        <div class="sk-bp-row2">
+          <span>вес ${Number(bp.weight_pct || 0).toFixed(2)}%</span>
+          <span>${above ? "↑" : "↓"} ${cur ? Math.abs(Number(bp.price) - cur).toFixed(5) : "—"}</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function _skRenderStrategy(d) {
+    const grid = document.getElementById("sk-strategy-grid");
+    const strat = d.per_session_strategy || {};
+    const all = strat.all_sessions || [];
+    if (!all.length) {
+      grid.innerHTML = `<div class="sk-empty">strategy_config ещё не подгружен</div>`;
+      return;
+    }
+    grid.innerHTML = all.map(s => {
+      const wr = Number(s.win_rate_pct || 0);
+      const cls = s.qualifies_70pct ? "ok" : (wr >= 60 ? "warn" : "bad");
+      const isCurrent = s.session === d.current_session;
+      return `<div class="sk-strat ${cls} ${isCurrent ? 'current' : ''}">
+        <div class="sk-strat-name">${s.session}${isCurrent ? " · сейчас" : ""}</div>
+        <div class="sk-strat-wr">${wr ? wr.toFixed(1) + "%" : "—"} <span class="sk-strat-trades">${s.trades || 0} сделок</span></div>
+        <div class="sk-strat-variant" title="${s.best_label || ""}">${s.best_variant || "—"}</div>
+      </div>`;
+    }).join("");
+  }
+
+  async function _skRefreshDetail() {
+    const pair = skState.selectedPair;
+    const d = await _skFetch(`/api/stakan-view/${pair}`);
+    if (!d || d.error) return;
+    skState.detail = d;
+    _skRenderHeader(d);
+    _skRender24h(d);
+    _skRender5h(d);
+    _skRenderBuyersSellers(d);
+    _skRenderOrderBook(d);
+    _skRenderBigPlayers(d);
+    _skRenderStrategy(d);
+  }
+
+  async function _skRefreshSummary() {
+    const s = await _skFetch("/api/stakan-view");
+    if (!s) return;
+    skState.summary = s;
+    _skRenderPicker();
+  }
+
+  async function refreshStakanView() {
+    await Promise.all([_skRefreshSummary(), _skRefreshDetail()]);
+  }
+
+  // Initial load + 10-sec live refresh
+  try {
+    const saved = localStorage.getItem("sk_pair");
+    if (saved && SK_PAIRS_28.includes(saved)) skState.selectedPair = saved;
+  } catch (_) {}
+  refreshStakanView();
+  skState.timer = setInterval(refreshStakanView, SK_REFRESH_MS);
 })();

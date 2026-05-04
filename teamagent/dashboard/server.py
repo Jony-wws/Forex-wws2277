@@ -35,6 +35,7 @@ from .. import paper_trader
 from .. import paper_trader_stakan
 from .. import live_analyst as live_analyst_mod
 from .. import regime as regime_mod
+from .. import stakan_view as stakan_view_mod
 
 log = logging.getLogger("dashboard")
 logging.basicConfig(
@@ -754,6 +755,28 @@ def api_volume_profile(pair: str):
     if pair not in config.PAIRS:
         raise HTTPException(400, f"unknown pair {pair}")
     return vp_mod.build(pair)
+
+
+# ────────── СТАКАН view (Order Book / Market Depth, added 2026-05-04) ──────────
+# Объединяет volume_profile + forecast + 24h bias + 1-5h main forecast + buyers/
+# sellers split + per-(pair, session) стратегию в один JSON для нового раздела
+# «СТАКАН» на главной странице. Источник правды — те же state/*.json, что
+# уже обновляются forecast_scanner-ом раз в 5 мин; на фронте опрашивается
+# каждые 10 сек по требованию пользователя ("должно быть точно как
+# tradingview, обновлять каждые 10 секунд").
+
+@app.get("/api/stakan-view/{pair}")
+def api_stakan_view_pair(pair: str):
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {pair}")
+    return stakan_view_mod.build_view(pair)
+
+
+@app.get("/api/stakan-view")
+def api_stakan_view_all():
+    """Компактный snapshot 28 пар для selector-сетки в разделе СТАКАН."""
+    return stakan_view_mod.build_all_summary()
 
 
 # ────────── Strategy "Стакан" (parallel system, added 2026-05-01) ──────────
