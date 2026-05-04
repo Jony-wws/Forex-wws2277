@@ -303,7 +303,37 @@
       return _jsonResponse(_clientMarketStatus());
     }
 
-    // 2) Try the live Fly backend first.
+    // 2) Same-origin live first (this fixes local FastAPI dashboards where
+    //    /api/* actually exists on the same host — without this the shim
+    //    would skip them and try Fly + baked JSON, both of which fail).
+    //    We only treat the request as "same-origin live" if the URL
+    //    targets the page's own origin AND it's not a static-build mirror
+    //    deploy (the mirror has no /api/ routes — only ./api/X.json files).
+    const isSameOrigin = u.origin === window.location.origin;
+    const looksLikeStaticMirror =
+      window.location.hostname.endsWith(".devinapps.com") ||
+      window.location.protocol === "file:";
+    if (isSameOrigin && !looksLikeStaticMirror) {
+      try {
+        const r = await _origFetch(input, init);
+        if (r.ok) {
+          const text = await r.text();
+          return new Response(text, {
+            status: 200,
+            headers: {
+              "Content-Type":
+                r.headers.get("Content-Type") || "application/json",
+              "X-FX-Source": "same-origin",
+            },
+          });
+        }
+        // Fall through to live/baked if same-origin returns non-2xx.
+      } catch (_e) {
+        // Fall through to live/baked.
+      }
+    }
+
+    // 3) Try the live Fly backend.
     try {
       const r = await _liveFetch(u);
       // Tag the response so dashboards can show "live" indicator.
@@ -316,7 +346,7 @@
         },
       });
     } catch (_e) {
-      // 3) Fall back to baked JSON.
+      // 4) Fall back to baked JSON.
       try {
         const r2 = await _bakedFetch(u);
         if (!r2.ok) throw new Error("baked HTTP " + r2.status);

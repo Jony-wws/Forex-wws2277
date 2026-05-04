@@ -37,7 +37,7 @@
     linear-gradient(90deg, rgba(0,225,255,.04) 1px, transparent 1px) 0 0/40px 40px,
     radial-gradient(ellipse at top, var(--fx-bg2) 0%, var(--fx-bg) 70%);
   pointer-events: none;
-  z-index: 0;
+  z-index: -1; /* sits behind all in-flow sections — fixes new sections being hidden */
 }
 .bg-aura {
   position: fixed;
@@ -46,7 +46,7 @@
   filter: blur(120px);
   opacity: .35;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1; /* same — keep below in-flow sections */
   animation: float 22s ease-in-out infinite alternate;
 }
 .aura-cyan { top: -200px; right: -200px; background: radial-gradient(circle, var(--fx-accent) 0%, transparent 60%); }
@@ -935,4 +935,98 @@ body.fx-mood-wait .bg-aura.aura-violet {
     50%      { transform: translate(-2vw,-1vh) scale(1.03); }
   }
   .fs-grid { grid-template-columns: 1fr; }
+}
+
+/* ═══════════ LIVE ANALYST + DAILY TARGET (2026-05-03) ═══════════ */
+.live-analyst-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.la-card {
+  background: rgba(20, 27, 50, 0.6);
+  border: 1px solid rgba(124, 92, 255, 0.14);
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.42;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 140px;
+}
+.la-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+}
+.la-pair {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.la-verdict {
+  font-size: 18px;
+}
+.la-meta {
+  font-size: 12px;
+  color: #9aa6c8;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.la-status-storm   { color: #4afaa3; }   /* STORM_PROOF */
+.la-status-qualif  { color: #4afaa3; }
+.la-status-prob    { color: #ffce5e; }
+.la-status-frozen  { color: #ff8090; }
+.la-status-insuff  { color: #9aa6c8; }
+.la-narrative {
+  font-size: 12.5px;
+  color: #d8def0;
+  line-height: 1.5;
+}
+
+.daily-target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.dt-card {
+  background: rgba(20, 27, 50, 0.6);
+  border: 1px solid rgba(124, 92, 255, 0.14);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dt-pair {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  justify-content: space-between;
+}
+.dt-count {
+  font-size: 14px;
+}
+.dt-bar {
+  height: 6px;
+  background: rgba(124, 92, 255, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.dt-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00e1ff, #7c5cff);
+  transition: width .4s ease;
+}
+.dt-fill.dt-on-target {
+  background: linear-gradient(90deg, #4afaa3, #00e1ff);
+}
+
+@media (max-width: 480px) {
+  .live-analyst-grid { grid-template-columns: 1fr; }
 }

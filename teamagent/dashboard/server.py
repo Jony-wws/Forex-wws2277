@@ -33,6 +33,8 @@ from ..data import yahoo
 from .. import volume_profile as vp_mod
 from .. import paper_trader
 from .. import paper_trader_stakan
+from .. import live_analyst as live_analyst_mod
+from .. import regime as regime_mod
 
 log = logging.getLogger("dashboard")
 logging.basicConfig(
@@ -582,6 +584,123 @@ def api_strategy_config():
         config.STATE_DIR / "strategy_config.json",
         {"as_of": None, "pairs": {}, "summary": {}},
     )
+
+
+@app.get("/api/playbook")
+def api_playbook():
+    """Per-(pair × session × regime) playbook. 28×4×4 = 448 ячеек.
+
+    Каждая ячейка имеет:
+      - status: STORM_PROOF | QUALIFIED | PROBABLE | FROZEN | INSUFFICIENT
+      - wr_pct, wilson_lower_pct, n_trades, side_bias
+      - worst_30d_wr_pct + storm_proof flag (резистентность к кризисам)
+    """
+    return _load(
+        config.STATE_DIR / "playbook.json",
+        {
+            "as_of": None,
+            "summary": {
+                "total_cells": 0,
+                "storm_proof": 0,
+                "qualified": 0,
+                "probable": 0,
+                "frozen": 0,
+                "insufficient": 0,
+                "note": "playbook not built yet — run `python -m teamagent.playbook`",
+            },
+            "cells": [],
+            "pairs": {},
+        },
+    )
+
+
+@app.get("/api/analyst/{pair}")
+def api_analyst(pair: str):
+    """🧠 Живой AI-аналитик для одной пары — мысли в реальном времени."""
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(404, f"unknown pair: {pair}")
+    try:
+        return live_analyst_mod.live_analyst(pair)
+    except Exception as e:
+        log.exception(f"analyst {pair} failed: {e}")
+        raise HTTPException(500, f"analyst error: {e}")
+
+
+@app.get("/api/analyst")
+def api_analyst_all():
+    """🧠 Живой AI-аналитик ПО ВСЕМ 28 парам сразу — для UI-карусели."""
+    try:
+        items = live_analyst_mod.live_analyst_all()
+    except Exception as e:
+        log.exception(f"analyst-all failed: {e}")
+        raise HTTPException(500, f"analyst-all error: {e}")
+    return JSONResponse({
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "count": len(items),
+        "items": items,
+    })
+
+
+@app.get("/api/regime/{pair}")
+def api_regime(pair: str):
+    """Текущий режим пары (Hurst + ATR%-percentile + EMA-stack)."""
+    pair = pair.upper()
+    if pair not in config.PAIRS:
+        raise HTTPException(404, f"unknown pair: {pair}")
+    try:
+        bars = yahoo.fetch(pair, interval="1h", period="3mo")
+    except Exception as e:
+        raise HTTPException(503, f"yahoo error: {e}")
+    if bars is None or bars.empty:
+        return {"pair": pair, "regime": None, "note": "no bars"}
+    return {"pair": pair, **regime_mod.regime_summary(bars)}
+
+
+@app.get("/api/daily-target")
+def api_daily_target():
+    """Дневной таргет: 5 сделок/день на каждую из 28 пар.
+
+    Считает сделки (paper_trader открытые/закрытые сегодня UTC) per pair.
+    Поле missing — на сколько недобираем до 5.
+    """
+    today = datetime.now(timezone.utc).date()
+    closed = _load(config.STATE_DIR / "closed_trades.json", [])
+    open_trades = _load(config.STATE_DIR / "open_trades.json", [])
+    counts: dict[str, int] = {p: 0 for p in config.PAIRS}
+    for t in list(closed) + list(open_trades):
+        opened_at = t.get("opened_at") or t.get("ts_open") or ""
+        if not opened_at:
+            continue
+        try:
+            d = datetime.fromisoformat(opened_at.replace("Z", "+00:00")).astimezone(timezone.utc).date()
+        except Exception:
+            continue
+        if d == today:
+            pair = t.get("pair")
+            if pair in counts:
+                counts[pair] += 1
+    items = []
+    target = 5
+    for p in config.PAIRS:
+        c = counts.get(p, 0)
+        items.append({
+            "pair": p,
+            "count": c,
+            "target": target,
+            "missing": max(0, target - c),
+            "on_target": c >= target,
+            "pct": min(100.0, c / target * 100.0) if target else 0.0,
+        })
+    on_target = sum(1 for x in items if x["on_target"])
+    return JSONResponse({
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "date_utc": today.isoformat(),
+        "target_per_pair": target,
+        "on_target_count": on_target,
+        "total_pairs": len(config.PAIRS),
+        "items": items,
+    })
 
 
 @app.get("/api/forecast/{pair}")

@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/intent.css">
-<script src="./lightweight-charts.standalone.production.js"></script>
+<script src="/static/lightweight-charts.standalone.production.js"></script>
 <script src="/static/fx-ux.js" defer></script>
 </head>
 <body class="intent-body">
@@ -74,6 +74,39 @@
   </p>
   <div id="ai-narrative-text" class="fs-card" style="white-space:pre-wrap;line-height:1.55;font-size:15px">
     <span class="muted">Запрашиваю комментарий у AI-аналитика…</span>
+  </div>
+</section>
+
+<!-- ═══ ЖИВОЙ AI-АНАЛИТИК — мысли в реальном времени по 28 парам ═══ -->
+<section id="live-analyst-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🧠</span> ЖИВОЙ AI-АНАЛИТИК — мысли в реальном времени</h2>
+    <span id="live-analyst-summary" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Поток мыслей по каждой из 28 пар: текущий <b>режим</b> (Hurst + ATR%-percentile + EMA-stack),
+    <b>сессия</b>, <b>playbook-ячейка</b> (STORM_PROOF / QUALIFIED / PROBABLE / FROZEN / INSUFFICIENT)
+    и финальное «открываем сделку или ждём». Обновляется каждые 30 сек. Это — РЕАЛЬНЫЕ мысли движка
+    на текущем баре, без выдумок.
+  </p>
+  <div id="live-analyst-grid" class="live-analyst-grid">
+    <div class="muted">Запрашиваю мысли движка…</div>
+  </div>
+</section>
+
+<!-- ═══ ДНЕВНОЙ ТАРГЕТ 5 СДЕЛОК НА ПАРУ ═══ -->
+<section id="daily-target-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🎯</span> ДНЕВНОЙ ТАРГЕТ — 5 сделок/день на каждую из 28 пар</h2>
+    <span id="daily-target-summary" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Прогресс по дневной цели «<b>5 сделок на каждую пару каждый день</b>». Если меньше — система
+    НЕ форсирует мусорные сделки, а честно показывает прогресс. Пары без 5/5 = «жду подходящих
+    условий по сессии/режиму/probability ≥ 70%».
+  </p>
+  <div id="daily-target-grid" class="daily-target-grid">
+    <div class="muted">Считаю сделки за сегодня…</div>
   </div>
 </section>
 

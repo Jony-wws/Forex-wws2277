@@ -207,17 +207,55 @@ function setClock() {
   el.textContent = `${utc} UTC`;
 }
 
+function renderPlaybook(pb) {
+  const grid = $("tr-playbook-grid");
+  const meta = $("tr-playbook-meta");
+  if (!grid) return;
+  if (!pb || !pb.summary || !pb.summary.total_cells) {
+    grid.innerHTML = `<div class="muted">${(pb && pb.summary && pb.summary.note) || "playbook ещё строится…"}</div>`;
+    if (meta) meta.textContent = "—";
+    return;
+  }
+  const s = pb.summary;
+  if (meta) {
+    meta.textContent = `${s.total_cells} ячеек · 🛡️${s.storm_proof || 0} · ✓${s.qualified || 0} · ${s.probable || 0}prob · ${s.frozen || 0}frozen`;
+  }
+  const cells = Array.isArray(pb.cells) ? pb.cells.slice() : [];
+  cells.sort((a, b) => {
+    const order = { STORM_PROOF: 0, QUALIFIED: 1, PROBABLE: 2, FROZEN: 3, INSUFFICIENT: 4 };
+    return (order[a.status] ?? 5) - (order[b.status] ?? 5)
+        || (b.wr_pct || 0) - (a.wr_pct || 0);
+  });
+  grid.innerHTML = "";
+  for (const c of cells) {
+    const wrCls = c.wr_pct >= 70 ? "win" : c.wr_pct < 50 ? "loss" : "";
+    const stormBadge = c.storm_proof ? "🛡️ " : "";
+    const div = document.createElement("div");
+    div.className = `tr-pair-cell ${wrCls}`;
+    div.innerHTML = `
+      <span class="name">${stormBadge}${c.pair} · ${c.session}</span>
+      <span class="muted small">${c.regime}</span>
+      <span class="wr">${(c.wr_pct ?? 0).toFixed(0)}%</span>
+      <span class="muted small">n=${c.n_trades || 0} · Wilson≥${(c.wilson_lower_pct ?? 0).toFixed(0)}%</span>
+      <span class="muted small">${c.side_bias || ""} · ${c.status}</span>
+    `;
+    grid.appendChild(div);
+  }
+}
+
 async function refresh() {
   setStatus(true, "обновляю…");
-  const [stats, open, closed] = await Promise.all([
+  const [stats, open, closed, playbook] = await Promise.all([
     fetchJson("/api/stats", {}),
     fetchJson("/api/open-trades", { trades: [], count: 0 }),
     fetchJson("/api/closed-trades?limit=100", { trades: [], count: 0 }),
+    fetchJson("/api/playbook", { summary: {}, cells: [] }),
   ]);
   renderStats(stats || {}, open ? open.count : 0);
   renderOpenTrades(open || {});
   renderClosedHistory(closed || {});
   renderByPair(closed || {});
+  renderPlaybook(playbook || {});
   setStatus(true, "live");
   // build stamp
   if (stats && stats.as_of) {
