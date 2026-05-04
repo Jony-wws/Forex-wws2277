@@ -11,6 +11,7 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 | event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
 |---|---:|---:|---|---:|---:|---:|
 | cb_rate_decision | 7 | -18.4 | up | 71% | 51% | 29% |
+| jp_unemp | 2 | +67.0 | down | 100% | 81% | 0% |
 
 ## London (07-12 UTC)
 - significant moves (>1.5σ): **24** of 251 cells (9.6%)

@@ -14,6 +14,7 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 
 | event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
 |---|---:|---:|---|---:|---:|---:|
+| ca_unemp | 2 | -29.7 | down | 100% | 72% | 0% |
 | cb_rate_decision | 1 | +23.2 | down | 100% | 12% | 0% |
 
 ## Overlap (13-16 UTC)
@@ -24,6 +25,7 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 
 | event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
 |---|---:|---:|---|---:|---:|---:|
+| ca_unemp | 2 | +3.6 | up | 50% | 52% | 0% |
 | cb_rate_decision | 1 | +18.4 | up | 100% | 67% | 0% |
 
 ## NY (17-21 UTC)
