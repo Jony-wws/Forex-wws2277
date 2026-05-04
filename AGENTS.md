@@ -264,12 +264,20 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-nbmuknwe.fly.dev/`** (canonical, 2026-05-04)
-Old (still alive but pre-3-section reorg): `https://fxinvestment-lbtxlhtb.fly.dev/`
+**`https://fxinvestment-jwodwfwy.fly.dev/`** (canonical, 2026-05-04 — feature-branch
+deploy of the «STAKAN-only» institutional verdict UI; будет канонической после
+merge PR #14 в `devin/1777586006-teamagent-rebuild`).
+
+Старые:
+- `https://fxinvestment-nbmuknwe.fly.dev/` (pre-stakan-only, 3-section UI)
+- `https://fxinvestment-lbtxlhtb.fly.dev/` (pre-3-section reorg)
 
 - No login. No password. Just open it.
 - Routes:
-  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts,
+  - `/` и `/stakan` → **STAKAN-only**: только селектор 28 пар + БОЛЬШОЙ
+    институциональный вердикт (КУПИТЬ / ПРОДАТЬ / СКОРЕЕ / ОЖИДАНИЕ) +
+    Volume-Profile-стакан + крупные игроки + live-цена (5–10 сек).
+  - `/intent` → cinematic FX INVESTMENT landing (legacy, 28 pairs, charts,
     pressure bars, currency strength heatmap, СТАКАН раздел, 10-sec refresh).
   - `/system` → audit dashboard (heartbeats, agents, paper-trader stats,
     closed-trades history).

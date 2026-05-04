@@ -11,7 +11,13 @@ description: |
 
 ## Live URL (canonical)
 
-`https://fxinvestment-nbmuknwe.fly.dev/`
+`https://fxinvestment-jwodwfwy.fly.dev/` (с 2026-05-04 — STAKAN-only UI на
+ветке PR #14; станет окончательно канонической после merge в
+`devin/1777586006-teamagent-rebuild`).
+
+Старые:
+- `https://fxinvestment-nbmuknwe.fly.dev/` (pre-stakan-only)
+- `https://fxinvestment-lbtxlhtb.fly.dev/` (pre-3-section reorg)
 
 If a redeploy assigns a different subdomain, update **both** this file
 and `AGENTS.md` "Where to find the user's data".
