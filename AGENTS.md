@@ -270,12 +270,13 @@ AGENTS.md секцию «PERMANENT URL».
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-ytjmvlnz.fly.dev/`** (canonical, 2026-05-04 — feature-branch
+**`https://fxinvestment-kwotgqny.fly.dev/`** (canonical, 2026-05-04 — feature-branch
 deploy of the «STAKAN-only» institutional verdict UI после правок «нигде не
 должно быть ОЖИДАНИЕ + min 70%»; будет канонической после merge PR #14
 в `devin/1777586006-teamagent-rebuild`).
 
 Старые:
+- `https://fxinvestment-ytjmvlnz.fly.dev/` (pre-30-min-refresh canonical)
 - `https://fxinvestment-jwodwfwy.fly.dev/` (pre-«no-ОЖИДАНИЕ» STAKAN-only)
 - `https://fxinvestment-nbmuknwe.fly.dev/` (pre-stakan-only, 3-section UI)
 - `https://fxinvestment-lbtxlhtb.fly.dev/` (pre-3-section reorg)
