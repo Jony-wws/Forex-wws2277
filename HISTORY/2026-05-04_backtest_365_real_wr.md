@@ -164,14 +164,30 @@ ENSEMBLE_MIN_VARIANT_WR = 65% (а не 70%) и paper_trader использует
 > Подтверждение: ни одного синтетического / mock / fake / искусственного
 > источника данных. Все цены, все trades, все WR-проценты — из Yahoo OHLCV.
 
+## Backtester 28/28 done (refresh @ 2026-05-04 22:01 UTC)
+
+Совокупный результат за 365 дней (31 858 сделок, 28 пар, $50 stake / 85% payout):
+
+| Метрика | Значение |
+|---|---|
+| trades | 31 858 |
+| wins | 16 270 |
+| WR | **51.07%** |
+| qualified ≥70% pairs | 0 / 28 |
+| breakeven WR (85% payout) | 54.05% |
+
+> **Вывод**: голая `forecast_scanner.evaluate_pair` без per-session
+> strategy_search **системно теряет деньги** на 365д. Всем 28 парам нужна
+> per-(pair × session) фильтрация → именно поэтому `paper_trader` смотрит
+> на `strategy_config.json` и переключается на per-session-вариант.
+
 ## TODO
 
-1. ~~Запустить strategy_search 365-day sweep~~ — running (~140 min total)
-2. ~~Запустить backtester 365-day prog~~ — running (~70 min total)
-3. ~~Сгенерировать CSV-сводку~~ — done из существующего state (refresh после finish)
-4. PR с CSV + отчётом + ссылкой на live деплой
-5. После finish обоих процессов — `scripts/generate_backtest_report.py`
-   повторно для refresh CSV из новых данных.
+1. ~~Запустить strategy_search 365-day sweep~~ — RUNNING (~70 min remaining, 14/28)
+2. ~~Запустить backtester 365-day~~ — **DONE 22:01 UTC** (28/28, WR 51.1%)
+3. ~~Сгенерировать CSV-сводку~~ — refreshed @ 2026-05-04 22:01:26
+4. ~~PR с CSV + отчётом~~ — PR #15 open
+5. После finish strategy_search — финальный refresh CSV.
 
 ## Файлы изменённые в этой сессии
 
