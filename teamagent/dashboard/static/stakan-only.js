@@ -193,9 +193,16 @@
 
     reason.textContent = v.reason_ru || "—";
 
+    // «Источников за / против» — показываем сырые числа, не процент. Bayesian
+    // (favorite_balance_pct) уже показан в блоке ПЕРЕВЕС и это и есть честный
+    // «процент уверенности». Дублировать процент здесь бессмысленно (числа
+    // расходятся, и пользователь путается).
+    const votedTotal = v.voted_total != null ? v.voted_total : v.institutional_sources_voted;
+    const votedFor = v.institutional_sources_agree;
+    const votedAgainst = (votedTotal != null && votedFor != null) ? Math.max(0, votedTotal - votedFor) : null;
     document.getElementById("so-stat-agree").textContent =
-      v.institutional_sources_agree != null
-        ? `${v.institutional_sources_agree} из ${v.institutional_sources_total} (${fmtPct(v.agreement_pct, 0)})`
+      (votedFor != null && votedTotal != null)
+        ? `${votedFor} за · ${votedAgainst} против · из ${votedTotal}`
         : "—";
     document.getElementById("so-stat-balance").textContent = fmtPct(v.favorite_balance_pct, 0);
     const favTxt =

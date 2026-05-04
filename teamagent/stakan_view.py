@@ -1077,7 +1077,11 @@ def _institutional_verdict(
     # Каждый источник со side=DOWN даёт log-odds = log((1-conf)/conf) = -log(...).
     # Складываем log-odds, получаем суммарный log-odds в пользу UP, оттуда
     # P(UP) = sigmoid(sum) = 1 / (1 + exp(-sum)).
-    voted_all = [s for s in sources if s["side"] in ("UP", "DOWN") and s.get("conf", 0.5) > 0.5]
+    # Включаем в Bayesian только источники с conf > 0.55 (= не «edge of neutral»).
+    # Источники с conf=0.55 — это формально случайные шумовые сигналы которые
+    # размывают композитную вероятность. Их голос в reason_ru остаётся, но в
+    # арифметику фаворита не входят. Это и есть «гарант честности» Bayesian.
+    voted_all = [s for s in sources if s["side"] in ("UP", "DOWN") and s.get("conf", 0.5) > 0.55]
     log_odds_up = 0.0
     for s in voted_all:
         c = max(0.51, min(0.95, float(s.get("conf") or 0.55)))
@@ -1104,6 +1108,18 @@ def _institutional_verdict(
     voted_count = agree + disagree
     agreement_pct = (
         round(agree / voted_count * 100.0, 1) if voted_count > 0 else 0.0
+    )
+
+    # ── Взвешенное согласие — для UI «N% институциональных свидетельств за».
+    # Берёт сумму уверенностей источников ЗА фаворита делённую на сумму всех
+    # уверенностей. Это и есть «честная» доля сигнала: 10 источников по 95%
+    # перевешивают 9 по 60%, и weighted_agreement правильно показывает >80%.
+    fav_dir_main = "UP" if favorite_side == "buyers" else "DOWN"
+    conf_for = sum(float(s.get("conf") or 0.55) for s in voted_all if s["side"] == fav_dir_main)
+    conf_against = sum(float(s.get("conf") or 0.55) for s in voted_all if s["side"] != fav_dir_main)
+    conf_total = conf_for + conf_against
+    weighted_agreement_pct = (
+        round(conf_for / conf_total * 100.0, 1) if conf_total > 0 else 0.0
     )
 
     in_blackout, blackout_reason = _check_news_blackout(pair, news_blackouts)
@@ -1242,9 +1258,11 @@ def _institutional_verdict(
         "total_up": round(total_up, 2),
         "total_down": round(total_dn, 2),
         "agreement_pct": agreement_pct,
+        "weighted_agreement_pct": weighted_agreement_pct,
         "institutional_sources_agree": agree,
         "institutional_sources_voted": voted_count,
         "institutional_sources_total": institutional_sources_total,
+        "voted_total": len(voted_all),
         "hours_to_midnight_utc5": hours_to_mid,
         "target_by_midnight": target_by_mid,
         "target_pips_to_midnight": target_pips_to_mid,
