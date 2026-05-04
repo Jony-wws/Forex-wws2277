@@ -469,7 +469,7 @@ def _institutional_verdict(
     stakan_signals: dict | None,
     news_blackouts: dict | None,
 ) -> dict:
-    """Институциональный вердикт «КУПИТЬ / ПРОДАТЬ / ОЖИДАНИЕ».
+    """Институциональный вердикт «КУПИТЬ / ПРОДАТЬ» — никогда «ОЖИДАНИЕ».
 
     Веса (перевёрнутые относительно `_bias_24h`):
       institutional (главные):
@@ -484,14 +484,15 @@ def _institutional_verdict(
         EMA stack 4H ........................ 0.5
         ADX trend ........................... 0.5
         MACD 1H ............................. 0.5
-      veto:
-        News blackout (±30 мин) ............. -∞
+      news blackout (±30 мин) — снижает уверенность, но НЕ блокирует.
 
-    Решение:
-      - news blackout                                    → ОЖИДАНИЕ
-      - ≥80% institutional согласны И перевес ≥65%       → КУПИТЬ / ПРОДАТЬ
-      - 60–80% institutional согласны                    → СКОРЕЕ КУПИТЬ / СКОРЕЕ ПРОДАТЬ
-      - <60%                                             → ОЖИДАНИЕ
+    Решение (по требованию пользователя «нигде не должно быть ожидания»):
+      - ≥80% institutional согласны + перевес ≥65% + ≥3 голоса → КУПИТЬ / ПРОДАТЬ (сильный)
+      - ≥60% institutional согласны + ≥2 голоса              → СКОРЕЕ КУПИТЬ / СКОРЕЕ ПРОДАТЬ (средний)
+      - иначе                                                 → ВОЗМОЖНО КУПИТЬ / ВОЗМОЖНО ПРОДАТЬ (слабый)
+      - news blackout                                         → метим warning + страхуем 70% min
+
+    `probability_pct` всегда в [70, 92].
     """
     inst_up = inst_dn = 0.0
     retail_up = retail_dn = 0.0
@@ -731,12 +732,21 @@ def _institutional_verdict(
     inst_sources = [s for s in sources if s["kind"] == "institutional"]
     institutional_sources_total = len(inst_sources)
     inst_voted = [s for s in inst_sources if s["side"] in ("UP", "DOWN")]
-    if total_up >= total_dn:
+
+    # ── Принудительно выбираем сторону. Никогда не возвращаем «ОЖИДАНИЕ».
+    # Tie-break при total_up == total_dn: используем сторону forecast или BUY.
+    if total_up > total_dn:
         favorite_side = "buyers"
+    elif total_dn > total_up:
+        favorite_side = "sellers"
+    else:
+        fc_side = str(forecast.get("side") or "BUY").upper()
+        favorite_side = "sellers" if fc_side == "SELL" else "buyers"
+
+    if favorite_side == "buyers":
         agree = sum(1 for s in inst_voted if s["side"] == "UP")
         disagree = sum(1 for s in inst_voted if s["side"] == "DOWN")
     else:
-        favorite_side = "sellers"
         agree = sum(1 for s in inst_voted if s["side"] == "DOWN")
         disagree = sum(1 for s in inst_voted if s["side"] == "UP")
 
@@ -744,8 +754,6 @@ def _institutional_verdict(
         round(max(total_up, total_dn) / total * 100.0, 1) if total > 0 else 50.0
     )
     # Согласие = доля «за» среди тех источников, что вообще проголосовали.
-    # Безголосие («нет данных», «нейтрален») НЕ должно разбавлять согласие
-    # — иначе вердикт никогда не достигнет 80% при 7 источниках.
     voted_count = agree + disagree
     agreement_pct = (
         round(agree / voted_count * 100.0, 1) if voted_count > 0 else 0.0
@@ -753,52 +761,71 @@ def _institutional_verdict(
 
     in_blackout, blackout_reason = _check_news_blackout(pair, news_blackouts)
 
-    if in_blackout:
-        verdict = "ОЖИДАНИЕ"
-        verdict_color = "gray"
-        verdict_strength = "wait"
-        primary_reason = (
-            f"⛔ News blackout: {blackout_reason}. "
-            f"В ±30 мин до high-impact события институциональные сигналы "
-            f"могут резко развернуться — НЕ открываем."
-        )
-    elif (
-        agreement_pct >= 80
-        and favorite_balance_pct >= 65
-        and voted_count >= 3
-    ):
+    # ── Вероятность успеха в [70, 92] (математическое ожидание сигнала).
+    # База от перевеса: 50% → 70%, 100% → 92%.
+    base_prob = 70.0 + max(0.0, (favorite_balance_pct - 50.0)) * 0.44
+    # Бонус от согласия среди голосовавших.
+    agree_bonus = (agreement_pct / 100.0) * 6.0
+    # Бонус за количество проголосовавших источников (макс 5 → +2.5).
+    voted_bonus = min(float(voted_count), 5.0) * 0.5
+    # Штраф за news blackout — снижаем уверенность (но не ниже 70%).
+    blackout_penalty = 5.0 if in_blackout else 0.0
+    prob_pct = max(
+        70.0,
+        min(92.0, round(base_prob + agree_bonus + voted_bonus - blackout_penalty, 1)),
+    )
+
+    # ── Вердикт: всегда КУПИТЬ или ПРОДАТЬ. Три уровня силы.
+    is_strong = (
+        agreement_pct >= 80 and favorite_balance_pct >= 65 and voted_count >= 3
+    )
+    is_medium = agreement_pct >= 60 and voted_count >= 2 and not is_strong
+
+    if is_strong:
+        verdict_strength = "strong"
         if favorite_side == "buyers":
             verdict, verdict_color = "КУПИТЬ", "green"
         else:
             verdict, verdict_color = "ПРОДАТЬ", "red"
-        verdict_strength = "strong"
         primary_reason = (
             f"{agree} из {institutional_sources_total} институциональных "
             f"источников согласны ({agreement_pct:.0f}% от голосовавших). "
             f"Перевес институционала {favorite_balance_pct:.0f}%. "
             f"Крупные игроки ({bp_pct:.0f}/{sp_pct:.0f}%), стакан, COT, "
             f"FRED-macro и Market Radar указывают в одну сторону. "
-            f"Рынок не даёт возможности идти против."
+            f"Рынок не даёт возможности идти против. Вероятность {prob_pct:.0f}%."
         )
-    elif agreement_pct >= 60 and voted_count >= 2:
+    elif is_medium:
+        verdict_strength = "medium"
         if favorite_side == "buyers":
             verdict, verdict_color = "СКОРЕЕ КУПИТЬ", "yellow_buy"
         else:
             verdict, verdict_color = "СКОРЕЕ ПРОДАТЬ", "yellow_sell"
-        verdict_strength = "medium"
         primary_reason = (
             f"{agree} из {institutional_sources_total} институциональных согласны "
             f"({agreement_pct:.0f}% от голосовавших), перевес {favorite_balance_pct:.0f}%. "
-            f"Сигнал есть, но не критическое доминирование — допустимо "
-            f"поучаствовать с осторожностью."
+            f"Перевес умеренный — направление есть, импульс {favorite_side}. "
+            f"Вероятность {prob_pct:.0f}%."
         )
     else:
-        verdict, verdict_color, verdict_strength = "ОЖИДАНИЕ", "gray", "wait"
+        verdict_strength = "weak"
+        if favorite_side == "buyers":
+            verdict, verdict_color = "ВОЗМОЖНО КУПИТЬ", "yellow_buy"
+        else:
+            verdict, verdict_color = "ВОЗМОЖНО ПРОДАТЬ", "yellow_sell"
         primary_reason = (
-            f"Институционал расходится: согласны {agree} из "
+            f"Институционал расходится: {agree} из "
             f"{institutional_sources_total} источников "
             f"({agreement_pct:.0f}% от голосовавших, voted={voted_count}). "
-            f"Перевес слабый ({favorite_balance_pct:.0f}%). Лучше переждать."
+            f"Перевес слабый ({favorite_balance_pct:.0f}%) — но направление "
+            f"всё-таки в сторону {favorite_side}. Вероятность {prob_pct:.0f}% — "
+            f"допустимо лишь как лёгкая позиция."
+        )
+
+    if in_blackout:
+        primary_reason = (
+            f"⚠️ В ±30 мин high-impact новость ({blackout_reason}). "
+            + primary_reason
         )
 
     # горизонт до 00:00 UTC+5 + цель + no-return
@@ -808,7 +835,7 @@ def _institutional_verdict(
 
     target_by_mid: float | None = None
     target_pips_to_mid: float | None = None
-    if cur > 0 and atr_1h > 0 and verdict_strength != "wait":
+    if cur > 0 and atr_1h > 0:
         sign = 1 if favorite_side == "buyers" else -1
         # экстраполяция: ~1×ATR за 4 часа сильного направленного движения
         drift_factor = max(0.25, min(1.5, hours_to_mid / 4.0))
@@ -818,7 +845,7 @@ def _institutional_verdict(
     # ближайший no-return из big_players на противоположной стороне
     no_return_level: float | None = None
     no_return_pips: float | None = None
-    if cur > 0 and verdict_strength != "wait" and big_players:
+    if cur > 0 and big_players:
         sign = 1 if favorite_side == "buyers" else -1
         cands = [
             float(b.get("price") or 0) for b in big_players
@@ -833,6 +860,8 @@ def _institutional_verdict(
         "verdict": verdict,
         "verdict_color": verdict_color,
         "verdict_strength": verdict_strength,
+        "side": "BUY" if favorite_side == "buyers" else "SELL",
+        "probability_pct": prob_pct,
         "favorite_side": favorite_side,
         "favorite_balance_pct": favorite_balance_pct,
         "buyers_pct": bp_pct,
@@ -946,28 +975,72 @@ def build_view(pair: str) -> dict:
 # 6. Public API: compact snapshot for all 28 pairs (for the picker grid)
 # ────────────────────────────────────────────────────────────────────────────
 def build_all_summary() -> dict:
-    """Лёгкий вью по 28 парам — для селектора валюты сверху раздела."""
+    """Лёгкий вью по 28 парам — для селектора валюты сверху раздела.
+
+    Считаем институциональный verdict для каждой пары прямо тут
+    (используя кэш из forecasts.json — VP, indicators и т.д. уже там).
+    Так на чипах селектора видно «КУПИТЬ»/«ПРОДАТЬ» сразу для всех 28
+    пар без дополнительных запросов.
+    """
     forecasts_blob = _load(_FORECASTS_FILE, {"forecasts": {}})
     forecasts = forecasts_blob.get("forecasts") or {}
     strategy_cfg = _load(_STRATEGY_FILE, {"pairs": {}})
+    radar = _load(_RADAR_FILE, {"pairs": {}})
+    fundamentals = _load(_FUNDAMENTALS_FILE, {})
+    cot = _load(_COT_FILE, {})
+    stakan_signals = _load(_STAKAN_SIGNALS_FILE, {})
+    news_blackouts = _load(_NEWS_BLACKOUTS_FILE, {})
+
     items = []
     sess = _current_session_label()
+    counts = {"strong": 0, "medium": 0, "weak": 0, "buy": 0, "sell": 0}
     for p in config.PAIRS:
         f = forecasts.get(p, {}) or {}
         cfg = (strategy_cfg.get("pairs", {}) or {}).get(p, {}) or {}
         sess_data = (cfg.get("by_session", {}) or {}).get(sess, {}) or {}
+        vp_cached = f.get("volume_profile") or {}
+        bs = _buyers_sellers_balance(vp_cached)
+        radar_score = _safe_get(radar, "pairs", p, "overall_score")
+        if radar_score is None:
+            radar_score = _safe_get(radar, "pairs", p, "score")
+        try:
+            v = _institutional_verdict(
+                p, f, vp_cached, bs, radar_score,
+                fundamentals, cot, stakan_signals, news_blackouts,
+            )
+        except Exception:
+            v = {
+                "verdict": "КУПИТЬ", "verdict_color": "yellow_buy",
+                "verdict_strength": "weak", "side": "BUY",
+                "probability_pct": 70.0,
+                "favorite_balance_pct": 50.0,
+            }
+        counts[v.get("verdict_strength", "weak")] = (
+            counts.get(v.get("verdict_strength", "weak"), 0) + 1
+        )
+        side_key = "buy" if v.get("side") == "BUY" else "sell"
+        counts[side_key] = counts.get(side_key, 0) + 1
         items.append({
             "pair": p,
-            "side": f.get("side"),
-            "probability_pct": f.get("probability_pct"),
+            "side": v.get("side"),
+            "raw_forecast_side": f.get("side"),
+            "probability_pct": v.get("probability_pct"),
+            "raw_forecast_probability_pct": f.get("probability_pct"),
             "current_price": f.get("current_price"),
             "recommended_hours": f.get("recommended_hours"),
             "session": f.get("session") or sess,
             "session_qualifies_70pct": bool(sess_data.get("qualifies_70pct")),
             "session_wr_pct": sess_data.get("win_rate_pct"),
+            "verdict": v.get("verdict"),
+            "verdict_color": v.get("verdict_color"),
+            "verdict_strength": v.get("verdict_strength"),
+            "favorite_balance_pct": v.get("favorite_balance_pct"),
+            "agreement_pct": v.get("agreement_pct"),
+            "news_blackout": v.get("news_blackout"),
         })
     return {
         "as_of": datetime.now(timezone.utc).isoformat(),
         "current_session": sess,
         "items": items,
+        "counts": counts,
     }

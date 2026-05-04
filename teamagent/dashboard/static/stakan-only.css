@@ -86,12 +86,28 @@ body {
 .so-chip-side { font-size: 10px; font-weight: 700; }
 .so-chip-side.buy  { color: #4afaa3; }
 .so-chip-side.sell { color: #ff8090; }
-.so-chip-verdict { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
+.so-chip-verdict { font-size: 10px; font-weight: 800; letter-spacing: 0.4px; line-height: 1.2; }
 .so-chip-verdict.green     { color: #4afaa3; }
 .so-chip-verdict.red       { color: #ff6979; }
-.so-chip-verdict.yellow_buy,
-.so-chip-verdict.yellow_sell { color: #ffce5e; }
+.so-chip-verdict.yellow_buy  { color: #fbe05a; }
+.so-chip-verdict.yellow_sell { color: #ffaa70; }
 .so-chip-verdict.gray      { color: #6f7e96; }
+.so-chip-prob {
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+.so-chip-prob.buy  { background: rgba(74,250,163,0.12); color: #4afaa3; }
+.so-chip-prob.sell { background: rgba(255,128,144,0.12); color: #ff8090; }
+/* highlight chips by side */
+.so-chip:has(.so-chip-verdict.green) { border-color: rgba(74,250,163,0.35); }
+.so-chip:has(.so-chip-verdict.red) { border-color: rgba(255,105,121,0.35); }
+.so-chip:has(.so-chip-verdict.yellow_buy) { border-color: rgba(251,224,90,0.30); }
+.so-chip:has(.so-chip-verdict.yellow_sell) { border-color: rgba(255,170,112,0.30); }
 
 /* ── Pair bar (текущая пара + live-цена) ─────────────────────────── */
 .so-pair-bar {
@@ -206,6 +222,7 @@ body {
 }
 .so-verdict-strength.strong { color: #ffffff; border-color: currentColor; }
 .so-verdict-strength.medium { color: #ffce5e; border-color: rgba(255,206,94,0.55); }
+.so-verdict-strength.weak   { color: #ffaa70; border-color: rgba(255,170,112,0.45); }
 .so-verdict-strength.wait   { color: #6f7e96; }
 
 .so-verdict-text {

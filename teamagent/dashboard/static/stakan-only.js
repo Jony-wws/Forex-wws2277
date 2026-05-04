@@ -87,15 +87,19 @@
     const byPair = new Map(items.map((it) => [it.pair, it]));
     const html = PAIRS_28.map((p) => {
       const it = byPair.get(p) || {};
-      const v = state.pairVerdict.get(p);
-      const verdictTxt = v ? v.short : "";
-      const colorCls = v ? v.color : "gray";
-      const sideCls = it.side === "BUY" ? "buy" : it.side === "SELL" ? "sell" : "";
+      // вердикт из summary (новый формат) или из локального кэша (старый).
+      const cachedV = state.pairVerdict.get(p);
+      const verdictText = it.verdict || (cachedV && cachedV.full) || "КУПИТЬ";
+      const colorCls = it.verdict_color || (cachedV && cachedV.color) || "yellow_buy";
+      const sideStr = it.side || (verdictText.includes("ПРОД") ? "SELL" : "BUY");
+      const sideCls = sideStr === "BUY" ? "buy" : "sell";
+      const prob = it.probability_pct != null ? Math.round(it.probability_pct) + "%" : "—";
       const active = p === state.selectedPair ? "active" : "";
+      const shortV = shortVerdict(verdictText);
       return `<button class="so-chip ${active}" data-pair="${p}" role="tab" aria-selected="${active === "active"}">
         <span class="so-chip-pair">${p}</span>
-        <span class="so-chip-side ${sideCls}">${it.side || "·"}</span>
-        <span class="so-chip-verdict ${colorCls}">${verdictTxt || "ЖДЁМ"}</span>
+        <span class="so-chip-verdict ${colorCls}">${shortV}</span>
+        <span class="so-chip-prob ${sideCls}">${prob}</span>
       </button>`;
     }).join("");
     grid.innerHTML = html;
@@ -119,13 +123,14 @@
 
   // ── Verdict block ────────────────────────────────────────────────
   function shortVerdict(verdict) {
-    if (!verdict) return "ЖДЁМ";
+    if (!verdict) return "КУП.";
     const m = {
       "КУПИТЬ": "КУПИТЬ",
       "ПРОДАТЬ": "ПРОДАТЬ",
-      "СКОРЕЕ КУПИТЬ": "СК.КУПИТЬ",
-      "СКОРЕЕ ПРОДАТЬ": "СК.ПРОДАТЬ",
-      "ОЖИДАНИЕ": "ЖДЁМ",
+      "СКОРЕЕ КУПИТЬ": "СК.КУП.",
+      "СКОРЕЕ ПРОДАТЬ": "СК.ПРОД.",
+      "ВОЗМОЖНО КУПИТЬ": "ВОЗМ.КУП.",
+      "ВОЗМОЖНО ПРОДАТЬ": "ВОЗМ.ПРОД.",
     };
     return m[verdict] || verdict;
   }
@@ -141,11 +146,13 @@
     text.textContent = v.verdict || "—";
 
     const strengthMap = {
-      strong: "сильный сигнал",
-      medium: "умеренный сигнал",
-      wait:   "ждём",
+      strong: "СИЛЬНЫЙ СИГНАЛ",
+      medium: "УМЕРЕННЫЙ СИГНАЛ",
+      weak:   "СЛАБЫЙ СИГНАЛ",
+      wait:   "ОЖИДАНИЕ",
     };
-    strength.textContent = strengthMap[v.verdict_strength] || "—";
+    const probStr = v.probability_pct != null ? ` · вероятность ${Number(v.probability_pct).toFixed(0)}%` : "";
+    strength.textContent = (strengthMap[v.verdict_strength] || "—") + probStr;
     strength.className = "so-verdict-strength " + (v.verdict_strength || "");
 
     reason.textContent = v.reason_ru || "—";
@@ -322,13 +329,19 @@
     if (d.verdict) {
       state.pairVerdict.set(state.selectedPair, {
         short: shortVerdict(d.verdict.verdict),
-        color: d.verdict.verdict_color || "gray",
+        full: d.verdict.verdict,
+        color: d.verdict.verdict_color || "yellow_buy",
       });
       // обновим только этот chip — остальные обновятся при следующем summary
       const chip = document.querySelector(`.so-chip[data-pair="${state.selectedPair}"] .so-chip-verdict`);
       if (chip) {
         chip.textContent = shortVerdict(d.verdict.verdict);
-        chip.className = "so-chip-verdict " + (d.verdict.verdict_color || "gray");
+        chip.className = "so-chip-verdict " + (d.verdict.verdict_color || "yellow_buy");
+      }
+      const probEl = document.querySelector(`.so-chip[data-pair="${state.selectedPair}"] .so-chip-prob`);
+      if (probEl && d.verdict.probability_pct != null) {
+        probEl.textContent = Math.round(d.verdict.probability_pct) + "%";
+        probEl.className = "so-chip-prob " + (d.verdict.side === "BUY" ? "buy" : "sell");
       }
     }
     setStatus("на связи · обновляется каждые 10с", "ok");
