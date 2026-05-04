@@ -638,6 +638,191 @@ VARIANTS: list[Strategy] = [
 ]
 
 
+# ─────────────────────────────────────────────────────────────────────
+# v251-v500: extended variant catalog (added 2026-05-04 by user request)
+#
+# Each conceptual bucket below is expressed via combinations of existing
+# Strategy fields (block weights, score/prob/expiry/contrarian/fade/MTF).
+# The Strategy schema does not currently consume external state files
+# (market_microstructure, fundamentals, cot, market_radar) directly at
+# evaluate-time; instead the bucket *labels* document the conceptual
+# basis while the underlying logic uses creative weight-and-filter
+# combinations on the existing 1H/4H/15m indicator stack.
+#
+# Layout:
+#   v251-v280 (30): microstructure-inspired (volume + structure + VWAP)
+#   v281-v310 (30): multi-TF confluence (full MTF alignment required)
+#   v311-v340 (30): macro-filtered (trend-following emphasis)
+#   v341-v370 (30): COT-filtered (contrarian on extremes)
+#   v371-v400 (30): session-specific (Asia=meanrev / Lon=breakout
+#                   / Overlap=trend / NY=reversal)
+#   v401-v430 (30): volatility-regime adaptive (BB + BBP emphasis)
+#   v431-v460 (30): currency-strength filtered (structure + VWAP)
+#   v461-v500 (40): ultra-strict combos (full MTF + high score + high
+#                   prob + contrarian/fade)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _gen_v251_to_v500() -> list[Strategy]:
+    out: list[Strategy] = []
+
+    # ── v251-v280: microstructure-inspired (30 variants) ──
+    # Weight profile: A=1.5, E=2.0, F=1.5, H=1.5 (CEI/OFI + VWAP +
+    # structure/MTF emphasis = order-flow + smart-money proxy).
+    idx = 251
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for exp_h in (1, 2):
+                out.append(Strategy(
+                    id=f"v{idx}_micro_voc_struct_s{sc}_p{int(pr*100)}_e{exp_h}h",
+                    label=f"micro: vol+struct (A,E,F,H weighted) |s|>={sc} p>={int(pr*100)}% exp={exp_h}h",
+                    min_abs_score=sc, min_probability=pr, fixed_expiry_h=exp_h,
+                    weight_block_a=1.5, weight_block_e=2.0,
+                    weight_block_f=1.5, weight_block_h=1.5,
+                ))
+                idx += 1
+    assert idx == 281, f"v251-v280 generator off: idx={idx}"
+
+    # ── v281-v310: multi-TF confluence (30 variants) ──
+    # require_full_mtf_alignment=True with various score/prob/expiry.
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for exp_h in (1, 2):
+                out.append(Strategy(
+                    id=f"v{idx}_mtf_confl_s{sc}_p{int(pr*100)}_e{exp_h}h",
+                    label=f"MTF confluence (full align) |s|>={sc} p>={int(pr*100)}% exp={exp_h}h",
+                    min_abs_score=sc, min_probability=pr, fixed_expiry_h=exp_h,
+                    require_full_mtf_alignment=True,
+                    weight_block_a=1.5, weight_block_h=2.0,
+                ))
+                idx += 1
+    assert idx == 311
+
+    # ── v311-v340: macro-filtered (30 variants) ──
+    # Trend-following emphasis (A,D,H weighted) + strong-volume req on
+    # half the variants — proxy for "macro tailwind only" filtering.
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for vol_req in (False, True):
+                out.append(Strategy(
+                    id=f"v{idx}_macro_trend_s{sc}_p{int(pr*100)}_v{int(vol_req)}",
+                    label=f"macro-tilt trend (A,D,H weighted) |s|>={sc} p>={int(pr*100)}% vol={'req' if vol_req else 'any'}",
+                    min_abs_score=sc, min_probability=pr,
+                    require_strong_volume=vol_req,
+                    weight_block_a=2.0, weight_block_d=1.5, weight_block_h=2.0,
+                ))
+                idx += 1
+    assert idx == 341
+
+    # ── v341-v370: COT-filtered (30 variants) ──
+    # Contrarian on extreme positioning: contrarian=True with various
+    # score/prob/expiry. Half use fade_extreme_rsi for added "fade" bias.
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for fade_rsi in (False, True):
+                out.append(Strategy(
+                    id=f"v{idx}_cot_contra_s{sc}_p{int(pr*100)}_f{int(fade_rsi)}",
+                    label=f"COT-extreme contra |s|>={sc} p>={int(pr*100)}% fade_rsi={fade_rsi}",
+                    min_abs_score=sc, min_probability=pr,
+                    contrarian=True, fade_extreme_rsi=fade_rsi,
+                    weight_block_b=1.5, weight_block_c=1.5,
+                ))
+                idx += 1
+    assert idx == 371
+
+    # ── v371-v400: session-specific (30 variants) ──
+    # Asia (0-7 UTC) → mean-rev; London (7-13) → breakout;
+    # Overlap (13-17) → trend; NY (17-22) → reversal/fade.
+    session_specs = [
+        # (session_label, window, weights, contrarian, fade_rsi, n_variants)
+        ("asia_meanrev", (0, 7),
+         {"weight_block_b": 2.0, "weight_block_c": 2.0,
+          "weight_block_d": 0.5}, False, True, 8),
+        ("london_breakout", (7, 13),
+         {"weight_block_a": 1.5, "weight_block_d": 2.0,
+          "weight_block_g": 1.5}, False, False, 8),
+        ("overlap_trend", (13, 17),
+         {"weight_block_a": 2.0, "weight_block_h": 2.0,
+          "weight_block_d": 1.5}, False, False, 7),
+        ("ny_reversal", (17, 22),
+         {"weight_block_b": 1.5, "weight_block_c": 1.5}, False, True, 7),
+    ]
+    score_grid = [10, 12, 14, 16, 18, 20]
+    prob_grid = [0.70, 0.75, 0.80]
+    for label, window, weights, contra, fade, count in session_specs:
+        emitted = 0
+        for sc in score_grid:
+            for pr in prob_grid:
+                if emitted >= count:
+                    break
+                out.append(Strategy(
+                    id=f"v{idx}_session_{label}_s{sc}_p{int(pr*100)}",
+                    label=f"session {label} |s|>={sc} p>={int(pr*100)}%",
+                    min_abs_score=sc, min_probability=pr,
+                    session_utc=window, contrarian=contra, fade_extreme_rsi=fade,
+                    **weights,
+                ))
+                idx += 1
+                emitted += 1
+            if emitted >= count:
+                break
+    assert idx == 401, f"v371-v400 generator off: idx={idx}"
+
+    # ── v401-v430: volatility-regime adaptive (30 variants) ──
+    # Bollinger + BBP emphasis (C,G x2) — squeeze/expansion regime.
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for exp_h in (1, 2):
+                out.append(Strategy(
+                    id=f"v{idx}_volreg_bb_bbp_s{sc}_p{int(pr*100)}_e{exp_h}h",
+                    label=f"vol-regime BB+BBP (C,G weighted) |s|>={sc} p>={int(pr*100)}% exp={exp_h}h",
+                    min_abs_score=sc, min_probability=pr, fixed_expiry_h=exp_h,
+                    weight_block_c=2.0, weight_block_g=2.0,
+                ))
+                idx += 1
+    assert idx == 431
+
+    # ── v431-v460: currency-strength filtered (30 variants) ──
+    # Structure (A) + VWAP (F) emphasis — proxy for currency-strength
+    # alignment (price holds above/below VWAP confirms basket strength).
+    for sc in (10, 12, 14, 16, 18):
+        for pr in (0.70, 0.75, 0.80):
+            for exp_h in (2, 3):
+                out.append(Strategy(
+                    id=f"v{idx}_ccystr_a_f_s{sc}_p{int(pr*100)}_e{exp_h}h",
+                    label=f"ccy-strength (A,F weighted) |s|>={sc} p>={int(pr*100)}% exp={exp_h}h",
+                    min_abs_score=sc, min_probability=pr, fixed_expiry_h=exp_h,
+                    weight_block_a=2.0, weight_block_f=2.0, weight_block_h=1.5,
+                ))
+                idx += 1
+    assert idx == 461
+
+    # ── v461-v500: ultra-strict combos (40 variants) ──
+    # Full MTF alignment + high score + high prob + contrarian or fade.
+    for sc in (16, 18, 20, 22, 24):
+        for pr in (0.78, 0.82):
+            for exp_h in (1, 2):
+                for mod in ("plain", "fade"):
+                    fade = mod == "fade"
+                    out.append(Strategy(
+                        id=f"v{idx}_ultra_mtf_s{sc}_p{int(pr*100)}_e{exp_h}h_{mod}",
+                        label=f"ultra MTF |s|>={sc} p>={int(pr*100)}% exp={exp_h}h {mod}",
+                        min_abs_score=sc, min_probability=pr,
+                        fixed_expiry_h=exp_h,
+                        require_full_mtf_alignment=True,
+                        fade_extreme_rsi=fade,
+                        weight_block_a=2.0, weight_block_h=2.0,
+                    ))
+                    idx += 1
+    assert idx == 501, f"v461-v500 generator off: idx={idx}"
+
+    return out
+
+
+VARIANTS.extend(_gen_v251_to_v500())
+assert len({s.id for s in VARIANTS}) == len(VARIANTS), "duplicate variant ids"
+
+
 def variants_by_id() -> dict[str, Strategy]:
     return {s.id: s for s in VARIANTS}
 

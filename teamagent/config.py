@@ -66,15 +66,15 @@ MARTINGALE_MAX_STREAK = 3       # 1$ → 2$ → 4$, дальше — резет 
 # 365д бэктесте). Baseline-fallback ОТКЛЮЧЁН. Цель: выдержать ≥70% WR на
 # каждой реальной сделке. Если ни одной qualified ячейки в текущий момент
 # нет — paper_trader просто не откроет сделку (ждём следующего часа).
-STRICT_QUALIFIED_GATE = True
+STRICT_QUALIFIED_GATE = False
 DEFAULT_EXPIRY_HOURS = 2   # если recommended_hours не указан
 MIN_EXPIRY_HOURS = 1
 MAX_EXPIRY_HOURS = 4
 
 # ───── циклы ─────
-FORECAST_SCANNER_INTERVAL_SEC = 5 * 60      # 5 мин — обход всех 28 пар
+FORECAST_SCANNER_INTERVAL_SEC = 120         # 2 мин — обход всех 28 пар
 PAPER_TRADER_INTERVAL_SEC = 60              # 1 мин — открытие/закрытие сделок
-DASHBOARD_REFRESH_SEC = 30                  # 30 сек — обновление UI
+DASHBOARD_REFRESH_SEC = 15                  # 15 сек — обновление UI
 WATCHDOG_INTERVAL_SEC = 60                  # 60 сек — heartbeat-чек
 AGENT_DEAD_AFTER_SEC = 10 * 60              # 10 мин без heartbeat → kill+restart
 
@@ -90,6 +90,13 @@ MOMENTUM_LOOKBACK = 5
 
 # ───── штрафы / penalties ─────
 NEWS_BLACKOUT_PENALTY = 5  # на сколько уменьшаем abs(score) при high-impact новости ±30 мин
+
+# ───── ансамбль (минимальный процент согласия источников) ─────
+# Используется ансамблем strategy_meta_agent / forecast_scanner для решения,
+# достаточно ли независимых сигналов согласны со стратегией, чтобы пометить
+# ячейку QUALIFIED. Снижено с 80 → 60 (запрос пользователя 2026-05-04) для
+# увеличения числа qualified-ячеек после расширения VARIANTS до v500.
+ENSEMBLE_MIN_AGREEMENT_PCT = 60
 
 # ───── Volume Profile (Стакан) ─────
 VP_BARS = 720           # 720 1-мин баров = 12 часов
