@@ -11,17 +11,21 @@ description: |
 
 ## Live URL (canonical)
 
-`https://fxinvestment-mjfdsshe.fly.dev/`
+`https://fxinvestment-uqfprqce.fly.dev/`
 
 If a redeploy assigns a different subdomain, update **both** this file
 and `AGENTS.md` "Where to find the user's data".
 
 ## Architecture
 
-The Fly machine runs the **dashboard only** — it auto-detects Fly via the
-`/data` mount (or `FLY_APP_NAME` env var) and skips spawning the
-orchestrator + 60 subprocess agents (which would OOM-kill on the 256-MB
-free tier).
+The free Fly machine runs the **dashboard only** by default — it auto-detects
+Fly via the `/data` mount (or `FLY_APP_NAME` env var) and skips spawning the
+orchestrator + 60 subprocess agents.
+
+2026-05-04 verification: forcing full mode does start `orchestrator` +
+`watchdog`, but the current free Fly resources OOM-kill the app after about
+90 seconds. Keep Fly as the stable no-auth public dashboard unless the user
+provides Fly scale access/token.
 
 The trading loop (forecast_scanner, paper_trader, paper_trader_daily,
 strategy_meta_agent, market_radar, etc.) runs on the Devin VM via the
@@ -57,9 +61,9 @@ deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true
 After the deploy finishes, verify with:
 
 ```bash
-curl -sI https://fxinvestment-mjfdsshe.fly.dev/intent          # 200 OK
-curl -s  https://fxinvestment-mjfdsshe.fly.dev/api/_debug | jq # state listing
-curl -s  https://fxinvestment-mjfdsshe.fly.dev/api/forecasts | python3 -c \
+curl -sI https://fxinvestment-uqfprqce.fly.dev/intent          # 200 OK
+curl -s  https://fxinvestment-uqfprqce.fly.dev/api/_debug | jq # state listing
+curl -s  https://fxinvestment-uqfprqce.fly.dev/api/forecasts | python3 -c \
   "import json,sys; d=json.load(sys.stdin); print(d.get('scanned_at'), len(d.get('forecasts',{})))"
 ```
 
@@ -79,8 +83,9 @@ If a future agent edits any of these, run a deploy + curl check:
   vars `TEAMAGENT_STATE_DIR` / `TEAMAGENT_LOGS_DIR` (Fly volume).
 - `teamagent/dashboard/server.py` — lifespan event runs
   `_seed_state_files()` (cold-boot bootstrap) + `_spawn_supervisor_processes()`
-  (auto-detects Fly → dashboard-only). Do not regress this to a manual
-  `if __name__ == "__main__"` server.
+  (auto-detects Fly → dashboard-only unless `FLY_FULL=1` is actually present
+  in the runtime env). Do not regress this to a manual `if __name__ ==
+  "__main__"` server.
 
 ## Why not the hand-written `infra/fly/Dockerfile`?
 
@@ -98,7 +103,7 @@ quota. The first request after idle takes ~10–20 sec to warm up
 
 If the user complains about slow first load, options:
 1. Tell them this is by design (free tier saves quota).
-2. Upgrade to ≥1 GB machine + `min_machines_running = 1` (needs flyctl
+2. Upgrade to ≥2 GB machine + `min_machines_running = 1` (needs flyctl
    + `FLY_API_TOKEN`).
 
 ## Custom domain (`fxinvestment.com`)
@@ -108,8 +113,8 @@ buys one:
 
 ```bash
 fly certs add fxinvestment.com -a fxinvestment-mjfdsshe
-# user adds CNAME @ -> fxinvestment-mjfdsshe.fly.dev at registrar
+# user adds CNAME @ -> fxinvestment-uqfprqce.fly.dev at registrar
 fly certs check fxinvestment.com -a fxinvestment-mjfdsshe   # wait for green
 ```
 
-Until then, `fxinvestment-mjfdsshe.fly.dev` is the free permanent URL.
+Until then, `fxinvestment-uqfprqce.fly.dev` is the free permanent URL.

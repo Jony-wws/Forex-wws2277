@@ -48,7 +48,7 @@ curl -sf --max-time 5 "$BASE/api/health" > /dev/null || { echo "ERROR: dashboard
 
 echo "== 3/5 reset $OUT =="
 rm -rf "$OUT"
-mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,daily,stability-forecast,volume-profile,meta-strategy,market-radar,market-regime,stability}
+mkdir -p "$OUT/api"/{intent-bars,forecast,microstructure,stakan,daily,stability-forecast,volume-profile,meta-strategy,market-radar,market-regime,stability,regime,analyst}
 
 echo "== 4/5 bake /api/* responses =="
 # Top-level endpoints. fundamentals / market-regime / weekly-loss-review /
@@ -93,6 +93,7 @@ for p in $PAIRS; do
   curl -sf --max-time 8  "$BASE/api/microstructure/$p"  > "$OUT/api/microstructure/${p}.json" 2>/dev/null || true
   curl -sf --max-time 8  "$BASE/api/volume-profile/$p"  > "$OUT/api/volume-profile/${p}.json" 2>/dev/null || true
 done
+find "$OUT/api" -type f -size 0 -delete
 
 echo "== 5/5 copy + patch HTML/JS/CSS =="
 cp "$SRC/intent.html"  "$OUT/index.html"

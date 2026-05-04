@@ -43,6 +43,11 @@ ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
 
 
+def _flag_enabled(name: str) -> bool:
+    value = os.environ.get(name)
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _seed_state_files() -> None:
     """Cold-boot seed for STATE_DIR so dashboard works before scanner's first sweep.
 
@@ -107,11 +112,12 @@ def _spawn_supervisor_processes() -> list[subprocess.Popen]:
     * FLY_MINIMAL=1          → spawn ONLY core trading loop (forecast_scanner +
       paper_trader_daily). Lightweight, fits in a free-tier Fly machine. The
       60+ subprocess agents are skipped — they only run on the Devin VM.
+    * FLY_FULL=1             → spawn full orchestrator + watchdog even on Fly.
     * (default, e.g. on a Devin VM) → spawn full orchestrator + watchdog. The
       orchestrator itself fans out to forecast_scanner, paper_traders, 60
       agents, etc.
     """
-    if os.environ.get("DASHBOARD_ONLY") == "1":
+    if _flag_enabled("DASHBOARD_ONLY"):
         log.info("DASHBOARD_ONLY=1 — skipping background processes")
         return []
     children: list[subprocess.Popen] = []
@@ -120,13 +126,14 @@ def _spawn_supervisor_processes() -> list[subprocess.Popen]:
 
     # Auto-detect Fly.io: presence of /data mount + FLY_APP_NAME env var.
     on_fly = os.environ.get("FLY_APP_NAME") is not None or Path("/data").is_dir()
-    if on_fly and os.environ.get("FLY_FULL") != "1":
+    fly_full = _flag_enabled("FLY_FULL")
+    if on_fly and not fly_full:
         # Default Fly machine = 256 MB → cannot fit orchestrator + 60 agents.
         # Dashboard-only mode reads state files committed by the hourly Devin
         # schedule (sched-…); for live scanning use a Fly machine with ≥1 GB.
         log.info("on-fly default-memory mode → dashboard-only (no scanner spawn)")
         return []
-    if os.environ.get("FLY_MINIMAL") == "1":
+    if _flag_enabled("FLY_MINIMAL") and not fly_full:
         modules = (
             "teamagent.forecast_scanner",
             "teamagent.paper_trader_daily",
