@@ -42,8 +42,148 @@
   <a class="fx-tab" href="/agents"><span class="ico">🤖</span>Агенты</a>
 </nav>
 
-<!-- ═══ ЕДИНОЕ МЕСТО: СДЕЛКИ — открытые + история + WR в одном разделе ═══ -->
-<!-- Раньше пользователь должен был ходить на /trades. Теперь это главный экран. -->
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Reorg 2026-05-04: пользователь явно попросил оставить ТОЛЬКО 3 раздела:
+    1) ОСНОВНОЙ ПРОГНОЗ — СТАКАН (главный, наверху)
+    2) ИСТОРИЯ + АВТО-СДЕЛКИ
+    3) СОСТОЯНИЕ СИСТЕМЫ
+  Старые разделы (final-signals, ai-narrative, live-analyst, daily-target,
+  fx-controls, fx-grid, fx-deep) обёрнуты в <div hidden> ниже — DOM intact,
+  JS-инициализация не падает, но визуально пользователь видит только 3 секции.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+
+<!-- ═══ РАЗДЕЛ 1 · ОСНОВНОЙ ПРОГНОЗ — СТАКАН (2026-05-04) ═══ -->
+<!--
+  Главный новый раздел: для каждой из 28 валют показываем стакан,
+  крупных игроков, баланс покупатели vs продавцы, направление на 24 часа
+  и основной прогноз 1–5 часов с целью + no-return уровнем. Live-обновление
+  каждые 10 секунд (как TradingView). Источник — /api/stakan-view/{pair}.
+-->
+<section id="stakan-view-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">📊</span> ОСНОВНОЙ ПРОГНОЗ — СТАКАН · 28 валют</h2>
+    <span id="sk-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Это <b>главный прогноз</b> для intraday-торговли: что рынок сделает <b>до 00:00 UTC+5</b>
+    и <b>основной прогноз 1–5 часов</b> от стакана + крупных игроков + 24h-bias.
+    <b style="color:#9ee2ff">Цена обновляется каждые 5 сек</b> · стакан и big-players каждые 10 сек.
+    Никаких симуляторов — только Yahoo Finance live + ForexFactory + FRED + COT.
+  </p>
+
+  <!-- Grid-селектор всех 28 пар -->
+  <div class="sk-pair-picker" id="sk-pair-picker" role="tablist" aria-label="Выбор валютной пары">
+    <div class="sk-empty">загружаю 28 валют…</div>
+  </div>
+
+  <!-- Шапка выбранной пары: цена, сессия, бейджи -->
+  <div class="sk-pair-header" id="sk-pair-header">
+    <div class="sk-pair-name" id="sk-pair-name">EURUSD</div>
+    <div class="sk-pair-price" id="sk-pair-price">—</div>
+    <div class="sk-pair-pulse" id="sk-pair-pulse" title="live price update каждые 5 сек">
+      <span class="sk-pulse-dot"></span>
+      <span class="sk-pulse-txt" id="sk-pair-pulse-txt">live · 5s</span>
+      <span class="sk-pulse-delta" id="sk-pair-pulse-delta">—</span>
+    </div>
+    <div class="sk-pair-sub" id="sk-pair-sub">сессия — · стратегия — · WR —</div>
+    <div class="sk-pair-badges">
+      <span class="sk-badge" id="sk-badge-side">…</span>
+      <span class="sk-badge" id="sk-badge-prob">…</span>
+      <span class="sk-badge" id="sk-badge-bias">…</span>
+      <span class="sk-badge" id="sk-badge-session">…</span>
+    </div>
+  </div>
+
+  <!-- Предупреждение о новостях / макроданных в горизонте сделки 1–5ч -->
+  <div class="sk-news-warning" id="sk-news-warning" hidden>
+    <span class="sk-nw-icon">⚠️</span>
+    <span class="sk-nw-text" id="sk-news-warning-text">…</span>
+  </div>
+
+  <!-- 3 hero-карточки: 24h bias · 1-5h main forecast · buyers/sellers -->
+  <div class="sk-hero-grid">
+    <div class="sk-hero" id="sk-hero-24h">
+      <div class="sk-hero-title">Прогноз на 24 часа</div>
+      <div class="sk-hero-arrow" id="sk-24h-arrow">…</div>
+      <div class="sk-hero-direction" id="sk-24h-direction">…</div>
+      <div class="sk-hero-conf" id="sk-24h-conf">уверенность —</div>
+      <div class="sk-hero-bar"><div class="sk-hero-bar-fill" id="sk-24h-bar"></div></div>
+      <ul class="sk-hero-reasons" id="sk-24h-reasons"></ul>
+    </div>
+
+    <div class="sk-hero sk-hero-main" id="sk-hero-5h">
+      <div class="sk-hero-title">ОСНОВНОЙ ПРОГНОЗ 1–5 часов</div>
+      <div class="sk-hero-side" id="sk-5h-side">…</div>
+      <div class="sk-hero-row"><span>Вход</span><b id="sk-5h-entry">—</b></div>
+      <div class="sk-hero-row"><span>Цель</span><b id="sk-5h-target">—</b></div>
+      <div class="sk-hero-row"><span>No-return</span><b id="sk-5h-noreturn">—</b></div>
+      <div class="sk-hero-row"><span>Горизонт</span><b id="sk-5h-hours">—</b></div>
+      <div class="sk-hero-row"><span>Вероятность</span><b id="sk-5h-prob">—</b></div>
+      <div class="sk-hero-explain" id="sk-5h-explain">—</div>
+    </div>
+
+    <div class="sk-hero" id="sk-hero-bs">
+      <div class="sk-hero-title">Покупатели vs Продавцы</div>
+      <div class="sk-bs-bar">
+        <div class="sk-bs-buy" id="sk-bs-buy">50%</div>
+        <div class="sk-bs-sell" id="sk-bs-sell">50%</div>
+      </div>
+      <div class="sk-bs-fav" id="sk-bs-fav">баланс</div>
+      <div class="sk-bs-help">
+        Считаем по volume profile + big-players (≥80-percentile объёма) ниже/выше текущей цены.
+        Чем больше доля — тем сильнее давление этой стороны.
+      </div>
+    </div>
+  </div>
+
+  <!-- Стакан + крупные игроки -->
+  <div class="sk-mid-grid">
+    <div class="sk-orderbook" id="sk-orderbook">
+      <div class="sk-ob-header">
+        <h3>Стакан · Volume Profile</h3>
+        <div class="sk-ob-legend">
+          <span class="sk-ob-pin sk-ob-poc">POC</span>
+          <span class="sk-ob-pin sk-ob-vah">VAH</span>
+          <span class="sk-ob-pin sk-ob-val">VAL</span>
+          <span class="sk-ob-pin sk-ob-cur">текущая</span>
+        </div>
+      </div>
+      <div class="sk-ob-body" id="sk-ob-body">
+        <div class="sk-empty">строю стакан…</div>
+      </div>
+    </div>
+
+    <div class="sk-bigplayers" id="sk-bigplayers">
+      <h3>🐋 Крупные игроки</h3>
+      <p class="sk-bigplayers-help">
+        Уровни с объёмом ≥80-percentile за последние ~24 часа — там «киты»
+        оставили свои ордера. Поддержка <span style="color:#4afaa3">снизу</span>,
+        сопротивление <span style="color:#ff8090">сверху</span>.
+      </p>
+      <div class="sk-bp-list" id="sk-bp-list">
+        <div class="sk-empty">ищу институциональные уровни…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-session strategy table: «особый подход» по каждой сессии -->
+  <div class="sk-strategy" id="sk-strategy">
+    <h3>Особый подход — стратегия по сессиям</h3>
+    <p class="sk-strategy-help">
+      Своя стратегия для каждой сессии (Asia · London · Overlap · NY) на 365-дневном
+      backtest. Зелёный — WR ≥ 70% (paper-trader будет открывать). Жёлтый — 60–70%
+      (нужен ансамбль). Красный — &lt; 60% (заморожен).
+    </p>
+    <div class="sk-strategy-grid" id="sk-strategy-grid">
+      <div class="sk-empty">…</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ РАЗДЕЛ 2 (после стакана): СДЕЛКИ + АВТО-СДЕЛКИ ОТ СТАКАНА ═══ -->
 <section id="main-trades-section" class="fs-multi-section">
   <div class="fs-multi-header">
     <h2><span style="font-size:22px">💼</span> СДЕЛКИ — открытые + история в одном месте</h2>
@@ -119,8 +259,77 @@
       <div class="mt-empty">подсчитываю…</div>
     </div>
   </div>
+
+  <!-- ─── АВТО-СДЕЛКИ ОТ СТАКАНА (paper_trader_stakan) ─── -->
+  <div class="mt-section mt-stakan-section">
+    <h3>🤖 Авто-сделки от СТАКАНА <span class="mt-pill" id="mt-stk-pill">…</span></h3>
+    <div class="mt-help">
+      Эти сделки система открывает <b>сама автоматически</b> когда стакан показывает
+      сильное преимущество одной стороны (≥60% покупателей или продавцов) +
+      согласие 24h-bias и 1–5h-forecast. Источник —
+      <code>paper_trader_stakan</code>, открыто/закрыто &nbsp;
+      <a href="/api/stakan/open-trades" target="_blank" style="color:#9ee2ff">/api/stakan/open-trades</a>,
+      <a href="/api/stakan/closed-trades" target="_blank" style="color:#9ee2ff">/api/stakan/closed-trades</a>.
+    </div>
+    <div class="mt-stk-stats" id="mt-stk-stats">
+      <div class="mt-stat"><div class="mt-lbl">Открыто</div><div class="mt-val mt-amber" id="mt-stk-open">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">Закрыто</div><div class="mt-val" id="mt-stk-closed">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">WIN</div><div class="mt-val mt-green" id="mt-stk-wins">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">LOSS</div><div class="mt-val mt-red" id="mt-stk-losses">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">Win Rate</div><div class="mt-val" id="mt-stk-wr">…</div></div>
+      <div class="mt-stat"><div class="mt-lbl">PnL</div><div class="mt-val" id="mt-stk-pnl">…</div></div>
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr><th>Пара</th><th>Сторона</th><th>Открыта</th><th>Цена входа</th><th>Истекает</th><th>Текущая</th><th>Прогноз PnL</th></tr>
+        </thead>
+        <tbody id="mt-stk-open-tbody">
+          <tr><td colspan="7" class="mt-empty">загружаю авто-сделки от стакана…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h4 style="margin-top:14px">📜 Последние закрытые автоматом (стакан)</h4>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr><th>Пара</th><th>Сторона</th><th>Открыта</th><th>Закрыта</th><th>Стратегия</th><th>Результат</th><th>PnL</th></tr>
+        </thead>
+        <tbody id="mt-stk-closed-tbody">
+          <tr><td colspan="7" class="mt-empty">загружаю историю авто-сделок…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </section>
 
+<!-- ═══ РАЗДЕЛ 3 · СОСТОЯНИЕ СИСТЕМЫ — health / heartbeats / процессы ═══ -->
+<section id="system-health-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">🩺</span> СОСТОЯНИЕ СИСТЕМЫ — все компоненты live</h2>
+    <span id="sh-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Видно сразу: <b>работает ли всё</b>. Каждый компонент пишет heartbeat-файл; зелёный —
+    жив (last_seen &lt; 10 мин), красный — мёртв. Если что-то не так — система предупредит здесь.
+    Обновляется каждые <b>5 секунд</b>. Источник — <code>/api/health</code>.
+  </p>
+  <div class="sh-grid" id="sh-grid">
+    <div class="sh-empty">опрашиваю heartbeat-и компонентов…</div>
+  </div>
+  <div class="sh-summary">
+    <div class="sh-stat"><div class="sh-lbl">Всего</div><div class="sh-val" id="sh-total">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Живы</div><div class="sh-val sh-green" id="sh-alive">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Мёртвы</div><div class="sh-val sh-red" id="sh-dead">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Open trades (paper)</div><div class="sh-val" id="sh-pt-open">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Open trades (стакан)</div><div class="sh-val" id="sh-stk-open">…</div></div>
+    <div class="sh-stat"><div class="sh-lbl">Закрыто всего</div><div class="sh-val" id="sh-closed">…</div></div>
+  </div>
+  <div class="sh-warnings" id="sh-warnings"></div>
+</section>
+
+<!-- HIDDEN since 2026-05-04: пользователь оставил только 3 секции, но JS-инициализация всё ещё ссылается на эти DOM-узлы. -->
+<div id="legacy-hidden-sections" hidden style="display:none !important" aria-hidden="true">
 <!-- ═══ ФИНАЛЬНЫЕ ПРОГНОЗЫ ДЛЯ ВСЕХ 28 ПАР — индивидуальный подход ═══ -->
 <section id="final-signals-section" class="fs-multi-section">
   <div class="fs-multi-header">
@@ -233,6 +442,8 @@
   <button class="fx-deep-close" aria-label="Close">×</button>
   <div id="fx-deep-body"></div>
 </dialog>
+</div>
+
 
 <footer class="fx-footer">
   <span>FX INVESTMENT · powered by TeamAgent · auto-refresh каждые 10s</span>

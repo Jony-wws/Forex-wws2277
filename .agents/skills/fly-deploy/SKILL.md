@@ -11,7 +11,7 @@ description: |
 
 ## Live URL (canonical)
 
-`https://fxinvestment-lbtxlhtb.fly.dev/`
+`https://fxinvestment-nbmuknwe.fly.dev/`
 
 If a redeploy assigns a different subdomain, update **both** this file
 and `AGENTS.md` "Where to find the user's data".
@@ -57,9 +57,9 @@ deploy backend --dir /home/ubuntu/repos/Forex-wws2277 --volume true
 After the deploy finishes, verify with:
 
 ```bash
-curl -sI https://fxinvestment-lbtxlhtb.fly.dev/intent          # 200 OK
-curl -s  https://fxinvestment-lbtxlhtb.fly.dev/api/_debug | jq # state listing
-curl -s  https://fxinvestment-lbtxlhtb.fly.dev/api/forecasts | python3 -c \
+curl -sI https://fxinvestment-nbmuknwe.fly.dev/intent          # 200 OK
+curl -s  https://fxinvestment-nbmuknwe.fly.dev/api/_debug | jq # state listing
+curl -s  https://fxinvestment-nbmuknwe.fly.dev/api/forecasts | python3 -c \
   "import json,sys; d=json.load(sys.stdin); print(d.get('scanned_at'), len(d.get('forecasts',{})))"
 ```
 
@@ -107,9 +107,9 @@ Paid (~$10–15/year at Namecheap, Cloudflare, etc.). Steps if the user
 buys one:
 
 ```bash
-fly certs add fxinvestment.com -a fxinvestment-lbtxlhtb
-# user adds CNAME @ -> fxinvestment-lbtxlhtb.fly.dev at registrar
-fly certs check fxinvestment.com -a fxinvestment-lbtxlhtb   # wait for green
+fly certs add fxinvestment.com -a fxinvestment-nbmuknwe
+# user adds CNAME @ -> fxinvestment-nbmuknwe.fly.dev at registrar
+fly certs check fxinvestment.com -a fxinvestment-nbmuknwe   # wait for green
 ```
 
-Until then, `fxinvestment-lbtxlhtb.fly.dev` is the free permanent URL.
+Until then, `fxinvestment-nbmuknwe.fly.dev` is the free permanent URL.

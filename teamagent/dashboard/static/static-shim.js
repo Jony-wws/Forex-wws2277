@@ -30,6 +30,8 @@
  *   /api/intent-bars/EURUSD?interval=15m&n=90     → ./api/intent-bars/EURUSD.json
  *   /api/forecast/EURUSD                          → ./api/forecast/EURUSD.json
  *   /api/stakan/open-trades                       → ./api/stakan/open-trades.json
+ *   /api/stakan-view                              → ./api/stakan-view.json
+ *   /api/stakan-view/EURUSD                       → ./api/stakan-view/EURUSD.json
  *   /api/stability-forecast?hours_ahead=1         → ./api/stability-forecast/1.json
  *   /api/meta-strategy/log?limit=20               → ./api/meta-strategy/log.json
  */
@@ -47,7 +49,7 @@
   // a new subdomain (Fly free tier rotates them on every machine recreate).
   const LIVE_BACKEND =
     (typeof window.FX_LIVE_BACKEND === "string" && window.FX_LIVE_BACKEND) ||
-    "https://fxinvestment-lbtxlhtb.fly.dev";
+    "https://fxinvestment-nbmuknwe.fly.dev";
 
   // Per-request timeout for the live-backend probe. Keep short so a dead Fly
   // doesn't tax the user — we'll fall through to the baked JSON anyway.

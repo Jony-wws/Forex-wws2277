@@ -264,12 +264,13 @@ thing, then `stop_all.sh` and exits. State is auto-committed via
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-lbtxlhtb.fly.dev/`**
+**`https://fxinvestment-nbmuknwe.fly.dev/`** (canonical, 2026-05-04)
+Old (still alive but pre-3-section reorg): `https://fxinvestment-lbtxlhtb.fly.dev/`
 
 - No login. No password. Just open it.
 - Routes:
   - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts,
-    pressure bars, currency strength heatmap, 10-sec refresh).
+    pressure bars, currency strength heatmap, СТАКАН раздел, 10-sec refresh).
   - `/system` → audit dashboard (heartbeats, agents, paper-trader stats,
     closed-trades history).
   - `/agents` → redirect to `/system#agents-section`.
@@ -298,6 +299,18 @@ user / `c7e01b4403f37888d4efcf17054c101b`
 This URL changes every Devin session. The current value is updated by the
 agent at the start of each "продолжай"/"continue" session and committed to
 this file so the user always has the latest.
+
+### Static CDN mirror (no-auth, instant cold-start)
+
+**`https://static-build-qumqktab.devinapps.com/`** (latest, 2026-05-04)
+
+- Public CDN snapshot of the dashboard (HTML + JS + 184 baked JSON files).
+- Updated on demand via `bash scripts/build_static_mirror.sh && deploy frontend`.
+- Has the new **СТАКАН — Order Book** section as a primary screen for all
+  28 pairs (selector + 3 hero cards + ордер-бук + крупные игроки + per-session
+  стратегия). Live "10-sec refresh" still polls `./api/*.json` files baked
+  at build time (so values are frozen between rebuilds — for fully live data
+  use the Fly URL above).
 
 ### Other links
 
