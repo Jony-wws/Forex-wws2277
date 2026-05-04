@@ -42,6 +42,85 @@
   <a class="fx-tab" href="/agents"><span class="ico">🤖</span>Агенты</a>
 </nav>
 
+<!-- ═══ ЕДИНОЕ МЕСТО: СДЕЛКИ — открытые + история + WR в одном разделе ═══ -->
+<!-- Раньше пользователь должен был ходить на /trades. Теперь это главный экран. -->
+<section id="main-trades-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">💼</span> СДЕЛКИ — открытые + история в одном месте</h2>
+    <span id="mt-summary-pill" class="fs-summary-pill">…</span>
+  </div>
+  <p class="fs-multi-help">
+    Сразу здесь, на главной — все сделки которые система <b>открыла сама</b> после прогноза
+    (paper-trader, free-70%-gate, $1 ставка, 1–5 ч экспирация, мартингейл 1→2→4→reset).
+    Никуда переходить не нужно: ниже сводка, открытые сейчас, последние закрытые и WR по парам.
+    Полная история (100+) — на странице <a href="/trades" style="color:#9ee2ff">/trades</a>.
+  </p>
+
+  <div class="mt-stats" id="mt-stats">
+    <div class="mt-stat"><div class="mt-lbl">Всего</div><div class="mt-val" id="mt-total">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Открыто</div><div class="mt-val mt-amber" id="mt-open">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">WIN</div><div class="mt-val mt-green" id="mt-wins">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">LOSS</div><div class="mt-val mt-red" id="mt-losses">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Win Rate</div><div class="mt-val" id="mt-wr">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">PnL</div><div class="mt-val" id="mt-pnl">…</div></div>
+  </div>
+
+  <div class="mt-section">
+    <h3>🔓 Открыты сейчас <span class="mt-pill" id="mt-open-count">0</span></h3>
+    <div class="mt-help">
+      Каждая сделка открывается автоматически paper-trader-ом, как только probability ≥ 70%
+      и пара/сессия проходит strict-quorum ансамбль (или fallback на baseline). Live-цена
+      обновляется каждые 30 сек.
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr>
+            <th>Пара</th><th>Сторона</th><th>Цена входа</th><th>Открыта</th>
+            <th>До экспирации</th><th>Текущая</th><th>Pips</th><th>Прогноз PnL</th>
+          </tr>
+        </thead>
+        <tbody id="mt-open-tbody">
+          <tr><td colspan="8" class="mt-empty">загружаю открытые сделки…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-section">
+    <h3>📜 Последние закрытые <span class="mt-pill" id="mt-closed-count">0</span></h3>
+    <div class="mt-help">
+      10 последних закрытых сделок. Полная история на /trades. WIN/LOSS — по реальной
+      цене Yahoo Finance на момент экспирации (без симуляторов).
+    </div>
+    <div class="mt-table-wrap">
+      <table class="mt-table">
+        <thead>
+          <tr>
+            <th>Пара</th><th>Сторона</th><th>Открыта</th><th>Закрыта</th>
+            <th>Вероятность</th><th>Стратегия</th><th>Результат</th><th>PnL</th>
+          </tr>
+        </thead>
+        <tbody id="mt-closed-tbody">
+          <tr><td colspan="8" class="mt-empty">загружаю историю…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-section">
+    <h3>📊 Win Rate по парам <span class="mt-pill" id="mt-bypair-meta">…</span></h3>
+    <div class="mt-help">
+      Какие пары надёжно зарабатывают, какие сливают. Зелёным — WR ≥ 70%, красным — &lt; 50%.
+      Это honest-разрез истории: если пара красная — strategy-search её фактически замораживает,
+      и paper-trader перестаёт её открывать (free-70%-gate + ансамбль это ловят).
+    </div>
+    <div class="mt-bypair" id="mt-bypair-grid">
+      <div class="mt-empty">подсчитываю…</div>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ ФИНАЛЬНЫЕ ПРОГНОЗЫ ДЛЯ ВСЕХ 28 ПАР — индивидуальный подход ═══ -->
 <section id="final-signals-section" class="fs-multi-section">
   <div class="fs-multi-header">

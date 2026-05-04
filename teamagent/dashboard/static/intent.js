@@ -1057,4 +1057,158 @@
   }
   refreshDailyTarget();
   setInterval(refreshDailyTarget, 30 * 1000);
+
+  // ═══ Главная страница: единая секция «Сделки» (open + closed + WR-by-pair) ═══
+  // Раньше пользователь должен был ходить на отдельный /trades. По требованию пользователя
+  // (одно место для всего на главной) — копия логики trades.js, упрощённая для main-screen.
+  const _mtFmt = {
+    num(x, d=0){ if(x==null||!isFinite(x)) return "—"; return Number(x).toFixed(d); },
+    price(x){ if(x==null||!isFinite(x)) return "—"; const n=Number(x); return n>=100?n.toFixed(3):n.toFixed(5); },
+    pips(x){ if(x==null||!isFinite(x)) return "—"; const s=x>=0?"+":""; return `${s}${Number(x).toFixed(1)}`; },
+    pnl(x){ if(x==null||!isFinite(x)) return "—"; const s=x>=0?"+$":"−$"; return `${s}${Math.abs(Number(x)).toFixed(2)}`; },
+    pct(x,d=1){ if(x==null||!isFinite(x)) return "—"; return `${Number(x).toFixed(d)}%`; },
+    utc(iso){ if(!iso) return "—"; try{const d=new Date(iso); return d.toLocaleString(undefined,{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(_){return iso;} },
+    countdown(secs){ if(secs==null||!isFinite(secs)||secs<=0) return "истекла"; const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), s=Math.floor(secs%60); if(h>0) return `${h}ч ${String(m).padStart(2,"0")}м`; if(m>0) return `${m}м ${String(s).padStart(2,"0")}с`; return `${s}с`; },
+  };
+  async function _mtFetch(url, fallback=null){
+    try { const r = await fetch(url, {cache:"no-store"}); if(!r.ok) throw new Error(`${url}→${r.status}`); return await r.json(); }
+    catch(e){ console.warn("mt-fetch failed", url, e); return fallback; }
+  }
+  function _mtLivePips(t){
+    const f = state.forecasts[t.pair];
+    const cur = f && (f.current_price ?? f.latest_price);
+    if (!isFinite(cur) || !isFinite(t.open_price)) return {cur:null, pips:null, pnl:null, inProfit:null};
+    const pipMul = t.pair.endsWith("JPY") ? 100 : 10000;
+    const diff = (cur - t.open_price) * pipMul;
+    const pips = t.side === "SELL" ? -diff : diff;
+    const inProfit = pips > 0;
+    const stake = Number(t.stake_usd ?? 1);
+    const payout = Number(t.payout_pct ?? 0.85);
+    const projPnl = inProfit ? stake * payout : -stake;
+    return {cur, pips, pnl: projPnl, inProfit};
+  }
+  function _mtRenderOpen(open){
+    const tbody = document.getElementById("mt-open-tbody");
+    if (!tbody) return;
+    if (!open || open.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="mt-empty">Сейчас открытых сделок нет. Как только probability ≥ 70% — paper-trader откроет сам.</td></tr>`;
+      return;
+    }
+    const now = Date.now();
+    const rows = open.slice(0, 12).map(t => {
+      const expiryMs = new Date(t.expiry_time).getTime();
+      const live = _mtLivePips(t);
+      const liveCls = live.inProfit===true?"mt-win":live.inProfit===false?"mt-loss":"mt-muted";
+      return `<tr>
+        <td><b>${t.pair}</b></td>
+        <td class="${t.side==="BUY"?"mt-buy":"mt-sell"}">${t.side}</td>
+        <td>${_mtFmt.price(t.open_price)}</td>
+        <td>${_mtFmt.utc(t.open_time)}</td>
+        <td class="mt-muted">${_mtFmt.countdown((expiryMs-now)/1000)}</td>
+        <td>${_mtFmt.price(live.cur)}</td>
+        <td class="${liveCls}">${_mtFmt.pips(live.pips)}</td>
+        <td class="${liveCls}">${_mtFmt.pnl(live.pnl)}</td>
+      </tr>`;
+    }).join("");
+    tbody.innerHTML = rows;
+  }
+  function _mtRenderClosed(closed){
+    const tbody = document.getElementById("mt-closed-tbody");
+    if (!tbody) return;
+    if (!closed || closed.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="mt-empty">История пока пустая.</td></tr>`;
+      return;
+    }
+    const sorted = [...closed].sort((a,b) => new Date(b.close_time||b.expiry_time) - new Date(a.close_time||a.expiry_time)).slice(0, 10);
+    tbody.innerHTML = sorted.map(t => {
+      const variant = t.strategy_variant_at_open || "—";
+      const wrAtOpen = t.strategy_wr_pct_at_open;
+      const stratLabel = wrAtOpen ? `${variant} <span class="mt-muted">(${_mtFmt.pct(wrAtOpen)})</span>` : variant;
+      const result = t.result || t.status;
+      const resultCls = result === "WIN" ? "mt-win" : "mt-loss";
+      return `<tr>
+        <td><b>${t.pair}</b></td>
+        <td class="${t.side==="BUY"?"mt-buy":"mt-sell"}">${t.side}</td>
+        <td>${_mtFmt.utc(t.open_time)}</td>
+        <td>${_mtFmt.utc(t.close_time||t.expiry_time)}</td>
+        <td>${_mtFmt.pct(t.probability_pct_at_open)}</td>
+        <td>${stratLabel}</td>
+        <td class="${resultCls}"><b>${result||"—"}</b></td>
+        <td class="${resultCls}">${_mtFmt.pnl(t.pnl_usd)}</td>
+      </tr>`;
+    }).join("");
+  }
+  function _mtRenderByPair(closed){
+    const grid = document.getElementById("mt-bypair-grid");
+    const meta = document.getElementById("mt-bypair-meta");
+    if (!grid) return;
+    const byPair = {};
+    (closed||[]).forEach(t => {
+      const p = t.pair;
+      if (!byPair[p]) byPair[p] = {wins:0, losses:0, pnl:0};
+      const r = (t.result||t.status);
+      if (r === "WIN") byPair[p].wins++;
+      else if (r === "LOSS") byPair[p].losses++;
+      byPair[p].pnl += Number(t.pnl_usd||0);
+    });
+    const entries = Object.entries(byPair).map(([pair, v]) => {
+      const total = v.wins + v.losses;
+      const wr = total > 0 ? (v.wins / total) * 100 : 0;
+      return {pair, total, wr, pnl: v.pnl, ...v};
+    }).sort((a,b) => b.wr - a.wr);
+    if (entries.length === 0) {
+      grid.innerHTML = `<div class="mt-empty">Пока нет закрытых сделок.</div>`;
+      if (meta) meta.textContent = "0 пар";
+      return;
+    }
+    grid.innerHTML = entries.map(e => {
+      const cls = e.wr >= 70 ? "mt-pair-win" : e.wr < 50 ? "mt-pair-loss" : "";
+      return `<div class="mt-pair-cell ${cls}">
+        <span class="mt-pair-name">${e.pair}</span>
+        <span class="mt-pair-wr">${e.wr.toFixed(0)}%</span>
+        <span class="mt-muted" style="font-size:10px">${e.wins}W ${e.losses}L</span>
+      </div>`;
+    }).join("");
+    if (meta) meta.textContent = `${entries.length} пар в истории`;
+  }
+  function _mtRenderStats(stats, openCount){
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setVal("mt-total", stats?.total ?? 0);
+    setVal("mt-open", openCount ?? 0);
+    setVal("mt-wins", stats?.wins ?? 0);
+    setVal("mt-losses", stats?.losses ?? 0);
+    const wr = Number(stats?.win_rate_pct ?? 0);
+    const wrEl = document.getElementById("mt-wr");
+    if (wrEl) {
+      wrEl.textContent = `${wr.toFixed(1)}%`;
+      wrEl.className = `mt-val ${wr >= 70 ? "mt-green" : wr < 50 ? "mt-red" : "mt-amber"}`;
+    }
+    const pnl = Number(stats?.total_pnl_usd ?? 0);
+    const pnlEl = document.getElementById("mt-pnl");
+    if (pnlEl) {
+      pnlEl.textContent = `${pnl>=0?"+$":"−$"}${Math.abs(pnl).toFixed(2)}`;
+      pnlEl.className = `mt-val ${pnl >= 0 ? "mt-green" : "mt-red"}`;
+    }
+    const pill = document.getElementById("mt-summary-pill");
+    if (pill) pill.textContent = `${stats?.total ?? 0} сделок · WR ${wr.toFixed(1)}% · ${openCount ?? 0} открыто`;
+  }
+  async function refreshMainTrades(){
+    const [stats, openR, closedR] = await Promise.all([
+      _mtFetch("/api/stats", {}),
+      _mtFetch("/api/open-trades", {trades:[]}),
+      _mtFetch("/api/closed-trades?limit=200", []),
+    ]);
+    const open = (openR && openR.trades) || [];
+    const closed = Array.isArray(closedR) ? closedR : (closedR?.trades || []);
+    _mtRenderStats(stats || {}, open.length);
+    _mtRenderOpen(open);
+    _mtRenderClosed(closed);
+    _mtRenderByPair(closed);
+    const oc = document.getElementById("mt-open-count");
+    if (oc) oc.textContent = String(open.length);
+    const cc = document.getElementById("mt-closed-count");
+    if (cc) cc.textContent = String(Math.min(closed.length, 10));
+  }
+  refreshMainTrades();
+  setInterval(refreshMainTrades, 30 * 1000);
 })();
