@@ -314,6 +314,99 @@ def evaluate_pair(pair: str) -> dict | None:
     except Exception as e:
         log.warning(f"forecast_scanner: cot signal failed for {pair}: {e}")
 
+    # ───── BLOCK K — Pivot Points position ─────
+    pp = ind_1h.get("pivot_pp", 0)
+    r1 = ind_1h.get("pivot_r1", 0)
+    s1 = ind_1h.get("pivot_s1", 0)
+    close_price = ind_1h["close"]
+    if pp > 0:
+        if close_price > r1:
+            vote("Pivot_above_R1", +2, f"Цена выше R1={r1:.5f} — сильный бычий")
+        elif close_price > pp:
+            vote("Pivot_above_PP", +1, f"Цена выше Pivot={pp:.5f}")
+        elif close_price < s1:
+            vote("Pivot_below_S1", -2, f"Цена ниже S1={s1:.5f} — сильный медвежий")
+        elif close_price < pp:
+            vote("Pivot_below_PP", -1, f"Цена ниже Pivot={pp:.5f}")
+
+    # ───── BLOCK L — Keltner Channels ─────
+    kelt_upper = ind_1h.get("keltner_upper", 0)
+    kelt_lower = ind_1h.get("keltner_lower", 0)
+    if kelt_upper > 0:
+        if close_price > kelt_upper:
+            vote("Keltner_breakout_up", +2, "Цена выше Keltner — прорыв вверх")
+        elif close_price < kelt_lower:
+            vote("Keltner_breakout_down", -2, "Цена ниже Keltner — прорыв вниз")
+
+    # ───── BLOCK M — Donchian Channels ─────
+    don_upper = ind_1h.get("donchian_upper", 0)
+    don_lower = ind_1h.get("donchian_lower", 0)
+    if don_upper > 0:
+        if close_price >= don_upper * 0.999:
+            vote("Donchian_high", +2, "Цена на уровне Donchian High — бычий прорыв")
+        elif close_price <= don_lower * 1.001:
+            vote("Donchian_low", -2, "Цена на уровне Donchian Low — медвежий прорыв")
+
+    # ───── BLOCK N — Smart Money Concepts ─────
+    smc_ob_bull = ind_1h.get("order_block_bull", 0)
+    smc_ob_bear = ind_1h.get("order_block_bear", 0)
+    smc_fvg_bull = ind_1h.get("fvg_bull", 0)
+    smc_fvg_bear = ind_1h.get("fvg_bear", 0)
+    smc_sweep_high = ind_1h.get("liq_sweep_high", 0)
+    smc_sweep_low = ind_1h.get("liq_sweep_low", 0)
+    if smc_ob_bull and not smc_ob_bear:
+        vote("SMC_order_block_bull", +2, "Бычий Order Block обнаружен")
+    elif smc_ob_bear and not smc_ob_bull:
+        vote("SMC_order_block_bear", -2, "Медвежий Order Block обнаружен")
+    if smc_fvg_bull:
+        vote("SMC_FVG_bull", +1, "Бычий Fair Value Gap")
+    if smc_fvg_bear:
+        vote("SMC_FVG_bear", -1, "Медвежий Fair Value Gap")
+    if smc_sweep_high:
+        vote("SMC_liq_sweep_high", -2, "Ликвидация лонгов — медвежий разворот")
+    if smc_sweep_low:
+        vote("SMC_liq_sweep_low", +2, "Ликвидация шортов — бычий разворот")
+
+    # ───── BLOCK O — Cumulative Delta ─────
+    cum_delta = ind_1h.get("cum_delta", 0)
+    if cum_delta > 0.3:
+        vote("CumDelta_bull", +2, f"Cumulative Delta={cum_delta:.2f} — покупатели доминируют")
+    elif cum_delta < -0.3:
+        vote("CumDelta_bear", -2, f"Cumulative Delta={cum_delta:.2f} — продавцы доминируют")
+    elif cum_delta > 0.1:
+        vote("CumDelta_mild_bull", +1, f"CumDelta={cum_delta:.2f}")
+    elif cum_delta < -0.1:
+        vote("CumDelta_mild_bear", -1, f"CumDelta={cum_delta:.2f}")
+
+    # ───── BLOCK P — Fibonacci position ─────
+    fib_382 = ind_1h.get("fib_382", 0)
+    fib_618 = ind_1h.get("fib_618", 0)
+    fib_high = ind_1h.get("fib_high", 0)
+    fib_low = ind_1h.get("fib_low", 0)
+    if fib_high > fib_low and fib_high > 0:
+        fib_pos = (close_price - fib_low) / (fib_high - fib_low)
+        if fib_pos > 0.786:
+            vote("Fib_near_high", -1, f"Цена у Fib 78.6% — возможен откат")
+        elif fib_pos < 0.236:
+            vote("Fib_near_low", +1, f"Цена у Fib 23.6% — возможен отскок")
+
+    # ───── BLOCK Q — Institutional Flow (COT + Retail Contrarian + Macro) ─────
+    try:
+        from . import institutional as inst_mod
+        inst = inst_mod.get_institutional_flow(pair)
+        if inst["signal"] in ("BUY", "SELL"):
+            pts = max(1, min(4, int(round(inst["strength"] / 25))))
+            if inst["signal"] == "SELL":
+                pts = -pts
+            vote(
+                "institutional_flow",
+                pts,
+                f"{inst['signal']} (strength={inst['strength']}%, "
+                f"sources: {', '.join(inst['sources'])})",
+            )
+    except Exception as e:
+        log.warning(f"institutional flow failed for {pair}: {e}")
+
     # ───── PENALTY: news blackout ─────
     # high-impact новость ±30 мин: снижаем confidence обеих сторон,
     # уменьшая abs(score) на величину penalty (но не ниже нуля).
@@ -336,7 +429,7 @@ def evaluate_pair(pair: str) -> dict | None:
         return None  # нейтрально, не показываем
 
     side = "BUY" if score > 0 else "SELL"
-    p_raw = _score_to_probability(abs(score), 75)
+    p_raw = _score_to_probability(abs(score), 100)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
     # Without multi-TF confirmation, cap at 65% (won't pass 80% gate)
