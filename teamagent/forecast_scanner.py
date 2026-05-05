@@ -50,16 +50,49 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def _score_to_probability(score: int, max_score: int = 75) -> float:
-    """Score -75..+75 → probability 0..1, абсолютная.
+def _score_to_probability(score: int, max_score: int | None = None) -> float:
+    """Score → probability 0..1, абсолютная.
 
     Score>0 → BUY вероятность; <0 → SELL вероятность.
-    max_score=75 учитывает 6 новых блоков (MACD, Stoch, ADX, Williams %R,
-    Ichimoku, и ADX regime gate) добавленных в 2026-05-03.
+    max_score defaults to config.MAX_SCORE (95) to account for all indicator
+    blocks including Phase 15 additions (CCI, ROC, Pivot, PSAR, S/R,
+    consecutive candles, session time).
     """
+    if max_score is None:
+        max_score = getattr(config, "MAX_SCORE", 95)
     norm = score / max_score              # -1..+1
     p = _sigmoid(norm * 4.0)              # softer sigmoid
     return p
+
+
+def _time_until_midnight_utc() -> float:
+    """Hours remaining until 0:00 UTC (next midnight)."""
+    now = datetime.now(timezone.utc)
+    midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return (midnight - now).total_seconds() / 3600.0
+
+
+def _session_remaining_hours(now: datetime) -> float:
+    """Hours remaining in current trading session. Returns 0 if off-hours."""
+    hour = now.hour
+    for name, (lo, hi) in config.SESSIONS.items():
+        if lo <= hour <= hi:
+            remaining = hi - hour + (60 - now.minute) / 60.0
+            return max(0, remaining)
+    return 0.0
+
+
+def _confluence_ratio(score_breakdown: list[dict]) -> float:
+    """Calculate what fraction of voting indicators agree with the majority direction.
+    Returns 0.0-1.0. Higher = stronger confluence."""
+    if not score_breakdown:
+        return 0.0
+    bullish = sum(1 for s in score_breakdown if s["contrib"] > 0)
+    bearish = sum(1 for s in score_breakdown if s["contrib"] < 0)
+    total = bullish + bearish
+    if total == 0:
+        return 0.0
+    return max(bullish, bearish) / total
 
 
 def evaluate_pair(pair: str) -> dict | None:
@@ -241,6 +274,101 @@ def evaluate_pair(pair: str) -> dict | None:
     elif below_cloud:
         vote("Ichimoku_bear", -1, "Цена ниже облака Ишимоку")
 
+    # ───── BLOCK H7 — CCI (Commodity Channel Index) ─────
+    cci_val = ind_1h.get("cci20", 0.0)
+    if cci_val > 200:
+        vote("CCI_extreme_overbought", -3, f"CCI={cci_val:.0f} >200 — сильная перекупленность")
+    elif cci_val > 100:
+        vote("CCI_overbought", -1, f"CCI={cci_val:.0f} >100 — перекупленность")
+    elif cci_val < -200:
+        vote("CCI_extreme_oversold", +3, f"CCI={cci_val:.0f} <-200 — сильная перепроданность")
+    elif cci_val < -100:
+        vote("CCI_oversold", +1, f"CCI={cci_val:.0f} <-100 — перепроданность")
+    elif 0 < cci_val < 100:
+        vote("CCI_bullish_zone", +1, f"CCI={cci_val:.0f} — бычья зона")
+    elif -100 < cci_val < 0:
+        vote("CCI_bearish_zone", -1, f"CCI={cci_val:.0f} — медвежья зона")
+
+    # ───── BLOCK H8 — Rate of Change (ROC) ─────
+    roc_val = ind_1h.get("roc10", 0.0)
+    if roc_val > 0.3:
+        vote("ROC_strong_up", +2, f"ROC={roc_val:.3f}% — сильный бычий момент")
+    elif roc_val > 0.1:
+        vote("ROC_mild_up", +1, f"ROC={roc_val:.3f}% — умеренный бычий момент")
+    elif roc_val < -0.3:
+        vote("ROC_strong_down", -2, f"ROC={roc_val:.3f}% — сильный медвежий момент")
+    elif roc_val < -0.1:
+        vote("ROC_mild_down", -1, f"ROC={roc_val:.3f}% — умеренный медвежий момент")
+
+    # ───── BLOCK H9 — Pivot Points (Support/Resistance levels) ─────
+    close_now = ind_1h["close"]
+    pivot_pp = ind_1h.get("pivot_pp", close_now)
+    pivot_r1 = ind_1h.get("pivot_r1", close_now)
+    pivot_s1 = ind_1h.get("pivot_s1", close_now)
+    pivot_r2 = ind_1h.get("pivot_r2", close_now)
+    pivot_s2 = ind_1h.get("pivot_s2", close_now)
+    if pivot_pp > 0:
+        if close_now > pivot_r1:
+            vote("Pivot_above_R1", +2, f"Цена выше R1 ({pivot_r1:.5f}) — бычий пробой")
+        elif close_now > pivot_pp:
+            vote("Pivot_above_PP", +1, f"Цена выше PP ({pivot_pp:.5f})")
+        elif close_now < pivot_s1:
+            vote("Pivot_below_S1", -2, f"Цена ниже S1 ({pivot_s1:.5f}) — медвежий пробой")
+        elif close_now < pivot_pp:
+            vote("Pivot_below_PP", -1, f"Цена ниже PP ({pivot_pp:.5f})")
+
+    # ───── BLOCK H10 — Parabolic SAR ─────
+    psar_bull = bool(ind_1h.get("psar_bullish", 0.0))
+    psar_bull_4h = bool(ind_4h.get("psar_bullish", 0.0))
+    if psar_bull and psar_bull_4h:
+        vote("PSAR_full_bull", +2, "PSAR бычий на 1H и 4H")
+    elif not psar_bull and not psar_bull_4h:
+        vote("PSAR_full_bear", -2, "PSAR медвежий на 1H и 4H")
+    elif psar_bull:
+        vote("PSAR_1h_bull", +1, "PSAR бычий на 1H")
+    else:
+        vote("PSAR_1h_bear", -1, "PSAR медвежий на 1H")
+
+    # ───── BLOCK H11 — Support/Resistance proximity ─────
+    res_high = ind_1h.get("resistance_high", 0)
+    sup_low = ind_1h.get("support_low", 0)
+    if res_high > 0 and sup_low > 0:
+        range_sr = res_high - sup_low
+        if range_sr > 0:
+            pos_in_range = (close_now - sup_low) / range_sr
+            if pos_in_range > 0.95:
+                vote("SR_at_resistance", -2, f"Цена у сопротивления ({pos_in_range:.0%})")
+            elif pos_in_range < 0.05:
+                vote("SR_at_support", +2, f"Цена у поддержки ({pos_in_range:.0%})")
+            elif pos_in_range > 0.80:
+                vote("SR_near_resistance", -1, f"Цена близко к сопротивлению ({pos_in_range:.0%})")
+            elif pos_in_range < 0.20:
+                vote("SR_near_support", +1, f"Цена близко к поддержке ({pos_in_range:.0%})")
+
+    # ───── BLOCK H12 — Consecutive candles (trend quality) ─────
+    consec = int(ind_1h.get("consec_candles", 0))
+    if consec >= 4:
+        vote("Consec_strong_bull_run", +3, f"{consec} бычьих свечей подряд")
+    elif consec >= 3:
+        vote("Consec_bull_run", +2, f"{consec} бычьих свечей подряд")
+    elif consec <= -4:
+        vote("Consec_strong_bear_run", -3, f"{abs(consec)} медвежьих свечей подряд")
+    elif consec <= -3:
+        vote("Consec_bear_run", -2, f"{abs(consec)} медвежьих свечей подряд")
+
+    # ───── BLOCK N — Session Time Awareness ─────
+    session_remaining_h = _session_remaining_hours(now)
+    hours_to_midnight = _time_until_midnight_utc()
+    if session_remaining_h < 1.0 and session_remaining_h > 0:
+        penalty = min(3, int(round(abs(score) * 0.3)))
+        if penalty > 0:
+            if score > 0:
+                vote("session_ending_penalty", -penalty,
+                     f"До конца сессии {session_remaining_h:.1f}ч — снижаем уверенность")
+            elif score < 0:
+                vote("session_ending_penalty", +penalty,
+                     f"До конца сессии {session_remaining_h:.1f}ч — снижаем уверенность")
+
     # ───── BLOCK I — Fundamental macro tilt (FRED rates / yields / CPI) ─────
     # Source: teamagent.fundamentals (FRED 24h cache, no API key).
     # Cap ±5 contribution so tech signals dominate; fundamentals are a slow-
@@ -322,19 +450,44 @@ def evaluate_pair(pair: str) -> dict | None:
         delta = -penalty if score > 0 else (penalty if score < 0 else 0)
         vote("news_blackout", delta, f"high-impact новость ±30 мин — снижаем abs(score) на {penalty}")
 
+    # ───── CONFLUENCE QUALITY GATE (Phase 15) ─────
+    confluence = _confluence_ratio(score_breakdown)
+    min_abs_score = getattr(config, "MIN_ABSOLUTE_SCORE", 8)
+    min_confluence = getattr(config, "MIN_CONFLUENCE_RATIO", 0.60)
+
     # ───── итог ─────
     if score == 0:
         return None  # нейтрально, не показываем
 
+    # Quality filter: if score is too weak or indicators too conflicted, skip
+    if abs(score) < min_abs_score:
+        log.info(f"{pair}: score={score} < min_abs_score={min_abs_score} — слабый сигнал, пропускаем")
+        return None
+
+    if confluence < min_confluence:
+        log.info(f"{pair}: confluence={confluence:.2f} < {min_confluence} — индикаторы конфликтуют, пропускаем")
+        return None
+
     side = "BUY" if score > 0 else "SELL"
-    p_raw = _score_to_probability(abs(score), 75)
+    max_sc = getattr(config, "MAX_SCORE", 95)
+    p_raw = _score_to_probability(abs(score), max_sc)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
+    # Confluence bonus: high confluence raises probability slightly
+    if confluence >= 0.85:
+        p = min(config.MAX_PROBABILITY, p + 0.03)
+    elif confluence >= 0.75:
+        p = min(config.MAX_PROBABILITY, p + 0.02)
+
     # рекомендованная экспирация: больше score → дольше держим
-    abs_norm = min(1.0, abs(score) / 20.0)
+    abs_norm = min(1.0, abs(score) / 25.0)
     recommended_hours = int(round(config.MIN_EXPIRY_HOURS + abs_norm * (config.MAX_EXPIRY_HOURS - config.MIN_EXPIRY_HOURS)))
     recommended_hours = max(config.MIN_EXPIRY_HOURS, min(config.MAX_EXPIRY_HOURS, recommended_hours))
+
+    # Time-aware expiry cap: don't set expiry beyond session end
+    if session_remaining_h > 0:
+        recommended_hours = min(recommended_hours, max(1, int(session_remaining_h)))
 
     # volume profile snapshot
     try:
@@ -349,9 +502,13 @@ def evaluate_pair(pair: str) -> dict | None:
         "probability": round(p, 4),
         "probability_pct": round(p * 100.0, 1),
         "score": score,
-        "max_score": 75,
+        "max_score": max_sc,
         "recommended_hours": recommended_hours,
         "current_price": ind_15m["close"],
+        "confluence_ratio": round(confluence, 3),
+        "confluence_pct": round(confluence * 100, 1),
+        "session_remaining_hours": round(session_remaining_h, 2),
+        "hours_to_midnight_utc": round(hours_to_midnight, 2),
         "indicators": {
             "4H": ind_4h,
             "1H": ind_1h,
@@ -365,6 +522,11 @@ def evaluate_pair(pair: str) -> dict | None:
         "volume_profile": vp,
         "as_of": now.isoformat(),
         "session": _current_session(now.hour),
+        "quality_gate": {
+            "min_abs_score": min_abs_score,
+            "min_confluence": min_confluence,
+            "passed": True,
+        },
     }
     return forecast
 
@@ -378,9 +540,18 @@ def _current_session(hour: int) -> str:
 
 def scan_all_pairs() -> dict:
     """Полный обход 28 пар. Сохраняет общий snapshot в state/forecasts.json."""
+    now = datetime.now(timezone.utc)
     snapshot = {
-        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "scanned_at": now.isoformat(),
         "total_pairs": len(config.PAIRS),
+        "hours_to_midnight_utc": round(_time_until_midnight_utc(), 2),
+        "session_remaining_hours": round(_session_remaining_hours(now), 2),
+        "current_session": _current_session(now.hour),
+        "quality_gate": {
+            "min_abs_score": getattr(config, "MIN_ABSOLUTE_SCORE", 8),
+            "min_confluence_ratio": getattr(config, "MIN_CONFLUENCE_RATIO", 0.60),
+            "min_probability": config.MIN_PROBABILITY,
+        },
         "forecasts": {},
         "rankings": [],
     }
@@ -416,7 +587,8 @@ def scan_all_pairs() -> dict:
             "probability_pct": f["probability_pct"],
             "score": f["score"],
             "recommended_hours": f["recommended_hours"],
-            # vote breakdown в выжимке тоже — иначе на дашборде пары показывают 0/0
+            "confluence_pct": f.get("confluence_pct", 0),
+            "session_remaining_hours": f.get("session_remaining_hours", 0),
             "agents_for_count": f.get("agents_for_count", 0),
             "agents_against_count": f.get("agents_against_count", 0),
         })

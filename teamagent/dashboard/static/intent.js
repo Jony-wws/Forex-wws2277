@@ -1719,4 +1719,126 @@
       _skRefreshNewsWatch();
     }
   });
+  // ═══════════════════════════════════════════════════════════════════════
+  // PHASE 15 · Quality Dashboard — Time + Confluence + Win Rates (2026-05-05)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  async function refreshPhase15() {
+    try {
+      const [timeData, wrData, forecastData] = await Promise.all([
+        _skFetch("/api/time-status"),
+        _skFetch("/api/pair-winrates"),
+        _skFetch("/api/forecasts"),
+      ]);
+
+      // Time countdown
+      if (timeData) {
+        const h = Math.floor(timeData.hours_to_midnight_utc);
+        const m = Math.round((timeData.hours_to_midnight_utc - h) * 60);
+        const midnightEl = document.getElementById("p15-midnight-countdown");
+        if (midnightEl) midnightEl.textContent = `${h}ч ${String(m).padStart(2, "0")}м`;
+
+        const sessEl = document.getElementById("p15-session");
+        if (sessEl) sessEl.textContent = timeData.current_session || "Off";
+        if (sessEl && timeData.current_session === "Off") sessEl.style.color = "#ff6666";
+        else if (sessEl) sessEl.style.color = "#00ff88";
+
+        const sessRemEl = document.getElementById("p15-session-remaining");
+        if (sessRemEl) {
+          const sr = timeData.session_remaining_hours;
+          sessRemEl.textContent = sr > 0 ? `осталось ${sr.toFixed(1)}ч · max expiry ${timeData.safe_max_expiry_hours}ч` : "сессия закрыта";
+        }
+      }
+
+      // Total win rate
+      if (wrData && wrData.pair_winrates) {
+        const wr = wrData.pair_winrates;
+        let totalWins = 0, totalLosses = 0, totalPnl = 0;
+        Object.values(wr).forEach(p => {
+          totalWins += p.wins;
+          totalLosses += p.losses;
+          totalPnl += p.pnl;
+        });
+        const total = totalWins + totalLosses;
+        const wrPct = total > 0 ? (totalWins / total * 100) : 0;
+        const wrEl = document.getElementById("p15-total-wr");
+        if (wrEl) {
+          wrEl.textContent = total > 0 ? `${wrPct.toFixed(1)}%` : "—";
+          wrEl.style.color = wrPct >= 70 ? "#00ff88" : wrPct >= 55 ? "#ffcc00" : "#ff4444";
+        }
+        const detailEl = document.getElementById("p15-total-wr-detail");
+        if (detailEl) detailEl.textContent = `${totalWins}W / ${totalLosses}L · PnL ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`;
+
+        // Per-pair grid
+        const pairGrid = document.getElementById("p15-pair-wr-grid");
+        if (pairGrid) {
+          const pairs = Object.entries(wr).sort((a, b) => b[1].win_rate_pct - a[1].win_rate_pct);
+          if (pairs.length === 0) {
+            pairGrid.innerHTML = '<div style="color:#5a7a9a;font-size:12px;padding:8px">пока нет закрытых сделок</div>';
+          } else {
+            pairGrid.innerHTML = pairs.map(([pair, s]) => {
+              const color = s.win_rate_pct >= 70 ? "#00ff88" : s.win_rate_pct >= 55 ? "#ffcc00" : "#ff4444";
+              const bg = s.win_rate_pct >= 70 ? "#00ff8815" : s.win_rate_pct >= 55 ? "#ffcc0015" : "#ff444415";
+              return `<div style="background:${bg};border:1px solid ${color}33;border-radius:8px;padding:8px 10px;font-size:12px">
+                <div style="font-weight:700;color:#fff">${pair}</div>
+                <div style="color:${color};font-size:16px;font-weight:800">${s.win_rate_pct.toFixed(0)}%</div>
+                <div style="color:#7aa2c0">${s.wins}W/${s.losses}L · $${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)}</div>
+              </div>`;
+            }).join("");
+          }
+        }
+      }
+
+      // Strong signals
+      if (forecastData && forecastData.forecasts) {
+        const fc = forecastData.forecasts;
+        const signalsGrid = document.getElementById("p15-strong-signals");
+        const qualityPill = document.getElementById("p15-quality-pill");
+        const qualityEl = document.getElementById("p15-signal-quality");
+        const strongSignals = Object.values(fc).filter(f =>
+          f && !f.skipped && f.probability_pct >= 75 && (f.confluence_pct || 0) >= 60
+        ).sort((a, b) => (b.probability_pct || 0) - (a.probability_pct || 0));
+
+        const totalForecasts = Object.values(fc).filter(f => f && !f.skipped).length;
+
+        if (qualityEl) qualityEl.textContent = `${strongSignals.length} / ${totalForecasts}`;
+        if (qualityPill) qualityPill.textContent = `v15 · ${strongSignals.length} сильных сигналов из ${Object.keys(fc).length} пар`;
+
+        if (signalsGrid) {
+          if (strongSignals.length === 0) {
+            signalsGrid.innerHTML = '<div style="color:#ffcc00;font-size:13px;padding:12px;background:#ffcc0010;border-radius:8px;border:1px solid #ffcc0033">Нет сигналов достаточного качества. Система ждёт лучший момент для входа.</div>';
+          } else {
+            signalsGrid.innerHTML = strongSignals.map(f => {
+              const sideColor = f.side === "BUY" ? "#00ff88" : "#ff4466";
+              const confColor = (f.confluence_pct || 0) >= 80 ? "#00ff88" : (f.confluence_pct || 0) >= 70 ? "#00e1ff" : "#ffcc00";
+              const sessRemain = f.session_remaining_hours || 0;
+              return `<div style="background:linear-gradient(135deg,#0a162899,#0d1f3c99);border:1px solid ${sideColor}44;border-radius:10px;padding:12px;position:relative;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <span style="font-weight:800;color:#fff;font-size:14px">${f.pair}</span>
+                  <span style="background:${sideColor}22;color:${sideColor};padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px">${f.side}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px">
+                  <div><span style="color:#7aa2c0">Вероятность:</span> <b style="color:#fff">${(f.probability_pct || 0).toFixed(1)}%</b></div>
+                  <div><span style="color:#7aa2c0">Confluence:</span> <b style="color:${confColor}">${(f.confluence_pct || 0).toFixed(0)}%</b></div>
+                  <div><span style="color:#7aa2c0">Score:</span> <b style="color:#fff">${f.score}/${f.max_score}</b></div>
+                  <div><span style="color:#7aa2c0">Expiry:</span> <b style="color:#fff">${f.recommended_hours}ч</b></div>
+                  <div><span style="color:#7aa2c0">Агенты за:</span> <b style="color:#00ff88">${f.agents_for_count || 0}</b></div>
+                  <div><span style="color:#7aa2c0">Против:</span> <b style="color:#ff4466">${f.agents_against_count || 0}</b></div>
+                </div>
+                ${sessRemain > 0 ? `<div style="margin-top:6px;font-size:10px;color:#5a7a9a">Сессия: осталось ${sessRemain.toFixed(1)}ч</div>` : ""}
+                <div style="position:absolute;top:0;right:0;bottom:0;width:4px;background:${sideColor}"></div>
+              </div>`;
+            }).join("");
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Phase 15 refresh failed:", e);
+    }
+  }
+
+  // Initial load + periodic refresh
+  refreshPhase15();
+  setInterval(refreshPhase15, 15_000);
+
 })();

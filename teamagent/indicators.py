@@ -174,6 +174,113 @@ def ichimoku(df: pd.DataFrame, tenkan_period: int = 9, kijun_period: int = 26,
     )
 
 
+def cci(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Commodity Channel Index. >100 overbought, <-100 oversold."""
+    typical = (df["High"] + df["Low"] + df["Close"]) / 3.0
+    sma = typical.rolling(period, min_periods=period).mean()
+    mad = typical.rolling(period, min_periods=period).apply(
+        lambda x: np.abs(x - x.mean()).mean(), raw=True,
+    )
+    denom = (0.015 * mad).replace(0.0, np.nan)
+    return ((typical - sma) / denom).fillna(0.0)
+
+
+def roc(close: pd.Series, period: int = 10) -> pd.Series:
+    """Rate of Change (%). Positive = bullish momentum."""
+    prev = close.shift(period).replace(0.0, np.nan)
+    return ((close - prev) / prev * 100.0).fillna(0.0)
+
+
+def pivot_points(df: pd.DataFrame) -> dict[str, float]:
+    """Classic pivot points from last completed bar (proxy for daily).
+    Returns dict with pp, r1, r2, r3, s1, s2, s3."""
+    if len(df) < 2:
+        c = float(df["Close"].iloc[-1]) if len(df) else 0.0
+        return {"pp": c, "r1": c, "r2": c, "r3": c, "s1": c, "s2": c, "s3": c}
+    prev = df.iloc[-2]
+    h, l, c = float(prev["High"]), float(prev["Low"]), float(prev["Close"])
+    pp = (h + l + c) / 3.0
+    r1 = 2 * pp - l
+    s1 = 2 * pp - h
+    r2 = pp + (h - l)
+    s2 = pp - (h - l)
+    r3 = h + 2 * (pp - l)
+    s3 = l - 2 * (h - pp)
+    return {"pp": pp, "r1": r1, "r2": r2, "r3": r3, "s1": s1, "s2": s2, "s3": s3}
+
+
+def parabolic_sar(df: pd.DataFrame, af_start: float = 0.02,
+                  af_step: float = 0.02, af_max: float = 0.20) -> pd.Series:
+    """Parabolic SAR. Returns series of SAR values."""
+    high = df["High"].values
+    low = df["Low"].values
+    n = len(high)
+    sar = np.zeros(n)
+    if n < 2:
+        return pd.Series(sar, index=df.index)
+    bull = True
+    af = af_start
+    ep = high[0]
+    sar[0] = low[0]
+    for i in range(1, n):
+        sar[i] = sar[i - 1] + af * (ep - sar[i - 1])
+        if bull:
+            if low[i] < sar[i]:
+                bull = False
+                sar[i] = ep
+                ep = low[i]
+                af = af_start
+            else:
+                if high[i] > ep:
+                    ep = high[i]
+                    af = min(af + af_step, af_max)
+        else:
+            if high[i] > sar[i]:
+                bull = True
+                sar[i] = ep
+                ep = high[i]
+                af = af_start
+            else:
+                if low[i] < ep:
+                    ep = low[i]
+                    af = min(af + af_step, af_max)
+    return pd.Series(sar, index=df.index)
+
+
+def consecutive_candles(df: pd.DataFrame, n: int = 5) -> int:
+    """Count of last consecutive bullish (+) or bearish (-) candles.
+    Returns positive int for bullish streak, negative for bearish."""
+    if len(df) < 2:
+        return 0
+    closes = df["Close"].values
+    opens = df["Open"].values
+    streak = 0
+    direction = 0
+    for i in range(len(closes) - 1, max(-1, len(closes) - 1 - n), -1):
+        bull = closes[i] > opens[i]
+        if direction == 0:
+            direction = 1 if bull else -1
+            streak = direction
+        elif (bull and direction > 0) or (not bull and direction < 0):
+            streak += direction
+        else:
+            break
+    return streak
+
+
+def support_resistance_levels(df: pd.DataFrame, lookback: int = 50) -> dict[str, float]:
+    """Recent support/resistance from rolling highs/lows."""
+    if len(df) < lookback:
+        lookback = len(df)
+    recent = df.tail(lookback)
+    return {
+        "resistance_high": float(recent["High"].max()),
+        "support_low": float(recent["Low"].min()),
+        "resistance_mid": float(recent["High"].rolling(20, min_periods=5).max().iloc[-1]),
+        "support_mid": float(recent["Low"].rolling(20, min_periods=5).min().iloc[-1]),
+    }
+
+
 def all_indicators(df: pd.DataFrame) -> dict[str, float]:
     """Скан всех индикаторов на последнем баре. Возвращает плоский dict для UI/агентов."""
     if df is None or df.empty or len(df) < 30:
@@ -224,5 +331,29 @@ def all_indicators(df: pd.DataFrame) -> dict[str, float]:
     cloud_bot = min(out["ichimoku_senkou_a"], out["ichimoku_senkou_b"])
     out["ichimoku_above_cloud"] = float(out["close"] > cloud_top)
     out["ichimoku_below_cloud"] = float(out["close"] < cloud_bot)
+
+    # CCI
+    out["cci20"] = float(cci(df, 20).iloc[-1])
+
+    # ROC
+    out["roc10"] = float(roc(close, 10).iloc[-1])
+
+    # Pivot Points
+    pp = pivot_points(df)
+    for k, v in pp.items():
+        out[f"pivot_{k}"] = v
+
+    # Parabolic SAR
+    sar_vals = parabolic_sar(df)
+    out["psar"] = float(sar_vals.iloc[-1])
+    out["psar_bullish"] = float(out["close"] > out["psar"])
+
+    # Consecutive candles
+    out["consec_candles"] = float(consecutive_candles(df, 5))
+
+    # Support/Resistance
+    sr = support_resistance_levels(df, 50)
+    for k, v in sr.items():
+        out[k] = v
 
     return out

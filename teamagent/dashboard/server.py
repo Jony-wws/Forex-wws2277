@@ -1878,6 +1878,72 @@ def api_health():
     return out
 
 
+@app.get("/api/pair-winrates")
+def api_pair_winrates():
+    """Honest per-pair win rates from closed trades."""
+    closed = _load(config.STATE_DIR / "closed_trades.json", [])
+    pair_stats: dict[str, dict] = {}
+    for t in closed:
+        pair = t.get("pair", "")
+        if pair not in pair_stats:
+            pair_stats[pair] = {"wins": 0, "losses": 0, "total": 0, "pnl": 0.0}
+        pair_stats[pair]["total"] += 1
+        if t.get("status") == "WIN":
+            pair_stats[pair]["wins"] += 1
+            pair_stats[pair]["pnl"] += float(t.get("pnl", 0))
+        elif t.get("status") == "LOSS":
+            pair_stats[pair]["losses"] += 1
+            pair_stats[pair]["pnl"] += float(t.get("pnl", 0))
+    result = {}
+    for pair, s in pair_stats.items():
+        wr = (s["wins"] / s["total"] * 100) if s["total"] > 0 else 0
+        result[pair] = {
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "total": s["total"],
+            "win_rate_pct": round(wr, 1),
+            "pnl": round(s["pnl"], 2),
+        }
+    return {
+        "pair_winrates": result,
+        "total_pairs_traded": len(result),
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/api/time-status")
+def api_time_status():
+    """Current time status: session, countdown to midnight UTC, session remaining."""
+    now = datetime.now(timezone.utc)
+    utc5 = now + __import__("datetime").timedelta(hours=5)
+    hour = now.hour
+    current_session = "Off"
+    session_end_hour = 0
+    for name, (lo, hi) in config.SESSIONS.items():
+        if lo <= hour <= hi:
+            current_session = name
+            session_end_hour = hi
+            break
+    session_remaining_h = max(0, session_end_hour - hour + (60 - now.minute) / 60.0) if current_session != "Off" else 0
+    midnight = (now + __import__("datetime").timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    hours_to_midnight = (midnight - now).total_seconds() / 3600.0
+    return {
+        "utc_now": now.isoformat(),
+        "utc5_now": utc5.isoformat(),
+        "current_session": current_session,
+        "session_remaining_hours": round(session_remaining_h, 2),
+        "hours_to_midnight_utc": round(hours_to_midnight, 2),
+        "minutes_to_midnight_utc": int(hours_to_midnight * 60),
+        "safe_max_expiry_hours": max(1, min(5, int(session_remaining_h))) if session_remaining_h > 0 else 0,
+    }
+
+
+@app.get("/orderbook")
+def orderbook_page():
+    """Redirect /orderbook to the main intent page (prognoses)."""
+    return RedirectResponse(url="/intent", status_code=302)
+
+
 def serve(host: str = config.DASHBOARD_HOST, port: int = config.DASHBOARD_PORT) -> None:
     import uvicorn
     log.info(f"dashboard serving on http://{host}:{port}")

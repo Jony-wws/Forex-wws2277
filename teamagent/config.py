@@ -51,7 +51,7 @@ SESSIONS: dict[str, tuple[int, int]] = {
 # открываемой сделки определяет mart_engine ниже (после loss-стрика).
 STAKE_USD = 1.0
 PAYOUT_PCT = 0.85          # WIN +$0.85 на $1, LOSS -$1
-MIN_PROBABILITY = 0.70     # открываем только если ≥70%
+MIN_PROBABILITY = 0.75     # открываем только если ≥75% (было 70%, повышено для WR 70%+)
 MAX_PROBABILITY = 0.92     # кэп — никогда не показываем 100%
 
 # Мартингейл (2026-05-01 user request): после N подряд LOSS на ОДНОЙ паре
@@ -72,6 +72,16 @@ MIN_EXPIRY_HOURS = 1
 # 2026-05-03: Ichimoku и ADX-trend варианты лучше держать чуть дольше
 # (5 часов), чтобы тренд успел реализоваться. Было 4.
 MAX_EXPIRY_HOURS = 5
+
+# ───── Phase 15: Confluence Quality Gate (2026-05-05) ─────
+# Minimum absolute score to generate any non-NEUTRAL forecast.
+# Filters out weak/ambiguous signals. Higher = fewer but better signals.
+MIN_ABSOLUTE_SCORE = 8
+# Minimum ratio of agreeing indicator categories (0.0-1.0).
+# e.g. 0.6 means ≥60% of indicator blocks must point the same way.
+MIN_CONFLUENCE_RATIO = 0.60
+# Maximum score for probability mapping (updated for new blocks)
+MAX_SCORE = 95
 
 # ───── Ensemble voting (2026-05-03 user request) ─────
 # Ensemble складывает голоса top_variants (до 10) для каждой (pair, session)
