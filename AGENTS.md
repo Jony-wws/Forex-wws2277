@@ -212,6 +212,31 @@ Stop everything: `bash scripts/stop_all.sh`.
 18. **MAX_EXPIRY_HOURS = 5 (was 4)** since 2026-05-03 — Ichimoku and ADX
     trend variants need an extra hour for the trend to play out.
 
+19. **Phase 9 BLOCK M (added 2026-05-04 — deeper conviction layers)**:
+    `forecast_scanner.evaluate_pair()` runs three additional learned-knowledge
+    layers (all grounded in real 365-day data, no simulator):
+
+    - `hour_bias_score(pair, now_utc)` — per-(pair × UTC hour) drift over 365
+      days of Yahoo 1H closes, threshold conc≥62% / n≥60. Cap ±1.
+    - `historical_wr_score(pair, session, pre_score)` — per-(pair × session)
+      backtest WR from `strategy_config_locked.json`. Tier ±2/±3/±4 for
+      WR≥60/65/70%. **Agreement guard**: only fires when historical
+      `dominant_side` matches the technical-stack score sign — never overrides
+      direction.
+    - `currency_strength_score(pair)` — real 24h cross-pair return ranking;
+      ±2 when base is in top-3 strongest AND quote in bottom-3 weakest (or
+      reverse). Cached 5 min.
+
+    All three additive votes; never block trades; the free 70% gate (rule #7)
+    stays free. See `HISTORY/2026-05-04_phase9_deeper_conviction.md`.
+
+20. **Phase 9 relaxed thresholds (events/training.py)**:
+    - High-conviction rules: freq≥3 + conc≥70% (was ≥4 + ≥75%) → 23 rules.
+    - Pair-session bias: conc≥65% / n≥80, cap ±3 (was ≥70% / ≥100, cap ±2).
+    - New artefact `pair_hour_bias` in `learned_rules.json` (49 cells, 22
+      pairs). Re-run via `python -m teamagent.events.training` (writes
+      `state/learned_rules.json`).
+
 ## Optional API keys (env vars)
 
 The 3 LLM agents are no-op if these aren't set; the rest of the system still

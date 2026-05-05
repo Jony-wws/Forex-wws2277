@@ -31,6 +31,7 @@ PERSISTENT_FILE = ART_DIR / "persistent_drivers.csv"
 PER_EVENT_PS_FILE = ART_DIR / "per_event_pair_session.csv"
 TRAP_PS_FILE = ART_DIR / "trap_pair_session_summary.csv"
 LEARNED_RULES_FILE = ROOT / "teamagent" / "state" / "learned_rules.json"
+STRATEGY_LOCKED_FILE = ROOT / "teamagent" / "state" / "strategy_config_locked.json"
 
 WINDOW_HOURS = 6  # ±6h around current time
 
@@ -47,6 +48,11 @@ _per_event_ps: dict[tuple[str, str, str], dict] = {}
 _high_conv_rules: dict[tuple[str, str, str], dict] = {}
 # (pair, session) → {mean_signed_pips, concordance_pct, dominant_direction, n}
 _pair_bias: dict[tuple[str, str], dict] = {}
+# Phase-9 trained knowledge
+# (pair, hour) → {n, ups, downs, concordance_pct, dominant_direction, mean_signed_pips}
+_pair_hour_bias: dict[tuple[str, int], dict] = {}
+# (pair, session) → {win_rate_pct, trades, dominant_side ('BUY'|'SELL')}
+_strategy_wr: dict[tuple[str, str], dict] = {}
 
 
 def _safe_float(x: str | None) -> float | None:
@@ -127,7 +133,7 @@ def _load() -> None:
     except Exception as e:
         log.warning(f"failed to load per_event_pair_session: {e}")
 
-    # Phase-8 learned rules
+    # Phase-8 learned rules + Phase-9 hour bias
     try:
         if LEARNED_RULES_FILE.exists():
             data = json.loads(LEARNED_RULES_FILE.read_text())
@@ -136,11 +142,48 @@ def _load() -> None:
             for pair, sess_map in data.get("pair_session_bias", {}).items():
                 for sess, info in sess_map.items():
                     _pair_bias[(pair, sess)] = info
-            log.info(f"loaded {len(_high_conv_rules)} high-conviction rules + {len(_pair_bias)} pair-bias cells")
+            for pair, hour_map in data.get("pair_hour_bias", {}).items():
+                for hour_str, info in hour_map.items():
+                    try:
+                        hr = int(hour_str)
+                    except (TypeError, ValueError):
+                        continue
+                    _pair_hour_bias[(pair, hr)] = info
+            log.info(
+                f"loaded {len(_high_conv_rules)} high-conviction rules + "
+                f"{len(_pair_bias)} pair-session bias cells + "
+                f"{len(_pair_hour_bias)} pair-hour bias cells"
+            )
         else:
-            log.info("learned_rules.json not found; phase-8 boost disabled")
+            log.info("learned_rules.json not found; phase-8/9 boost disabled")
     except Exception as e:
         log.warning(f"failed to load learned_rules: {e}")
+
+    # Phase-9: strategy_config_locked → per-(pair, session) historical WR + dominant side
+    try:
+        if STRATEGY_LOCKED_FILE.exists():
+            data = json.loads(STRATEGY_LOCKED_FILE.read_text())
+            for pair, info in data.get("pairs", {}).items():
+                by_sess = info.get("by_session") or {}
+                for sess_name, sess_info in by_sess.items():
+                    wr = sess_info.get("win_rate_pct")
+                    trades = sess_info.get("trades") or 0
+                    top_variants = sess_info.get("top_variants") or []
+                    dom_side = None
+                    if top_variants:
+                        dom_side = top_variants[0].get("dominant_side")
+                    if wr is None or dom_side not in ("BUY", "SELL"):
+                        continue
+                    _strategy_wr[(pair, sess_name)] = {
+                        "win_rate_pct": float(wr),
+                        "trades": int(trades),
+                        "dominant_side": dom_side,
+                    }
+            log.info(f"loaded {len(_strategy_wr)} per-(pair, session) historical WR cells")
+        else:
+            log.info("strategy_config_locked.json not found; historical_wr boost disabled")
+    except Exception as e:
+        log.warning(f"failed to load strategy_config_locked: {e}")
 
 
 def event_affects_pair(event_ccy: str, pair: str) -> bool:
@@ -355,13 +398,18 @@ def learned_rule_score(
     return int(round(total)), "learned_rule: " + ", ".join(parts)
 
 
-def pair_session_bias_score(pair: str, session: str, base_pts: int = 2) -> tuple[int, str | None]:
-    """Phase-8 layer 2: persistent pair-session directional bias.
+def pair_session_bias_score(pair: str, session: str, base_pts: int = 3) -> tuple[int, str | None]:
+    """Phase-8 layer 2 (relaxed in Phase 9): persistent pair-session directional bias.
 
     Even with no specific event in window, a (pair × session) cell may have a
     long-term drift. We translate this into a small constant nudge (max
-    ±base_pts) when historical concordance ≥ 70% over ≥ 100 days. Below 70%
-    concordance the bias is too noisy to use.
+    ±base_pts) when historical concordance ≥ 65% over ≥ 80 days.
+
+    Phase 9 (2026-05-04) lowered the threshold from (conc≥70%, n≥100, cap=±2)
+    to (conc≥65%, n≥80, cap=±3). 65% concordance over n≥80 days is still
+    statistically significant (binomial p<0.01 vs fair coin). The wider net
+    fires on more cells (~9 instead of ~5 today) so technical signals get an
+    extra honest tilt aligned with the year-long drift.
     """
     _load()
     info = _pair_bias.get((pair, _norm_session(session)))
@@ -369,17 +417,218 @@ def pair_session_bias_score(pair: str, session: str, base_pts: int = 2) -> tuple
         return 0, None
     conc = info.get("concordance_pct", 0.0)
     n = info.get("n", 0)
-    if conc < 70.0 or n < 100:
+    if conc < 65.0 or n < 80:
         return 0, None
     direction = info.get("dominant_direction", "flat")
     if direction not in ("up", "down"):
         return 0, None
     sign = +1 if direction == "up" else -1
-    # Magnitude scales with concordance excess over 70%: 70%→1pt, 90%→2pts.
-    magnitude = max(1, min(base_pts, int(round((conc - 70.0) / 10.0)) + 1))
+    # Magnitude scales with concordance excess over 65%: 65%→1pt, 75%→2pts, 85%+→3pts.
+    magnitude = max(1, min(base_pts, int(round((conc - 65.0) / 10.0)) + 1))
     delta = magnitude * sign
     mean_pips = info.get("mean_signed_pips", 0.0)
     return delta, f"pair_session_bias: {direction}×{magnitude} (conc={int(conc)}%, mean={mean_pips:+.1f}pips, n={n})"
+
+
+def _pair_dir_to_pair_sign(direction: str) -> int:
+    """Convert pair-level direction string ('up'/'down') to pair-sign (+1/-1)."""
+    if direction == "up":
+        return +1
+    if direction == "down":
+        return -1
+    return 0
+
+
+def hour_bias_score(pair: str, now_utc: datetime, base_pts: int = 1) -> tuple[int, str | None]:
+    """Phase-9 layer 2b: per-(pair × UTC hour) directional drift.
+
+    Reads `pair_hour_bias` artefact (built from 365-day Yahoo 1H closes by
+    `training._build_pair_hour_bias`). When the current UTC hour for `pair`
+    has historical concordance ≥ 62% over ≥ 60 days, add a small ±1 nudge
+    in the dominant direction. Smaller cap than session-bias because hourly
+    samples are noisier.
+    """
+    _load()
+    if not _pair_hour_bias:
+        return 0, None
+    info = _pair_hour_bias.get((pair, now_utc.hour))
+    if not info:
+        return 0, None
+    conc = info.get("concordance_pct", 0.0)
+    n = info.get("n", 0)
+    if conc < 62.0 or n < 60:
+        return 0, None
+    sign = _pair_dir_to_pair_sign(info.get("dominant_direction", "flat"))
+    if sign == 0:
+        return 0, None
+    delta = base_pts * sign
+    mean_pips = info.get("mean_signed_pips", 0.0)
+    return delta, (
+        f"hour_bias: hr={now_utc.hour:02d}UTC×{sign:+d}×{base_pts} "
+        f"(conc={int(conc)}%, mean={mean_pips:+.2f}pips, n={n})"
+    )
+
+
+def historical_wr_score(
+    pair: str,
+    session: str,
+    pre_score: int,
+    base_pts: int = 4,
+) -> tuple[int, str | None]:
+    """Phase-9 layer 4: per-(pair × session) historical backtest WR vote.
+
+    Reads `state/strategy_config_locked.json` (output of strategy_search) for
+    the current (pair × session). If the cell's historical WR ≥ 60% on a
+    statistically meaningful sample (≥ 8 trades), AND the cell's dominant
+    historical side AGREES with the current technical-stack score sign,
+    amplify in that direction. Magnitude tiers:
+      WR ≥ 70% → ±4 (strong, qualified cell)
+      WR 65-70% → ±3
+      WR 60-65% → ±2
+      WR < 60% → 0 (no edge to amplify)
+
+    The agreement guard matters: strategy_search variants are usually one-
+    sided filters (BUY-only or SELL-only) so a cell's `dominant_side` only
+    reflects the side the best filter measured. We never use it to override
+    technicals — only to amplify when both agree.
+    """
+    _load()
+    info = _strategy_wr.get((pair, _norm_session(session)))
+    if not info:
+        return 0, None
+    wr = info["win_rate_pct"]
+    trades = info["trades"]
+    if trades < 8 or wr < 60.0:
+        return 0, None
+    side = info["dominant_side"]
+    sign = +1 if side == "BUY" else -1
+    # Only amplify if technicals agree (same sign). Pre-score==0 means no
+    # technical signal yet → don't impose direction.
+    if pre_score == 0 or (pre_score > 0) != (sign > 0):
+        return 0, None
+    # Magnitude: 60-65 → 2, 65-70 → 3, 70-100 → 4
+    if wr >= 70.0:
+        magnitude = base_pts
+    elif wr >= 65.0:
+        magnitude = max(1, base_pts - 1)
+    else:
+        magnitude = max(1, base_pts - 2)
+    delta = magnitude * sign
+    return delta, (
+        f"historical_wr: WR={wr:.1f}% × {side} × {magnitude} "
+        f"(trades={trades}, agrees with technicals)"
+    )
+
+
+# Module-level cache for currency strength so we recompute at most once per
+# 5 min — the same TTL used elsewhere for live data.
+_CCY_STRENGTH_CACHE: dict[str, tuple[float, dict]] = {}
+_CCY_STRENGTH_TTL_SEC = 300.0
+
+
+def _compute_currency_strength_24h() -> dict[str, float]:
+    """Compute 24h relative strength for each of the 8 majors.
+
+    Uses real Yahoo 1H bars (last 24 closes) — no simulator. Each currency's
+    strength = mean of its returns vs USD across the relevant pairs in our
+    28-pair universe. USD's strength = inverted mean of all USD-quote and
+    USD-base pairs.
+
+    Returns {ccy: strength_value} where positive = currency strengthened
+    over last 24h relative to USD.
+    """
+    import time as _time
+    now_t = _time.time()
+    cached = _CCY_STRENGTH_CACHE.get("data")
+    if cached and now_t - cached[0] < _CCY_STRENGTH_TTL_SEC:
+        return cached[1]
+
+    try:
+        from teamagent.data import yahoo as _yahoo
+        from teamagent import config as _cfg
+    except Exception as e:
+        log.warning(f"currency_strength: import failed ({e})")
+        return {}
+
+    # Pair-level 24h return = (close[-1] - close[-25]) / close[-25]
+    pair_returns: dict[str, float] = {}
+    for pair in _cfg.PAIRS:
+        try:
+            df = _yahoo.latest_bars(pair, "1h", 30)
+        except Exception:
+            continue
+        if df is None or len(df) < 25:
+            continue
+        close_col = "Close" if "Close" in df.columns else "close"
+        try:
+            c0 = float(df[close_col].iloc[-25])
+            c1 = float(df[close_col].iloc[-1])
+        except Exception:
+            continue
+        if c0 <= 0:
+            continue
+        pair_returns[pair] = (c1 - c0) / c0
+
+    if not pair_returns:
+        return {}
+
+    # Per-currency: average return when currency is BASE; subtract average
+    # return when currency is QUOTE. Effectively: how much it strengthened
+    # vs the rest of the basket.
+    accum: dict[str, list[float]] = defaultdict(list)
+    for pair, ret in pair_returns.items():
+        base = pair[:3]
+        quote = pair[3:6]
+        accum[base].append(ret)
+        accum[quote].append(-ret)
+    out = {ccy: (sum(v) / len(v)) for ccy, v in accum.items() if v}
+    _CCY_STRENGTH_CACHE["data"] = (now_t, out)
+    return out
+
+
+def currency_strength_score(pair: str, base_pts: int = 2) -> tuple[int, str | None]:
+    """Phase-9 layer 5: cross-pair currency-strength rank vote.
+
+    Computes 24h relative strength for each of the 8 majors from real Yahoo
+    1H closes. For pair AB:
+      - if A is in the top-N strongest AND B is in the bottom-N weakest,
+        emit +base_pts (BUY pair)
+      - if A is in the bottom-N AND B is in the top-N, emit -base_pts (SELL)
+      - otherwise 0 (no rank-divergence edge)
+
+    Real cross-pair signal that the per-pair technical stack misses: it
+    captures basket-wide currency flow that drove the move on the other
+    27 pairs in the same 24h window.
+    """
+    strengths = _compute_currency_strength_24h()
+    if not strengths or len(strengths) < 4:
+        return 0, None
+    base = pair[:3]
+    quote = pair[3:6]
+    base_s = strengths.get(base)
+    quote_s = strengths.get(quote)
+    if base_s is None or quote_s is None:
+        return 0, None
+    # Rank ascending: index 0 = weakest, last = strongest
+    ranking = sorted(strengths.items(), key=lambda kv: kv[1])
+    rank: dict[str, int] = {ccy: i for i, (ccy, _) in enumerate(ranking)}
+    n = len(ranking)
+    top_thr = max(1, n - 3)  # top 3 strongest = ranks [n-3, n-1]
+    bot_thr = 2  # bottom 3 weakest = ranks [0, 1, 2]
+    base_rank = rank[base]
+    quote_rank = rank[quote]
+    # Strong BUY when base in top, quote in bottom
+    if base_rank >= top_thr and quote_rank <= bot_thr:
+        sign = +1
+    elif base_rank <= bot_thr and quote_rank >= top_thr:
+        sign = -1
+    else:
+        return 0, None
+    delta = base_pts * sign
+    return delta, (
+        f"currency_strength: {base}(rank{base_rank+1}/{n}, {base_s*100:+.2f}%) vs "
+        f"{quote}(rank{quote_rank+1}/{n}, {quote_s*100:+.2f}%) → {sign:+d}×{base_pts}"
+    )
 
 
 def multi_event_cluster_amplifier(
