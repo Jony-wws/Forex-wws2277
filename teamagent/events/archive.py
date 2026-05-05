@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import cb_calendar, fred_calendar, cot_calendar, geo_calendar
+from . import cb_calendar, fred_calendar, fred_global_calendar, cot_calendar, geo_calendar
 
 log = logging.getLogger("events.archive")
 
@@ -32,13 +32,15 @@ def build_archive(end: datetime | None = None, days: int = 400) -> dict:
     sources = {
         "central_bank": cb_calendar.all_events(start, end),
         "fred_us": fred_calendar.all_events(start, end),
+        "fred_global": fred_global_calendar.all_events(start, end),
         "cot": cot_calendar.all_events(start, end),
         "geo": geo_calendar.all_events(start, end),
     }
     log.info(
-        "archive built: cb=%d fred=%d cot=%d geo=%d",
+        "archive built: cb=%d fred_us=%d fred_global=%d cot=%d geo=%d",
         len(sources["central_bank"]),
         len(sources["fred_us"]),
+        len(sources["fred_global"]),
         len(sources["cot"]),
         len(sources["geo"]),
     )

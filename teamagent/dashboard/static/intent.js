@@ -1378,25 +1378,32 @@
   }
 
   function _skRenderBuyersSellers(d) {
-    const bs = d.buyers_vs_sellers || {};
-    const buy = Number(bs.buyers_pct ?? 50);
-    const sell = Number(bs.sellers_pct ?? 50);
+    // Раньше брали d.buyers_vs_sellers — это сырой VP big-players bar (один
+    // из 22 источников). Часто противоречил итоговому Bayesian-вердикту
+    // (например 51/49 в баре, но «ПРОДАТЬ 92%» в шапке). Теперь bar
+    // показывает реальный Bayesian fav-balance из вердикта — значения
+    // совпадают с тем, что нарисовано выше.
+    const v = d.verdict || {};
+    const fav = v.favorite_side || "neutral";
+    const bal = Number(v.favorite_balance_pct ?? 50);
+    const buy = fav === "buyers" ? bal : 100 - bal;
+    const sell = 100 - buy;
     const buyEl = document.getElementById("sk-bs-buy");
     const sellEl = document.getElementById("sk-bs-sell");
     buyEl.style.flex = `${buy} 0 0`;
     sellEl.style.flex = `${sell} 0 0`;
     buyEl.textContent = `${buy.toFixed(0)}% покупают`;
     sellEl.textContent = `${sell.toFixed(0)}% продают`;
-    const fav = document.getElementById("sk-bs-fav");
-    if (bs.favorite === "buyers") {
-      fav.textContent = "🟢 фаворит — покупатели";
-      fav.className = "sk-bs-fav fav-buy";
-    } else if (bs.favorite === "sellers") {
-      fav.textContent = "🔴 фаворит — продавцы";
-      fav.className = "sk-bs-fav fav-sell";
+    const favEl = document.getElementById("sk-bs-fav");
+    if (fav === "buyers") {
+      favEl.textContent = "🟢 фаворит — покупатели";
+      favEl.className = "sk-bs-fav fav-buy";
+    } else if (fav === "sellers") {
+      favEl.textContent = "🔴 фаворит — продавцы";
+      favEl.className = "sk-bs-fav fav-sell";
     } else {
-      fav.textContent = "🟡 баланс — паритет";
-      fav.className = "sk-bs-fav fav-neutral";
+      favEl.textContent = "🟡 баланс — паритет";
+      favEl.className = "sk-bs-fav fav-neutral";
     }
   }
 
