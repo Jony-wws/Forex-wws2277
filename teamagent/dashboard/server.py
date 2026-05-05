@@ -1990,10 +1990,289 @@ def api_strategy_winrates():
     }
 
 
+@app.get("/api/smart-orderbook")
+def api_smart_orderbook():
+    """SMART ORDERBOOK v2 — all 28 pairs with multi-TF confluence, institutional
+    flow, session-optimal strategy, momentum scoring, smart money zones.
+
+    This is the single endpoint for the new /orderbook page."""
+    now = datetime.now(timezone.utc)
+    hour = now.hour
+
+    # Current session
+    current_session = "Off"
+    session_end_hour = 0
+    for name, (lo, hi) in config.SESSIONS.items():
+        if lo <= hour < hi:
+            current_session = name
+            session_end_hour = hi
+            break
+    session_remaining_h = max(0, session_end_hour - hour + (60 - now.minute) / 60.0) if current_session != "Off" else 0
+
+    # Time to midnight
+    from datetime import timedelta
+    midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    hours_to_midnight = (midnight - now).total_seconds() / 3600.0
+
+    # Load state data
+    forecasts_data = _load(config.STATE_DIR / "forecasts.json", {})
+    fc = forecasts_data.get("forecasts", {})
+    strategy_config = _load(config.STATE_DIR / "strategy_config.json", {})
+    strat_pairs = strategy_config.get("pairs", {})
+    closed_trades = _load(config.STATE_DIR / "closed_trades.json", [])
+    open_trades = _load(config.STATE_DIR / "open_trades.json", [])
+    paper_stats = _load(config.STATE_DIR / "paper_stats.json", {})
+
+    # Build per-pair data
+    pairs_result = []
+    for pair in config.PAIRS:
+        f = fc.get(pair, {})
+        if not f or f.get("skipped"):
+            continue
+
+        # Strategy data for current session
+        sp = strat_pairs.get(pair, {})
+        by_session = sp.get("by_session", {})
+        sess_data = by_session.get(current_session, {})
+        sess_wr = float(sess_data.get("win_rate_pct", 0))
+        sess_variant = sess_data.get("best_variant", "")
+        global_wr = float(sp.get("win_rate_pct", 0))
+
+        # Best WR across all sessions
+        best_wr = global_wr
+        best_sess = "global"
+        for s_name, s_data in by_session.items():
+            wr = float(s_data.get("win_rate_pct", 0))
+            if wr > best_wr:
+                best_wr = wr
+                best_sess = s_name
+
+        # Indicators multi-TF
+        ind_4h = f.get("indicators", {}).get("4H", {}) or {}
+        ind_1h = f.get("indicators", {}).get("1H", {}) or {}
+        ind_15m = f.get("indicators", {}).get("15m", {}) or {}
+
+        # Multi-TF confluence: how many TFs agree on direction
+        tf_signals = []
+        for tf_name, ind in [("4H", ind_4h), ("1H", ind_1h), ("15m", ind_15m)]:
+            rsi = ind.get("rsi14", 50)
+            ema20 = ind.get("ema20", 0)
+            ema50 = ind.get("ema50", 0)
+            close = ind.get("close", 0)
+            direction = 0
+            if close and ema20 and ema50:
+                if close > ema20 > ema50:
+                    direction = 1  # bullish
+                elif close < ema20 < ema50:
+                    direction = -1  # bearish
+            if rsi > 60:
+                direction += 0.5
+            elif rsi < 40:
+                direction -= 0.5
+            tf_signals.append({"tf": tf_name, "direction": round(direction, 1), "rsi": round(rsi, 1)})
+
+        # Multi-TF confluence score (0-100%)
+        dirs = [s["direction"] for s in tf_signals]
+        avg_dir = sum(dirs) / len(dirs) if dirs else 0
+        all_agree = all(d > 0 for d in dirs) or all(d < 0 for d in dirs)
+        mtf_confluence = 100 if all_agree and abs(avg_dir) > 0.5 else (
+            75 if all_agree else (
+            50 if sum(1 for d in dirs if d * avg_dir > 0) >= 2 else 25
+        ))
+
+        # Momentum scoring: RSI + MACD + Stochastic across TFs
+        rsi_1h = ind_1h.get("rsi14", 50)
+        macd_hist = ind_1h.get("macd_hist", 0)
+        macd_prev = ind_1h.get("macd_prev_hist", 0)
+        stoch_k = ind_1h.get("stoch_k", 50)
+        momentum_score = 0
+        momentum_signals = []
+        if rsi_1h > 55:
+            momentum_score += 1
+            momentum_signals.append(f"RSI={rsi_1h:.0f} bullish")
+        elif rsi_1h < 45:
+            momentum_score -= 1
+            momentum_signals.append(f"RSI={rsi_1h:.0f} bearish")
+        if macd_hist and macd_prev and macd_hist > macd_prev:
+            momentum_score += 1
+            momentum_signals.append("MACD растёт")
+        elif macd_hist and macd_prev and macd_hist < macd_prev:
+            momentum_score -= 1
+            momentum_signals.append("MACD падает")
+        if stoch_k > 80:
+            momentum_score -= 0.5
+            momentum_signals.append(f"Stoch={stoch_k:.0f} перекуплен")
+        elif stoch_k < 20:
+            momentum_score += 0.5
+            momentum_signals.append(f"Stoch={stoch_k:.0f} перепродан")
+
+        # Volume profile + smart money zones
+        vp = f.get("volume_profile", {})
+        poc = vp.get("poc", 0)
+        vah = vp.get("vah", 0)
+        val_level = vp.get("val", 0)
+        cur_price = f.get("current_price", 0)
+        big_players = vp.get("big_players", [])
+        buckets = vp.get("buckets", [])
+        no_return = vp.get("no_return_levels", [])
+
+        # Smart money zones: accumulation (near VAL) or distribution (near VAH)
+        smart_money_zone = "neutral"
+        if cur_price and vah and val_level:
+            range_size = vah - val_level if vah > val_level else 0.0001
+            position_in_range = (cur_price - val_level) / range_size if range_size > 0 else 0.5
+            if position_in_range < 0.3:
+                smart_money_zone = "accumulation"
+            elif position_in_range > 0.7:
+                smart_money_zone = "distribution"
+            else:
+                smart_money_zone = "equilibrium"
+
+        # Institutional levels
+        institutional_levels = []
+        for bp in (big_players or [])[:8]:
+            bp_price = float(bp.get("price", 0))
+            bp_weight = float(bp.get("weight_pct", 0))
+            level_type = "resistance" if bp_price > cur_price else "support"
+            dist_pips = abs(bp_price - cur_price) * 10000 if cur_price else 0
+            institutional_levels.append({
+                "price": round(bp_price, 5),
+                "weight_pct": round(bp_weight, 1),
+                "type": level_type,
+                "distance_pips": round(dist_pips, 1),
+            })
+
+        # Buyers vs sellers
+        buyers_w = sellers_w = 0.0
+        for b in buckets:
+            price = float(b.get("price", 0))
+            w = float(b.get("weight_pct", 0))
+            if price <= cur_price:
+                buyers_w += w
+            else:
+                sellers_w += w
+        for bp in big_players:
+            price = float(bp.get("price", 0))
+            w = float(bp.get("weight_pct", 0)) * 2.0
+            if price <= cur_price:
+                buyers_w += w
+            else:
+                sellers_w += w
+        total_w = buyers_w + sellers_w
+        buyers_pct = round(buyers_w / total_w * 100, 1) if total_w > 0 else 50
+        sellers_pct = round(100 - buyers_pct, 1)
+
+        # EV calculation
+        broker_payout = 0.85
+        prob = (f.get("probability_pct", 50)) / 100
+        eff_wr = max(prob, best_wr / 100)
+        ev = eff_wr * broker_payout - (1 - eff_wr)
+
+        # Score breakdown categories for confluence
+        breakdown = f.get("score_breakdown", [])
+        n_for = sum(1 for b in breakdown if b.get("delta", 0) > 0)
+        n_against = sum(1 for b in breakdown if b.get("delta", 0) < 0)
+        n_total = n_for + n_against
+        confluence_pct = round(max(n_for, n_against) / n_total * 100, 1) if n_total > 0 else 0
+
+        pairs_result.append({
+            "pair": pair,
+            "current_price": round(cur_price, 5) if cur_price else 0,
+            "side": f.get("side", "NEUTRAL"),
+            "probability_pct": round(f.get("probability_pct", 0), 1),
+            "score": f.get("score", 0),
+            "max_score": f.get("max_score", 95),
+            "recommended_hours": f.get("recommended_hours", 3),
+
+            # Strategy WR
+            "strategy_wr": {
+                "current_session_wr": round(sess_wr, 1),
+                "current_session_variant": sess_variant,
+                "best_wr": round(best_wr, 1),
+                "best_session": best_sess,
+                "global_wr": round(global_wr, 1),
+            },
+
+            # Multi-TF confluence
+            "multi_tf": {
+                "signals": tf_signals,
+                "confluence_pct": mtf_confluence,
+                "all_agree": all_agree,
+            },
+
+            # Momentum
+            "momentum": {
+                "score": round(momentum_score, 1),
+                "signals": momentum_signals,
+            },
+
+            # Volume Profile / Orderbook
+            "orderbook": {
+                "poc": round(poc, 5) if poc else 0,
+                "vah": round(vah, 5) if vah else 0,
+                "val": round(val_level, 5) if val_level else 0,
+                "buckets": buckets[:20],
+                "buyers_pct": buyers_pct,
+                "sellers_pct": sellers_pct,
+                "favorite": "buyers" if buyers_pct > 55 else "sellers" if sellers_pct > 55 else "neutral",
+            },
+
+            # Institutional flow
+            "institutional": {
+                "levels": institutional_levels,
+                "big_player_count": len(big_players),
+            },
+
+            # Smart money
+            "smart_money": {
+                "zone": smart_money_zone,
+                "no_return_levels": no_return[:4] if no_return else [],
+            },
+
+            # Indicator confluence
+            "confluence_pct": confluence_pct,
+
+            # Math
+            "ev_pct": round(ev * 100, 1),
+            "breakeven_wr_pct": round(1 / (1 + broker_payout) * 100, 1),
+        })
+
+    # Sort by best strategy WR descending
+    pairs_result.sort(key=lambda x: x["strategy_wr"]["best_wr"], reverse=True)
+
+    # Paper trading stats
+    total_trades = int(paper_stats.get("total", 0))
+    wins = int(paper_stats.get("wins", 0))
+    losses = int(paper_stats.get("losses", 0))
+    wr = float(paper_stats.get("win_rate_pct", 0))
+    pnl = float(paper_stats.get("total_pnl", 0))
+
+    return {
+        "version": "SMART_ORDERBOOK_v2",
+        "as_of": now.isoformat(),
+        "time": {
+            "utc_now": now.isoformat(),
+            "current_session": current_session,
+            "session_remaining_hours": round(session_remaining_h, 2),
+            "hours_to_midnight_utc": round(hours_to_midnight, 2),
+        },
+        "paper_stats": {
+            "total": total_trades,
+            "wins": wins,
+            "losses": losses,
+            "win_rate_pct": round(wr, 1),
+            "pnl": round(pnl, 2),
+            "open_trades": len(open_trades),
+        },
+        "pairs": pairs_result,
+        "total_pairs": len(pairs_result),
+    }
+
+
 @app.get("/orderbook")
 def orderbook_page():
-    """Redirect /orderbook to the main intent page (prognoses)."""
-    return RedirectResponse(url="/intent", status_code=302)
+    """Serve the NEW Smart Orderbook v2 page."""
+    return FileResponse(STATIC / "orderbook.html")
 
 
 def serve(host: str = config.DASHBOARD_HOST, port: int = config.DASHBOARD_PORT) -> None:

@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04060d">
+<title>FX INVESTMENT — SMART ORDERBOOK v2</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2300e1ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='system-ui' font-size='30' font-weight='800' fill='%2304060d'%3EFX%3C/text%3E%3C/svg%3E">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#04060d;color:#e0e6f0;font-family:'Inter','SF Pro',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ─── Header ─── */
+.hdr{background:linear-gradient(135deg,#0a1628,#101d35);border-bottom:1px solid #1a2a45;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.hdr h1{font-size:16px;font-weight:800;background:linear-gradient(135deg,#00e1ff,#7c5cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:0.5px}
+.hdr-sub{color:#5a7a9a;font-size:11px;margin-top:2px}
+.hdr-right{text-align:right}
+.hdr-live{color:#00ff88;font-size:11px;font-weight:700;animation:pulse 2s infinite}
+.hdr-clock{color:#7aa2c0;font-size:11px;margin-top:2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ─── Container ─── */
+.wrap{max-width:1440px;margin:0 auto;padding:12px 14px}
+
+/* ─── Top metrics ─── */
+.top-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.tcard{background:linear-gradient(135deg,#0a162899,#0d1f3c99);border:1px solid #1a3a5c;border-radius:10px;padding:12px 10px;text-align:center}
+.tcard .lbl{color:#5a7a9a;font-size:10px;text-transform:uppercase;letter-spacing:0.8px}
+.tcard .val{font-size:26px;font-weight:800;margin:4px 0;line-height:1.1}
+.tcard .sub{color:#5a7a9a;font-size:10px}
+
+/* ─── Section titles ─── */
+.stitle{font-size:13px;font-weight:700;color:#7aa2c0;text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #1a2a4555;display:flex;align-items:center;gap:8px}
+.stitle .badge{background:#7c5cff22;color:#7c5cff;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+
+/* ─── WR Heatmap grid ─── */
+.wr-heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:5px;margin-bottom:14px}
+.wr-cell{border-radius:6px;padding:6px;text-align:center;position:relative;overflow:hidden}
+.wr-cell .p{font-weight:700;font-size:10px;color:#fff}
+.wr-cell .w{font-size:15px;font-weight:800;line-height:1.2}
+.wr-cell .d{font-size:9px;color:rgba(255,255,255,.5)}
+
+/* ─── Pair cards ─── */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+.pcard{background:linear-gradient(145deg,#0a1628,#0d1f3c);border:1px solid #1a3a5c;border-radius:12px;padding:14px;position:relative;overflow:hidden;transition:all .3s}
+.pcard:hover{border-color:#7c5cff55;transform:translateY(-1px)}
+.pcard .stripe{position:absolute;top:0;left:0;bottom:0;width:3px}
+
+/* card header */
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ph-pair{font-size:17px;font-weight:800;color:#fff}
+.ph-price{font-size:13px;color:#7aa2c0;font-weight:600;margin-left:6px}
+.ph-side{padding:2px 8px;border-radius:5px;font-weight:700;font-size:11px;letter-spacing:.3px}
+.side-b{background:#00ff8822;color:#00ff88;border:1px solid #00ff8844}
+.side-s{background:#ff446622;color:#ff4466;border:1px solid #ff446644}
+
+/* Multi-TF confluence meter */
+.mtf{display:flex;gap:3px;margin-bottom:6px;align-items:center}
+.mtf-label{font-size:9px;color:#5a7a9a;width:50px}
+.mtf-bar{flex:1;height:22px;border-radius:4px;background:#ffffff06;position:relative;overflow:hidden;display:flex;align-items:center}
+.mtf-fill{height:100%;border-radius:4px;transition:width .5s}
+.mtf-txt{position:absolute;right:6px;font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 4px #000}
+.mtf-dots{display:flex;gap:2px;margin-left:6px}
+.mtf-dot{width:8px;height:8px;border-radius:50%;border:1px solid #ffffff33}
+
+/* Momentum heatmap */
+.mom{display:flex;gap:3px;margin-bottom:6px}
+.mom-cell{flex:1;text-align:center;border-radius:4px;padding:3px 2px;font-size:9px;font-weight:700}
+.mom-lbl{color:#5a7a9a;font-size:8px}
+
+/* Order book mini */
+.ob{margin-bottom:6px}
+.ob-row{display:flex;align-items:center;margin:1px 0;height:16px;position:relative}
+.ob-pr{width:60px;text-align:right;color:#5a7a9a;font-size:9px;font-weight:600;padding-right:4px;flex-shrink:0}
+.ob-bar{height:14px;border-radius:2px;min-width:2px;transition:width .3s}
+.ob-bar-b{background:linear-gradient(90deg,#00ff8855,#00ff8822)}
+.ob-bar-s{background:linear-gradient(90deg,#ff446655,#ff446622)}
+.ob-pct{font-size:9px;color:#5a7a9a;margin-left:4px}
+.ob-pin{position:absolute;right:3px;font-size:8px;font-weight:700;padding:0 3px;border-radius:2px}
+.pin-poc{background:#ffcc0033;color:#ffcc00}
+.pin-vah{background:#ff808033;color:#ff8080}
+.pin-val{background:#4afaa333;color:#4afaa3}
+
+/* Buyers vs Sellers */
+.bvs{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-bottom:4px}
+.bvs-b{background:linear-gradient(90deg,#00ff88,#00cc6a)}
+.bvs-s{background:linear-gradient(90deg,#ff6666,#ff4466)}
+.bvs-txt{display:flex;justify-content:space-between;font-size:9px;color:#5a7a9a;margin-bottom:6px}
+
+/* Institutional levels */
+.inst{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+.inst-lv{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600}
+.inst-r{background:#ff808010;color:#ff8080;border:1px solid #ff808033}
+.inst-s{background:#4afaa310;color:#4afaa3;border:1px solid #4afaa333}
+
+/* Smart money zone */
+.smz{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;display:inline-block;margin-bottom:6px}
+.smz-acc{background:#4afaa315;color:#4afaa3;border:1px solid #4afaa333}
+.smz-dist{background:#ff808015;color:#ff8080;border:1px solid #ff808033}
+.smz-eq{background:#ffcc0015;color:#ffcc00;border:1px solid #ffcc0033}
+
+/* Forecast bottom bar */
+.fbar{background:#ffffff06;border-radius:6px;padding:8px 10px;margin-top:4px}
+.fbar-top{display:flex;justify-content:space-between;align-items:center}
+.fbar-dir{font-size:14px;font-weight:800}
+.fbar-prob{font-size:22px;font-weight:800}
+.fbar-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:4px;font-size:10px}
+.fbar-item{display:flex;justify-content:space-between}
+.fbar-k{color:#5a7a9a}
+.fbar-v{font-weight:700}
+
+/* Filter tabs */
+.ftabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.ftab{padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #1a3a5c;background:#0a162855;color:#7aa2c0;transition:all .2s}
+.ftab.active{background:#7c5cff22;border-color:#7c5cff;color:#fff}
+.ftab:hover{border-color:#7c5cff88}
+
+@media(max-width:700px){
+  .top-row{grid-template-columns:repeat(2,1fr)}
+  .pgrid{grid-template-columns:1fr}
+  .wr-heat{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <h1>SMART ORDERBOOK v2</h1>
+    <div class="hdr-sub" id="h-info">загрузка…</div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-live" id="h-live">● LIVE</div>
+    <div class="hdr-clock" id="h-clock"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ═══ Top metrics ═══ -->
+  <div class="top-row">
+    <div class="tcard">
+      <div class="lbl">До полуночи UTC</div>
+      <div class="val" id="t-midnight" style="color:#00e1ff">—</div>
+      <div class="sub">система знает время</div>
+    </div>
+    <div class="tcard">
+      <div class="lbl">Сессия</div>
+      <div class="val" id="t-session" style="color:#00ff88">—</div>
+      <div class="sub" id="t-sess-rem">—</div>
+    </div>
+    <div class="tcard">
+      <div class="lbl">Прогнозы</div>
+      <div class="val" id="t-total" style="color:#fff">—</div>
+      <div class="sub" id="t-buysell">—</div>
+    </div>
+    <div class="tcard">
+      <div class="lbl">Paper WR</div>
+      <div class="val" id="t-wr" style="color:#00ff88">—</div>
+      <div class="sub" id="t-wr-d">—</div>
+    </div>
+    <div class="tcard">
+      <div class="lbl">Open Trades</div>
+      <div class="val" id="t-open" style="color:#ffcc00">—</div>
+      <div class="sub" id="t-pnl">—</div>
+    </div>
+  </div>
+
+  <!-- ═══ Strategy WR Heatmap ═══ -->
+  <div class="stitle">Win Rate 365д бэктест — все 28 валют <span class="badge">НОВОЕ</span></div>
+  <div class="wr-heat" id="wr-heat">загрузка…</div>
+
+  <!-- ═══ Filter tabs ═══ -->
+  <div class="stitle">Стакан ордеров <span class="badge">SMART v2</span></div>
+  <div class="ftabs" id="ftabs">
+    <div class="ftab active" data-f="all">Все 28</div>
+    <div class="ftab" data-f="strong">STRONG ≥75%</div>
+    <div class="ftab" data-f="session">Лучшие для сессии</div>
+    <div class="ftab" data-f="momentum">По моментуму</div>
+  </div>
+
+  <!-- ═══ Pair cards ═══ -->
+  <div class="pgrid" id="pgrid">
+    <div style="color:#5a7a9a;padding:20px">загрузка стакана…</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  let allPairsData = [];
+  let currentFilter = "all";
+
+  async function fj(u){try{const r=await fetch(u);if(!r.ok)return null;return await r.json()}catch(e){return null}}
+
+  // ═══ Clock ═══
+  function clock(){
+    const n=new Date();
+    const el=document.getElementById("h-clock");
+    if(el) el.textContent=n.toISOString().slice(11,19)+" UTC";
+  }
+
+  // ═══ Refresh all data ═══
+  async function refresh(){
+    const d = await fj("/api/smart-orderbook");
+    if(!d) return;
+
+    // Time
+    const t = d.time;
+    const hm = Math.floor(t.hours_to_midnight_utc);
+    const mm = Math.round((t.hours_to_midnight_utc - hm)*60);
+    const el1 = document.getElementById("t-midnight");
+    if(el1) el1.textContent = hm+"ч "+String(mm).padStart(2,"0")+"м";
+    const el2 = document.getElementById("t-session");
+    if(el2){el2.textContent=t.current_session||"Off"; el2.style.color=t.current_session==="Off"?"#ff6666":"#00ff88"}
+    const el3 = document.getElementById("t-sess-rem");
+    if(el3) el3.textContent = t.session_remaining_hours > 0 ? "осталось "+t.session_remaining_hours.toFixed(1)+"ч":"закрыта";
+    const hi = document.getElementById("h-info");
+    if(hi) hi.textContent = t.current_session + " · " + d.total_pairs + " пар · до полуночи " + hm + "ч " + mm + "м";
+
+    // Stats
+    const ps = d.paper_stats;
+    const wrEl = document.getElementById("t-wr");
+    if(wrEl){wrEl.textContent=ps.win_rate_pct.toFixed(1)+"%"; wrEl.style.color=ps.win_rate_pct>=70?"#00ff88":ps.win_rate_pct>=55?"#ffcc00":"#ff4444"}
+    const wdEl = document.getElementById("t-wr-d");
+    if(wdEl) wdEl.textContent=ps.wins+"W / "+ps.losses+"L";
+    const opEl = document.getElementById("t-open");
+    if(opEl) opEl.textContent=ps.open_trades;
+    const pnlEl = document.getElementById("t-pnl");
+    if(pnlEl) pnlEl.textContent="PnL $"+(ps.pnl>=0?"+":"")+ps.pnl.toFixed(2);
+
+    // Forecasts count
+    const pairs = d.pairs || [];
+    allPairsData = pairs;
+    const buyC = pairs.filter(p=>p.side==="BUY").length;
+    const sellC = pairs.filter(p=>p.side==="SELL").length;
+    const tEl = document.getElementById("t-total");
+    if(tEl) tEl.textContent = pairs.length + " пар";
+    const bsEl = document.getElementById("t-buysell");
+    if(bsEl) bsEl.textContent = buyC + " BUY · " + sellC + " SELL";
+
+    // WR Heatmap
+    renderWRHeat(pairs, t.current_session);
+
+    // Pair cards
+    renderPairs(pairs, t.current_session);
+  }
+
+  // ═══ WR Heatmap ═══
+  function renderWRHeat(pairs, curSession){
+    const grid = document.getElementById("wr-heat");
+    if(!grid) return;
+    const sorted = [...pairs].sort((a,b) => (b.strategy_wr.best_wr||0) - (a.strategy_wr.best_wr||0));
+    grid.innerHTML = sorted.map(p => {
+      const wr = p.strategy_wr.best_wr;
+      const sessWR = p.strategy_wr.current_session_wr;
+      const c = wr>=80?"#00ff88":wr>=70?"#00e1ff":wr>=60?"#ffcc00":"#ff6666";
+      const bg = wr>=80?"#00ff8818":wr>=70?"#00e1ff18":wr>=60?"#ffcc0018":"#ff666618";
+      const border = wr>=80?"#00ff8844":wr>=70?"#00e1ff44":wr>=60?"#ffcc0044":"#ff666644";
+      return '<div class="wr-cell" style="background:'+bg+';border:1px solid '+border+'"><div class="p">'+p.pair+'</div><div class="w" style="color:'+c+'">'+wr.toFixed(1)+'%</div><div class="d">'+p.strategy_wr.best_session+(sessWR>0?' · '+curSession+':'+sessWR.toFixed(0)+'%':'')+'</div></div>';
+    }).join("");
+  }
+
+  // ═══ Filter logic ═══
+  function filterPairs(pairs, filter, curSession){
+    if(filter==="strong") return pairs.filter(p=>p.strategy_wr.best_wr>=75);
+    if(filter==="session") return [...pairs].sort((a,b)=>(b.strategy_wr.current_session_wr||0)-(a.strategy_wr.current_session_wr||0));
+    if(filter==="momentum") return [...pairs].sort((a,b)=>Math.abs(b.momentum.score)-Math.abs(a.momentum.score));
+    return pairs;
+  }
+
+  // ═══ Render pair cards ═══
+  function renderPairs(pairs, curSession){
+    const grid = document.getElementById("pgrid");
+    if(!grid) return;
+    const filtered = filterPairs(pairs, currentFilter, curSession);
+    if(filtered.length===0){grid.innerHTML='<div style="color:#5a7a9a;padding:20px">нет данных</div>';return}
+
+    grid.innerHTML = filtered.map(p => {
+      const sc = p.side==="BUY"?"side-b":"side-s";
+      const sideCol = p.side==="BUY"?"#00ff88":"#ff4466";
+      const wr = p.strategy_wr.best_wr;
+      const wrCol = wr>=80?"#00ff88":wr>=70?"#00e1ff":wr>=60?"#ffcc00":"#ff6666";
+      const sessWR = p.strategy_wr.current_session_wr;
+
+      // Multi-TF confluence
+      const mtf = p.multi_tf;
+      const mtfPct = mtf.confluence_pct;
+      const mtfCol = mtfPct>=75?"#00ff88":mtfPct>=50?"#ffcc00":"#ff6666";
+      const tfDots = (mtf.signals||[]).map(s=>{
+        const dc = s.direction>0?"#00ff88":s.direction<0?"#ff4466":"#5a7a9a";
+        return '<div class="mtf-dot" style="background:'+dc+';border-color:'+dc+'" title="'+s.tf+': dir='+s.direction+' RSI='+s.rsi+'"></div>';
+      }).join("");
+
+      // Momentum heatmap cells
+      const momScore = p.momentum.score;
+      const momCol = momScore>1?"#00ff88":momScore>0?"#4afaa3":momScore<-1?"#ff4466":momScore<0?"#ff8080":"#5a7a9a";
+      const momSigs = (p.momentum.signals||[]).join(" · ");
+
+      // Orderbook mini
+      let obHTML = "";
+      const buckets = (p.orderbook.buckets||[]).slice(-10);
+      if(buckets.length>0){
+        const maxVol = Math.max(...buckets.map(b=>parseFloat(b.weight_pct||b.volume||0)),0.01);
+        obHTML = '<div class="ob">' + buckets.map(b=>{
+          const pr = parseFloat(b.price||0);
+          const wt = parseFloat(b.weight_pct||b.volume||0);
+          const pct = wt/maxVol*100;
+          const cls = pr >= p.current_price ? "ob-bar-s" : "ob-bar-b";
+          let pin = "";
+          if(p.orderbook.poc && Math.abs(pr-p.orderbook.poc)<(p.current_price*0.0001)) pin='<span class="ob-pin pin-poc">POC</span>';
+          else if(p.orderbook.vah && Math.abs(pr-p.orderbook.vah)<(p.current_price*0.0001)) pin='<span class="ob-pin pin-vah">VAH</span>';
+          else if(p.orderbook.val && Math.abs(pr-p.orderbook.val)<(p.current_price*0.0001)) pin='<span class="ob-pin pin-val">VAL</span>';
+          return '<div class="ob-row"><span class="ob-pr">'+pr.toFixed(5)+'</span><div class="ob-bar '+cls+'" style="width:'+Math.max(2,pct)+'%"></div><span class="ob-pct">'+wt.toFixed(1)+'%</span>'+pin+'</div>';
+        }).join("") + '</div>';
+      }
+
+      // Buyers vs Sellers
+      const bp = p.orderbook.buyers_pct;
+      const sp = p.orderbook.sellers_pct;
+      const favCol = p.orderbook.favorite==="buyers"?"#00ff88":p.orderbook.favorite==="sellers"?"#ff4466":"#ffcc00";
+
+      // Institutional levels
+      const instLevels = (p.institutional.levels||[]).slice(0,6);
+      const instHTML = instLevels.length > 0 ? '<div class="inst">' + instLevels.map(l=>{
+        const cls = l.type==="resistance"?"inst-r":"inst-s";
+        const label = l.type==="resistance"?"R":"S";
+        return '<span class="inst-lv '+cls+'">'+label+' '+l.price.toFixed(5)+' ('+l.weight_pct.toFixed(1)+'%) '+l.distance_pips.toFixed(0)+'p</span>';
+      }).join("") + '</div>' : '';
+
+      // Smart money zone
+      const smz = p.smart_money.zone;
+      const smzCls = smz==="accumulation"?"smz-acc":smz==="distribution"?"smz-dist":"smz-eq";
+      const smzLabel = smz==="accumulation"?"НАКОПЛЕНИЕ":smz==="distribution"?"РАСПРЕДЕЛЕНИЕ":"РАВНОВЕСИЕ";
+
+      // EV
+      const ev = p.ev_pct;
+      const evCol = ev>=5?"#00ff88":ev>0?"#ffcc00":"#ff4444";
+
+      return '<div class="pcard">'+
+        '<div class="stripe" style="background:'+wrCol+'"></div>'+
+        // Header
+        '<div class="ph">'+
+          '<div><span class="ph-pair">'+p.pair+'</span><span class="ph-price">'+p.current_price.toFixed(5)+'</span></div>'+
+          '<span class="ph-side '+sc+'">'+p.side+'</span>'+
+        '</div>'+
+
+        // Multi-TF Confluence Meter
+        '<div class="mtf">'+
+          '<span class="mtf-label">Multi-TF</span>'+
+          '<div class="mtf-bar"><div class="mtf-fill" style="width:'+mtfPct+'%;background:'+mtfCol+'"></div><span class="mtf-txt">'+mtfPct+'%</span></div>'+
+          '<div class="mtf-dots">'+tfDots+'</div>'+
+        '</div>'+
+
+        // Momentum heatmap
+        '<div class="mom">'+
+          '<div class="mom-cell" style="background:'+momCol+'22;color:'+momCol+';border:1px solid '+momCol+'33">Момент: '+(momScore>0?"+":"")+momScore.toFixed(1)+'</div>'+
+          '<div class="mom-cell" style="background:#ffffff06;color:#7aa2c0;font-size:8px;flex:2">'+momSigs+'</div>'+
+        '</div>'+
+
+        // Smart Money Zone
+        '<div class="smz '+smzCls+'">'+smzLabel+'</div>'+
+
+        // Orderbook mini
+        obHTML +
+
+        // Buyers vs Sellers
+        '<div class="bvs"><div class="bvs-b" style="width:'+bp+'%"></div><div class="bvs-s" style="width:'+sp+'%"></div></div>'+
+        '<div class="bvs-txt"><span style="color:'+favCol+'">'+bp.toFixed(0)+'% покупатели</span><span>'+sp.toFixed(0)+'% продавцы</span></div>'+
+
+        // Institutional levels
+        instHTML +
+
+        // Forecast bar
+        '<div class="fbar">'+
+          '<div class="fbar-top">'+
+            '<div><span class="fbar-dir" style="color:'+sideCol+'">'+p.side+'</span> · '+p.recommended_hours+'ч</div>'+
+            '<span class="fbar-prob" style="color:'+sideCol+'">'+p.probability_pct.toFixed(1)+'%</span>'+
+          '</div>'+
+          '<div class="fbar-grid">'+
+            '<div class="fbar-item"><span class="fbar-k">Стратегия:</span><span class="fbar-v" style="color:'+wrCol+'">'+wr.toFixed(1)+'%</span></div>'+
+            '<div class="fbar-item"><span class="fbar-k">Сессия '+curSession+':</span><span class="fbar-v" style="color:'+(sessWR>=70?"#00ff88":sessWR>=60?"#ffcc00":"#ff6666")+'">'+sessWR.toFixed(1)+'%</span></div>'+
+            '<div class="fbar-item"><span class="fbar-k">EV:</span><span class="fbar-v" style="color:'+evCol+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span></div>'+
+            '<div class="fbar-item"><span class="fbar-k">Score:</span><span class="fbar-v" style="color:#fff">'+p.score+'/'+p.max_score+'</span></div>'+
+            '<div class="fbar-item"><span class="fbar-k">Confluence:</span><span class="fbar-v" style="color:'+(p.confluence_pct>=70?"#00ff88":p.confluence_pct>=50?"#ffcc00":"#ff6666")+'">'+p.confluence_pct+'%</span></div>'+
+            '<div class="fbar-item"><span class="fbar-k">Безубыток:</span><span class="fbar-v" style="color:#5a7a9a">'+p.breakeven_wr_pct+'%</span></div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join("");
+  }
+
+  // ═══ Filter tabs ═══
+  document.addEventListener("click", function(e){
+    if(!e.target.classList.contains("ftab")) return;
+    document.querySelectorAll(".ftab").forEach(t=>t.classList.remove("active"));
+    e.target.classList.add("active");
+    currentFilter = e.target.dataset.f;
+    renderPairs(allPairsData, document.getElementById("t-session")?.textContent || "NY");
+  });
+
+  // ═══ Init ═══
+  async function init(){
+    clock();
+    await refresh();
+  }
+  init();
+  setInterval(clock, 1000);
+  setInterval(refresh, 15000);
+})();
+</script>
+</body>
+</html>
