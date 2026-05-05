@@ -29,13 +29,39 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import config
-from ..data import yahoo
-from .. import volume_profile as vp_mod
-from .. import paper_trader
-from .. import paper_trader_stakan
-from .. import live_analyst as live_analyst_mod
-from .. import regime as regime_mod
-from .. import stakan_view as stakan_view_mod
+
+# Lazy imports: heavy modules (pandas/numpy/yfinance) loaded on first use,
+# NOT at server startup — cuts cold-boot from ~90s to ~5s on Fly free tier.
+yahoo = None          # teamagent.data.yahoo
+vp_mod = None         # teamagent.volume_profile
+paper_trader = None   # teamagent.paper_trader
+paper_trader_stakan = None
+live_analyst_mod = None
+regime_mod = None
+stakan_view_mod = None
+_lazy_loaded = False
+
+
+def _ensure_lazy():
+    global yahoo, vp_mod, paper_trader, paper_trader_stakan
+    global live_analyst_mod, regime_mod, stakan_view_mod, _lazy_loaded
+    if _lazy_loaded:
+        return
+    from ..data import yahoo as _y
+    from .. import volume_profile as _vp
+    from .. import paper_trader as _pt
+    from .. import paper_trader_stakan as _pts
+    from .. import live_analyst as _la
+    from .. import regime as _reg
+    from .. import stakan_view as _sv
+    yahoo = _y
+    vp_mod = _vp
+    paper_trader = _pt
+    paper_trader_stakan = _pts
+    live_analyst_mod = _la
+    regime_mod = _reg
+    stakan_view_mod = _sv
+    _lazy_loaded = True
 
 log = logging.getLogger("dashboard")
 logging.basicConfig(
@@ -373,6 +399,14 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+
+
+@app.middleware("http")
+async def _lazy_load_middleware(request, call_next):
+    """Load heavy modules on first API request (not on server startup)."""
+    if not _lazy_loaded and request.url.path.startswith("/api/"):
+        _ensure_lazy()
+    return await call_next(request)
 
 
 def _load(path: Path, default):
