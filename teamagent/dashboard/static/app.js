@@ -2266,12 +2266,42 @@ function tickClock() {
   _tickCountdown();
 }
 
+// ─── 28 Pairs Real Data Performance ───
+async function refreshPairPerformance() {
+  try {
+    const data = await api("/api/pair-performance");
+    const grid = $("pair-performance-grid");
+    if (!grid || !data.pairs) return;
+    grid.innerHTML = "";
+    for (const p of data.pairs) {
+      const wr = p.display_wr_pct;
+      const card = el("div", {
+        class: "pp-card",
+        style: `background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:8px 10px;`
+      },
+        el("div", { style: "font-size:11px;font-weight:800;color:#e2e8f0;white-space:nowrap;" }, p.pair),
+        el("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-top:4px;" },
+          el("span", { style: "font-size:14px;font-weight:900;color:#10b981;" }, wr.toFixed(0) + "%"),
+          el("span", { style: "font-size:8px;color:#94a3b8;" }, p.qualified_sessions + "/4 sess")
+        ),
+        el("div", { style: "width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;margin-top:4px;overflow:hidden;" },
+          el("div", { style: `width:${wr}%;height:100%;background:#10b981;border-radius:2px;` })
+        )
+      );
+      grid.appendChild(card);
+    }
+  } catch (e) {
+    console.warn("pair-performance:", e);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  $("manual-refresh").addEventListener("click", () => { tick(); tickForecasts(); refreshVP(); });
+  $("manual-refresh").addEventListener("click", () => { tick(); tickForecasts(); refreshVP(); refreshPairPerformance(); });
   $("vp-refresh").addEventListener("click", refreshVP);
   $("vp-pair").addEventListener("change", refreshVP);
 
   populateVPDropdown().then(refreshVP);
+  refreshPairPerformance();
 
   tickClock();
   tick();
@@ -2279,4 +2309,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(tickClock, 1000);
   setInterval(tick, REFRESH_LIVE_MS);
   setInterval(tickForecasts, REFRESH_FORECASTS_MS);
+  setInterval(refreshPairPerformance, 60000);
 });
