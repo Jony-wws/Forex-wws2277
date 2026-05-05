@@ -1938,6 +1938,58 @@ def api_time_status():
     }
 
 
+@app.get("/api/strategy-winrates")
+def api_strategy_winrates():
+    """Strategy backtest WR per pair from strategy_config.json (365-day data)."""
+    sc_file = config.STATE_DIR / "strategy_config.json"
+    locked_file = config.STATE_DIR / "strategy_config_locked.json"
+    sc = {}
+    for f in (sc_file, locked_file):
+        if f.exists():
+            try:
+                sc = json.loads(f.read_text())
+                break
+            except Exception:
+                continue
+    pairs_data = sc.get("pairs", {})
+    result = {}
+    for pair in config.PAIRS:
+        pd_entry = pairs_data.get(pair, {})
+        by_session = pd_entry.get("by_session", {})
+        # Find best WR across all sessions
+        best_wr = 0.0
+        best_session = ""
+        for s_name, s_data in by_session.items():
+            wr = float(s_data.get("win_rate_pct", 0))
+            if wr > best_wr:
+                best_wr = wr
+                best_session = s_name
+        global_wr = float(pd_entry.get("win_rate_pct", 0))
+        if global_wr > best_wr:
+            best_wr = global_wr
+            best_session = "global"
+        result[pair] = {
+            "best_wr_pct": round(best_wr, 1),
+            "best_session": best_session,
+            "global_wr_pct": round(global_wr, 1),
+            "sessions": {s: round(float(d.get("win_rate_pct", 0)), 1) for s, d in by_session.items()},
+        }
+    # Summary stats
+    wr_values = [v["best_wr_pct"] for v in result.values() if v["best_wr_pct"] > 0]
+    avg_wr = sum(wr_values) / len(wr_values) if wr_values else 0
+    above_70 = sum(1 for w in wr_values if w >= 70)
+    above_80 = sum(1 for w in wr_values if w >= 80)
+    return {
+        "pairs": result,
+        "summary": {
+            "avg_best_wr_pct": round(avg_wr, 1),
+            "pairs_above_70pct": above_70,
+            "pairs_above_80pct": above_80,
+            "total_pairs": len(result),
+        },
+    }
+
+
 @app.get("/orderbook")
 def orderbook_page():
     """Redirect /orderbook to the main intent page (prognoses)."""

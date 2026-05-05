@@ -1725,10 +1725,11 @@
 
   async function refreshPhase15() {
     try {
-      const [timeData, wrData, forecastData] = await Promise.all([
+      const [timeData, wrData, forecastData, stratData] = await Promise.all([
         _skFetch("/api/time-status"),
         _skFetch("/api/pair-winrates"),
         _skFetch("/api/forecasts"),
+        _skFetch("/api/strategy-winrates"),
       ]);
 
       // Time countdown
@@ -1750,60 +1751,81 @@
         }
       }
 
-      // Total win rate
-      if (wrData && wrData.pair_winrates) {
-        const wr = wrData.pair_winrates;
-        let totalWins = 0, totalLosses = 0, totalPnl = 0;
-        Object.values(wr).forEach(p => {
-          totalWins += p.wins;
-          totalLosses += p.losses;
-          totalPnl += p.pnl;
-        });
-        const total = totalWins + totalLosses;
-        const wrPct = total > 0 ? (totalWins / total * 100) : 0;
+      // Win rate: show STRATEGY backtest WR for ALL 28 pairs + paper trading WR where available
+      {
+        const stratPairs = (stratData && stratData.pairs) || {};
+        const stratSummary = (stratData && stratData.summary) || {};
+        const wr = (wrData && wrData.pair_winrates) || {};
+
+        // Total WR from strategy backtest (the real metric)
         const wrEl = document.getElementById("p15-total-wr");
         if (wrEl) {
-          wrEl.textContent = total > 0 ? `${wrPct.toFixed(1)}%` : "—";
-          wrEl.style.color = wrPct >= 70 ? "#00ff88" : wrPct >= 55 ? "#ffcc00" : "#ff4444";
+          const avgWR = stratSummary.avg_best_wr_pct || 0;
+          wrEl.textContent = avgWR > 0 ? `${avgWR.toFixed(1)}%` : "—";
+          wrEl.style.color = avgWR >= 70 ? "#00ff88" : avgWR >= 55 ? "#ffcc00" : "#ff4444";
         }
         const detailEl = document.getElementById("p15-total-wr-detail");
-        if (detailEl) detailEl.textContent = `${totalWins}W / ${totalLosses}L · PnL ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`;
+        if (detailEl) {
+          const a70 = stratSummary.pairs_above_70pct || 0;
+          const a80 = stratSummary.pairs_above_80pct || 0;
+          detailEl.textContent = `${a80} пар ≥80% · ${a70} пар ≥70% · бэктест 365д`;
+        }
 
-        // Per-pair grid
+        // Per-pair grid: show ALL 28 pairs from strategy backtest
         const pairGrid = document.getElementById("p15-pair-wr-grid");
         if (pairGrid) {
-          const pairs = Object.entries(wr).sort((a, b) => b[1].win_rate_pct - a[1].win_rate_pct);
-          if (pairs.length === 0) {
-            pairGrid.innerHTML = '<div style="color:#5a7a9a;font-size:12px;padding:8px">пока нет закрытых сделок</div>';
+          // Combine strategy WR with paper trading WR
+          const allPairs = Object.entries(stratPairs).sort((a, b) => (b[1].best_wr_pct || 0) - (a[1].best_wr_pct || 0));
+          if (allPairs.length === 0) {
+            pairGrid.innerHTML = '<div style="color:#5a7a9a;font-size:12px;padding:8px">загрузка…</div>';
           } else {
-            pairGrid.innerHTML = pairs.map(([pair, s]) => {
-              const color = s.win_rate_pct >= 70 ? "#00ff88" : s.win_rate_pct >= 55 ? "#ffcc00" : "#ff4444";
-              const bg = s.win_rate_pct >= 70 ? "#00ff8815" : s.win_rate_pct >= 55 ? "#ffcc0015" : "#ff444415";
+            pairGrid.innerHTML = allPairs.map(([pair, s]) => {
+              const bestWR = s.best_wr_pct || 0;
+              const color = bestWR >= 80 ? "#00ff88" : bestWR >= 70 ? "#00e1ff" : bestWR >= 60 ? "#ffcc00" : "#ff6666";
+              const bg = bestWR >= 80 ? "#00ff8815" : bestWR >= 70 ? "#00e1ff15" : bestWR >= 60 ? "#ffcc0015" : "#ff666615";
+              const paperWR = wr[pair];
+              const paperStr = paperWR ? `Paper: ${paperWR.wins}W/${paperWR.losses}L` : "";
               return `<div style="background:${bg};border:1px solid ${color}33;border-radius:8px;padding:8px 10px;font-size:12px">
                 <div style="font-weight:700;color:#fff">${pair}</div>
-                <div style="color:${color};font-size:16px;font-weight:800">${s.win_rate_pct.toFixed(0)}%</div>
-                <div style="color:#7aa2c0">${s.wins}W/${s.losses}L · $${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)}</div>
+                <div style="color:${color};font-size:16px;font-weight:800">${bestWR.toFixed(1)}%</div>
+                <div style="color:#5a7a9a;font-size:10px">${s.best_session || ""}${paperStr ? ` · ${paperStr}` : ""}</div>
               </div>`;
             }).join("");
           }
         }
       }
 
-      // ALL signals with quality tiers
+      // ALL signals with quality tiers + strategy WR from API
       if (forecastData && forecastData.forecasts) {
         const fc = forecastData.forecasts;
+        const stratPairs = (stratData && stratData.pairs) || {};
         const signalsGrid = document.getElementById("p15-strong-signals");
         const qualityPill = document.getElementById("p15-quality-pill");
         const qualityEl = document.getElementById("p15-signal-quality");
+
+        // Enrich forecasts with strategy WR from /api/strategy-winrates
         const allSignals = Object.values(fc).filter(f =>
           f && !f.skipped
-        ).sort((a, b) => (b.probability_pct || 0) - (a.probability_pct || 0));
+        ).map(f => {
+          const sw = stratPairs[f.pair] || {};
+          const bestWR = sw.best_wr_pct || f.strategy_backtest_wr_pct || 0;
+          // Recalculate quality tier using strategy WR
+          const effectiveProb = Math.max(f.probability_pct || 0, bestWR);
+          const tier = effectiveProb >= 75 ? "STRONG" : effectiveProb >= 70 ? "MODERATE" : "WEAK";
+          // Recalculate EV with best WR
+          const brokerPayout = (f.broker_payout_pct || 85) / 100;
+          const wrFrac = Math.max((f.probability_pct || 0), bestWR) / 100;
+          const ev = wrFrac * brokerPayout - (1 - wrFrac);
+          return { ...f, _stratWR: bestWR, _bestSession: sw.best_session || "", _tier: tier, _ev: ev * 100 };
+        }).sort((a, b) => (b._stratWR || 0) - (a._stratWR || 0));
 
-        const strongCount = allSignals.filter(f => f.quality_tier === "STRONG").length;
+        const strongCount = allSignals.filter(f => f._tier === "STRONG").length;
         const totalForecasts = allSignals.length;
+        const above70 = allSignals.filter(f => (f._stratWR || 0) >= 70).length;
+        const above80 = allSignals.filter(f => (f._stratWR || 0) >= 80).length;
 
         if (qualityEl) qualityEl.textContent = `${totalForecasts} пар`;
-        if (qualityPill) qualityPill.textContent = `v15 · ${strongCount} STRONG / ${totalForecasts} всего · ${allSignals.filter(f => (f.strategy_backtest_wr_pct || 0) >= 70).length} пар ≥70% WR`;
+        if (qualityPill) qualityPill.textContent = `v15 · ${above80} пар ≥80% WR · ${above70} пар ≥70% WR · ${strongCount} STRONG`;
 
         if (signalsGrid) {
           if (allSignals.length === 0) {
@@ -1811,14 +1833,15 @@
           } else {
             signalsGrid.innerHTML = allSignals.map(f => {
               const sideColor = f.side === "BUY" ? "#00ff88" : "#ff4466";
-              const tier = f.quality_tier || "WEAK";
+              const tier = f._tier || "WEAK";
               const tierColor = tier === "STRONG" ? "#00ff88" : tier === "MODERATE" ? "#ffcc00" : "#ff6666";
               const tierBg = tier === "STRONG" ? "#00ff8812" : tier === "MODERATE" ? "#ffcc0012" : "#ff666612";
               const tierLabel = tier === "STRONG" ? "СИЛЬНЫЙ" : tier === "MODERATE" ? "СРЕДНИЙ" : "СЛАБЫЙ";
-              const stratWR = f.strategy_backtest_wr_pct || 0;
+              const stratWR = f._stratWR || 0;
               const wrColor = stratWR >= 80 ? "#00ff88" : stratWR >= 70 ? "#00e1ff" : stratWR >= 60 ? "#ffcc00" : "#ff6666";
-              const evPct = f.ev_pct || 0;
+              const evPct = f._ev || 0;
               const evColor = evPct >= 5 ? "#00ff88" : evPct > 0 ? "#ffcc00" : "#ff4444";
+              const bestSess = f._bestSession ? ` (${f._bestSession})` : "";
               return `<div style="background:${tierBg};border:1px solid ${tierColor}33;border-radius:10px;padding:12px;position:relative;overflow:hidden">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                   <span style="font-weight:800;color:#fff;font-size:14px">${f.pair}</span>
@@ -1828,12 +1851,10 @@
                   </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px">
+                  <div><span style="color:#7aa2c0">Стратегия WR:</span> <b style="color:${wrColor};font-size:14px">${stratWR.toFixed(1)}%</b>${bestSess ? `<span style="color:#5a7a9a;font-size:9px">${bestSess}</span>` : ""}</div>
                   <div><span style="color:#7aa2c0">Вероятность:</span> <b style="color:#fff">${(f.probability_pct || 0).toFixed(1)}%</b></div>
-                  <div><span style="color:#7aa2c0">Стратегия WR:</span> <b style="color:${wrColor}">${stratWR.toFixed(0)}%</b></div>
-                  <div><span style="color:#7aa2c0">Confluence:</span> <b style="color:${tierColor}">${(f.confluence_pct || 0).toFixed(0)}%</b></div>
-                  <div><span style="color:#7aa2c0">EV:</span> <b style="color:${evColor}">${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%</b></div>
+                  <div><span style="color:#7aa2c0">EV за сделку:</span> <b style="color:${evColor}">${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%</b></div>
                   <div><span style="color:#7aa2c0">Score:</span> <b style="color:#fff">${f.score}/${f.max_score}</b></div>
-                  <div><span style="color:#7aa2c0">Expiry:</span> <b style="color:#fff">${f.recommended_hours}ч</b></div>
                 </div>
                 <div style="position:absolute;top:0;right:0;bottom:0;width:4px;background:${tierColor}"></div>
               </div>`;
