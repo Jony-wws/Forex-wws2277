@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOREX Сигналы — Анализ рынка в реальном времени</title>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --card-bg: #141b2d;
+            --card-border: #1e2a3a;
+            --text: #e2e8f0;
+            --text-dim: #8892a4;
+            --buy: #00e676;
+            --buy-bg: rgba(0, 230, 118, 0.06);
+            --sell: #ff5252;
+            --sell-bg: rgba(255, 82, 82, 0.06);
+            --neutral: #546e7a;
+            --accent: #4fc3f7;
+            --header-bg: #0d1321;
+            --row-hover: rgba(79,195,247,0.04);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        /* === HEADER === */
+        .header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { font-size: 18px; font-weight: 700; color: var(--accent); }
+        .header-info {
+            display: flex; gap: 16px; align-items: center;
+            font-size: 12px; color: var(--text-dim);
+        }
+        .status-dot {
+            display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%; background: var(--buy); margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* === TAB NAV === */
+        .tabs {
+            display: flex; gap: 0; background: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 0 20px;
+        }
+        .tab {
+            padding: 10px 20px; cursor: pointer;
+            font-size: 13px; font-weight: 600;
+            color: var(--text-dim); border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* === STATS BAR === */
+        .stats-bar {
+            display: flex; gap: 14px; padding: 10px 20px;
+            background: var(--header-bg); border-bottom: 1px solid var(--card-border);
+            font-size: 12px; overflow-x: auto;
+        }
+        .stat-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .stat-label { color: var(--text-dim); }
+        .stat-value { font-weight: 600; }
+
+        /* === TABLE === */
+        .container { max-width: 1600px; margin: 0 auto; padding: 12px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left; padding: 10px 12px;
+            font-size: 11px; font-weight: 600;
+            color: var(--text-dim); text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            position: sticky; top: 82px; z-index: 10;
+            cursor: pointer; user-select: none;
+        }
+        th:hover { color: var(--accent); }
+        td {
+            padding: 10px 12px; border-bottom: 1px solid rgba(30,42,58,0.5);
+            vertical-align: middle;
+        }
+        tr:hover { background: var(--row-hover); }
+        .pair-cell { font-weight: 700; font-size: 14px; }
+        .pair-sub { font-size: 11px; color: var(--text-dim); }
+        .price-cell { font-family: 'SF Mono', Consolas, monospace; font-weight: 600; font-size: 14px; }
+
+        .signal-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 3px 12px; border-radius: 16px;
+            font-weight: 700; font-size: 12px; letter-spacing: 0.5px;
+        }
+        .badge-buy { background: rgba(0,230,118,0.12); color: var(--buy); border: 1px solid rgba(0,230,118,0.25); }
+        .badge-sell { background: rgba(255,82,82,0.12); color: var(--sell); border: 1px solid rgba(255,82,82,0.25); }
+        .badge-none { background: rgba(84,110,122,0.1); color: var(--neutral); border: 1px solid rgba(84,110,122,0.2); font-size: 11px; }
+
+        .change-up { color: var(--buy); }
+        .change-down { color: var(--sell); }
+
+        .conf-bar {
+            width: 60px; height: 6px; border-radius: 3px;
+            background: rgba(255,255,255,0.08); display: inline-block;
+            vertical-align: middle; margin-right: 6px;
+        }
+        .conf-fill { height: 100%; border-radius: 3px; }
+        .conf-fill-buy { background: var(--buy); }
+        .conf-fill-sell { background: var(--sell); }
+        .conf-fill-none { background: var(--neutral); }
+
+        .forecast-text { font-size: 12px; }
+        .fc-up { color: var(--buy); }
+        .fc-down { color: var(--sell); }
+        .fc-none { color: var(--text-dim); }
+
+        /* === DETAIL ROW === */
+        .detail-row { display: none; }
+        .detail-row.open { display: table-row; }
+        .detail-row td {
+            padding: 12px 20px; background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid var(--card-border);
+        }
+        .detail-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .detail-block h4 {
+            font-size: 12px; color: var(--accent); margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .detail-item {
+            display: flex; justify-content: space-between;
+            padding: 3px 0; font-size: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .detail-name { color: var(--text-dim); }
+        .dv-pos { color: var(--buy); font-weight: 600; }
+        .dv-neg { color: var(--sell); font-weight: 600; }
+
+        /* === ORDER BOOK === */
+        .ob-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 12px;
+        }
+        .ob-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 10px; padding: 14px; cursor: pointer;
+        }
+        .ob-card:hover { border-color: var(--accent); }
+        .ob-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        .ob-pair { font-weight: 700; font-size: 15px; }
+        .ob-spread { font-size: 12px; color: var(--text-dim); }
+        .ob-prices {
+            display: flex; justify-content: space-between;
+            margin-bottom: 10px; padding: 8px;
+            background: rgba(0,0,0,0.2); border-radius: 6px;
+        }
+        .ob-bid { color: var(--buy); font-weight: 700; font-family: monospace; }
+        .ob-ask { color: var(--sell); font-weight: 700; font-family: monospace; }
+        .ob-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+        .ob-depth { margin-top: 8px; }
+        .ob-depth-row {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 3px; font-size: 11px;
+        }
+        .ob-depth-bar {
+            height: 14px; border-radius: 2px; min-width: 2px;
+            transition: width 0.3s;
+        }
+        .ob-depth-bid { background: rgba(0,230,118,0.25); }
+        .ob-depth-ask { background: rgba(255,82,82,0.25); }
+        .ob-depth-price { width: 70px; text-align: right; font-family: monospace; font-size: 10px; color: var(--text-dim); }
+        .ob-depth-vol { width: 35px; text-align: right; font-size: 10px; color: var(--text-dim); }
+
+        .ob-levels { margin-top: 8px; font-size: 11px; }
+        .ob-level-row { display: flex; justify-content: space-between; padding: 2px 0; }
+        .ob-support { color: var(--buy); }
+        .ob-resist { color: var(--sell); }
+
+        /* === LOADING === */
+        .loading { text-align: center; padding: 50px; color: var(--text-dim); }
+        .spinner {
+            display: inline-block; width: 36px; height: 36px;
+            border: 3px solid var(--card-border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 768px) {
+            .header { padding: 10px 12px; }
+            .header h1 { font-size: 15px; }
+            .container { padding: 6px; }
+            th, td { padding: 6px 8px; font-size: 12px; }
+            .pair-cell { font-size: 12px; }
+            .price-cell { font-size: 12px; }
+            .detail-grid { grid-template-columns: 1fr; }
+            .ob-grid { grid-template-columns: 1fr; }
+            .tabs { padding: 0 8px; }
+            .tab { padding: 8px 12px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FOREX СИГНАЛЫ</h1>
+        <div class="header-info">
+            <span><span class="status-dot"></span>Обновление: 10 сек</span>
+            <span id="clock">--:--:--</span>
+            <span id="scan-info">Загрузка...</span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="signals">Сигналы и прогнозы</div>
+        <div class="tab" data-tab="orderbook">Стакан ордеров</div>
+    </div>
+
+    <div class="stats-bar">
+        <div class="stat-item">
+            <span class="stat-label">Всего пар:</span>
+            <span class="stat-value" id="total-pairs">28</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">BUY:</span>
+            <span class="stat-value" style="color:var(--buy)" id="buy-count">—</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">SELL:</span>
+            <span class="stat-value" style="color:var(--sell)" id="sell-count">—</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Без сигнала:</span>
+            <span class="stat-value" id="neutral-count">—</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Время UTC+5:</span>
+            <span class="stat-value" id="clock2">—</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- SIGNALS TABLE -->
+        <div class="tab-content active" id="tab-signals">
+            <div id="signals-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Загрузка данных с рынка...</div>
+                    <div style="font-size:12px;margin-top:6px;color:var(--text-dim)">Первый запуск: до 30 секунд</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ORDER BOOK -->
+        <div class="tab-content" id="tab-orderbook">
+            <div id="ob-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Загрузка стакана ордеров...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // === TABS ===
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            if (tab.dataset.tab === 'orderbook') fetchOrderbooks();
+        });
+    });
+
+    let sortCol = 'signal';
+    let sortDir = 1;
+
+    function fmtPrice(p, pair) {
+        return pair.includes('JPY') ? p.toFixed(3) : p.toFixed(5);
+    }
+
+    function renderSignalsTable(data) {
+        if (!data || !data.pairs || Object.keys(data.pairs).length === 0) return;
+
+        let pairs = Object.values(data.pairs);
+        const buyC = pairs.filter(p => p.signal === 'BUY').length;
+        const sellC = pairs.filter(p => p.signal === 'SELL').length;
+        const neutC = pairs.filter(p => !p.signal).length;
+
+        document.getElementById('total-pairs').textContent = pairs.length;
+        document.getElementById('buy-count').textContent = buyC;
+        document.getElementById('sell-count').textContent = sellC;
+        document.getElementById('neutral-count').textContent = neutC;
+        document.getElementById('scan-info').textContent = 'Обн. #' + data.scan_count;
+
+        // Sort
+        pairs.sort((a, b) => {
+            if (sortCol === 'signal') {
+                const sa = a.signal ? (a.signal === 'BUY' ? 2 : 1) : 0;
+                const sb = b.signal ? (b.signal === 'BUY' ? 2 : 1) : 0;
+                if (sa !== sb) return (sb - sa) * sortDir;
+                return (Math.abs(b.score||0) - Math.abs(a.score||0)) * sortDir;
+            }
+            if (sortCol === 'pair') return a.pair.localeCompare(b.pair) * sortDir;
+            if (sortCol === 'price') return ((b.price||0) - (a.price||0)) * sortDir;
+            if (sortCol === 'change') return ((b.change_24h_pips||0) - (a.change_24h_pips||0)) * sortDir;
+            if (sortCol === 'confidence') return ((b.confidence||0) - (a.confidence||0)) * sortDir;
+            return 0;
+        });
+
+        let html = `<table>
+            <thead><tr>
+                <th data-sort="pair">Пара</th>
+                <th data-sort="price">Цена</th>
+                <th data-sort="change">Изм. 24ч</th>
+                <th data-sort="signal">Сигнал</th>
+                <th data-sort="confidence">Уверенность</th>
+                <th>Прогноз 5ч</th>
+                <th>Прогноз 24ч</th>
+                <th>Сила</th>
+            </tr></thead><tbody>`;
+
+        pairs.forEach((d, i) => {
+            const hasSig = !!d.signal;
+            const badgeClass = hasSig ? (d.signal === 'BUY' ? 'badge-buy' : 'badge-sell') : 'badge-none';
+            const badgeText = hasSig ? (d.signal === 'BUY' ? 'ПОКУПКА' : 'ПРОДАЖА') : '—';
+            const arrow = hasSig ? (d.signal === 'BUY' ? '&#9650; ' : '&#9660; ') : '';
+
+            const chClass = d.change_24h_pips >= 0 ? 'change-up' : 'change-down';
+            const chSign = d.change_24h_pips >= 0 ? '+' : '';
+
+            const confPct = d.confidence || 0;
+            const confColor = hasSig ? (d.signal === 'BUY' ? 'conf-fill-buy' : 'conf-fill-sell') : 'conf-fill-none';
+
+            let fc5 = '<span class="fc-none">—</span>';
+            if (d.forecast_5h) {
+                const cls = d.forecast_5h.direction === 'Рост' ? 'fc-up' : 'fc-down';
+                const arr = d.forecast_5h.direction === 'Рост' ? '&#9650;' : '&#9660;';
+                fc5 = `<span class="forecast-text ${cls}">${arr} ${d.forecast_5h.direction}</span>`;
+            }
+
+            let fc24 = '<span class="fc-none">—</span>';
+            if (d.forecast_24h) {
+                const cls = d.forecast_24h.direction === 'Рост' ? 'fc-up' : 'fc-down';
+                const arr = d.forecast_24h.direction === 'Рост' ? '&#9650;' : '&#9660;';
+                fc24 = `<span class="forecast-text ${cls}">${arr} ${d.forecast_24h.strength}</span>`;
+            }
+
+            const rowBg = hasSig ? (d.signal === 'BUY' ? 'background:var(--buy-bg)' : 'background:var(--sell-bg)') : '';
+
+            html += `<tr style="${rowBg}" class="data-row" data-idx="${i}" onclick="toggleDetail(${i})">
+                <td><div class="pair-cell">${d.pair}</div><div class="pair-sub">${d.name_ru}</div></td>
+                <td class="price-cell">${d.price_display}</td>
+                <td class="${chClass}">${chSign}${d.change_24h_pips} пп</td>
+                <td><span class="signal-badge ${badgeClass}">${arrow}${badgeText}</span></td>
+                <td>
+                    <span class="conf-bar"><span class="conf-fill ${confColor}" style="width:${confPct}%"></span></span>
+                    ${confPct}%
+                </td>
+                <td>${fc5}</td>
+                <td>${fc24}</td>
+                <td style="font-size:12px;color:var(--text-dim)">${d.strength || '—'}</td>
+            </tr>`;
+
+            // Detail row
+            let detailsHtml = '';
+            if (d.details && d.details.length) {
+                detailsHtml = d.details.map(item => {
+                    const vc = item.value > 0 ? 'dv-pos' : item.value < 0 ? 'dv-neg' : '';
+                    const s = item.value > 0 ? '+' : '';
+                    return `<div class="detail-item"><span class="detail-name">${item.reason}</span><span class="${vc}">${s}${item.value}</span></div>`;
+                }).join('');
+            }
+
+            let indHtml = '';
+            if (d.indicators && Object.keys(d.indicators).length) {
+                indHtml = Object.entries(d.indicators).map(([k,v]) =>
+                    `<div class="detail-item"><span class="detail-name">${k}</span><span>${v}</span></div>`
+                ).join('');
+            }
+
+            html += `<tr class="detail-row" id="detail-${i}"><td colspan="8">
+                <div class="detail-grid">
+                    <div class="detail-block"><h4>Анализ индикаторов</h4>${detailsHtml || '<div style="color:var(--text-dim)">Нет данных</div>'}</div>
+                    <div class="detail-block"><h4>Значения индикаторов</h4>${indHtml || '<div style="color:var(--text-dim)">Нет данных</div>'}</div>
+                </div>
+            </td></tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('signals-content').innerHTML = html;
+
+        // Sort headers
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const col = th.dataset.sort;
+                if (sortCol === col) sortDir *= -1;
+                else { sortCol = col; sortDir = -1; }
+                renderSignalsTable(lastSignals);
+            });
+        });
+    }
+
+    function toggleDetail(idx) {
+        const row = document.getElementById('detail-' + idx);
+        if (row) row.classList.toggle('open');
+    }
+
+    // === ORDER BOOK ===
+    function renderOrderbooks(data) {
+        if (!data || Object.keys(data).length === 0) {
+            document.getElementById('ob-content').innerHTML = '<div class="loading">Стакан ордеров загружается... Обновите через 10 секунд</div>';
+            return;
+        }
+
+        const pairs = Object.values(data);
+        let html = '<div class="ob-grid">';
+
+        pairs.forEach(ob => {
+            const isJpy = ob.pair.includes('JPY');
+            const fmt = isJpy ? 3 : 5;
+
+            let depthHtml = '';
+            if (ob.depth && ob.depth.length) {
+                const maxVol = Math.max(...ob.depth.map(d => d.volume_pct || 0), 1);
+                const bids = ob.depth.filter(d => d.side === 'bid').reverse().slice(0, 6);
+                const asks = ob.depth.filter(d => d.side === 'ask').slice(0, 6);
+
+                depthHtml = '<div class="ob-depth">';
+                asks.reverse().forEach(d => {
+                    const w = Math.max(5, (d.volume_pct / maxVol) * 100);
+                    depthHtml += `<div class="ob-depth-row">
+                        <span class="ob-depth-price" style="color:var(--sell)">${d.price.toFixed(fmt)}</span>
+                        <div class="ob-depth-bar ob-depth-ask" style="width:${w}%"></div>
+                        <span class="ob-depth-vol">${d.volume_pct}%</span>
+                    </div>`;
+                });
+                depthHtml += '<div style="border-top:1px solid var(--card-border);margin:4px 0"></div>';
+                bids.forEach(d => {
+                    const w = Math.max(5, (d.volume_pct / maxVol) * 100);
+                    depthHtml += `<div class="ob-depth-row">
+                        <span class="ob-depth-price" style="color:var(--buy)">${d.price.toFixed(fmt)}</span>
+                        <div class="ob-depth-bar ob-depth-bid" style="width:${w}%"></div>
+                        <span class="ob-depth-vol">${d.volume_pct}%</span>
+                    </div>`;
+                });
+                depthHtml += '</div>';
+            }
+
+            let levelsHtml = '';
+            if (ob.supports && ob.supports.length || ob.resistances && ob.resistances.length) {
+                levelsHtml = '<div class="ob-levels">';
+                (ob.resistances || []).reverse().forEach(r => {
+                    levelsHtml += `<div class="ob-level-row"><span class="ob-resist">Сопротивление</span><span class="ob-resist">${r.toFixed(fmt)}</span></div>`;
+                });
+                (ob.supports || []).reverse().forEach(s => {
+                    levelsHtml += `<div class="ob-level-row"><span class="ob-support">Поддержка</span><span class="ob-support">${s.toFixed(fmt)}</span></div>`;
+                });
+                levelsHtml += '</div>';
+            }
+
+            html += `<div class="ob-card">
+                <div class="ob-header">
+                    <span class="ob-pair">${ob.pair}</span>
+                    <span class="ob-spread">Спред: ${ob.spread_pips} пп</span>
+                </div>
+                <div class="ob-prices">
+                    <div><div class="ob-label">Bid (покупка)</div><div class="ob-bid">${ob.bid ? ob.bid.toFixed(fmt) : '—'}</div></div>
+                    <div style="text-align:center"><div class="ob-label">Средняя</div><div>${ob.mid ? ob.mid.toFixed(fmt) : '—'}</div></div>
+                    <div style="text-align:right"><div class="ob-label">Ask (продажа)</div><div class="ob-ask">${ob.ask ? ob.ask.toFixed(fmt) : '—'}</div></div>
+                </div>
+                ${depthHtml}
+                ${levelsHtml}
+            </div>`;
+        });
+
+        html += '</div>';
+        document.getElementById('ob-content').innerHTML = html;
+    }
+
+    // === CLOCK ===
+    function updateClock() {
+        const now = new Date();
+        const utc5 = new Date(now.getTime() + 5 * 3600000);
+        const t = [utc5.getUTCHours(), utc5.getUTCMinutes(), utc5.getUTCSeconds()]
+            .map(n => String(n).padStart(2,'0')).join(':');
+        document.getElementById('clock').textContent = 'UTC+5: ' + t;
+        document.getElementById('clock2').textContent = t;
+    }
+
+    // === DATA FETCH ===
+    let lastSignals = null;
+    let lastOB = null;
+    let dataLoaded = false;
+    let retryCount = 0;
+    let fetchErrors = 0;
+
+    // Use injected data from server if available (no API call needed)
+    if (window.__INITIAL_DATA__) {
+        lastSignals = window.__INITIAL_DATA__;
+        const hasPairs = lastSignals && lastSignals.pairs && Object.keys(lastSignals.pairs).length > 0;
+        if (hasPairs) {
+            dataLoaded = true;
+            renderSignalsTable(lastSignals);
+        }
+    }
+
+    async function fetchSignals() {
+        try {
+            const res = await fetch('/api/signals', {credentials: 'include'});
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
+            lastSignals = await res.json();
+            fetchErrors = 0;
+            const hasPairs = lastSignals && lastSignals.pairs && Object.keys(lastSignals.pairs).length > 0;
+            if (hasPairs) {
+                dataLoaded = true;
+                renderSignalsTable(lastSignals);
+            } else if (!dataLoaded) {
+                retryCount++;
+                showLoading('Сканирование рынка... Попытка ' + retryCount);
+                setTimeout(fetchSignals, 2000);
+            }
+        } catch(e) {
+            console.error('fetch signals:', e);
+            fetchErrors++;
+            if (!dataLoaded) {
+                retryCount++;
+                if (fetchErrors > 3) {
+                    showLoading('Ошибка подключения. Повтор через 3 сек... (' + e.message + ')');
+                } else {
+                    showLoading('Загрузка данных... Попытка ' + retryCount);
+                }
+                setTimeout(fetchSignals, fetchErrors > 3 ? 3000 : 2000);
+            }
+        }
+    }
+
+    function showLoading(msg) {
+        document.getElementById('signals-content').innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>${msg}</div>
+            </div>`;
+    }
+
+    async function fetchOrderbooks() {
+        try {
+            const res = await fetch('/api/orderbooks', {credentials: 'include'});
+            if (!res.ok) return;
+            lastOB = await res.json();
+            renderOrderbooks(lastOB);
+        } catch(e) { console.error('fetch orderbooks:', e); }
+    }
+
+    // Start fetching (initial data may already be rendered from __INITIAL_DATA__)
+    if (!dataLoaded) fetchSignals();
+    setInterval(fetchSignals, 10000);
+    setInterval(() => {
+        if (document.querySelector('.tab[data-tab="orderbook"]').classList.contains('active')) {
+            fetchOrderbooks();
+        }
+    }, 10000);
+    setInterval(updateClock, 1000);
+    updateClock();
+    </script>
+</body>
+</html>

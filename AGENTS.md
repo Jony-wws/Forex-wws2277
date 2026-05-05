@@ -4,25 +4,38 @@ This file is read automatically by AI assistants when they work in this repo.
 Read it BEFORE doing anything else. It explains the project, conventions, and
 how to continue work without re-asking the user.
 
+---
+
+## ⚠️ ОСНОВНАЯ СИСТЕМА — `new_signals/` (с 2026-05-05)
+
+**`new_signals/` — это единственная актуальная система.** Используй ТОЛЬКО её.
+Старая система `teamagent/` больше НЕ используется. Не запускай `teamagent/`,
+не модифицируй `teamagent/`, не ссылайся на неё.
+
+Пользователь явно указал: *"сохранил это в github... это теперь основная
+система и использовать только это"*.
+
+---
+
 ## How to start a NEW session (зачем оно)
 
 If the user just writes "продолжай" / "continue" — DO ALL OF THIS, in order:
 
 1. **Read recent context FIRST** — before doing anything else, read:
-   - `git log --oneline -20` on `devin/1777586006-teamagent-rebuild`.
-   - The 3 most recent files in `HISTORY/` (sorted by filename desc).
-   - This `AGENTS.md` (which you're reading) and `SESSION_STATE.md`.
-2. Install deps if needed: `pip install -q -r teamagent/requirements.txt`.
-3. Start the system: `bash scripts/start_all.sh` (it auto-installs deps too).
-4. Wait ~5 sec, then verify: `curl -s http://127.0.0.1:8080/api/health`.
+   - `git log --oneline -20` on `main`.
+   - This `AGENTS.md` (which you're reading).
+2. Install deps: `pip install -q fastapi uvicorn yfinance pandas numpy`.
+3. Start the system:
+   ```bash
+   cd new_signals
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+   ```
+4. Wait ~15 sec (first scan downloads data from Yahoo Finance), then verify:
+   `curl -s http://127.0.0.1:8080/api/health`.
 5. Expose externally with the Devin `deploy expose port=8080` tool — you'll
    get a URL like `https://<ID>-tunnel-<TOKEN>.devinapps.com/` with HTTP Basic
    Auth (`user` / `<token>`).
-6. Update the "Where to find the user's data" section below with the NEW URL
-   + login + password, commit and push to this branch
-   (`devin/1777586006-teamagent-rebuild`) so it lands in PR #1. This is how
-   the next session in any account will know the live URL without asking.
-7. Send the URL + login + password to the user as the FIRST message after
+6. Send the URL + login + password to the user as the FIRST message after
    start. The user is on Android Chrome — use the auto-login URL form
    `https://user:<password>@<host>/` so they can just tap and open it.
 
@@ -45,9 +58,10 @@ system state ever be lost between sessions / accounts / chats. The
 `HISTORY/` log is the canonical mechanism — chat history in the Devin
 webapp is per-account and DOES NOT migrate to a new account.
 
-## Project: FOREX AI 2026 — TeamAgent
+## Project: FOREX Сигналы 2026 (new_signals)
 
-Multi-agent paper-trading system for **28 forex pairs**.
+Real-time forex signal system for **28 currency pairs**.
+Clean rewrite as of 2026-05-05, replacing the old TeamAgent system.
 
 - **Real data only**: Yahoo Finance (live + history), Dukascopy (1m cache),
   ForexFactory RSS (news blackout). NO simulators. NO synthetic / random data.
