@@ -8,9 +8,18 @@ we approximate market depth using:
 """
 from __future__ import annotations
 
+import threading
+import time
+
 import numpy as np
 import pandas as pd
 from .prices import fetch_bars
+
+_OB_TTL_SEC = 30          # full orderbook per-pair cache
+_VP_TTL_SEC = 5 * 60      # volume profile per-pair cache (heavier)
+_OB_CACHE: dict[str, tuple[float, dict]] = {}
+_VP_CACHE: dict[str, tuple[float, list[dict]]] = {}
+_OB_LOCK = threading.Lock()
 
 
 def _estimate_spread(pair: str) -> dict:
@@ -48,7 +57,16 @@ def _estimate_spread(pair: str) -> dict:
 
 
 def _volume_profile(pair: str, bars: int = 100) -> list[dict]:
-    """Compute volume profile - key price levels where most trading happened."""
+    """Compute volume profile - key price levels where most trading happened.
+
+    Cached per-pair for ``_VP_TTL_SEC`` because the underlying 1h Yahoo
+    history is also cached and the profile is one of the heavier steps in
+    the orderbook build.
+    """
+    cached = _VP_CACHE.get(pair)
+    if cached and time.time() - cached[0] < _VP_TTL_SEC:
+        return cached[1]
+
     df = fetch_bars(pair, "1h", "5d")
     if df.empty or len(df) < 20:
         return []
@@ -94,6 +112,7 @@ def _volume_profile(pair: str, bars: int = 100) -> list[dict]:
         for p in profile:
             p["volume_pct"] = round(p["bar_count"] / max(1, len(df)) * 100, 1)
 
+    _VP_CACHE[pair] = (time.time(), profile)
     return profile
 
 
@@ -174,24 +193,39 @@ def _approximate_depth(pair: str) -> list[dict]:
     return depth
 
 
-def get_orderbook(pair: str) -> dict:
-    """Full order book data for a pair."""
-    spread = _estimate_spread(pair)
-    sr = _find_support_resistance(pair)
-    depth = _approximate_depth(pair)
-    profile = _volume_profile(pair)
+def get_orderbook(pair: str, force_refresh: bool = False) -> dict:
+    """Full order book data for a pair (cached for ``_OB_TTL_SEC``)."""
+    if not force_refresh:
+        cached = _OB_CACHE.get(pair)
+        if cached and time.time() - cached[0] < _OB_TTL_SEC:
+            return cached[1]
 
-    is_jpy = "JPY" in pair
-    fmt = 3 if is_jpy else 5
+    with _OB_LOCK:
+        # Double-check after acquiring the lock so concurrent callers reuse
+        # the same fresh result instead of recomputing in parallel.
+        if not force_refresh:
+            cached = _OB_CACHE.get(pair)
+            if cached and time.time() - cached[0] < _OB_TTL_SEC:
+                return cached[1]
 
-    return {
-        "pair": pair,
-        "bid": round(spread["bid"], fmt),
-        "ask": round(spread["ask"], fmt),
-        "spread_pips": spread["spread_pips"],
-        "mid": round(spread.get("mid", 0), fmt),
-        "supports": sr["supports"],
-        "resistances": sr["resistances"],
-        "depth": depth,
-        "volume_profile": profile,
-    }
+        spread = _estimate_spread(pair)
+        sr = _find_support_resistance(pair)
+        depth = _approximate_depth(pair)
+        profile = _volume_profile(pair)
+
+        is_jpy = "JPY" in pair
+        fmt = 3 if is_jpy else 5
+
+        result = {
+            "pair": pair,
+            "bid": round(spread["bid"], fmt),
+            "ask": round(spread["ask"], fmt),
+            "spread_pips": spread["spread_pips"],
+            "mid": round(spread.get("mid", 0), fmt),
+            "supports": sr["supports"],
+            "resistances": sr["resistances"],
+            "depth": depth,
+            "volume_profile": profile,
+        }
+        _OB_CACHE[pair] = (time.time(), result)
+        return result

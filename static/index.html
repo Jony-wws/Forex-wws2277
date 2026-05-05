@@ -210,6 +210,79 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* === STRICT 5H CYCLE (top-5) === */
+        .cycle-block {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 10px; margin: 10px;
+            padding: 12px 14px;
+        }
+        .cycle-head {
+            display: flex; flex-wrap: wrap; gap: 10px;
+            align-items: center; justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .cycle-title {
+            font-size: 14px; font-weight: 700; color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .cycle-title .sub {
+            color: var(--text-dim); font-weight: 500; font-size: 11px;
+            margin-left: 6px;
+        }
+        .cycle-countdown {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(79,195,247,0.12);
+            border: 1px solid rgba(79,195,247,0.3);
+            color: var(--accent); font-weight: 700;
+            padding: 4px 10px; border-radius: 14px;
+            font-family: 'SF Mono', Consolas, monospace; font-size: 12px;
+        }
+        .cycle-winrate {
+            display: flex; gap: 14px; flex-wrap: wrap;
+            font-size: 12px; color: var(--text-dim);
+        }
+        .cycle-winrate b { color: var(--text); font-weight: 700; }
+        .cycle-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .cycle-card {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--card-border);
+            border-radius: 8px; padding: 10px;
+            display: flex; flex-direction: column; gap: 6px;
+            position: relative;
+        }
+        .cycle-card.buy { border-left: 3px solid var(--buy); }
+        .cycle-card.sell { border-left: 3px solid var(--sell); }
+        .cycle-card-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px;
+        }
+        .cycle-pair { font-weight: 700; font-size: 14px; }
+        .cycle-pair-sub { font-size: 11px; color: var(--text-dim); }
+        .tier-badge {
+            font-size: 10px; padding: 2px 7px; border-radius: 10px;
+            font-weight: 700; letter-spacing: 0.5px;
+        }
+        .tier-premium {
+            background: rgba(255,193,7,0.16); color: #ffc107;
+            border: 1px solid rgba(255,193,7,0.35);
+        }
+        .tier-medium {
+            background: rgba(84,110,122,0.16); color: var(--text-dim);
+            border: 1px solid rgba(84,110,122,0.3);
+        }
+        .cycle-meta { color: var(--text-dim); font-size: 11px; }
+        .cycle-conf { color: var(--text); font-weight: 700; }
+        .cycle-empty {
+            color: var(--text-dim); font-size: 12px; padding: 14px 0;
+            text-align: center;
+        }
+        .res-win  { color: var(--buy);  font-weight: 700; }
+        .res-loss { color: var(--sell); font-weight: 700; }
+
         /* === RESPONSIVE === */
         @media (max-width: 768px) {
             .header { padding: 10px 12px; }
@@ -222,6 +295,9 @@
             .ob-grid { grid-template-columns: 1fr; }
             .tabs { padding: 0 8px; }
             .tab { padding: 8px 12px; font-size: 12px; }
+            .cycle-block { margin: 6px; padding: 10px; }
+            .cycle-cards { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+            .cycle-pair { font-size: 13px; }
         }
     </style>
 </head>
@@ -232,6 +308,20 @@
             <span><span class="status-dot"></span>Обновление: 10 сек</span>
             <span id="clock">--:--:--</span>
             <span id="scan-info">Загрузка...</span>
+        </div>
+    </div>
+
+    <!-- Strict 5h cycle: top-5 forecasts + countdown + winrate -->
+    <div class="cycle-block" id="cycle-block">
+        <div class="cycle-head">
+            <div>
+                <span class="cycle-title">ТОП-5 СЕЙЧАС<span class="sub">— строгий 5-часовой цикл</span></span>
+            </div>
+            <div class="cycle-countdown" id="cycle-countdown">--:--:--</div>
+            <div class="cycle-winrate" id="cycle-winrate">Нет истории</div>
+        </div>
+        <div class="cycle-cards" id="cycle-cards">
+            <div class="cycle-empty">Ожидание первого цикла…</div>
         </div>
     </div>
 
@@ -518,6 +608,7 @@
     // === DATA FETCH ===
     let lastSignals = null;
     let lastOB = null;
+    let lastCycle = null;
     let dataLoaded = false;
     let retryCount = 0;
     let fetchErrors = 0;
@@ -531,6 +622,104 @@
             renderSignalsTable(lastSignals);
         }
     }
+    if (window.__INITIAL_CYCLE__) {
+        lastCycle = window.__INITIAL_CYCLE__;
+        renderCycle(lastCycle);
+    }
+
+    // === STRICT CYCLE (top-5) ===
+
+    function fmtCountdown(sec) {
+        sec = Math.max(0, sec | 0);
+        const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        return h + ':' + m + ':' + s;
+    }
+
+    function renderCycle(data) {
+        if (!data) return;
+        const cd = document.getElementById('cycle-countdown');
+        if (cd) cd.textContent = 'До следующего: ' + fmtCountdown(data.seconds_to_next_cycle);
+
+        const wr = document.getElementById('cycle-winrate');
+        if (wr) {
+            const w5 = data.winrate_5h || {};
+            const w24 = data.winrate_24h || {};
+            const fmt = (w) => w.decisions > 0
+                ? `<b>${w.winrate_pct}%</b> (${w.wins}П / ${w.losses}М, ${w.decisions} реш.)`
+                : '<b>—</b>';
+            wr.innerHTML = `Винрейт 5ч: ${fmt(w5)} · 24ч: ${fmt(w24)} · порог ±${(data.win_threshold_pct ?? 0.10).toFixed(2)}%`;
+        }
+
+        const cards = document.getElementById('cycle-cards');
+        if (!cards) return;
+        const cycle = data.current_cycle;
+        if (!cycle || !cycle.selected || cycle.selected.length === 0) {
+            cards.innerHTML = '<div class="cycle-empty">Ожидание первого цикла…</div>';
+            return;
+        }
+
+        cards.innerHTML = cycle.selected.map(f => {
+            const isJpy = (f.pair || '').includes('JPY');
+            const fmtP = (p) => p == null ? '—' : (isJpy ? Number(p).toFixed(3) : Number(p).toFixed(5));
+            const sideCls = f.side === 'BUY' ? 'buy' : 'sell';
+            const sideTxt = f.side === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
+            const sideColor = f.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+            const tierCls = f.tier === 'PREMIUM' ? 'tier-premium' : 'tier-medium';
+            const tierTxt = f.tier === 'PREMIUM' ? 'ПРЕМИУМ' : 'Средний';
+            const result5 = f.result_5h
+                ? (f.result_5h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
+                : '';
+            const result24 = f.result_24h
+                ? (f.result_24h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
+                : '';
+            const move5 = f.move_pct_5h != null
+                ? ` (${f.move_pct_5h >= 0 ? '+' : ''}${Number(f.move_pct_5h).toFixed(2)}%)`
+                : '';
+            const move24 = f.move_pct_24h != null
+                ? ` (${f.move_pct_24h >= 0 ? '+' : ''}${Number(f.move_pct_24h).toFixed(2)}%)`
+                : '';
+            return `<div class="cycle-card ${sideCls}">
+                <div class="cycle-card-row">
+                    <div>
+                        <div class="cycle-pair">${f.pair}</div>
+                        <div class="cycle-pair-sub">${f.name_ru || ''}</div>
+                    </div>
+                    <span class="tier-badge ${tierCls}">${tierTxt}</span>
+                </div>
+                <div class="cycle-card-row">
+                    <span style="color:${sideColor};font-weight:700;font-size:12px">${sideTxt}</span>
+                    <span class="cycle-conf">${f.confidence}%</span>
+                </div>
+                <div class="cycle-card-row">
+                    <span class="cycle-meta">Вход</span>
+                    <span class="price-cell" style="font-size:12px">${fmtP(f.entry_price)}</span>
+                </div>
+                <div class="cycle-card-row">
+                    <span class="cycle-meta">5ч / 24ч</span>
+                    <span style="font-size:11px">${result5}${move5} · ${result24}${move24}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async function fetchCycle() {
+        try {
+            const res = await fetch('/api/cycle', {credentials: 'include'});
+            if (!res.ok) return;
+            lastCycle = await res.json();
+            renderCycle(lastCycle);
+        } catch (e) { console.error('fetch cycle:', e); }
+    }
+
+    // Tick the countdown locally every second so it never feels stale.
+    setInterval(() => {
+        if (!lastCycle) return;
+        lastCycle.seconds_to_next_cycle = Math.max(0, (lastCycle.seconds_to_next_cycle | 0) - 1);
+        const cd = document.getElementById('cycle-countdown');
+        if (cd) cd.textContent = 'До следующего: ' + fmtCountdown(lastCycle.seconds_to_next_cycle);
+    }, 1000);
 
     async function fetchSignals() {
         try {
@@ -583,7 +772,9 @@
 
     // Start fetching (initial data may already be rendered from __INITIAL_DATA__)
     if (!dataLoaded) fetchSignals();
+    if (!lastCycle) fetchCycle();
     setInterval(fetchSignals, 10000);
+    setInterval(fetchCycle, 10000);
     setInterval(() => {
         if (document.querySelector('.tab[data-tab="orderbook"]').classList.contains('active')) {
             fetchOrderbooks();

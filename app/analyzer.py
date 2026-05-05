@@ -2,6 +2,7 @@
 
 Generates BUY/SELL signals with confidence levels.
 Only shows signal when confidence >= 80%.
+Timeframes: M15 + H1 + H4 + D1 (real Yahoo Finance bars).
 Uses: RSI, MACD, EMA, Bollinger, Stochastic, ADX, Williams %R,
 Ichimoku, Momentum, VWAP, ATR, Volume analysis, Price Action patterns.
 """
@@ -21,20 +22,37 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def analyze_pair(pair: str) -> dict | None:
-    """Full multi-TF analysis of one pair."""
-    bars_4h = fetch_bars(pair, "1h", "1mo")
-    bars_1h = fetch_bars(pair, "1h", "5d")
-    bars_15m = fetch_bars(pair, "15m", "5d")
+def _confidence_from_ratio(abs_score: int, max_score: int) -> int:
+    """Map score/max ratio to confidence percentage.
 
-    if any(df.empty or len(df) < 30 for df in (bars_4h, bars_1h, bars_15m)):
+    Calibrated so that ratio ~0.30 -> ~80% confidence (entry threshold).
+    Uses a saturating curve so adding/removing voting blocks does not
+    break the 80% gate — confidence scales with the realized ratio.
+    """
+    if max_score <= 0:
+        return 50
+    ratio = min(1.0, abs_score / max_score)
+    confidence = 50 + 45 * (1 - math.exp(-3.66 * ratio))
+    return max(50, min(95, int(round(confidence))))
+
+
+def analyze_pair(pair: str) -> dict | None:
+    """Full multi-TF analysis of one pair on M15 / H1 / H4 / D1."""
+    # Real timeframes — NOT a 1h proxy for 4h.
+    bars_15m = fetch_bars(pair, "15m", "5d")
+    bars_1h = fetch_bars(pair, "1h", "1mo")
+    bars_4h = fetch_bars(pair, "4h", "3mo")
+    bars_1d = fetch_bars(pair, "1d", "1y")
+
+    if any(df.empty or len(df) < 30 for df in (bars_15m, bars_1h, bars_4h, bars_1d)):
         return None
 
-    ind_4h = indicators.compute_all(bars_4h)
-    ind_1h = indicators.compute_all(bars_1h)
     ind_15m = indicators.compute_all(bars_15m)
+    ind_1h = indicators.compute_all(bars_1h)
+    ind_4h = indicators.compute_all(bars_4h)
+    ind_1d = indicators.compute_all(bars_1d)
 
-    if not ind_4h or not ind_1h or not ind_15m:
+    if not ind_15m or not ind_1h or not ind_4h or not ind_1d:
         return None
 
     score = 0
@@ -46,6 +64,18 @@ def analyze_pair(pair: str) -> dict | None:
         score += contrib
         max_possible += abs(weight) if weight else abs(contrib)
         details.append({"name": name, "value": contrib, "reason": reason})
+
+    # === BLOCK A0: 1D Trend Structure (weight: 3) — senior timeframe ===
+    if ind_1d["close"] > ind_1d["ema50"] > ind_1d["ema200"]:
+        vote("1D Тренд", +3, "Сильный восходящий тренд (1D)", 3)
+    elif ind_1d["close"] < ind_1d["ema50"] < ind_1d["ema200"]:
+        vote("1D Тренд", -3, "Сильный нисходящий тренд (1D)", 3)
+    elif ind_1d["close"] > ind_1d["ema50"]:
+        vote("1D Тренд", +1, "Умеренный рост (1D)", 3)
+    elif ind_1d["close"] < ind_1d["ema50"]:
+        vote("1D Тренд", -1, "Умеренное падение (1D)", 3)
+    else:
+        vote("1D Тренд", 0, "Нейтральный (1D)", 3)
 
     # === BLOCK A: 4H Trend Structure (weight: 3) ===
     if ind_4h["close"] > ind_4h["ema50"] > ind_4h["ema200"]:
@@ -187,16 +217,21 @@ def analyze_pair(pair: str) -> dict | None:
     elif ind_1h["close"] < ind_1h["vwap"] * 0.999:
         vote("VWAP", -1, "Цена ниже VWAP — медвежий настрой", 1)
 
-    # === BLOCK M: Multi-TF Agreement (weight: 3) ===
+    # === BLOCK M: Multi-TF Agreement across M15+H1+H4+D1 (weight: 3) ===
     bull_count = (
-        int(ind_4h["close"] > ind_4h["ema50"])
+        int(ind_1d["close"] > ind_1d["ema50"])
+        + int(ind_4h["close"] > ind_4h["ema50"])
         + int(ind_1h["close"] > ind_1h["ema20"])
         + int(ind_15m["close"] > ind_15m["ema20"])
     )
-    if bull_count == 3:
-        vote("Мульти-ТФ", +3, "Все 3 таймфрейма бычьи — сильное подтверждение", 3)
+    if bull_count == 4:
+        vote("Мульти-ТФ", +3, "Все 4 таймфрейма бычьи (D1+H4+H1+M15)", 3)
     elif bull_count == 0:
-        vote("Мульти-ТФ", -3, "Все 3 таймфрейма медвежьи — сильное подтверждение", 3)
+        vote("Мульти-ТФ", -3, "Все 4 таймфрейма медвежьи (D1+H4+H1+M15)", 3)
+    elif bull_count >= 3:
+        vote("Мульти-ТФ", +1, f"3 из 4 таймфреймов бычьи", 3)
+    elif bull_count <= 1:
+        vote("Мульти-ТФ", -1, f"3 из 4 таймфреймов медвежьи", 3)
 
     # === BLOCK N: Price Action (weight: 3) ===
     pa_score, pa_reasons = price_action_score(bars_1h)
@@ -211,26 +246,12 @@ def analyze_pair(pair: str) -> dict | None:
     elif ind_15m["ema20"] < ind_15m["ema50"]:
         vote("EMA Кросс 15М", -1, "EMA20 < EMA50 на 15М — медвежий кросс", 1)
 
-    # === Calculate confidence ===
+    # === Calculate confidence (dynamic max_score) ===
+    # max_possible accumulates the |weight| of every block that voted, so it
+    # grows automatically when blocks are added/removed. Confidence is derived
+    # from the score / max ratio rather than from hardcoded score thresholds.
     abs_score = abs(score)
-    # Realistic max score when most indicators agree strongly is ~25-30
-    # Score 8+ means strong agreement, 15+ means very strong
-    # Map: 0->50%, 5->65%, 8->75%, 10->80%, 15->87%, 20->92%, 25->95%
-    if abs_score >= 20:
-        confidence = 92
-    elif abs_score >= 15:
-        confidence = 85 + int((abs_score - 15) * 1.4)
-    elif abs_score >= 10:
-        confidence = 80 + int((abs_score - 10) * 1.0)
-    elif abs_score >= 8:
-        confidence = 75 + int((abs_score - 8) * 2.5)
-    elif abs_score >= 5:
-        confidence = 65 + int((abs_score - 5) * 3.3)
-    elif abs_score >= 3:
-        confidence = 58 + int((abs_score - 3) * 3.5)
-    else:
-        confidence = 50 + int(abs_score * 2.7)
-    confidence = max(50, min(95, confidence))
+    confidence = _confidence_from_ratio(abs_score, max_possible)
 
     side = "BUY" if score > 0 else "SELL" if score < 0 else None
 
@@ -266,6 +287,12 @@ def analyze_pair(pair: str) -> dict | None:
             "strength": f24_str,
         }
 
+    # Multi-TF alignment flag — used by the cycle module to mark «PREMIUM»
+    # forecasts that have all 4 senior timeframes agreeing in one direction.
+    multi_tf_aligned = (bull_count == 4 and side == "BUY") or (
+        bull_count == 0 and side == "SELL"
+    )
+
     return {
         "pair": pair,
         "side": side,
@@ -276,6 +303,8 @@ def analyze_pair(pair: str) -> dict | None:
         "details": details,
         "forecast_5h": forecast_5h,
         "forecast_24h": forecast_24h,
+        "multi_tf_aligned": multi_tf_aligned,
+        "adx": round(ind_1h["adx"], 1),
         "indicators": {
             "RSI": round(ind_1h["rsi14"], 1),
             "MACD": round(ind_1h["macd_hist"], 6),
