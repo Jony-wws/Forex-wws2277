@@ -31,88 +31,90 @@ _orderbooks: dict = {}
 _lock = threading.Lock()
 
 
+def _build_entry(pair: str) -> dict | None:
+    """Build data entry for one pair."""
+    price = get_current_price(pair)
+    if price is None:
+        return None
+
+    analysis = analyze_pair(pair)
+    price_info = get_price_change(pair)
+
+    is_jpy = "JPY" in pair
+    pip_mult = 100 if is_jpy else 10000
+
+    entry: dict = {
+        "pair": pair,
+        "name_ru": PAIR_NAMES_RU.get(pair, pair),
+        "price": price,
+        "price_display": f"{price:.3f}" if is_jpy else f"{price:.5f}",
+    }
+
+    if price_info:
+        entry["change_24h_pips"] = round(price_info["change"] * pip_mult, 1)
+        entry["change_24h_pct"] = price_info["change_pct"]
+    else:
+        entry["change_24h_pips"] = 0
+        entry["change_24h_pct"] = 0
+
+    if analysis:
+        has_signal = (
+            analysis["side"] is not None
+            and analysis["confidence"] >= MIN_CONFIDENCE
+        )
+        entry["signal"] = analysis["side"] if has_signal else None
+        entry["confidence"] = analysis["confidence"]
+        entry["strength"] = analysis["strength"] if has_signal else "Нет сигнала"
+        entry["score"] = analysis["score"]
+        entry["details"] = analysis["details"]
+        entry["indicators"] = analysis["indicators"]
+        entry["forecast_5h"] = analysis["forecast_5h"]
+        entry["forecast_24h"] = analysis["forecast_24h"]
+    else:
+        entry["signal"] = None
+        entry["confidence"] = 0
+        entry["strength"] = "Нет данных"
+        entry["score"] = 0
+        entry["details"] = []
+        entry["indicators"] = {}
+        entry["forecast_5h"] = None
+        entry["forecast_24h"] = None
+
+    return entry
+
+
 def _scanner_loop():
-    """Background scanner - runs every SCAN_INTERVAL_SEC."""
+    """Background scanner - publishes each pair as it's ready."""
     log.info("Scanner started")
     scan_num = 0
     while True:
         start = time.time()
         scan_num += 1
-        results = {}
 
         for pair in PAIRS:
             try:
-                price = get_current_price(pair)
-                if price is None:
-                    continue
-
-                analysis = analyze_pair(pair)
-                price_info = get_price_change(pair)
-
-                is_jpy = "JPY" in pair
-                pip_mult = 100 if is_jpy else 10000
-
-                entry: dict = {
-                    "pair": pair,
-                    "name_ru": PAIR_NAMES_RU.get(pair, pair),
-                    "price": price,
-                    "price_display": f"{price:.3f}" if is_jpy else f"{price:.5f}",
-                }
-
-                if price_info:
-                    entry["change_24h_pips"] = round(price_info["change"] * pip_mult, 1)
-                    entry["change_24h_pct"] = price_info["change_pct"]
-                else:
-                    entry["change_24h_pips"] = 0
-                    entry["change_24h_pct"] = 0
-
-                if analysis:
-                    has_signal = (
-                        analysis["side"] is not None
-                        and analysis["confidence"] >= MIN_CONFIDENCE
-                    )
-                    entry["signal"] = analysis["side"] if has_signal else None
-                    entry["confidence"] = analysis["confidence"]
-                    entry["strength"] = analysis["strength"] if has_signal else "Нет сигнала"
-                    entry["score"] = analysis["score"]
-                    entry["details"] = analysis["details"]
-                    entry["indicators"] = analysis["indicators"]
-                    entry["forecast_5h"] = analysis["forecast_5h"]
-                    entry["forecast_24h"] = analysis["forecast_24h"]
-                else:
-                    entry["signal"] = None
-                    entry["confidence"] = 0
-                    entry["strength"] = "Нет данных"
-                    entry["score"] = 0
-                    entry["details"] = []
-                    entry["indicators"] = {}
-                    entry["forecast_5h"] = None
-                    entry["forecast_24h"] = None
-
-                results[pair] = entry
-
+                entry = _build_entry(pair)
+                if entry:
+                    now_utc5 = datetime.now(TZ_UTC5)
+                    with _lock:
+                        _signals["pairs"][pair] = entry
+                        _signals["updated_at"] = now_utc5.strftime("%Y-%m-%d %H:%M:%S")
+                        _signals["scan_count"] = scan_num
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
 
         # Update order books (less frequently - every 3rd scan)
-        ob_data = {}
         if scan_num % 3 == 1:
             for pair in PAIRS:
                 try:
-                    ob_data[pair] = get_orderbook(pair)
+                    ob = get_orderbook(pair)
+                    with _lock:
+                        _orderbooks[pair] = ob
                 except Exception as e:
                     log.error(f"Error orderbook {pair}: {e}")
 
-        now_utc5 = datetime.now(TZ_UTC5)
-        with _lock:
-            _signals["pairs"] = results
-            _signals["updated_at"] = now_utc5.strftime("%Y-%m-%d %H:%M:%S")
-            _signals["scan_count"] = scan_num
-            if ob_data:
-                _orderbooks.update(ob_data)
-
         elapsed = time.time() - start
-        log.info(f"Scan #{scan_num}: {len(results)} pairs in {elapsed:.1f}s")
+        log.info(f"Scan #{scan_num}: {len(_signals['pairs'])} pairs in {elapsed:.1f}s")
 
         sleep_time = max(1, SCAN_INTERVAL_SEC - elapsed)
         time.sleep(sleep_time)

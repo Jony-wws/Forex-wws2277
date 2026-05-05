@@ -518,14 +518,39 @@
     // === DATA FETCH ===
     let lastSignals = null;
     let lastOB = null;
+    let dataLoaded = false;
+    let retryCount = 0;
 
     async function fetchSignals() {
         try {
             const res = await fetch('/api/signals');
             if (!res.ok) return;
             lastSignals = await res.json();
-            renderSignalsTable(lastSignals);
-        } catch(e) { console.error('fetch signals:', e); }
+            const hasPairs = lastSignals && lastSignals.pairs && Object.keys(lastSignals.pairs).length > 0;
+            if (hasPairs) {
+                dataLoaded = true;
+                renderSignalsTable(lastSignals);
+            } else if (!dataLoaded) {
+                retryCount++;
+                const dots = '.'.repeat((retryCount % 3) + 1);
+                document.getElementById('signals-content').innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Загрузка данных с рынка${dots}</div>
+                        <div style="font-size:12px;margin-top:6px;color:var(--text-dim)">
+                            Первый запуск: сканирование ${lastSignals.scan_count > 0 ? 'идёт' : 'запускается'}...
+                            Попытка ${retryCount}
+                        </div>
+                    </div>`;
+                setTimeout(fetchSignals, 2000);
+            }
+        } catch(e) {
+            console.error('fetch signals:', e);
+            if (!dataLoaded) {
+                retryCount++;
+                setTimeout(fetchSignals, 2000);
+            }
+        }
     }
 
     async function fetchOrderbooks() {
