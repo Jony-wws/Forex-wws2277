@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import time
 import signal
 import sys
@@ -80,6 +81,65 @@ def _session_remaining_hours(now: datetime) -> float:
             remaining = hi - hour + (60 - now.minute) / 60.0
             return max(0, remaining)
     return 0.0
+
+
+_strategy_cache: dict | None = None
+_strategy_cache_ts: float = 0.0
+
+
+def _load_strategy_config() -> dict:
+    """Load strategy_config.json with 60-second cache."""
+    global _strategy_cache, _strategy_cache_ts
+    now = time.time()
+    if _strategy_cache is not None and now - _strategy_cache_ts < 60:
+        return _strategy_cache
+    sc_file = config.STATE_DIR / "strategy_config.json"
+    locked_file = config.STATE_DIR / "strategy_config_locked.json"
+    for f in (sc_file, locked_file):
+        if f.exists():
+            try:
+                data = json.loads(f.read_text())
+                _strategy_cache = data
+                _strategy_cache_ts = now
+                return data
+            except Exception:
+                continue
+    return {}
+
+
+def _get_strategy_wr(pair: str, session: str) -> float | None:
+    """Get the best strategy WR for a pair in the current session.
+
+    Returns the best WR as a fraction (0.0-1.0), checking:
+    1. By-session WR for the current session
+    2. Global best WR for the pair
+    Picks the highest available."""
+    sc = _load_strategy_config()
+    pairs = sc.get("pairs", {})
+    pair_data = pairs.get(pair, {})
+    if not pair_data:
+        return None
+
+    candidates: list[float] = []
+
+    # Session-specific WR
+    by_session = pair_data.get("by_session", {})
+    sess_data = by_session.get(session, {})
+    if sess_data.get("win_rate_pct"):
+        candidates.append(float(sess_data["win_rate_pct"]) / 100.0)
+
+    # Global best WR
+    if pair_data.get("win_rate_pct"):
+        candidates.append(float(pair_data["win_rate_pct"]) / 100.0)
+
+    # Also check all sessions for the best one
+    for s_name, s_data in by_session.items():
+        if s_data.get("win_rate_pct"):
+            candidates.append(float(s_data["win_rate_pct"]) / 100.0)
+
+    if not candidates:
+        return None
+    return max(candidates)
 
 
 def _confluence_ratio(score_breakdown: list[dict]) -> float:
@@ -450,23 +510,12 @@ def evaluate_pair(pair: str) -> dict | None:
         delta = -penalty if score > 0 else (penalty if score < 0 else 0)
         vote("news_blackout", delta, f"high-impact новость ±30 мин — снижаем abs(score) на {penalty}")
 
-    # ───── CONFLUENCE QUALITY GATE (Phase 15) ─────
+    # ───── CONFLUENCE + STRATEGY CALIBRATION (Phase 15) ─────
     confluence = _confluence_ratio(score_breakdown)
-    min_abs_score = getattr(config, "MIN_ABSOLUTE_SCORE", 8)
-    min_confluence = getattr(config, "MIN_CONFLUENCE_RATIO", 0.60)
 
     # ───── итог ─────
     if score == 0:
         return None  # нейтрально, не показываем
-
-    # Quality filter: if score is too weak or indicators too conflicted, skip
-    if abs(score) < min_abs_score:
-        log.info(f"{pair}: score={score} < min_abs_score={min_abs_score} — слабый сигнал, пропускаем")
-        return None
-
-    if confluence < min_confluence:
-        log.info(f"{pair}: confluence={confluence:.2f} < {min_confluence} — индикаторы конфликтуют, пропускаем")
-        return None
 
     side = "BUY" if score > 0 else "SELL"
     max_sc = getattr(config, "MAX_SCORE", 95)
@@ -474,11 +523,34 @@ def evaluate_pair(pair: str) -> dict | None:
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
-    # Confluence bonus: high confluence raises probability slightly
+    # Confluence bonus: high confluence raises probability
     if confluence >= 0.85:
-        p = min(config.MAX_PROBABILITY, p + 0.03)
+        p = min(config.MAX_PROBABILITY, p + 0.04)
     elif confluence >= 0.75:
+        p = min(config.MAX_PROBABILITY, p + 0.03)
+    elif confluence >= 0.65:
         p = min(config.MAX_PROBABILITY, p + 0.02)
+
+    # ───── Strategy backtest WR calibration ─────
+    # Blend technical probability with historical strategy WR for accuracy
+    strat_wr = _get_strategy_wr(pair, _current_session(now.hour))
+    strat_wr_pct = strat_wr * 100 if strat_wr else 0
+    if strat_wr is not None and strat_wr > 0:
+        # Weighted blend: 40% technical + 60% historical strategy WR
+        p_blended = 0.40 * p + 0.60 * strat_wr
+        p = max(0.50, min(config.MAX_PROBABILITY, p_blended))
+
+    # Quality tier based on combined signals
+    quality_tier = "STRONG"  # >= 75%
+    if p < 0.70:
+        quality_tier = "WEAK"
+    elif p < 0.75:
+        quality_tier = "MODERATE"
+
+    # Mathematical EV calculation at user's broker payout
+    broker_payout = float(os.environ.get("BROKER_PAYOUT_PCT", "0.85"))
+    ev_per_trade = p * broker_payout - (1.0 - p)
+    breakeven_wr = 1.0 / (1.0 + broker_payout)
 
     # рекомендованная экспирация: больше score → дольше держим
     abs_norm = min(1.0, abs(score) / 25.0)
@@ -509,6 +581,12 @@ def evaluate_pair(pair: str) -> dict | None:
         "confluence_pct": round(confluence * 100, 1),
         "session_remaining_hours": round(session_remaining_h, 2),
         "hours_to_midnight_utc": round(hours_to_midnight, 2),
+        "quality_tier": quality_tier,
+        "strategy_backtest_wr_pct": round(strat_wr_pct, 1),
+        "ev_per_trade": round(ev_per_trade, 4),
+        "ev_pct": round(ev_per_trade * 100, 1),
+        "breakeven_wr_pct": round(breakeven_wr * 100, 1),
+        "broker_payout_pct": round(broker_payout * 100, 1),
         "indicators": {
             "4H": ind_4h,
             "1H": ind_1h,
@@ -522,11 +600,6 @@ def evaluate_pair(pair: str) -> dict | None:
         "volume_profile": vp,
         "as_of": now.isoformat(),
         "session": _current_session(now.hour),
-        "quality_gate": {
-            "min_abs_score": min_abs_score,
-            "min_confluence": min_confluence,
-            "passed": True,
-        },
     }
     return forecast
 
@@ -588,6 +661,9 @@ def scan_all_pairs() -> dict:
             "score": f["score"],
             "recommended_hours": f["recommended_hours"],
             "confluence_pct": f.get("confluence_pct", 0),
+            "quality_tier": f.get("quality_tier", ""),
+            "strategy_backtest_wr_pct": f.get("strategy_backtest_wr_pct", 0),
+            "ev_pct": f.get("ev_pct", 0),
             "session_remaining_hours": f.get("session_remaining_hours", 0),
             "agents_for_count": f.get("agents_for_count", 0),
             "agents_against_count": f.get("agents_against_count", 0),

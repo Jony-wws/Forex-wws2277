@@ -1789,44 +1789,53 @@
         }
       }
 
-      // Strong signals
+      // ALL signals with quality tiers
       if (forecastData && forecastData.forecasts) {
         const fc = forecastData.forecasts;
         const signalsGrid = document.getElementById("p15-strong-signals");
         const qualityPill = document.getElementById("p15-quality-pill");
         const qualityEl = document.getElementById("p15-signal-quality");
-        const strongSignals = Object.values(fc).filter(f =>
-          f && !f.skipped && f.probability_pct >= 75 && (f.confluence_pct || 0) >= 60
+        const allSignals = Object.values(fc).filter(f =>
+          f && !f.skipped
         ).sort((a, b) => (b.probability_pct || 0) - (a.probability_pct || 0));
 
-        const totalForecasts = Object.values(fc).filter(f => f && !f.skipped).length;
+        const strongCount = allSignals.filter(f => f.quality_tier === "STRONG").length;
+        const totalForecasts = allSignals.length;
 
-        if (qualityEl) qualityEl.textContent = `${strongSignals.length} / ${totalForecasts}`;
-        if (qualityPill) qualityPill.textContent = `v15 · ${strongSignals.length} сильных сигналов из ${Object.keys(fc).length} пар`;
+        if (qualityEl) qualityEl.textContent = `${totalForecasts} пар`;
+        if (qualityPill) qualityPill.textContent = `v15 · ${strongCount} STRONG / ${totalForecasts} всего · ${allSignals.filter(f => (f.strategy_backtest_wr_pct || 0) >= 70).length} пар ≥70% WR`;
 
         if (signalsGrid) {
-          if (strongSignals.length === 0) {
-            signalsGrid.innerHTML = '<div style="color:#ffcc00;font-size:13px;padding:12px;background:#ffcc0010;border-radius:8px;border:1px solid #ffcc0033">Нет сигналов достаточного качества. Система ждёт лучший момент для входа.</div>';
+          if (allSignals.length === 0) {
+            signalsGrid.innerHTML = '<div style="color:#ffcc00;font-size:13px;padding:12px;background:#ffcc0010;border-radius:8px;border:1px solid #ffcc0033">Рынок закрыт или сканирование в процессе…</div>';
           } else {
-            signalsGrid.innerHTML = strongSignals.map(f => {
+            signalsGrid.innerHTML = allSignals.map(f => {
               const sideColor = f.side === "BUY" ? "#00ff88" : "#ff4466";
-              const confColor = (f.confluence_pct || 0) >= 80 ? "#00ff88" : (f.confluence_pct || 0) >= 70 ? "#00e1ff" : "#ffcc00";
-              const sessRemain = f.session_remaining_hours || 0;
-              return `<div style="background:linear-gradient(135deg,#0a162899,#0d1f3c99);border:1px solid ${sideColor}44;border-radius:10px;padding:12px;position:relative;overflow:hidden">
+              const tier = f.quality_tier || "WEAK";
+              const tierColor = tier === "STRONG" ? "#00ff88" : tier === "MODERATE" ? "#ffcc00" : "#ff6666";
+              const tierBg = tier === "STRONG" ? "#00ff8812" : tier === "MODERATE" ? "#ffcc0012" : "#ff666612";
+              const tierLabel = tier === "STRONG" ? "СИЛЬНЫЙ" : tier === "MODERATE" ? "СРЕДНИЙ" : "СЛАБЫЙ";
+              const stratWR = f.strategy_backtest_wr_pct || 0;
+              const wrColor = stratWR >= 80 ? "#00ff88" : stratWR >= 70 ? "#00e1ff" : stratWR >= 60 ? "#ffcc00" : "#ff6666";
+              const evPct = f.ev_pct || 0;
+              const evColor = evPct >= 5 ? "#00ff88" : evPct > 0 ? "#ffcc00" : "#ff4444";
+              return `<div style="background:${tierBg};border:1px solid ${tierColor}33;border-radius:10px;padding:12px;position:relative;overflow:hidden">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                   <span style="font-weight:800;color:#fff;font-size:14px">${f.pair}</span>
-                  <span style="background:${sideColor}22;color:${sideColor};padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px">${f.side}</span>
+                  <div style="display:flex;gap:4px">
+                    <span style="background:${sideColor}22;color:${sideColor};padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px">${f.side}</span>
+                    <span style="background:${tierColor}22;color:${tierColor};padding:2px 6px;border-radius:4px;font-weight:700;font-size:10px">${tierLabel}</span>
+                  </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px">
                   <div><span style="color:#7aa2c0">Вероятность:</span> <b style="color:#fff">${(f.probability_pct || 0).toFixed(1)}%</b></div>
-                  <div><span style="color:#7aa2c0">Confluence:</span> <b style="color:${confColor}">${(f.confluence_pct || 0).toFixed(0)}%</b></div>
+                  <div><span style="color:#7aa2c0">Стратегия WR:</span> <b style="color:${wrColor}">${stratWR.toFixed(0)}%</b></div>
+                  <div><span style="color:#7aa2c0">Confluence:</span> <b style="color:${tierColor}">${(f.confluence_pct || 0).toFixed(0)}%</b></div>
+                  <div><span style="color:#7aa2c0">EV:</span> <b style="color:${evColor}">${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%</b></div>
                   <div><span style="color:#7aa2c0">Score:</span> <b style="color:#fff">${f.score}/${f.max_score}</b></div>
                   <div><span style="color:#7aa2c0">Expiry:</span> <b style="color:#fff">${f.recommended_hours}ч</b></div>
-                  <div><span style="color:#7aa2c0">Агенты за:</span> <b style="color:#00ff88">${f.agents_for_count || 0}</b></div>
-                  <div><span style="color:#7aa2c0">Против:</span> <b style="color:#ff4466">${f.agents_against_count || 0}</b></div>
                 </div>
-                ${sessRemain > 0 ? `<div style="margin-top:6px;font-size:10px;color:#5a7a9a">Сессия: осталось ${sessRemain.toFixed(1)}ч</div>` : ""}
-                <div style="position:absolute;top:0;right:0;bottom:0;width:4px;background:${sideColor}"></div>
+                <div style="position:absolute;top:0;right:0;bottom:0;width:4px;background:${tierColor}"></div>
               </div>`;
             }).join("");
           }
