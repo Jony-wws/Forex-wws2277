@@ -283,6 +283,48 @@
         .res-win  { color: var(--buy);  font-weight: 700; }
         .res-loss { color: var(--sell); font-weight: 700; }
 
+        .cycle-legend {
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+        .cycle-legend b { color: var(--text); }
+        .cycle-legend .lg-prem { color: #ffc107; }
+        .cycle-legend .lg-med { color: var(--text-dim); }
+
+        .fc24-empty { color: var(--text-dim); font-size: 12px; padding: 10px 0; text-align: center; }
+        .fc24-card {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--card-border);
+            border-radius: 8px; padding: 8px 10px;
+            display: flex; flex-direction: column; gap: 4px;
+            position: relative;
+        }
+        .fc24-card.buy { border-left: 3px solid var(--buy); }
+        .fc24-card.sell { border-left: 3px solid var(--sell); }
+        .fc24-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .fc24-pair { font-weight: 700; font-size: 13px; }
+        .fc24-pair-sub { font-size: 10px; color: var(--text-dim); }
+        .fc24-side-buy { color: var(--buy); font-weight: 700; font-size: 12px; }
+        .fc24-side-sell { color: var(--sell); font-weight: 700; font-size: 12px; }
+        .fc24-conf { color: var(--text); font-weight: 700; }
+
+        .ob-current {
+            background: rgba(79,195,247,0.10);
+            border: 1px solid rgba(79,195,247,0.30);
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .ob-current-label { color: var(--text-dim); font-size: 11px; }
+        .ob-current-price { color: var(--accent); font-weight: 700; font-size: 16px;
+                            font-family: 'SF Mono', Consolas, monospace; }
+
         /* === RESPONSIVE === */
         @media (max-width: 768px) {
             .header { padding: 10px 12px; }
@@ -316,12 +358,33 @@
         <div class="cycle-head">
             <div>
                 <span class="cycle-title">ТОП-5 СЕЙЧАС<span class="sub">— строгий 5-часовой цикл</span></span>
+                <div id="cycle-start" style="font-size:11px;color:var(--text-dim);margin-top:2px">Старт цикла: --:--</div>
             </div>
             <div class="cycle-countdown" id="cycle-countdown">--:--:--</div>
             <div class="cycle-winrate" id="cycle-winrate">Нет истории</div>
         </div>
         <div class="cycle-cards" id="cycle-cards">
             <div class="cycle-empty">Ожидание первого цикла…</div>
+        </div>
+        <div class="cycle-legend">
+            <b>Расшифровка тиров:</b>
+            <span class="lg-prem">ПРЕМИУМ</span> — строгий гейт: уверенность ≥85%, score≥0.50, ADX≥25, согласие 4 ТФ (M15+H1+H4+D1).
+            <span class="lg-prem">ПРЕМИУМ*</span> — добор до 3 при слабом рынке (немного мягче, но всё равно из ТОП-5).
+            <span class="lg-med">Средний</span> — пара попала в ТОП-5 по силе сигнала, но строгий гейт не прошла. Торговать <b>можно при уверенности ≥80%</b>, но риск выше.
+            Цена и % здесь — <b>живые</b>, такие же как в таблице 28 пар. «Вход цикла» — цена в момент старта 5-часового окна (для расчёта результата).
+        </div>
+    </div>
+
+    <!-- 24h forecast: separate block, all pairs at >=80% confidence -->
+    <div class="cycle-block" id="fc24-block">
+        <div class="cycle-head">
+            <div>
+                <span class="cycle-title">ПРОГНОЗ НА 24 ЧАСА<span class="sub">— все пары с уверенностью ≥80%</span></span>
+            </div>
+            <div id="fc24-count" class="cycle-winrate">—</div>
+        </div>
+        <div class="cycle-cards" id="fc24-cards">
+            <div class="fc24-empty">Ожидание данных…</div>
         </div>
     </div>
 
@@ -581,9 +644,12 @@
                     <span class="ob-pair">${ob.pair}</span>
                     <span class="ob-spread">Спред: ${ob.spread_pips} пп</span>
                 </div>
+                <div class="ob-current">
+                    <span class="ob-current-label">Текущая цена</span>
+                    <span class="ob-current-price">${ob.mid ? ob.mid.toFixed(fmt) : '—'}</span>
+                </div>
                 <div class="ob-prices">
                     <div><div class="ob-label">Bid (покупка)</div><div class="ob-bid">${ob.bid ? ob.bid.toFixed(fmt) : '—'}</div></div>
-                    <div style="text-align:center"><div class="ob-label">Средняя</div><div>${ob.mid ? ob.mid.toFixed(fmt) : '—'}</div></div>
                     <div style="text-align:right"><div class="ob-label">Ask (продажа)</div><div class="ob-ask">${ob.ask ? ob.ask.toFixed(fmt) : '—'}</div></div>
                 </div>
                 ${depthHtml}
@@ -626,6 +692,8 @@
         lastCycle = window.__INITIAL_CYCLE__;
         renderCycle(lastCycle);
     }
+    // Render the 24h block from any initial signals data we already have
+    if (lastSignals) render24h(lastSignals);
 
     // === STRICT CYCLE (top-5) ===
 
@@ -641,6 +709,23 @@
         if (!data) return;
         const cd = document.getElementById('cycle-countdown');
         if (cd) cd.textContent = 'До следующего: ' + fmtCountdown(data.seconds_to_next_cycle);
+
+        // Cycle start label (in UTC+5, what the user sees on the clock)
+        const cs = document.getElementById('cycle-start');
+        if (cs) {
+            const cyc = data.current_cycle;
+            if (cyc && cyc.cycle_start_utc) {
+                // ISO with trailing Z; UTC. Convert to UTC+5 for display.
+                const dt = new Date(cyc.cycle_start_utc);
+                if (!isNaN(dt.getTime())) {
+                    // UTC+5 = UTC + 5h
+                    const u5 = new Date(dt.getTime() + 5 * 3600 * 1000);
+                    const hh = String(u5.getUTCHours()).padStart(2, '0');
+                    const mm = String(u5.getUTCMinutes()).padStart(2, '0');
+                    cs.textContent = `Старт цикла: ${hh}:${mm} (UTC+5)`;
+                }
+            }
+        }
 
         const wr = document.getElementById('cycle-winrate');
         if (wr) {
@@ -660,9 +745,17 @@
             return;
         }
 
+        // Single source of truth: pull LIVE price + LIVE confidence from
+        // /api/signals so the TOP-5 cards always match the 28-pair table.
+        // The frozen entry_price is shown as a smaller "Вход" label below.
+        const livePairs = (lastSignals && lastSignals.pairs) || {};
+
         cards.innerHTML = cycle.selected.map(f => {
             const isJpy = (f.pair || '').includes('JPY');
             const fmtP = (p) => p == null ? '—' : (isJpy ? Number(p).toFixed(3) : Number(p).toFixed(5));
+            const live = livePairs[f.pair] || {};
+            const livePrice = live.price != null ? live.price : f.entry_price;
+            const liveConf = live.confidence != null ? live.confidence : f.confidence;
             const sideCls = f.side === 'BUY' ? 'buy' : 'sell';
             const sideTxt = f.side === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
             const sideColor = f.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
@@ -693,11 +786,15 @@
                 </div>
                 <div class="cycle-card-row">
                     <span style="color:${sideColor};font-weight:700;font-size:12px">${sideTxt}</span>
-                    <span class="cycle-conf">${f.confidence}%</span>
+                    <span class="cycle-conf">${liveConf}%</span>
                 </div>
                 <div class="cycle-card-row">
-                    <span class="cycle-meta">Вход</span>
-                    <span class="price-cell" style="font-size:12px">${fmtP(f.entry_price)}</span>
+                    <span class="cycle-meta">Текущая цена</span>
+                    <span class="price-cell" style="font-size:13px;font-weight:700">${fmtP(livePrice)}</span>
+                </div>
+                <div class="cycle-card-row">
+                    <span class="cycle-meta">Вход цикла</span>
+                    <span style="font-size:11px;color:var(--text-dim)">${fmtP(f.entry_price)}</span>
                 </div>
                 <div class="cycle-card-row">
                     <span class="cycle-meta">5ч / 24ч</span>
@@ -707,13 +804,87 @@
         }).join('');
     }
 
+    // Page may be loaded via Basic-Auth URL (https://user:pass@host/...).
+    // Chrome refuses fetch() when the resolved URL contains credentials, so
+    // build a clean origin (without creds) and use absolute URLs.
+    const API_ORIGIN = `${window.location.protocol}//${window.location.host}`;
+    const apiUrl = (path) => API_ORIGIN + path;
+
     async function fetchCycle() {
         try {
-            const res = await fetch('/api/cycle', {credentials: 'include'});
+            const res = await fetch(apiUrl('/api/cycle'));
             if (!res.ok) return;
             lastCycle = await res.json();
             renderCycle(lastCycle);
         } catch (e) { console.error('fetch cycle:', e); }
+    }
+
+    // === 24h FORECAST (separate block) ===
+    // Show all pairs with confidence >= 80% AND a 24h direction.
+    // Sourced from /api/signals so price/% match the 28-pair table.
+
+    function render24h(data) {
+        const cards = document.getElementById('fc24-cards');
+        const counter = document.getElementById('fc24-count');
+        if (!cards) return;
+        if (!data || !data.pairs) {
+            cards.innerHTML = '<div class="fc24-empty">Ожидание данных…</div>';
+            if (counter) counter.textContent = '—';
+            return;
+        }
+
+        const list = Object.values(data.pairs).filter(d =>
+            d && (d.confidence || 0) >= 80
+            && d.signal && (d.signal === 'BUY' || d.signal === 'SELL')
+            && d.forecast_24h && d.forecast_24h.direction
+        );
+        // Sort by confidence desc, then by score magnitude
+        list.sort((a, b) =>
+            (b.confidence || 0) - (a.confidence || 0)
+            || Math.abs(b.score || 0) - Math.abs(a.score || 0)
+        );
+
+        if (counter) {
+            counter.innerHTML = list.length
+                ? `Сильных сигналов: <b>${list.length}</b> из ${Object.keys(data.pairs).length}`
+                : `Нет пар с уверенностью ≥80%`;
+        }
+
+        if (list.length === 0) {
+            cards.innerHTML = '<div class="fc24-empty">Сейчас рынок слабый — нет пар с уверенностью ≥80% на 24 часа. Подождите следующее обновление.</div>';
+            return;
+        }
+
+        cards.innerHTML = list.map(d => {
+            const isJpy = (d.pair || '').includes('JPY');
+            const fmtP = (p) => p == null ? '—' : (isJpy ? Number(p).toFixed(3) : Number(p).toFixed(5));
+            const sideCls = d.signal === 'BUY' ? 'buy' : 'sell';
+            const sideTxt = d.signal === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
+            const sideKls = d.signal === 'BUY' ? 'fc24-side-buy' : 'fc24-side-sell';
+            const dir = (d.forecast_24h && d.forecast_24h.direction) || '';
+            const strn = (d.forecast_24h && d.forecast_24h.strength) || '';
+            return `<div class="fc24-card ${sideCls}">
+                <div class="fc24-row">
+                    <div>
+                        <div class="fc24-pair">${d.pair}</div>
+                        <div class="fc24-pair-sub">${d.name_ru || ''}</div>
+                    </div>
+                    <span class="${sideKls}">${sideTxt}</span>
+                </div>
+                <div class="fc24-row">
+                    <span class="cycle-meta">Уверенность</span>
+                    <span class="fc24-conf">${d.confidence}%</span>
+                </div>
+                <div class="fc24-row">
+                    <span class="cycle-meta">Текущая цена</span>
+                    <span class="price-cell" style="font-size:12px;font-weight:700">${fmtP(d.price)}</span>
+                </div>
+                <div class="fc24-row">
+                    <span class="cycle-meta">24ч</span>
+                    <span style="font-size:11px">${dir}${strn ? ' · ' + strn : ''}</span>
+                </div>
+            </div>`;
+        }).join('');
     }
 
     // Tick the countdown locally every second so it never feels stale.
@@ -726,7 +897,7 @@
 
     async function fetchSignals() {
         try {
-            const res = await fetch('/api/signals', {credentials: 'include'});
+            const res = await fetch(apiUrl('/api/signals'));
             if (!res.ok) {
                 throw new Error('HTTP ' + res.status);
             }
@@ -736,6 +907,9 @@
             if (hasPairs) {
                 dataLoaded = true;
                 renderSignalsTable(lastSignals);
+                // Re-render TOP-5 cycle cards so live price/% stay in sync
+                if (lastCycle) renderCycle(lastCycle);
+                render24h(lastSignals);
             } else if (!dataLoaded) {
                 retryCount++;
                 showLoading('Сканирование рынка... Попытка ' + retryCount);
@@ -766,7 +940,7 @@
 
     async function fetchOrderbooks() {
         try {
-            const res = await fetch('/api/orderbooks', {credentials: 'include'});
+            const res = await fetch(apiUrl('/api/orderbooks'));
             if (!res.ok) return;
             lastOB = await res.json();
             renderOrderbooks(lastOB);
@@ -776,6 +950,9 @@
     // Start fetching (initial data may already be rendered from __INITIAL_DATA__)
     if (!dataLoaded) fetchSignals();
     if (!lastCycle) fetchCycle();
+    // Warm the orderbook cache in the background so the first tab click
+    // renders instantly (the endpoint is cheap thanks to the 60s file cache).
+    fetchOrderbooks();
     setInterval(fetchSignals, 10000);
     setInterval(fetchCycle, 10000);
     setInterval(() => {
