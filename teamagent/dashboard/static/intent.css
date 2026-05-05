@@ -317,6 +317,13 @@
 .fx-card.sell .fx-card-side { background: rgba(255, 85, 119, .12); color: var(--fx-sell); border-color: rgba(255, 85, 119, .25); }
 .fx-card.neutral .fx-card-side { background: rgba(255, 181, 71, .12); color: var(--fx-warn); border-color: rgba(255, 181, 71, .25); }
 
+/* Phase-11: EV badge tint added to [data-side]. The «EV +X%» text shows
+   honest math expectation at the user's broker payout. Green = safe edge,
+   yellow = marginal +EV, red = losing on distance. */
+.fx-card-side.ev-green  { box-shadow: inset 0 0 0 2px rgba(32, 227, 165, .55); }
+.fx-card-side.ev-yellow { box-shadow: inset 0 0 0 2px rgba(255, 181, 71, .55); }
+.fx-card-side.ev-red    { box-shadow: inset 0 0 0 2px rgba(255, 85, 119, .65); }
+
 /* PRESSURE BAR — buy vs sell tug-of-war */
 .fx-press {
   position: relative;

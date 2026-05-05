@@ -574,6 +574,19 @@ def api_forecasts():
             "agents_against_count": f.get("agents_against_count", len(f.get("agents_against", []))),
             "recommended_hours": f.get("recommended_hours"),
             "as_of": f.get("as_of"),
+            # Phase-11 EV transparency fields (BLOCK O in forecast_scanner).
+            # Surfaced here so the dashboard can show real math expectation
+            # at the user's broker payout (default 70%).
+            "broker_payout_pct": f.get("broker_payout_pct"),
+            "ev_per_trade": f.get("ev_per_trade"),
+            "ev_pct_per_trade": f.get("ev_pct_per_trade"),
+            "breakeven_wr_pct": f.get("breakeven_wr_pct"),
+            "ev_status": f.get("ev_status"),
+            "realized_cell_wr_pct": f.get("realized_cell_wr_pct"),
+            "realized_cell_n": f.get("realized_cell_n"),
+            "realized_cell_side": f.get("realized_cell_side"),
+            "cell_anchor_active": f.get("cell_anchor_active"),
+            "session": f.get("session"),
         }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
