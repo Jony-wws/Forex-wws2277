@@ -237,6 +237,32 @@ Stop everything: `bash scripts/stop_all.sh`.
       pairs). Re-run via `python -m teamagent.events.training` (writes
       `state/learned_rules.json`).
 
+21. **Phase 11 BLOCK O — honest math expectation @ user broker payout
+    (added 2026-05-05)**: every forecast row in `state/forecasts.json` now
+    carries 9 EV-transparency fields:
+    - `broker_payout_pct` — 0.70 default (env-overridable via
+      `BROKER_PAYOUT_PCT`). The user's real broker pays 70% on a winning
+      binary; the dashboard shows the math at THAT payout (not the 85% the
+      paper-trader simulates internally).
+    - `ev_per_trade`, `ev_pct_per_trade` — `p × (1 + payout) − 1`.
+    - `breakeven_wr_pct` — `1 / (1 + payout)`. At 70% payout = 58.82%.
+      **Below this, every trade is a guaranteed loss on distance.**
+    - `ev_status` — `green` (≥+5%), `yellow` (>0..+5%), `red` (≤0).
+    - `realized_cell_wr_pct`, `realized_cell_n`, `realized_cell_side` —
+      365-day backtest WR for the current `(pair × session)` cell when
+      available (≥8 trades).
+    - `cell_anchor_active` — true when Phase-10 BLOCK N anchored the
+      displayed probability to the realized cell WR.
+    
+    **The free 70% gate (rule #7) is unchanged** — paper_trader still opens
+    when `probability_pct ≥ 70`. EV is informational, surfaced so the user
+    can see at a glance which forecasts have real positive expectation. The
+    PROGNOZY-28 card displays `SIDE prob% · EV ±X%` with green/yellow/red
+    inset borders. **Do NOT inflate `probability_pct` or rewrite
+    `_score_to_probability` to "force" 80% — that creates losing trades on
+    distance. Always derive EV from the real probability.** See
+    `HISTORY/2026-05-05_phase11_math_expectation.md`.
+
 ## Optional API keys (env vars)
 
 The 3 LLM agents are no-op if these aren't set; the rest of the system still

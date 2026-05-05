@@ -346,7 +346,26 @@
     root.classList.toggle("neutral", side !== "SELL" && side !== "BUY");
 
     root.querySelector("[data-price]").textContent = `px ${fmtPrice(f.current_price)}`;
-    root.querySelector("[data-side]").textContent = `${side} ${toFixedSafe(f.probability_pct, 0)}%`;
+    // Phase-11 (2026-05-05): show side + probability + EV at user broker payout.
+    // The «80%» on the card is meaningful only when EV is also positive — at
+    // 70% broker payout the break-even WR is ≈58.82%, so a forecast at 55%
+    // probability is mathematically a guaranteed loser regardless of the
+    // displayed colour. EV-tag colour mirrors `f.ev_status` (green/yellow/red).
+    const evPct = (f.ev_pct_per_trade != null) ? f.ev_pct_per_trade : null;
+    const evStatus = f.ev_status || (evPct == null ? null : (evPct >= 5 ? "green" : evPct > 0 ? "yellow" : "red"));
+    const evTxt = (evPct == null) ? "" : ` · EV ${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%`;
+    const sideEl = root.querySelector("[data-side]");
+    sideEl.textContent = `${side} ${toFixedSafe(f.probability_pct, 0)}%${evTxt}`;
+    sideEl.classList.remove("ev-green", "ev-yellow", "ev-red");
+    if (evStatus) sideEl.classList.add(`ev-${evStatus}`);
+    // Cell-anchor active marker (Phase 10) — small badge so the user knows the
+    // probability is anchored to a measured 365-day historical WR cell, not
+    // just to the technical-stack score.
+    if (f.cell_anchor_active && f.realized_cell_wr_pct != null) {
+      sideEl.title = `cell-anchor: ${f.realized_cell_side} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n})`;
+    } else if (f.realized_cell_wr_pct != null) {
+      sideEl.title = `cell ${f.realized_cell_side || "?"} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n}) — not anchored (guard: side or n<8)`;
+    }
 
     const radarScore = state.radar[f.pair]?.overall_score ?? 0;
 

@@ -478,6 +478,41 @@ def evaluate_pair(pair: str) -> dict | None:
             "reason": p10_reason,
         })
 
+    # ───── BLOCK O — Phase-11 honest math expectation @ user broker payout ─────
+    # The user's binary-options broker pays 70% on WIN (not the 85% the
+    # paper-trader simulates). At 70% payout the break-even WR is
+    # 1/(1+0.70)≈58.82% — below that, every trade is a guaranteed loss on
+    # distance no matter what `probability_pct` says. We expose the EV math
+    # transparently so the user can SEE which forecasts truly have positive
+    # math expectation. We also surface the realized 365-day cell WR (when
+    # available) so a 78% displayed probability anchored to a 78% historical
+    # WR is visibly different from a 78% displayed probability that has no
+    # backtest backing. This is the single honest path to "math expectation
+    # advantage on distance" — no inflation, just transparent EV.
+    broker_payout = float(getattr(config, "BROKER_PAYOUT_PCT", 0.70))
+    ev_per_trade = round(p * (1 + broker_payout) - 1, 4)
+    ev_pct_per_trade = round(ev_per_trade * 100, 1)
+    breakeven_wr_pct = round(100 / (1 + broker_payout), 2)
+    realized_cell_wr_pct = None
+    realized_cell_n = None
+    realized_cell_side = None
+    try:
+        from .events import live_weights as ev_lw
+        sess_now2 = ev_lw._hour_to_analysis_session(now.hour)
+        info = ev_lw._strategy_wr.get((pair, sess_now2))
+        if info:
+            realized_cell_wr_pct = info.get("win_rate_pct")
+            realized_cell_n = info.get("trades")
+            realized_cell_side = info.get("dominant_side")
+    except Exception:
+        pass
+    if ev_per_trade >= 0.05:
+        ev_status = "green"      # ≥+5% EV — trade with confidence
+    elif ev_per_trade > 0:
+        ev_status = "yellow"     # marginal positive — caution
+    else:
+        ev_status = "red"        # negative EV — losing on distance
+
     forecast = {
         "pair": pair,
         "side": side,
@@ -500,6 +535,16 @@ def evaluate_pair(pair: str) -> dict | None:
         "volume_profile": vp,
         "as_of": now.isoformat(),
         "session": _current_session(now.hour),
+        # Phase-11 EV transparency fields
+        "broker_payout_pct": broker_payout,
+        "ev_per_trade": ev_per_trade,
+        "ev_pct_per_trade": ev_pct_per_trade,
+        "breakeven_wr_pct": breakeven_wr_pct,
+        "ev_status": ev_status,
+        "realized_cell_wr_pct": realized_cell_wr_pct,
+        "realized_cell_n": realized_cell_n,
+        "realized_cell_side": realized_cell_side,
+        "cell_anchor_active": bool(p10_reason),
     }
     return forecast
 

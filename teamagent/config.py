@@ -50,7 +50,14 @@ SESSIONS: dict[str, tuple[int, int]] = {
 # $1 → $2 → $4. STAKE_USD теперь = базовая ставка ($1). Реальный размер
 # открываемой сделки определяет mart_engine ниже (после loss-стрика).
 STAKE_USD = 1.0
-PAYOUT_PCT = 0.85          # WIN +$0.85 на $1, LOSS -$1
+PAYOUT_PCT = 0.85          # WIN +$0.85 на $1, LOSS -$1 (paper-trader simulation)
+# Phase 11 (2026-05-05): user's REAL broker pays 70% on a winning binary, not 85%.
+# We expose `BROKER_PAYOUT_PCT` as the displayed-EV reference so the dashboard
+# can show whether each forecast actually has POSITIVE math expectation at the
+# user's broker payout. Override via env: `export BROKER_PAYOUT_PCT=0.85`.
+# At 70% payout, break-even WR = 1 / (1+0.70) = 58.82%. Below that → losing on
+# distance. Above 70% probability with realized cell WR ≥ 70% → +EV with margin.
+BROKER_PAYOUT_PCT = float(os.environ.get("BROKER_PAYOUT_PCT", "0.70"))
 MIN_PROBABILITY = 0.70     # открываем только если ≥70%
 MAX_PROBABILITY = 0.92     # кэп — никогда не показываем 100%
 
