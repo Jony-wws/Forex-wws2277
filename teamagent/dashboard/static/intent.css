@@ -342,6 +342,60 @@
 .fx-peak-24h.peak-buy  { color: var(--fx-buy);  border-color: rgba(32, 227, 165, .35); background: rgba(32, 227, 165, .06); }
 .fx-peak-24h.peak-sell { color: var(--fx-sell); border-color: rgba(255, 85, 119, .35); background: rgba(255, 85, 119, .06); }
 
+/* Phase-14: per-(pair × session) smart-money 24h plates — 4 cells per card,
+   showing institutional verdict (BUY/SELL + confidence%) for each session
+   over the next 24h. Inactive cells are muted so the user immediately sees
+   which sessions have conviction and which don't. */
+.fx-sm24h {
+  margin-top: 4px;
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.05);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+.fx-sm24h .sm24h-label {
+  font-size: 9px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--fx-muted, #9aa6b2);
+  margin-bottom: 4px;
+}
+.fx-sm24h .sm24h-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.fx-sm24h .sm24h-cell {
+  text-align: center;
+  padding: 4px 2px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  cursor: help;
+}
+.fx-sm24h .sm24h-cell .s-name {
+  font-size: 9px;
+  color: var(--fx-muted, #9aa6b2);
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.fx-sm24h .sm24h-cell .s-val {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+.fx-sm24h .sm24h-cell.sm-buy {
+  color: var(--fx-buy);
+  border-color: rgba(32, 227, 165, .35);
+  background: rgba(32, 227, 165, .06);
+}
+.fx-sm24h .sm24h-cell.sm-sell {
+  color: var(--fx-sell);
+  border-color: rgba(255, 85, 119, .35);
+  background: rgba(255, 85, 119, .06);
+}
+.fx-sm24h .sm24h-cell.sm-mute .s-val { color: var(--fx-muted, #9aa6b2); opacity: .55; }
+
 /* PRESSURE BAR — buy vs sell tug-of-war */
 .fx-press {
   position: relative;
