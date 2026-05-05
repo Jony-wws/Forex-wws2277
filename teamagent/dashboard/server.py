@@ -190,9 +190,9 @@ async def _fly_state_refresher():
     async def _tick():
         loop = asyncio.get_running_loop()
         try:
-            from .. import forecast_scanner, forecast_24h, probability_calibrator
+            from .. import forecast_scanner, forecast_24h, probability_calibrator, smart_money_24h
         except ImportError:
-            from teamagent import forecast_scanner, forecast_24h, probability_calibrator
+            from teamagent import forecast_scanner, forecast_24h, probability_calibrator, smart_money_24h
         # First refresh: 30 sec after boot — give the request loop time to
         # serve initial requests before saturating Yahoo.
         await asyncio.sleep(30)
@@ -212,6 +212,12 @@ async def _fly_state_refresher():
                 await loop.run_in_executor(pool, probability_calibrator.build_calibration)
                 probability_calibrator.reload()
                 log.info("[fly-refresh] probability_calibrator.build_calibration() done")
+                # Phase-14: rebuild per-(pair × session) smart-money 24h forecast.
+                # Cheap (≤1s) — reads cached learned_rules / cot / fundamentals /
+                # market_regime files; reuses fundamentals tilts in-process.
+                log.info("[fly-refresh] smart_money_24h.build_snapshot() starting")
+                await loop.run_in_executor(pool, smart_money_24h.build_snapshot)
+                log.info("[fly-refresh] smart_money_24h.build_snapshot() done")
             except Exception as e:
                 log.exception(f"[fly-refresh] failed: {e}")
             await asyncio.sleep(interval)
@@ -557,6 +563,9 @@ def api_forecasts():
     # Phase-12: per-pair 24h-ahead peak (best forecast hour for the next 24h).
     snap_24h = _load(config.STATE_DIR / "forecast_24h.json", {"pairs": {}})
     pairs_24h = snap_24h.get("pairs") or {}
+    # Phase-14: per-(pair × session) smart-money 24h verdict (4 sessions).
+    snap_smart = _load(config.STATE_DIR / "smart_money_24h.json", {"pairs": {}})
+    pairs_smart_money = snap_smart.get("pairs") or {}
     # Расширенная по-парамная инфа + сжатый набор ключевых indicators (нужны
     # cinematic Market-Intent карточкам без второго round-trip).
     forecasts_lite = {}
@@ -612,6 +621,11 @@ def api_forecasts():
             "calibration_n": f.get("calibration_n"),
             "calibration_wilson_lower_pct": f.get("calibration_wilson_lower_pct"),
             "calibration_active": f.get("calibration_active"),
+            # Phase-14: per-(pair × session) smart-money 24h verdict — 4 plates
+            # rendered on the стакан card for the next 24h. None entries are
+            # rendered as muted «нет сигнала» so the user sees which session
+            # has institutional conviction and which doesn't.
+            "smart_money_24h": (pairs_smart_money.get(pair) or None),
         }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
@@ -645,6 +659,47 @@ def api_calibration():
             "note": "calibration not built yet — run `python -m teamagent.probability_calibrator`",
         },
     )
+
+
+@app.get("/api/smart_money_24h")
+def api_smart_money_24h(pair: str | None = None):
+    """Phase-14: per-(pair × session) smart-money 24h forecast.
+
+    For each of the 28 pairs × 4 sessions cells, reports a single UP/DOWN
+    verdict for the next 24h backed by an ensemble of 5 real-data signals:
+      1. learned `pair_session_bias` (365-day per-cell drift).
+      2. learned `pair_hour_bias` aggregated over the session's hours.
+      3. CFTC COT contrarian z-score for the pair's currencies.
+      4. FRED-derived macro tilt (rate / yield / CPI differential).
+      5. 365-day market regime `up_share_pct` for the (pair × session × DOW).
+
+    Confidence is `score-magnitude + agreement bonus`, hard-capped at 88%
+    (rule #4 / #21). A cell only displays when ≥2 signals fire AND ≥60%
+    of them agree on direction. Wilson-90% lower bound is reported for
+    transparency (`wilson_lower_pct` field) but is NOT the primary display
+    figure because the small-n bias is too brutal at 2-3 signals.
+    """
+    snap = _load(config.STATE_DIR / "smart_money_24h.json", {
+        "as_of": None,
+        "horizon_hours": 24,
+        "min_signals_active": 2,
+        "wilson_z": 1.645,
+        "n_pairs": 0,
+        "n_active_cells": 0,
+        "n_total_cells": 0,
+        "active_per_session": {},
+        "pairs": {},
+        "note": "smart_money_24h not built yet — run `python -m teamagent.smart_money_24h`",
+    })
+    if pair:
+        pair = pair.upper()
+        return JSONResponse({
+            "as_of": snap.get("as_of"),
+            "horizon_hours": snap.get("horizon_hours"),
+            "pair": pair,
+            "sessions": (snap.get("pairs") or {}).get(pair),
+        })
+    return JSONResponse(snap)
 
 
 @app.get("/api/forecast-24h")

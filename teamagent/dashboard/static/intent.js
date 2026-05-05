@@ -279,6 +279,23 @@
         <div class="fx-press-labels"><span class="l">SELL</span><span class="r">BUY</span></div>
       </div>
       <div class="fx-peak-24h" data-peak-24h>24ч: —</div>
+      <div class="fx-sm24h" data-sm24h>
+        <div class="sm24h-label">smart-money 24ч — по сессиям</div>
+        <div class="sm24h-grid">
+          <div class="sm24h-cell" data-sm24h-session="Asia">
+            <div class="s-name">Asia</div><div class="s-val">—</div>
+          </div>
+          <div class="sm24h-cell" data-sm24h-session="London">
+            <div class="s-name">London</div><div class="s-val">—</div>
+          </div>
+          <div class="sm24h-cell" data-sm24h-session="LON+NY">
+            <div class="s-name">L+NY</div><div class="s-val">—</div>
+          </div>
+          <div class="sm24h-cell" data-sm24h-session="NY">
+            <div class="s-name">NY</div><div class="s-val">—</div>
+          </div>
+        </div>
+      </div>
       <div class="fx-chart" data-chart></div>
       <div class="fx-metrics" data-metrics></div>
       <div class="fx-forecasts" data-forecasts></div>
@@ -398,6 +415,37 @@
       if (peakRow) peakRow.textContent = "24ч: — нет 365-дневной поддержки";
     }
     if (titleParts.length) sideEl.title = titleParts.join(" · ");
+
+    // Phase-14: per-(pair × session) smart-money 24h plates. Render BUY/SELL
+    // direction + confidence% on each of 4 session cells. Inactive cells
+    // show "—" so the user can see which sessions have institutional
+    // conviction and which don't.
+    const sm = f.smart_money_24h || null;
+    const smGrid = root.querySelector("[data-sm24h]");
+    if (smGrid) {
+      for (const sName of ["Asia", "London", "LON+NY", "NY"]) {
+        const cell = sm ? sm[sName] : null;
+        const cellEl = smGrid.querySelector(`[data-sm24h-session="${sName}"]`);
+        if (!cellEl) continue;
+        const valEl = cellEl.querySelector(".s-val");
+        cellEl.classList.remove("sm-buy", "sm-sell", "sm-mute");
+        if (cell && cell.active && cell.side) {
+          const arrow = cell.side === "BUY" ? "▲" : "▼";
+          valEl.textContent = `${arrow} ${Math.round(cell.confidence_pct)}%`;
+          cellEl.classList.add(cell.side === "BUY" ? "sm-buy" : "sm-sell");
+          const drivers = (cell.drivers || []).join(" · ");
+          cellEl.title = `${sName} — smart-money 24h ${cell.side} (${cell.n_signals_agreeing}/${cell.n_signals} signals agree, score=${cell.score})\n${drivers}`;
+        } else {
+          valEl.textContent = "—";
+          cellEl.classList.add("sm-mute");
+          if (cell) {
+            cellEl.title = `${sName} — недостаточно сигналов (${cell.n_signals || 0} fired, score=${cell.score || 0})`;
+          } else {
+            cellEl.title = `${sName} — smart-money 24h не построен`;
+          }
+        }
+      }
+    }
 
     const radarScore = state.radar[f.pair]?.overall_score ?? 0;
 
