@@ -7,7 +7,6 @@ __pycache__/
 .eggs/
 
 # Caches
-*.parquet
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -18,24 +17,6 @@ __pycache__/
 venv/
 env/
 
-# Runtime
-teamagent/state/dukascopy_cache/
-teamagent/state/heartbeat_*.json
-teamagent/state/agents.json
-teamagent/state/agent_*.json
-teamagent/state/recommended_restart.json
-teamagent/state/open_trades_enriched.json
-teamagent/state/_intent_bars_cache/
-teamagent/state/stakan_open_trades_enriched.json
-teamagent/logs/*.log
-teamagent/logs/*.out
-teamagent/logs/*.err
-# Persisted across sessions (auto-committed by state_committer):
-#   teamagent/state/forecasts.json
-#   teamagent/state/open_trades.json
-#   teamagent/state/closed_trades.json
-#   teamagent/state/paper_stats.json
-
 # OS
 .DS_Store
 Thumbs.db
@@ -44,4 +25,3 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
-static_build/
