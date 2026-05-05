@@ -20,8 +20,8 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 | us_ppi | 2 | -28.3 | down | 100% | 34% | 50% |
 | us_nfp | 2 | -34.4 | down | 100% | 36% | 50% |
 | us_unrate | 2 | -34.4 | down | 100% | 36% | 50% |
+| ca_unemp | 2 | -34.4 | up | 100% | 36% | 50% |
 | us_gdp | 1 | +2.9 | up | 100% | 29% | 100% |
-| us_pce | 1 | +0.5 | up | 100% | 90% | 100% |
 
 ## Overlap (13-16 UTC)
 - significant moves (>1.5σ): **19** of 252 cells (7.5%)
@@ -33,12 +33,12 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 |---|---:|---:|---|---:|---:|---:|
 | us_claims | 5 | +26.7 | up | 60% | 41% | 0% |
 | us_nfp | 2 | -54.5 | down | 100% | 100% | 0% |
+| ca_unemp | 2 | -54.5 | up | 100% | 100% | 0% |
 | us_pce | 2 | -51.5 | down | 100% | 100% | 0% |
 | us_core_pce | 2 | -51.5 | down | 100% | 100% | 0% |
 | us_unrate | 1 | -71.3 | down | 100% | 100% | 0% |
 | us_gdp | 1 | -4.0 | down | 100% | 54% | 0% |
 | us_cpi | 1 | +48.9 | up | 100% | 25% | 0% |
-| us_core_cpi | 1 | +48.9 | up | 100% | 25% | 0% |
 
 ## NY (17-21 UTC)
 - significant moves (>1.5σ): **24** of 252 cells (9.5%)

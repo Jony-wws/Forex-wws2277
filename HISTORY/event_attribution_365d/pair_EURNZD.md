@@ -16,6 +16,12 @@ _(period: 365 days, Yahoo 1H bars, real events from FRED+CB+COT+geo archive)_
 - significant moves (>1.5σ): **27** of 251 cells (10.8%)
 - traps (significant move reversed ≥80% within 6h): **12** (44.4% of significant moves)
 
+**Top event drivers:**
+
+| event_type | n | mean_signed_move_pips | direction (event ccy) | concordance | persistence_24h | trap_rate |
+|---|---:|---:|---|---:|---:|---:|
+| eu_cpi | 1 | -86.2 | down | 100% | 92% | 0% |
+
 ## Overlap (13-16 UTC)
 - significant moves (>1.5σ): **21** of 251 cells (8.4%)
 - traps (significant move reversed ≥80% within 6h): **4** (19.0% of significant moves)
