@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOREX Сигналы — Все валюты в реальном времени</title>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --card-bg: #141b2d;
+            --card-border: #1e2a3a;
+            --text: #e2e8f0;
+            --text-dim: #8892a4;
+            --buy: #00e676;
+            --buy-bg: rgba(0, 230, 118, 0.08);
+            --sell: #ff5252;
+            --sell-bg: rgba(255, 82, 82, 0.08);
+            --neutral: #546e7a;
+            --accent: #4fc3f7;
+            --header-bg: #0d1321;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .header-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--buy);
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            padding: 12px 24px;
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--card-border);
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .stat-label { color: var(--text-dim); }
+        .stat-value { font-weight: 600; }
+        .stat-buy { color: var(--buy); }
+        .stat-sell { color: var(--sell); }
+
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            transition: transform 0.15s, box-shadow 0.15s;
+            cursor: default;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .card-buy { border-left: 3px solid var(--buy); background: var(--buy-bg); }
+        .card-sell { border-left: 3px solid var(--sell); background: var(--sell-bg); }
+        .card-neutral { border-left: 3px solid var(--neutral); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .pair-name {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .pair-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .signal-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .badge-buy {
+            background: rgba(0,230,118,0.15);
+            color: var(--buy);
+            border: 1px solid rgba(0,230,118,0.3);
+        }
+
+        .badge-sell {
+            background: rgba(255,82,82,0.15);
+            color: var(--sell);
+            border: 1px solid rgba(255,82,82,0.3);
+        }
+
+        .badge-neutral {
+            background: rgba(84,110,122,0.15);
+            color: var(--neutral);
+            border: 1px solid rgba(84,110,122,0.3);
+            font-size: 12px;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 12px;
+        }
+
+        .price {
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'SF Mono', 'Consolas', monospace;
+        }
+
+        .price-change {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .change-up { color: var(--buy); }
+        .change-down { color: var(--sell); }
+
+        .forecast-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--card-border);
+        }
+
+        .forecast-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .forecast-label {
+            color: var(--text-dim);
+        }
+
+        .forecast-value {
+            font-weight: 600;
+        }
+
+        .indicators-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .ind-tag {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            color: var(--text-dim);
+        }
+
+        .strength-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.1);
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .strength-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .strength-fill-buy { background: var(--buy); }
+        .strength-fill-sell { background: var(--sell); }
+        .strength-fill-neutral { background: var(--neutral); }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-dim);
+            font-size: 18px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--card-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .detail-toggle {
+            font-size: 12px;
+            color: var(--accent);
+            cursor: pointer;
+            margin-top: 8px;
+            user-select: none;
+        }
+
+        .detail-toggle:hover { text-decoration: underline; }
+
+        .details-panel {
+            display: none;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .details-panel.open { display: block; }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .detail-item:last-child { border-bottom: none; }
+
+        .detail-name { color: var(--text-dim); }
+        .detail-value-pos { color: var(--buy); font-weight: 600; }
+        .detail-value-neg { color: var(--sell); font-weight: 600; }
+
+        @media (max-width: 480px) {
+            .header { padding: 12px 16px; }
+            .header h1 { font-size: 16px; }
+            .container { padding: 8px; }
+            .grid { grid-template-columns: 1fr; gap: 8px; }
+            .card { padding: 12px; }
+            .pair-name { font-size: 16px; }
+            .price { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>FOREX СИГНАЛЫ</h1>
+        <div class="header-info">
+            <span><span class="status-dot"></span>Обновление каждые 10 сек</span>
+            <span id="clock">--:--:--</span>
+            <span id="scan-info">Загрузка...</span>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+        <div class="stat-item">
+            <span class="stat-label">Всего пар:</span>
+            <span class="stat-value" id="total-pairs">28</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">BUY сигналов:</span>
+            <span class="stat-value stat-buy" id="buy-count">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">SELL сигналов:</span>
+            <span class="stat-value stat-sell" id="sell-count">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Без сигнала:</span>
+            <span class="stat-value" id="neutral-count">-</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="content">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <div>Загрузка данных с рынка...</div>
+                <div style="font-size:13px;margin-top:8px;color:var(--text-dim)">
+                    Первый запуск может занять до 30 секунд
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lastData = null;
+
+        function formatPrice(price, pair) {
+            const isJpy = pair.includes('JPY');
+            return isJpy ? price.toFixed(3) : price.toFixed(5);
+        }
+
+        function renderCard(d) {
+            const hasSig = d.signal !== null;
+            const cardClass = hasSig ? (d.signal === 'BUY' ? 'card-buy' : 'card-sell') : 'card-neutral';
+            const badgeClass = hasSig ? (d.signal === 'BUY' ? 'badge-buy' : 'badge-sell') : 'badge-neutral';
+            const badgeText = hasSig ? (d.signal === 'BUY' ? 'ПОКУПКА' : 'ПРОДАЖА') : 'Нет сигнала';
+            const arrow = hasSig ? (d.signal === 'BUY' ? '&#9650;' : '&#9660;') : '';
+
+            const changeClass = d.change_24h_pips >= 0 ? 'change-up' : 'change-down';
+            const changeSign = d.change_24h_pips >= 0 ? '+' : '';
+
+            let forecastHtml = '';
+            if (hasSig) {
+                const f5 = d.forecast_5h;
+                const f24 = d.forecast_24h;
+                const f5Dir = f5.direction === 'BUY' ? 'Рост' : 'Снижение';
+                const f24Dir = f24.direction === 'BUY' ? 'Рост' : 'Снижение';
+                const f5Color = f5.direction === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+                const f24Color = f24.direction === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+
+                forecastHtml = `
+                    <div class="forecast-section">
+                        <div class="forecast-row">
+                            <span class="forecast-label">Прогноз 5 часов:</span>
+                            <span class="forecast-value" style="color:${f5Color}">${f5Dir} — ${f5.strength}</span>
+                        </div>
+                        <div class="forecast-row">
+                            <span class="forecast-label">Прогноз 24 часа:</span>
+                            <span class="forecast-value" style="color:${f24Color}">${f24Dir} — ${f24.strength}</span>
+                        </div>
+                    </div>`;
+            }
+
+            // Indicators
+            let indHtml = '';
+            if (d.indicators && Object.keys(d.indicators).length > 0) {
+                const tags = Object.entries(d.indicators).map(([k, v]) =>
+                    `<span class="ind-tag">${k}: ${v}</span>`
+                ).join('');
+                indHtml = `<div class="indicators-row">${tags}</div>`;
+            }
+
+            // Strength bar
+            const barWidth = hasSig ? Math.min(100, d.confidence) : 10;
+            const barClass = hasSig ? (d.signal === 'BUY' ? 'strength-fill-buy' : 'strength-fill-sell') : 'strength-fill-neutral';
+
+            // Details
+            let detailsHtml = '';
+            if (d.details && d.details.length > 0) {
+                const items = d.details.map(item => {
+                    const valClass = item.value > 0 ? 'detail-value-pos' : item.value < 0 ? 'detail-value-neg' : '';
+                    const sign = item.value > 0 ? '+' : '';
+                    return `<div class="detail-item">
+                        <span class="detail-name">${item.reason}</span>
+                        <span class="${valClass}">${sign}${item.value}</span>
+                    </div>`;
+                }).join('');
+                detailsHtml = `
+                    <div class="detail-toggle" onclick="this.nextElementSibling.classList.toggle('open')">
+                        Подробный анализ &#9662;
+                    </div>
+                    <div class="details-panel">${items}</div>`;
+            }
+
+            return `
+                <div class="card ${cardClass}">
+                    <div class="card-header">
+                        <div>
+                            <div class="pair-name">${d.pair}</div>
+                            <div class="pair-label">${d.name_ru}</div>
+                        </div>
+                        <span class="signal-badge ${badgeClass}">${arrow} ${badgeText}</span>
+                    </div>
+                    <div class="price-row">
+                        <span class="price">${d.price_display}</span>
+                        <span class="price-change ${changeClass}">
+                            ${changeSign}${d.change_24h_pips} пипсов (${changeSign}${d.change_24h_pct}%)
+                        </span>
+                    </div>
+                    <div class="strength-bar">
+                        <div class="strength-fill ${barClass}" style="width:${barWidth}%"></div>
+                    </div>
+                    ${hasSig ? `<div style="font-size:12px;color:var(--text-dim);margin-top:4px">Уверенность: ${d.confidence}% — ${d.strength}</div>` : ''}
+                    ${forecastHtml}
+                    ${indHtml}
+                    ${detailsHtml}
+                </div>`;
+        }
+
+        function updateUI(data) {
+            if (!data || !data.pairs || Object.keys(data.pairs).length === 0) return;
+
+            lastData = data;
+
+            // Stats
+            const pairs = Object.values(data.pairs);
+            const buyCount = pairs.filter(p => p.signal === 'BUY').length;
+            const sellCount = pairs.filter(p => p.signal === 'SELL').length;
+            const neutralCount = pairs.filter(p => p.signal === null).length;
+
+            document.getElementById('total-pairs').textContent = pairs.length;
+            document.getElementById('buy-count').textContent = buyCount;
+            document.getElementById('sell-count').textContent = sellCount;
+            document.getElementById('neutral-count').textContent = neutralCount;
+            document.getElementById('scan-info').textContent = `Обновление #${data.scan_count}`;
+
+            // Sort: signals first (by abs score desc), then no-signal
+            pairs.sort((a, b) => {
+                if (a.signal && !b.signal) return -1;
+                if (!a.signal && b.signal) return 1;
+                return Math.abs(b.score || 0) - Math.abs(a.score || 0);
+            });
+
+            const container = document.getElementById('content');
+            container.innerHTML = `<div class="grid">${pairs.map(renderCard).join('')}</div>`;
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const utc5 = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+            const h = String(utc5.getUTCHours()).padStart(2, '0');
+            const m = String(utc5.getUTCMinutes()).padStart(2, '0');
+            const s = String(utc5.getUTCSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `UTC+5: ${h}:${m}:${s}`;
+        }
+
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/signals');
+                if (!res.ok) return;
+                const data = await res.json();
+                updateUI(data);
+            } catch (e) {
+                console.error('Fetch error:', e);
+            }
+        }
+
+        // Initial load
+        fetchData();
+        // Auto-refresh every 10 seconds
+        setInterval(fetchData, 10000);
+        // Clock update every second
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
+</body>
+</html>
