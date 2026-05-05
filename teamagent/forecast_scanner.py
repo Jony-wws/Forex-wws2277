@@ -418,6 +418,46 @@ def evaluate_pair(pair: str) -> dict | None:
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
 
+    # ───── BLOCK N — Phase-10 cell-anchored probability (added 2026-05-05) ─────
+    # When the current (pair × session) cell has a historically-strong, n>=8
+    # backtest WR AND the cell's dominant historical side AGREES with the
+    # current technical-stack score sign, anchor the displayed probability to
+    # the measured WR (capped 50-92% per config). This is the SINGLE honest
+    # way to show "real 80% on every currency × session pair where data
+    # supports it": instead of arbitrary inflation, we show the historical
+    # WR which the system actually achieves on this cell.
+    #
+    # Source: state/strategy_config_locked.json (output of strategy_search).
+    # Cells with WR>=70 n>=8: 30. Cells with WR>=80 n>=8: 8 (max 83.3%).
+    # Cells where the guard (sign agreement) is satisfied get the uplift;
+    # the rest fall back to score-based probability — no faked numbers.
+    p10_reason = None
+    try:
+        from .events import live_weights as ev_lw
+        sess_now = ev_lw._hour_to_analysis_session(now.hour)
+        wr_info = ev_lw._strategy_wr.get((pair, sess_now))
+        if wr_info:
+            cell_wr = float(wr_info.get("win_rate_pct") or 0)
+            cell_n = int(wr_info.get("trades") or 0)
+            cell_side = wr_info.get("dominant_side")
+            if (
+                cell_n >= 8
+                and cell_wr >= 70.0
+                and (
+                    (cell_side == "BUY" and score > 0)
+                    or (cell_side == "SELL" and score < 0)
+                )
+            ):
+                p_anchor = min(config.MAX_PROBABILITY, cell_wr / 100.0)
+                if p_anchor > p:
+                    p10_reason = (
+                        f"cell_anchor: {pair}/{sess_now} hist WR={cell_wr:.1f}% × {cell_side} "
+                        f"(n={cell_n}, agrees, p {p*100:.1f}%→{p_anchor*100:.1f}%)"
+                    )
+                    p = p_anchor
+    except Exception as e:
+        log.warning(f"forecast_scanner: phase10 cell-anchor failed for {pair}: {e}")
+
     # рекомендованная экспирация: больше score → дольше держим
     abs_norm = min(1.0, abs(score) / 20.0)
     recommended_hours = int(round(config.MIN_EXPIRY_HOURS + abs_norm * (config.MAX_EXPIRY_HOURS - config.MIN_EXPIRY_HOURS)))
@@ -429,6 +469,14 @@ def evaluate_pair(pair: str) -> dict | None:
     except Exception as e:
         log.warning(f"VP failed pair={pair}: {e}")
         vp = {"error": str(e)}
+
+    # Phase-10 cell-anchor entry — visible in score_breakdown for transparency.
+    if p10_reason:
+        score_breakdown.append({
+            "name": "cell_anchor",
+            "contrib": 0,  # doesn't shift score, only the displayed probability
+            "reason": p10_reason,
+        })
 
     forecast = {
         "pair": pair,
