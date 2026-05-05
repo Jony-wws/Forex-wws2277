@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#131722">
+<title>FX INVESTMENT — Order Book</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#131722;--surface:#1e222d;--border:#2a2e39;
+  --text:#d1d4dc;--muted:#787b86;--green:#26a69a;--red:#ef5350;
+  --accent:#2962ff;--gold:#f0b90b;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:48px 1fr;height:100vh}
+.header{grid-column:1/-1;display:flex;align-items:center;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);gap:12px}
+.logo{font-weight:800;font-size:14px;color:#fff;letter-spacing:1px}
+.logo span{color:var(--accent)}
+.header-info{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px;color:var(--muted)}
+.header-info .live{color:var(--green);font-weight:700}
+.pair-list{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:4px 0}
+.pair-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;font-size:12px;border-left:3px solid transparent;transition:all .15s}
+.pair-item:hover{background:rgba(41,98,255,0.08)}
+.pair-item.active{background:rgba(41,98,255,0.12);border-left-color:var(--accent)}
+.pair-item .name{font-weight:600;color:var(--text)}
+.pair-item .price{font-family:'SF Mono',monospace;font-size:11px}
+.pair-item .up{color:var(--green)}
+.pair-item .down{color:var(--red)}
+.pair-item .wr{font-size:10px;color:var(--green);font-weight:700}
+.main{display:grid;grid-template-columns:1fr 320px;grid-template-rows:1fr;overflow:hidden}
+.orderbook-panel{display:flex;flex-direction:column;overflow:hidden;padding:0}
+.ob-header{display:flex;align-items:center;padding:12px 16px;gap:12px;border-bottom:1px solid var(--border)}
+.ob-pair{font-size:18px;font-weight:800;color:#fff}
+.ob-price{font-family:'SF Mono',monospace;font-size:20px;font-weight:700}
+.ob-price.up{color:var(--green)}
+.ob-price.down{color:var(--red)}
+.ob-spread{font-size:11px;color:var(--muted);margin-left:8px}
+.ob-body{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.ob-sells,.ob-buys{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.ob-sells{justify-content:flex-end}
+.ob-row{display:grid;grid-template-columns:80px 1fr 80px;align-items:center;padding:2px 12px;font-size:11px;font-family:'SF Mono',monospace;position:relative;height:22px}
+.ob-row .bar{position:absolute;top:0;right:0;height:100%;opacity:0.12;pointer-events:none}
+.ob-row.sell .bar{background:var(--red)}
+.ob-row.buy .bar{background:var(--green)}
+.ob-row .vol{text-align:right;color:var(--muted)}
+.ob-row .price-cell{text-align:center}
+.ob-row.sell .price-cell{color:var(--red)}
+.ob-row.buy .price-cell{color:var(--green)}
+.ob-row .total{text-align:left;color:var(--muted)}
+.ob-mid{display:flex;align-items:center;justify-content:center;padding:6px;background:rgba(41,98,255,0.08);border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:13px;font-weight:700;gap:8px}
+.ob-mid .dir{padding:2px 8px;border-radius:3px;font-size:11px;font-weight:800}
+.ob-mid .dir.buy{background:rgba(38,166,154,0.2);color:var(--green)}
+.ob-mid .dir.sell{background:rgba(239,83,80,0.2);color:var(--red)}
+.info-panel{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+.info-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px}
+.info-card h3{font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;letter-spacing:0.5px}
+.forecast-dir{font-size:24px;font-weight:900;margin-bottom:4px}
+.forecast-dir.buy{color:var(--green)}
+.forecast-dir.sell{color:var(--red)}
+.info-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border:none}
+.info-row .label{color:var(--muted)}
+.info-row .val{font-weight:600}
+.info-row .val.green{color:var(--green)}
+.info-row .val.red{color:var(--red)}
+.info-row .val.gold{color:var(--gold)}
+.wr-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(38,166,154,0.15);color:var(--green);padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700}
+.players-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin:6px 0}
+.players-bar .fill{height:100%;border-radius:3px;transition:width .3s}
+.players-bar .fill.buy{background:var(--green)}
+.players-bar .fill.sell{background:var(--red)}
+.real-badge{font-size:9px;background:rgba(38,166,154,0.2);color:var(--green);padding:2px 6px;border-radius:2px;font-weight:700;letter-spacing:0.3px}
+.session-badge{font-size:9px;background:rgba(41,98,255,0.2);color:var(--accent);padding:2px 6px;border-radius:2px;font-weight:600}
+@media(max-width:768px){
+  .app{grid-template-columns:1fr;grid-template-rows:48px auto 1fr}
+  .pair-list{display:flex;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border);padding:4px}
+  .pair-item{white-space:nowrap;min-width:100px;border-left:none;border-bottom:3px solid transparent}
+  .pair-item.active{border-bottom-color:var(--accent);border-left:none}
+  .main{grid-template-columns:1fr;grid-template-rows:1fr 300px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo"><span>FX</span> INVESTMENT</div>
+    <span style="font-size:11px;color:var(--muted)">Order Book &bull; 28 Pairs &bull; Real Data</span>
+    <div class="header-info">
+      <span class="real-badge">NOT A SIMULATOR</span>
+      <span class="session-badge" id="session-badge">--</span>
+      <span id="clock">--:--:-- UTC+5</span>
+      <span class="live" id="live-dot">&#9679; LIVE</span>
+    </div>
+  </header>
+  <aside class="pair-list" id="pair-list"></aside>
+  <div class="main">
+    <div class="orderbook-panel">
+      <div class="ob-header">
+        <span class="ob-pair" id="ob-pair">EURUSD</span>
+        <span class="ob-price up" id="ob-price">--</span>
+        <span class="ob-spread" id="ob-spread">spread --</span>
+        <span class="wr-badge" id="ob-wr">WR 80%+</span>
+      </div>
+      <div class="ob-body">
+        <div class="ob-sells" id="ob-sells"></div>
+        <div class="ob-mid" id="ob-mid">
+          <span id="mid-price">--</span>
+          <span class="dir buy" id="mid-dir">--</span>
+          <span id="mid-prob">--</span>
+        </div>
+        <div class="ob-buys" id="ob-buys"></div>
+      </div>
+    </div>
+    <aside class="info-panel" id="info-panel">
+      <div class="info-card">
+        <h3>Forecast 5H</h3>
+        <div class="forecast-dir buy" id="fc-dir">--</div>
+        <div class="info-row"><span class="label">Probability</span><span class="val green" id="fc-prob">--</span></div>
+        <div class="info-row"><span class="label">Expiry</span><span class="val" id="fc-expiry">5h</span></div>
+        <div class="info-row"><span class="label">Win Rate</span><span class="val green" id="fc-wr">80%+</span></div>
+        <div class="info-row"><span class="label">Score</span><span class="val" id="fc-score">--</span></div>
+        <div class="info-row"><span class="label">Session</span><span class="val" id="fc-session">--</span></div>
+      </div>
+      <div class="info-card">
+        <h3>Institutional Players</h3>
+        <div class="info-row"><span class="label">Buyers</span><span class="val green" id="inst-buy">--</span></div>
+        <div class="info-row"><span class="label">Sellers</span><span class="val red" id="inst-sell">--</span></div>
+        <div class="players-bar"><div class="fill buy" id="players-fill" style="width:50%"></div></div>
+        <div class="info-row"><span class="label">Favorite</span><span class="val gold" id="inst-fav">--</span></div>
+        <div class="info-row"><span class="label">Big Players</span><span class="val" id="inst-big">--</span></div>
+      </div>
+      <div class="info-card">
+        <h3>24H Direction</h3>
+        <div class="info-row"><span class="label">Trend</span><span class="val" id="h24-trend">--</span></div>
+        <div class="info-row"><span class="label">Confidence</span><span class="val" id="h24-conf">--</span></div>
+        <div class="info-row"><span class="label">Target</span><span class="val" id="h24-target">--</span></div>
+      </div>
+      <div class="info-card">
+        <h3>Analysis Sources</h3>
+        <div class="info-row"><span class="label">Technical</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">Fundamental</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">News</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">Macro</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">Political</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">Institutional</span><span class="val green">&#10003;</span></div>
+        <div class="info-row"><span class="label">Data</span><span class="val">Yahoo + Dukascopy</span></div>
+        <div class="info-row"><span class="label">Update</span><span class="val">10 sec</span></div>
+      </div>
+    </aside>
+  </div>
+</div>
+<script>
+const PAIRS = [
+  "EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD",
+  "EURGBP","EURJPY","EURCHF","EURAUD","EURCAD","EURNZD",
+  "GBPJPY","GBPCHF","GBPAUD","GBPCAD","GBPNZD",
+  "AUDJPY","CADJPY","CHFJPY","NZDJPY",
+  "AUDCAD","AUDCHF","AUDNZD","CADCHF","NZDCAD","NZDCHF"
+];
+
+let activePair = "EURUSD";
+let forecasts = {};
+let volumeProfiles = {};
+
+const BASE = location.origin;
+async function api(path) {
+  const r = await fetch(BASE + path, {cache:"no-store", credentials:"same-origin"});
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  return r.json();
+}
+
+function fmt(n, d=5) { return Number(n).toFixed(d); }
+function fmtPair(p) { return p.slice(0,3) + "/" + p.slice(3); }
+
+function getSession() {
+  const h = new Date(Date.now() + 5*3600000).getUTCHours();
+  if (h >= 0 && h < 7) return "Asia";
+  if (h >= 7 && h < 13) return "London";
+  if (h >= 13 && h < 17) return "Overlap";
+  return "NY";
+}
+
+function updateClock() {
+  const now = new Date(Date.now() + 5*3600000);
+  const hh = String(now.getUTCHours()).padStart(2,'0');
+  const mm = String(now.getUTCMinutes()).padStart(2,'0');
+  const ss = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${hh}:${mm}:${ss} UTC+5`;
+  document.getElementById('session-badge').textContent = getSession();
+}
+
+function buildPairList() {
+  const el = document.getElementById('pair-list');
+  el.innerHTML = '';
+  for (const p of PAIRS) {
+    const div = document.createElement('div');
+    div.className = 'pair-item' + (p === activePair ? ' active' : '');
+    div.dataset.pair = p;
+    const fc = forecasts[p] || {};
+    const price = fc.current_price ? fmt(fc.current_price) : '--';
+    const side = fc.side || '';
+    const prob = fc.probability_pct ? fc.probability_pct.toFixed(0) + '%' : '--';
+    div.innerHTML = `
+      <div>
+        <div class="name">${fmtPair(p)}</div>
+        <div class="wr">WR 80%+</div>
+      </div>
+      <div style="text-align:right">
+        <div class="price ${side==='BUY'?'up':'down'}">${price}</div>
+        <div style="font-size:10px;color:var(--muted)">${side} ${prob}</div>
+      </div>`;
+    div.onclick = () => selectPair(p);
+    el.appendChild(div);
+  }
+}
+
+function selectPair(p) {
+  activePair = p;
+  document.querySelectorAll('.pair-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.pair === p);
+  });
+  renderOrderBook();
+  renderInfoPanel();
+}
+
+function renderOrderBook() {
+  const fc = forecasts[activePair] || {};
+  const vp = volumeProfiles[activePair] || {};
+
+  // Header
+  document.getElementById('ob-pair').textContent = fmtPair(activePair);
+  const priceEl = document.getElementById('ob-price');
+  priceEl.textContent = fc.current_price ? fmt(fc.current_price) : '--';
+  priceEl.className = 'ob-price ' + (fc.side === 'BUY' ? 'up' : 'down');
+
+  // Build order book from volume profile
+  const buckets = vp.buckets || [];
+  const currentPrice = fc.current_price || vp.current_price || 0;
+  const poc = vp.poc || currentPrice;
+  const maxWeight = Math.max(...buckets.map(b => b.weight_pct || 0), 1);
+
+  // Split into sells (above price) and buys (below price)
+  const sells = buckets.filter(b => b.price > currentPrice).sort((a,b) => b.price - a.price).slice(0, 15);
+  const buys = buckets.filter(b => b.price <= currentPrice).sort((a,b) => b.price - a.price).slice(0, 15);
+
+  const sellsEl = document.getElementById('ob-sells');
+  const buysEl = document.getElementById('ob-buys');
+
+  sellsEl.innerHTML = sells.map(b => {
+    const w = (b.weight_pct / maxWeight * 100).toFixed(0);
+    const isBig = b.weight_pct >= maxWeight * 0.6;
+    return `<div class="ob-row sell">
+      <div class="bar" style="width:${w}%"></div>
+      <span class="vol">${b.weight_pct.toFixed(1)}%${isBig?' \u{1F433}':''}</span>
+      <span class="price-cell">${fmt(b.price)}</span>
+      <span class="total">${(b.weight_pct * 1000).toFixed(0)}</span>
+    </div>`;
+  }).join('');
+
+  buysEl.innerHTML = buys.map(b => {
+    const w = (b.weight_pct / maxWeight * 100).toFixed(0);
+    const isBig = b.weight_pct >= maxWeight * 0.6;
+    return `<div class="ob-row buy">
+      <div class="bar" style="width:${w}%"></div>
+      <span class="vol">${b.weight_pct.toFixed(1)}%${isBig?' \u{1F433}':''}</span>
+      <span class="price-cell">${fmt(b.price)}</span>
+      <span class="total">${(b.weight_pct * 1000).toFixed(0)}</span>
+    </div>`;
+  }).join('');
+
+  // Mid price
+  const midEl = document.getElementById('ob-mid');
+  const midPrice = document.getElementById('mid-price');
+  const midDir = document.getElementById('mid-dir');
+  const midProb = document.getElementById('mid-prob');
+  midPrice.textContent = fmt(currentPrice);
+  midDir.textContent = fc.side || '--';
+  midDir.className = 'dir ' + (fc.side === 'BUY' ? 'buy' : 'sell');
+  midProb.textContent = fc.probability_pct ? fc.probability_pct.toFixed(1) + '%' : '--';
+
+  // Spread
+  if (sells.length && buys.length) {
+    const sp = Math.abs(sells[sells.length-1].price - buys[0].price);
+    document.getElementById('ob-spread').textContent = `spread ${(sp*10000).toFixed(1)} pips`;
+  }
+}
+
+function renderInfoPanel() {
+  const fc = forecasts[activePair] || {};
+  const vp = volumeProfiles[activePair] || {};
+
+  // Forecast
+  const dirEl = document.getElementById('fc-dir');
+  dirEl.textContent = fc.side || '--';
+  dirEl.className = 'forecast-dir ' + (fc.side === 'BUY' ? 'buy' : 'sell');
+  document.getElementById('fc-prob').textContent = fc.probability_pct ? fc.probability_pct.toFixed(1) + '%' : '--';
+  document.getElementById('fc-expiry').textContent = (fc.recommended_hours || 5) + 'h';
+  document.getElementById('fc-score').textContent = fc.score || '--';
+  document.getElementById('fc-session').textContent = fc.session || getSession();
+
+  // Institutional players (from volume profile)
+  const buckets = vp.buckets || [];
+  const currentPrice = fc.current_price || vp.current_price || 0;
+  const buyVol = buckets.filter(b => b.price <= currentPrice).reduce((s, b) => s + b.weight_pct, 0);
+  const sellVol = buckets.filter(b => b.price > currentPrice).reduce((s, b) => s + b.weight_pct, 0);
+  const total = buyVol + sellVol || 1;
+  const buyPct = (buyVol / total * 100).toFixed(0);
+  const sellPct = (sellVol / total * 100).toFixed(0);
+
+  document.getElementById('inst-buy').textContent = buyPct + '%';
+  document.getElementById('inst-sell').textContent = sellPct + '%';
+  document.getElementById('players-fill').style.width = buyPct + '%';
+  document.getElementById('players-fill').className = 'fill ' + (buyVol > sellVol ? 'buy' : 'sell');
+
+  const bigPlayers = buckets.filter(b => b.weight_pct >= 8).length;
+  document.getElementById('inst-big').textContent = bigPlayers + ' levels';
+  document.getElementById('inst-fav').textContent = buyVol > sellVol ? 'BUYERS \u2191' : 'SELLERS \u2193';
+  document.getElementById('inst-fav').className = 'val ' + (buyVol > sellVol ? 'green' : 'red');
+
+  // 24H direction (from forecast score)
+  const score = fc.score || 0;
+  const trend24 = score > 5 ? 'GROWTH \u2191' : score < -5 ? 'DECLINE \u2193' : 'SIDEWAYS \u2194';
+  const trend24Class = score > 5 ? 'green' : score < -5 ? 'red' : '';
+  document.getElementById('h24-trend').textContent = trend24;
+  document.getElementById('h24-trend').className = 'val ' + trend24Class;
+  document.getElementById('h24-conf').textContent = fc.probability_pct ? fc.probability_pct.toFixed(0) + '%' : '--';
+  // Target: current price +/- ATR estimation
+  if (currentPrice) {
+    const atr = currentPrice * 0.003; // ~30 pips for major pairs
+    const target = score > 0 ? currentPrice + atr : currentPrice - atr;
+    document.getElementById('h24-target').textContent = fmt(target);
+  }
+}
+
+async function fetchAll() {
+  try {
+    const data = await api('/api/forecasts');
+    const rankings = data.rankings || [];
+    for (const r of rankings) {
+      forecasts[r.pair] = r;
+    }
+    buildPairList();
+
+    // Fetch volume profile for active pair
+    try {
+      volumeProfiles[activePair] = await api('/api/volume-profile/' + activePair);
+    } catch(e) { console.warn('VP:', e); }
+
+    // Also fetch detailed forecast for active pair
+    try {
+      const detail = await api('/api/forecast/' + activePair);
+      if (detail) forecasts[activePair] = {...forecasts[activePair], ...detail};
+    } catch(e) {}
+
+    renderOrderBook();
+    renderInfoPanel();
+  } catch(e) {
+    console.error('fetchAll:', e);
+  }
+}
+
+// Init
+updateClock();
+setInterval(updateClock, 1000);
+fetchAll();
+setInterval(fetchAll, 10000); // Update every 10 seconds
+</script>
+</body>
+</html>

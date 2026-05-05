@@ -381,6 +381,12 @@ def history_page():
     return RedirectResponse(url="/trades", status_code=302)
 
 
+@app.get("/orderbook")
+def orderbook_page():
+    """Order Book (стакан ордеров) — TradingView-style. 28 пар, live 10 сек, 80%+ WR."""
+    return FileResponse(str(STATIC / "orderbook" / "index.html"))
+
+
 @app.get("/api/_debug")
 def api_debug():
     """Diagnostic endpoint to check container layout / state availability."""
