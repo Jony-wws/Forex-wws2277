@@ -50,22 +50,29 @@ def _f(x: str) -> float:
 
 
 def _build_high_conviction_rules() -> list[dict]:
-    """Layer 1: high-conviction (pair × session × event_type) cells."""
+    """Layer 1: high-conviction (pair × session × event_type) cells.
+
+    Phase 9 (2026-05-04): thresholds relaxed from (freq≥4, conc≥75%) to
+    (freq≥3, conc≥70%) so we capture more learned cells. Per-rule weight
+    in `live_weights.learned_rule_score()` already scales with concordance
+    and frequency, so weak rules add only a small contribution while strong
+    ones still dominate — widening the net does not dilute conviction.
+    """
     src = ARTEFACTS_DIR / "per_event_pair_session.csv"
     rows = list(csv.DictReader(open(src)))
     rules: list[dict] = []
     for r in rows:
         n = int(r["frequency"])
-        if n < 4:
+        if n < 3:
             continue
         conc = _f(r["direction_concordance_pct"])
         # Either highly bullish OR highly bearish (concordance far from 50%)
-        if not (conc >= 75 or conc <= 25):
+        if not (conc >= 70 or conc <= 30):
             continue
         persist = _f(r["persistence_24h_avg_pct"])
         # We accept lower persistence here because intraday binary trades
         # only need 1-5h follow-through, not 24h.
-        if persist < 30:
+        if persist < 25:
             continue
         rules.append({
             "pair": r["pair"],
@@ -122,8 +129,89 @@ def _build_pair_session_bias() -> dict[str, dict]:
             "mean_signed_pips": round(mean, 3),
             "concordance_pct": round(concordance, 2),
             "dominant_direction": dom_dir,
+            # Phase 9: include raw counts so live_weights can tier the
+            # confidence (binomial p-value) without re-reading the JSONL.
+            "ups": ups,
+            "downs": downs,
         }
     log.info(f"per-pair-session bias: {sum(len(v) for v in out.values())} cells")
+    return out
+
+
+def _build_pair_hour_bias() -> dict[str, dict]:
+    """Phase 9 layer 2b: per (pair, hour-of-day) directional drift from hourly bars.
+
+    Source: 365-day Yahoo 1H OHLCV (real, no simulator). For each pair we
+    look at all 8760 1H bars and compute, per UTC-hour-of-day, the share of
+    bars that closed above their open vs below. Cells with concordance ≥
+    62% on n ≥ 60 days qualify; live_weights.hour_bias_score adds a small
+    ±1 nudge in the dominant direction.
+
+    Output structure: {pair: {hour_str: {n, ups, downs, concordance_pct,
+    dominant_direction, mean_pips}}}.
+    """
+    try:
+        from teamagent.data import yahoo  # type: ignore
+    except Exception as e:
+        log.warning(f"hour_bias: yahoo import failed ({e}); skipping")
+        return {}
+    try:
+        from teamagent import config  # type: ignore
+        pairs = list(config.PAIRS)
+    except Exception:
+        pairs = []
+    if not pairs:
+        return {}
+    out: dict[str, dict] = {}
+    for pair in pairs:
+        try:
+            df = yahoo.fetch(pair, interval="1h", period="365d")
+        except Exception as e:
+            log.warning(f"hour_bias {pair}: fetch failed ({e})")
+            continue
+        if df is None or len(df) < 200:
+            continue
+        # Group by UTC hour of day. df.index assumed UTC tz-aware.
+        try:
+            df = df.copy()
+            df["_hr"] = df.index.hour  # type: ignore[attr-defined]
+            # yahoo.fetch returns Title-Case columns (Open/High/Low/Close).
+            close_col = "Close" if "Close" in df.columns else "close"
+            open_col = "Open" if "Open" in df.columns else "open"
+            df["_signed"] = df[close_col] - df[open_col]
+        except Exception as e:
+            log.warning(f"hour_bias {pair}: dataframe shape ({e})")
+            continue
+        per_hour: dict[str, dict] = {}
+        for hr in range(24):
+            sub = df[df["_hr"] == hr]
+            n = len(sub)
+            if n < 60:
+                continue
+            signed_vals = sub["_signed"].tolist()
+            ups = sum(1 for v in signed_vals if v > 0)
+            downs = sum(1 for v in signed_vals if v < 0)
+            tot = ups + downs or 1
+            conc = max(ups, downs) / tot * 100
+            if conc < 62:
+                continue
+            mean_signed = sum(signed_vals) / max(1, n)
+            # Convert to pips: pips per unit depends on JPY pairs vs others.
+            pip_factor = 100.0 if pair.endswith("JPY") else 10000.0
+            mean_pips = mean_signed * pip_factor
+            per_hour[str(hr)] = {
+                "n": n,
+                "ups": ups,
+                "downs": downs,
+                "concordance_pct": round(conc, 2),
+                "dominant_direction": "up" if ups >= downs else "down",
+                "mean_signed_pips": round(mean_pips, 3),
+            }
+        if per_hour:
+            out[pair] = per_hour
+    log.info(
+        f"per-pair-hour bias: {sum(len(v) for v in out.values())} cells across {len(out)} pairs"
+    )
     return out
 
 
@@ -136,17 +224,20 @@ def _build_persistent_drivers_set() -> set[str]:
     return {r["event_type"] for r in rows}
 
 
-def build_all() -> dict:
+def build_all(include_hour_bias: bool = True) -> dict:
     rules = _build_high_conviction_rules()
     pair_bias = _build_pair_session_bias()
     persistent = sorted(_build_persistent_drivers_set())
+    hour_bias = _build_pair_hour_bias() if include_hour_bias else {}
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "n_high_conviction_rules": len(rules),
         "n_pair_session_bias_cells": sum(len(v) for v in pair_bias.values()),
+        "n_pair_hour_bias_cells": sum(len(v) for v in hour_bias.values()),
         "n_persistent_drivers": len(persistent),
         "high_conviction_rules": rules,
         "pair_session_bias": pair_bias,
+        "pair_hour_bias": hour_bias,
         "persistent_driver_types": persistent,
     }
     return out
@@ -169,8 +260,13 @@ def load() -> dict | None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    out = build_all()
+    import sys
+    include_hours = "--no-hours" not in sys.argv
+    out = build_all(include_hour_bias=include_hours)
     p = save(out)
-    print(f"saved learned_rules to {p}: {out['n_high_conviction_rules']} rules, "
-          f"{out['n_pair_session_bias_cells']} bias cells, "
-          f"{out['n_persistent_drivers']} persistent drivers")
+    print(
+        f"saved learned_rules to {p}: {out['n_high_conviction_rules']} rules, "
+        f"{out['n_pair_session_bias_cells']} session-bias cells, "
+        f"{out['n_pair_hour_bias_cells']} hour-bias cells, "
+        f"{out['n_persistent_drivers']} persistent drivers"
+    )

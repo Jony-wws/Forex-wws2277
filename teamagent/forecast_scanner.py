@@ -376,6 +376,39 @@ def evaluate_pair(pair: str) -> dict | None:
     except Exception as e:
         log.warning(f"forecast_scanner: learned_rules integration failed for {pair}: {e}")
 
+    # ───── BLOCK M — Phase-9 deeper conviction (added 2026-05-04) ─────
+    # Three more learned-knowledge layers grounded entirely in real 365-day
+    # data (no simulator, no random):
+    #   1. hour_bias_score: per-(pair × UTC hour) drift over 365 days of
+    #      Yahoo 1H bars (concordance ≥ 62%, n ≥ 60). Up to ±1 per pair.
+    #   2. historical_wr_score: per-(pair × session) backtest win-rate from
+    #      `state/strategy_config_locked.json` (output of strategy_search).
+    #      Tiered ±2/±3/±4 for WR≥60/65/70%.
+    #   3. currency_strength_score: real 24h cross-pair return ranking — when
+    #      base is in top-3 strongest AND quote in bottom-3 weakest (or vice
+    #      versa), emit ±2 in the rank-divergence direction.
+    # All three additive votes; never block trades; the free 70% gate stays
+    # free per AGENTS.md rule #7.
+    try:
+        from .events import live_weights as ev_lw
+        sess_now = ev_lw._hour_to_analysis_session(now.hour)
+        # Layer M1: hour-of-day bias
+        hb_delta, hb_reason = ev_lw.hour_bias_score(pair, now)
+        if hb_delta != 0 and hb_reason:
+            vote("hour_bias", hb_delta, hb_reason)
+        # Layer M2: historical backtest WR per (pair × session) — only
+        # amplifies when its dominant side agrees with the technical-stack
+        # score sign. Pass current `score` as pre_score for that guard.
+        wr_delta, wr_reason = ev_lw.historical_wr_score(pair, sess_now, score)
+        if wr_delta != 0 and wr_reason:
+            vote("historical_wr", wr_delta, wr_reason)
+        # Layer M3: cross-pair currency-strength rank
+        cs_delta, cs_reason = ev_lw.currency_strength_score(pair)
+        if cs_delta != 0 and cs_reason:
+            vote("currency_strength", cs_delta, cs_reason)
+    except Exception as e:
+        log.warning(f"forecast_scanner: phase9 integration failed for {pair}: {e}")
+
     # ───── итог ─────
     if score == 0:
         return None  # нейтрально, не показываем
