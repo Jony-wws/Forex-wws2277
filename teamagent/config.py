@@ -58,6 +58,26 @@ PAYOUT_PCT = 0.85          # WIN +$0.85 на $1, LOSS -$1 (paper-trader simulati
 # At 70% payout, break-even WR = 1 / (1+0.70) = 58.82%. Below that → losing on
 # distance. Above 70% probability with realized cell WR ≥ 70% → +EV with margin.
 BROKER_PAYOUT_PCT = float(os.environ.get("BROKER_PAYOUT_PCT", "0.70"))
+
+# Phase 12 (2026-05-05): 24-hour-ahead forecast engine writes
+# `state/forecast_24h.json` every 30 min. Recommended trade expiry per
+# 24h-forecast signal is 5 hours (matches `MAX_EXPIRY_HOURS` and the
+# user's Phase-12 spec — «отработка прогноза будет 5 часов»). Override
+# via env: `export FORECAST_24H_EXPIRY_HOURS=3`.
+FORECAST_24H_EXPIRY_HOURS = int(os.environ.get("FORECAST_24H_EXPIRY_HOURS", "5"))
+
+# Phase-12 macro/risk-on proxy symbols. Six FREE Yahoo symbols (no API
+# keys) that the brain pulls 1H closes from to compute the user's
+# requested «больше источников» macro tilt: dollar index, volatility,
+# S&P, gold, oil, bitcoin. These get exposed via /api/macro-signals.
+MACRO_PROXY_SYMBOLS = [
+    "^DXY",      # US Dollar Index — primary $ strength indicator
+    "^VIX",      # Volatility — risk-on/risk-off gauge
+    "^GSPC",    # S&P 500 — risk asset proxy
+    "GC=F",      # Gold front-month — safe-haven flow
+    "CL=F",      # WTI crude — energy / commodity-FX driver
+    "BTC-USD",  # Bitcoin — risk-on retail-flow proxy
+]
 MIN_PROBABILITY = 0.70     # открываем только если ≥70%
 MAX_PROBABILITY = 0.92     # кэп — никогда не показываем 100%
 

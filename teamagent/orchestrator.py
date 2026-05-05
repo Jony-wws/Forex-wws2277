@@ -126,6 +126,10 @@ def _build_agent_cmd(agent: dict) -> list[str]:
 def _build_all_children() -> dict[str, ChildProc]:
     out: dict[str, ChildProc] = {}
     out["forecast_scanner"] = ChildProc("forecast_scanner", [sys.executable, "-m", "teamagent.forecast_scanner"])
+    # Phase-12 (2026-05-05): 24-hour-ahead forecast engine. Anchored on
+    # 365-day learned_rules (pair_hour_bias + pair_session_bias). Rebuilds
+    # every 30 min, writes state/forecast_24h.json, exposes /api/forecast-24h.
+    out["forecast_24h"] = ChildProc("forecast_24h", [sys.executable, "-m", "teamagent.forecast_24h"])
     out["paper_trader"] = ChildProc("paper_trader", [sys.executable, "-m", "teamagent.paper_trader"])
     # Параллельная стратегия "Стакан" (2026-05-01): отдельный процесс, отдельные state-файлы.
     out["paper_trader_stakan"] = ChildProc(

@@ -263,6 +263,34 @@ Stop everything: `bash scripts/stop_all.sh`.
     distance. Always derive EV from the real probability.** See
     `HISTORY/2026-05-05_phase11_math_expectation.md`.
 
+22. **Phase 12 — 24-hour-ahead forecast engine (added 2026-05-05)**: new
+    module `teamagent/forecast_24h.py` writes `state/forecast_24h.json`
+    every 30 minutes (in-orchestrator child + Fly fallback in
+    `_fly_state_refresher`). Anchored on the 365-day knowledge already in
+    `learned_rules.json` (`pair_hour_bias` + `pair_session_bias`). For each
+    pair × each future hour `h ∈ [now+1h, now+24h]`:
+    `total_score = hour_bias_signal + session_bias_signal`,
+    `expected_pips = weighted_avg(mean_signed_pips of voting cells)`,
+    `confidence_pct = blend(concordance_pct of voters)` clipped 50..85.
+    Pairs with no learned-cell support return `NEUTRAL` and have no
+    `best_peak` — we never invent numbers.
+    
+    Recommended trade expiry per 24h-forecast signal is **5 hours**
+    (`config.FORECAST_24H_EXPIRY_HOURS = 5` per the user's Phase-12 spec).
+    
+    `/api/forecast-24h` exposes the snapshot. `/api/forecasts` carries
+    `forecast_24h_peak` per pair so PROGNOZY-28 cards can show
+    `24ч: HH:00 UTC SIDE ±Xп · доверие Y% · экспайри 5ч` under the EV pill.
+    
+    `config.MACRO_PROXY_SYMBOLS = ["^DXY", "^VIX", "^GSPC", "GC=F", "CL=F", "BTC-USD"]`
+    enumerates 6 free Yahoo macro-proxies (no API keys) for future macro-tilt
+    modules. **Do NOT replace `forecast_24h` with a live-Yahoo scanner** —
+    it MUST keep using cached `learned_rules.json` so that:
+    (a) Fly default-memory (256 MB) doesn't OOM; (b) no Yahoo rate-limit
+    pressure; (c) the 24h forecast stays interpretable (every hour shows
+    exactly which 365-day cell vote produced its score).
+    See `HISTORY/2026-05-05_phase12_24h_forecast.md`.
+
 ## Optional API keys (env vars)
 
 The 3 LLM agents are no-op if these aren't set; the rest of the system still
