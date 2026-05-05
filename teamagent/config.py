@@ -9,9 +9,20 @@ from datetime import timedelta
 
 # ───── корневые директории ─────
 ROOT = Path(__file__).resolve().parent
-# Allow override via env (Fly.io persistent volume at /data); fallback to ROOT.
-STATE_DIR = Path(os.environ.get("TEAMAGENT_STATE_DIR", ROOT / "state"))
-LOGS_DIR = Path(os.environ.get("TEAMAGENT_LOGS_DIR", ROOT / "logs"))
+
+# Auto-detect Fly.io persistent volume at /data; use it for state + logs
+# so data survives machine restarts (free tier auto-suspends after idle).
+_fly_data = Path("/data")
+_on_fly = _fly_data.is_dir() or os.environ.get("FLY_APP_NAME") is not None
+
+STATE_DIR = Path(os.environ.get(
+    "TEAMAGENT_STATE_DIR",
+    str(_fly_data / "state") if _on_fly else str(ROOT / "state"),
+))
+LOGS_DIR = Path(os.environ.get(
+    "TEAMAGENT_LOGS_DIR",
+    str(_fly_data / "logs") if _on_fly else str(ROOT / "logs"),
+))
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
