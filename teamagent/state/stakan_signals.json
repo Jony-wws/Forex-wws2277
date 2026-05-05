@@ -1,75 +1,93 @@
 {
-  "as_of": "2026-05-05T06:44:41.121734+00:00",
+  "as_of": "2026-05-05T06:59:18.382574+00:00",
   "min_votes_required": 8,
   "max_votes": 11,
   "signals": [
     {
       "pair": "EURUSD",
-      "skip_reason": "no_valid_avoidance_level",
-      "all_levels_count": 10,
-      "current_price": 1.1690436601638794,
-      "atr_pips": 7.6,
-      "sample_levels": [
-        {
-          "price": 1.1737896633148193,
-          "kind": "resistance",
-          "weight_pct": 4.448275862068965,
-          "level_distance_pips": 47.5,
-          "avoidance_distance_pips": 3.6,
-          "approached_pct": 19.86,
-          "time_in_band_pct": 19.86,
-          "avoidance_score": 0.468,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 1.1735312747955322,
-          "kind": "resistance",
-          "weight_pct": 5.310344827586206,
-          "level_distance_pips": 44.9,
-          "avoidance_distance_pips": 1.0,
-          "approached_pct": 22.01,
-          "time_in_band_pct": 22.01,
-          "avoidance_score": 0.128,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 1.1732728862762452,
-          "kind": "resistance",
-          "weight_pct": 4.879310344827586,
-          "level_distance_pips": 42.3,
-          "avoidance_distance_pips": -1.6,
-          "approached_pct": 26.25,
-          "time_in_band_pct": 26.81,
-          "avoidance_score": -0.211,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        }
-      ]
+      "skip_reason": "forecast_prob_below_70_(64.3%)",
+      "direction": "SELL",
+      "best_level": {
+        "price": 1.1737896633148193,
+        "kind": "resistance",
+        "weight_pct": 4.437564499484004,
+        "level_distance_pips": 48.8,
+        "avoidance_distance_pips": 4.9,
+        "approached_pct": 18.89,
+        "time_in_band_pct": 18.89,
+        "avoidance_score": 0.648,
+        "is_valid": true,
+        "trade_direction": "SELL",
+        "valid_extreme": true,
+        "valid_distance": true,
+        "valid_approached": true
+      },
+      "votes": {
+        "votes": [
+          {
+            "name": "vp_no_return_dir",
+            "yes": false
+          },
+          {
+            "name": "forecast_prob_70",
+            "yes": false
+          },
+          {
+            "name": "forecast_side_match",
+            "yes": true
+          },
+          {
+            "name": "macro_tilt",
+            "yes": false
+          },
+          {
+            "name": "cot_contrarian",
+            "yes": false
+          },
+          {
+            "name": "rsi_not_extreme",
+            "yes": true
+          },
+          {
+            "name": "ema20_vs_ema50",
+            "yes": true
+          },
+          {
+            "name": "atr_not_spiking",
+            "yes": true
+          },
+          {
+            "name": "no_news_blackout",
+            "yes": true
+          },
+          {
+            "name": "poc_distance_ok",
+            "yes": true
+          },
+          {
+            "name": "market_radar_aligned",
+            "yes": false,
+            "detail": "radar=+2.5 (NEUTRAL)"
+          }
+        ],
+        "yes": 6,
+        "total": 11
+      },
+      "current_price": 1.1689070463180542
     },
     {
       "pair": "GBPUSD",
-      "skip_reason": "forecast_prob_below_70_(59.2%)",
+      "skip_reason": "forecast_prob_below_70_(56.6%)",
       "direction": "BUY",
       "best_level": {
         "price": 1.3477019131183625,
         "kind": "support",
-        "weight_pct": 3.9489567166752884,
-        "level_distance_pips": 54.6,
+        "weight_pct": 3.9394460691553417,
+        "level_distance_pips": 57.2,
         "avoidance_distance_pips": 37.0,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
-        "avoidance_score": 3.694,
+        "avoidance_score": 3.642,
         "is_valid": true,
         "trade_direction": "BUY",
         "valid_extreme": true,
@@ -121,26 +139,26 @@
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=+2.2 (NEUTRAL)"
+            "detail": "radar=+2.5 (NEUTRAL)"
           }
         ],
         "yes": 5,
         "total": 11
       },
-      "current_price": 1.3531616926193237
+      "current_price": 1.353417992591858
     },
     {
       "pair": "USDJPY",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 157.23199462890625,
+      "current_price": 157.23599243164062,
       "atr_pips": 17.7,
       "sample_levels": [
         {
           "price": 160.35410690307617,
           "kind": "resistance",
-          "weight_pct": 6.190393618865961,
-          "level_distance_pips": 312.2,
+          "weight_pct": 6.174334140435835,
+          "level_distance_pips": 311.8,
           "avoidance_distance_pips": 305.1,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
@@ -154,8 +172,8 @@
         {
           "price": 160.24870681762695,
           "kind": "resistance",
-          "weight_pct": 4.491069880353737,
-          "level_distance_pips": 301.7,
+          "weight_pct": 4.479418886198547,
+          "level_distance_pips": 301.3,
           "avoidance_distance_pips": 294.6,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
@@ -169,8 +187,8 @@
         {
           "price": 159.61630630493164,
           "kind": "resistance",
-          "weight_pct": 6.675914687012312,
-          "level_distance_pips": 238.4,
+          "weight_pct": 6.658595641646489,
+          "level_distance_pips": 238.0,
           "avoidance_distance_pips": 231.3,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
@@ -185,17 +203,17 @@
     },
     {
       "pair": "USDCHF",
-      "skip_reason": "only_5_of_11_votes",
+      "skip_reason": "forecast_prob_below_70_(67.8%)",
       "direction": "SELL",
       "best_level": {
         "price": 0.7894256120920181,
         "kind": "resistance",
-        "weight_pct": 3.68567454798331,
+        "weight_pct": 3.6760880873937927,
         "level_distance_pips": 52.3,
         "avoidance_distance_pips": 46.3,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
-        "avoidance_score": 5.721,
+        "avoidance_score": 5.706,
         "is_valid": true,
         "trade_direction": "SELL",
         "valid_extreme": true,
@@ -210,281 +228,11 @@
           },
           {
             "name": "forecast_prob_70",
-            "yes": true
-          },
-          {
-            "name": "forecast_side_match",
-            "yes": false
-          },
-          {
-            "name": "macro_tilt",
-            "yes": false
-          },
-          {
-            "name": "cot_contrarian",
-            "yes": false
-          },
-          {
-            "name": "rsi_not_extreme",
-            "yes": true
-          },
-          {
-            "name": "ema20_vs_ema50",
-            "yes": false
-          },
-          {
-            "name": "atr_not_spiking",
-            "yes": true
-          },
-          {
-            "name": "no_news_blackout",
-            "yes": true
-          },
-          {
-            "name": "poc_distance_ok",
-            "yes": true
-          },
-          {
-            "name": "market_radar_aligned",
-            "yes": false,
-            "detail": "radar=-0.6 (NEUTRAL)"
-          }
-        ],
-        "yes": 5,
-        "total": 11
-      },
-      "current_price": 0.7842000126838684
-    },
-    {
-      "pair": "AUDUSD",
-      "skip_reason": "no_valid_avoidance_level",
-      "all_levels_count": 10,
-      "current_price": 0.7146941423416138,
-      "atr_pips": 8.2,
-      "sample_levels": [
-        {
-          "price": 0.7203200471401214,
-          "kind": "resistance",
-          "weight_pct": 5.315843976527442,
-          "level_distance_pips": 56.3,
-          "avoidance_distance_pips": -25.9,
-          "approached_pct": 40.0,
-          "time_in_band_pct": 67.22,
-          "avoidance_score": -3.141,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 0.7200734770298005,
-          "kind": "resistance",
-          "weight_pct": 4.694511563686572,
-          "level_distance_pips": 53.8,
-          "avoidance_distance_pips": -28.4,
-          "approached_pct": 33.61,
-          "time_in_band_pct": 67.43,
-          "avoidance_score": -3.44,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 0.7193337666988373,
-          "kind": "resistance",
-          "weight_pct": 4.452882292026234,
-          "level_distance_pips": 46.4,
-          "avoidance_distance_pips": -35.8,
-          "approached_pct": 32.43,
-          "time_in_band_pct": 78.54,
-          "avoidance_score": -4.337,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        }
-      ]
-    },
-    {
-      "pair": "USDCAD",
-      "skip_reason": "forecast_prob_below_70_(64.3%)",
-      "direction": "SELL",
-      "best_level": {
-        "price": 1.3685995161533357,
-        "kind": "resistance",
-        "weight_pct": 6.238086986657425,
-        "level_distance_pips": 68.1,
-        "avoidance_distance_pips": 56.2,
-        "approached_pct": 0.0,
-        "time_in_band_pct": 0.0,
-        "avoidance_score": 4.936,
-        "is_valid": true,
-        "trade_direction": "SELL",
-        "valid_extreme": true,
-        "valid_distance": true,
-        "valid_approached": false
-      },
-      "votes": {
-        "votes": [
-          {
-            "name": "vp_no_return_dir",
-            "yes": true
-          },
-          {
-            "name": "forecast_prob_70",
             "yes": false
           },
           {
             "name": "forecast_side_match",
             "yes": false
-          },
-          {
-            "name": "macro_tilt",
-            "yes": false
-          },
-          {
-            "name": "cot_contrarian",
-            "yes": false
-          },
-          {
-            "name": "rsi_not_extreme",
-            "yes": true
-          },
-          {
-            "name": "ema20_vs_ema50",
-            "yes": false
-          },
-          {
-            "name": "atr_not_spiking",
-            "yes": true
-          },
-          {
-            "name": "no_news_blackout",
-            "yes": true
-          },
-          {
-            "name": "poc_distance_ok",
-            "yes": true
-          },
-          {
-            "name": "market_radar_aligned",
-            "yes": false,
-            "detail": "radar=+1.1 (NEUTRAL)"
-          }
-        ],
-        "yes": 5,
-        "total": 11
-      },
-      "current_price": 1.3617899417877197
-    },
-    {
-      "pair": "NZDUSD",
-      "skip_reason": "forecast_prob_below_70_(59.2%)",
-      "direction": "BUY",
-      "best_level": {
-        "price": 0.5832290029525757,
-        "kind": "support",
-        "weight_pct": 3.6934760096651713,
-        "level_distance_pips": 42.1,
-        "avoidance_distance_pips": 27.0,
-        "approached_pct": 0.0,
-        "time_in_band_pct": 0.0,
-        "avoidance_score": 4.074,
-        "is_valid": true,
-        "trade_direction": "BUY",
-        "valid_extreme": true,
-        "valid_distance": true,
-        "valid_approached": false
-      },
-      "votes": {
-        "votes": [
-          {
-            "name": "vp_no_return_dir",
-            "yes": true
-          },
-          {
-            "name": "forecast_prob_70",
-            "yes": false
-          },
-          {
-            "name": "forecast_side_match",
-            "yes": false
-          },
-          {
-            "name": "macro_tilt",
-            "yes": false
-          },
-          {
-            "name": "cot_contrarian",
-            "yes": false
-          },
-          {
-            "name": "rsi_not_extreme",
-            "yes": true
-          },
-          {
-            "name": "ema20_vs_ema50",
-            "yes": false
-          },
-          {
-            "name": "atr_not_spiking",
-            "yes": true
-          },
-          {
-            "name": "no_news_blackout",
-            "yes": true
-          },
-          {
-            "name": "poc_distance_ok",
-            "yes": true
-          },
-          {
-            "name": "market_radar_aligned",
-            "yes": false,
-            "detail": "radar=+1.0 (NEUTRAL)"
-          }
-        ],
-        "yes": 5,
-        "total": 11
-      },
-      "current_price": 0.587440550327301
-    },
-    {
-      "pair": "EURGBP",
-      "skip_reason": "forecast_prob_below_70_(60.5%)",
-      "direction": "SELL",
-      "best_level": {
-        "price": 0.8664377909898758,
-        "kind": "resistance",
-        "weight_pct": 6.726612484869444,
-        "level_distance_pips": 27.4,
-        "avoidance_distance_pips": 16.4,
-        "approached_pct": 0.0,
-        "time_in_band_pct": 0.0,
-        "avoidance_score": 3.692,
-        "is_valid": true,
-        "trade_direction": "SELL",
-        "valid_extreme": true,
-        "valid_distance": true,
-        "valid_approached": false
-      },
-      "votes": {
-        "votes": [
-          {
-            "name": "vp_no_return_dir",
-            "yes": true
-          },
-          {
-            "name": "forecast_prob_70",
-            "yes": false
-          },
-          {
-            "name": "forecast_side_match",
-            "yes": true
           },
           {
             "name": "macro_tilt",
@@ -520,23 +268,293 @@
             "detail": "radar=-8.2 (NEUTRAL)"
           }
         ],
-        "yes": 7,
+        "yes": 5,
         "total": 11
       },
-      "current_price": 0.8636999726295471
+      "current_price": 0.7842000126838684
+    },
+    {
+      "pair": "AUDUSD",
+      "skip_reason": "no_valid_avoidance_level",
+      "all_levels_count": 10,
+      "current_price": 0.7147452235221863,
+      "atr_pips": 8.2,
+      "sample_levels": [
+        {
+          "price": 0.7203200471401214,
+          "kind": "resistance",
+          "weight_pct": 5.303030303030303,
+          "level_distance_pips": 55.7,
+          "avoidance_distance_pips": -25.9,
+          "approached_pct": 40.0,
+          "time_in_band_pct": 66.74,
+          "avoidance_score": -3.141,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": false,
+          "valid_distance": true,
+          "valid_approached": true
+        },
+        {
+          "price": 0.7200734770298005,
+          "kind": "resistance",
+          "weight_pct": 4.683195592286501,
+          "level_distance_pips": 53.3,
+          "avoidance_distance_pips": -28.4,
+          "approached_pct": 33.61,
+          "time_in_band_pct": 66.94,
+          "avoidance_score": -3.44,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": false,
+          "valid_distance": true,
+          "valid_approached": true
+        },
+        {
+          "price": 0.7193337666988373,
+          "kind": "resistance",
+          "weight_pct": 4.4421487603305785,
+          "level_distance_pips": 45.9,
+          "avoidance_distance_pips": -35.8,
+          "approached_pct": 32.43,
+          "time_in_band_pct": 78.06,
+          "avoidance_score": -4.337,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": false,
+          "valid_distance": true,
+          "valid_approached": true
+        }
+      ]
+    },
+    {
+      "pair": "USDCAD",
+      "skip_reason": "forecast_prob_below_70_(64.3%)",
+      "direction": "SELL",
+      "best_level": {
+        "price": 1.3685995161533357,
+        "kind": "resistance",
+        "weight_pct": 6.221914967162116,
+        "level_distance_pips": 67.7,
+        "avoidance_distance_pips": 56.2,
+        "approached_pct": 0.0,
+        "time_in_band_pct": 0.0,
+        "avoidance_score": 4.905,
+        "is_valid": true,
+        "trade_direction": "SELL",
+        "valid_extreme": true,
+        "valid_distance": true,
+        "valid_approached": false
+      },
+      "votes": {
+        "votes": [
+          {
+            "name": "vp_no_return_dir",
+            "yes": true
+          },
+          {
+            "name": "forecast_prob_70",
+            "yes": false
+          },
+          {
+            "name": "forecast_side_match",
+            "yes": false
+          },
+          {
+            "name": "macro_tilt",
+            "yes": false
+          },
+          {
+            "name": "cot_contrarian",
+            "yes": false
+          },
+          {
+            "name": "rsi_not_extreme",
+            "yes": true
+          },
+          {
+            "name": "ema20_vs_ema50",
+            "yes": false
+          },
+          {
+            "name": "atr_not_spiking",
+            "yes": true
+          },
+          {
+            "name": "no_news_blackout",
+            "yes": true
+          },
+          {
+            "name": "poc_distance_ok",
+            "yes": true
+          },
+          {
+            "name": "market_radar_aligned",
+            "yes": false,
+            "detail": "radar=+0.6 (NEUTRAL)"
+          }
+        ],
+        "yes": 5,
+        "total": 11
+      },
+      "current_price": 1.3618299961090088
+    },
+    {
+      "pair": "NZDUSD",
+      "skip_reason": "forecast_prob_below_70_(56.6%)",
+      "direction": "BUY",
+      "best_level": {
+        "price": 0.5832290029525757,
+        "kind": "support",
+        "weight_pct": 3.6845730027548207,
+        "level_distance_pips": 45.2,
+        "avoidance_distance_pips": 27.0,
+        "approached_pct": 0.0,
+        "time_in_band_pct": 0.0,
+        "avoidance_score": 3.927,
+        "is_valid": true,
+        "trade_direction": "BUY",
+        "valid_extreme": true,
+        "valid_distance": true,
+        "valid_approached": false
+      },
+      "votes": {
+        "votes": [
+          {
+            "name": "vp_no_return_dir",
+            "yes": true
+          },
+          {
+            "name": "forecast_prob_70",
+            "yes": false
+          },
+          {
+            "name": "forecast_side_match",
+            "yes": false
+          },
+          {
+            "name": "macro_tilt",
+            "yes": false
+          },
+          {
+            "name": "cot_contrarian",
+            "yes": false
+          },
+          {
+            "name": "rsi_not_extreme",
+            "yes": true
+          },
+          {
+            "name": "ema20_vs_ema50",
+            "yes": false
+          },
+          {
+            "name": "atr_not_spiking",
+            "yes": true
+          },
+          {
+            "name": "no_news_blackout",
+            "yes": true
+          },
+          {
+            "name": "poc_distance_ok",
+            "yes": true
+          },
+          {
+            "name": "market_radar_aligned",
+            "yes": false,
+            "detail": "radar=+0.9 (NEUTRAL)"
+          }
+        ],
+        "yes": 5,
+        "total": 11
+      },
+      "current_price": 0.5877512693405151
+    },
+    {
+      "pair": "EURGBP",
+      "skip_reason": "forecast_prob_below_70_(66.7%)",
+      "direction": "SELL",
+      "best_level": {
+        "price": 0.8664377909898758,
+        "kind": "resistance",
+        "weight_pct": 6.709210072438772,
+        "level_distance_pips": 29.8,
+        "avoidance_distance_pips": 16.4,
+        "approached_pct": 0.0,
+        "time_in_band_pct": 0.0,
+        "avoidance_score": 3.572,
+        "is_valid": true,
+        "trade_direction": "SELL",
+        "valid_extreme": true,
+        "valid_distance": true,
+        "valid_approached": false
+      },
+      "votes": {
+        "votes": [
+          {
+            "name": "vp_no_return_dir",
+            "yes": true
+          },
+          {
+            "name": "forecast_prob_70",
+            "yes": false
+          },
+          {
+            "name": "forecast_side_match",
+            "yes": true
+          },
+          {
+            "name": "macro_tilt",
+            "yes": false
+          },
+          {
+            "name": "cot_contrarian",
+            "yes": false
+          },
+          {
+            "name": "rsi_not_extreme",
+            "yes": true
+          },
+          {
+            "name": "ema20_vs_ema50",
+            "yes": false
+          },
+          {
+            "name": "atr_not_spiking",
+            "yes": true
+          },
+          {
+            "name": "no_news_blackout",
+            "yes": true
+          },
+          {
+            "name": "poc_distance_ok",
+            "yes": true
+          },
+          {
+            "name": "market_radar_aligned",
+            "yes": false,
+            "detail": "radar=-3.4 (NEUTRAL)"
+          }
+        ],
+        "yes": 6,
+        "total": 11
+      },
+      "current_price": 0.8634600043296814
     },
     {
       "pair": "EURJPY",
-      "skip_reason": "forecast_prob_below_70_(50.0%)",
+      "skip_reason": "forecast_prob_below_70_(61.8%)",
       "direction": "SELL",
       "best_level": {
         "price": 184.43290481567382,
         "kind": "resistance",
-        "weight_pct": 4.373379429559205,
-        "level_distance_pips": 65.7,
+        "weight_pct": 4.362068965517241,
+        "level_distance_pips": 68.6,
         "avoidance_distance_pips": 32.9,
-        "approached_pct": 67.43,
-        "time_in_band_pct": 67.43,
+        "approached_pct": 66.74,
+        "time_in_band_pct": 66.74,
         "avoidance_score": 1.494,
         "is_valid": true,
         "trade_direction": "SELL",
@@ -556,7 +574,7 @@
           },
           {
             "name": "forecast_side_match",
-            "yes": false
+            "yes": true
           },
           {
             "name": "macro_tilt",
@@ -589,101 +607,83 @@
           {
             "name": "market_radar_aligned",
             "yes": true,
-            "detail": "radar=-16.3 (SELL)"
+            "detail": "radar=-18.7 (SELL)"
           }
         ],
-        "yes": 5,
+        "yes": 6,
         "total": 11
       },
-      "current_price": 183.7760009765625
+      "current_price": 183.7469940185547
     },
     {
       "pair": "EURCHF",
-      "skip_reason": "forecast_prob_below_70_(54.0%)",
-      "direction": "SELL",
-      "best_level": {
-        "price": 0.9233043104410172,
-        "kind": "resistance",
-        "weight_pct": 5.291557876414274,
-        "level_distance_pips": 67.9,
-        "avoidance_distance_pips": 54.5,
-        "approached_pct": 0.0,
-        "time_in_band_pct": 0.0,
-        "avoidance_score": 6.353,
-        "is_valid": true,
-        "trade_direction": "SELL",
-        "valid_extreme": true,
-        "valid_distance": true,
-        "valid_approached": false
-      },
-      "votes": {
-        "votes": [
-          {
-            "name": "vp_no_return_dir",
-            "yes": false
-          },
-          {
-            "name": "forecast_prob_70",
-            "yes": false
-          },
-          {
-            "name": "forecast_side_match",
-            "yes": false
-          },
-          {
-            "name": "macro_tilt",
-            "yes": false
-          },
-          {
-            "name": "cot_contrarian",
-            "yes": false
-          },
-          {
-            "name": "rsi_not_extreme",
-            "yes": true
-          },
-          {
-            "name": "ema20_vs_ema50",
-            "yes": true
-          },
-          {
-            "name": "atr_not_spiking",
-            "yes": true
-          },
-          {
-            "name": "no_news_blackout",
-            "yes": true
-          },
-          {
-            "name": "poc_distance_ok",
-            "yes": false
-          },
-          {
-            "name": "market_radar_aligned",
-            "yes": false,
-            "detail": "radar=-0.5 (NEUTRAL)"
-          }
-        ],
-        "yes": 4,
-        "total": 11
-      },
-      "current_price": 0.9165099859237671
+      "skip_reason": "no_valid_avoidance_level",
+      "all_levels_count": 10,
+      "current_price": 0.9163600206375122,
+      "atr_pips": 8.6,
+      "sample_levels": [
+        {
+          "price": 0.9237127095460891,
+          "kind": "resistance",
+          "weight_pct": 6.649305555555555,
+          "level_distance_pips": 73.5,
+          "avoidance_distance_pips": 58.6,
+          "approached_pct": 0.0,
+          "time_in_band_pct": 0.0,
+          "avoidance_score": 6.828,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": true,
+          "valid_distance": false,
+          "valid_approached": false
+        },
+        {
+          "price": 0.9235085099935532,
+          "kind": "resistance",
+          "weight_pct": 7.552083333333333,
+          "level_distance_pips": 71.5,
+          "avoidance_distance_pips": 56.6,
+          "approached_pct": 0.0,
+          "time_in_band_pct": 0.0,
+          "avoidance_score": 6.591,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": true,
+          "valid_distance": false,
+          "valid_approached": false
+        },
+        {
+          "price": 0.9233043104410172,
+          "kind": "resistance",
+          "weight_pct": 5.277777777777778,
+          "level_distance_pips": 69.4,
+          "avoidance_distance_pips": 54.5,
+          "approached_pct": 0.0,
+          "time_in_band_pct": 0.0,
+          "avoidance_score": 6.353,
+          "is_valid": false,
+          "trade_direction": "SELL",
+          "valid_extreme": true,
+          "valid_distance": false,
+          "valid_approached": false
+        }
+      ]
     },
     {
       "pair": "EURAUD",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 1.6356600522994995,
+      "current_price": 1.635699987411499,
       "atr_pips": 20.4,
       "sample_levels": [
         {
           "price": 1.6291028237342835,
           "kind": "support",
-          "weight_pct": 5.411479944674966,
-          "level_distance_pips": 65.6,
+          "weight_pct": 5.397482324538713,
+          "level_distance_pips": 66.0,
           "avoidance_distance_pips": -17.2,
-          "approached_pct": 80.42,
-          "time_in_band_pct": 95.56,
+          "approached_pct": 79.44,
+          "time_in_band_pct": 94.51,
           "avoidance_score": -0.845,
           "is_valid": false,
           "trade_direction": "BUY",
@@ -694,11 +694,11 @@
         {
           "price": 1.6294500231742859,
           "kind": "support",
-          "weight_pct": 3.423236514522822,
-          "level_distance_pips": 62.1,
+          "weight_pct": 3.414381789963787,
+          "level_distance_pips": 62.5,
           "avoidance_distance_pips": -20.7,
-          "approached_pct": 73.89,
-          "time_in_band_pct": 96.94,
+          "approached_pct": 73.54,
+          "time_in_band_pct": 96.18,
           "avoidance_score": -1.015,
           "is_valid": false,
           "trade_direction": "BUY",
@@ -709,10 +709,10 @@
         {
           "price": 1.6297972226142883,
           "kind": "support",
-          "weight_pct": 3.8035961272475793,
-          "level_distance_pips": 58.6,
+          "weight_pct": 3.7937575444042073,
+          "level_distance_pips": 59.0,
           "avoidance_distance_pips": -24.2,
-          "approached_pct": 68.12,
+          "approached_pct": 69.1,
           "time_in_band_pct": 98.54,
           "avoidance_score": -1.186,
           "is_valid": false,
@@ -725,16 +725,16 @@
     },
     {
       "pair": "EURCAD",
-      "skip_reason": "forecast_prob_below_70_(63.0%)",
+      "skip_reason": "forecast_prob_below_70_(65.5%)",
       "direction": "SELL",
       "best_level": {
         "price": 1.5970489799976348,
         "kind": "resistance",
-        "weight_pct": 3.8029386343993083,
-        "level_distance_pips": 55.5,
+        "weight_pct": 3.793103448275862,
+        "level_distance_pips": 57.5,
         "avoidance_distance_pips": 16.6,
-        "approached_pct": 26.74,
-        "time_in_band_pct": 26.74,
+        "approached_pct": 25.69,
+        "time_in_band_pct": 25.69,
         "avoidance_score": 1.23,
         "is_valid": true,
         "trade_direction": "SELL",
@@ -787,27 +787,27 @@
           {
             "name": "market_radar_aligned",
             "yes": true,
-            "detail": "radar=-7.5 (NEUTRAL)"
+            "detail": "radar=-10.6 (SELL)"
           }
         ],
         "yes": 8,
         "total": 11
       },
-      "current_price": 1.5915000438690186
+      "current_price": 1.5913000106811523
     },
     {
       "pair": "EURNZD",
-      "skip_reason": "reversal_unlikely_1_of_5",
+      "skip_reason": "reversal_unlikely_0_of_5",
       "direction": "SELL",
       "best_level": {
         "price": 2.0018274128437046,
         "kind": "resistance",
-        "weight_pct": 3.5955056179775284,
-        "level_distance_pips": 122.3,
+        "weight_pct": 3.5862068965517238,
+        "level_distance_pips": 126.9,
         "avoidance_distance_pips": 76.2,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
-        "avoidance_score": 3.335,
+        "avoidance_score": 3.258,
         "is_valid": true,
         "trade_direction": "SELL",
         "valid_extreme": true,
@@ -859,7 +859,7 @@
           {
             "name": "market_radar_aligned",
             "yes": true,
-            "detail": "radar=-10.4 (SELL)"
+            "detail": "radar=-7.1 (NEUTRAL)"
           }
         ],
         "yes": 8,
@@ -869,17 +869,17 @@
         "signs": {
           "rsi_5m_extreme": {
             "yes": false,
-            "value": 38.1,
+            "value": 40.4,
             "threshold": 70
           },
           "short_term_momentum": {
-            "yes": true,
-            "recent_avg": 1.98971,
-            "prior_avg": 1.98996
+            "yes": false,
+            "recent_avg": 1.98884,
+            "prior_avg": 1.98868
           },
           "bb_extreme": {
             "yes": false,
-            "value": 0.241
+            "value": 0.247
           },
           "last_bar_thrust": {
             "yes": false,
@@ -889,30 +889,30 @@
           "near_micro_level": {
             "yes": false,
             "level": 1.99365,
-            "dist_atr": 2.08
+            "dist_atr": 2.26
           }
         },
-        "yes_count": 1,
+        "yes_count": 0,
         "min_required": 3
       },
-      "current_price": 1.9895999431610107
+      "current_price": 1.9891400337219238
     },
     {
       "pair": "GBPJPY",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 212.76199340820312,
+      "current_price": 212.781005859375,
       "atr_pips": 25.2,
       "sample_levels": [
         {
           "price": 216.1612547302246,
           "kind": "resistance",
-          "weight_pct": 7.550103662750518,
-          "level_distance_pips": 339.9,
-          "avoidance_distance_pips": 300.4,
+          "weight_pct": 7.530587627089437,
+          "level_distance_pips": 338.0,
+          "avoidance_distance_pips": 302.9,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
-          "avoidance_score": 11.901,
+          "avoidance_score": 12.0,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": true,
@@ -922,12 +922,12 @@
         {
           "price": 216.03761489868162,
           "kind": "resistance",
-          "weight_pct": 8.897719419488597,
-          "level_distance_pips": 327.6,
-          "avoidance_distance_pips": 288.1,
+          "weight_pct": 8.874719972428055,
+          "level_distance_pips": 325.7,
+          "avoidance_distance_pips": 290.6,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
-          "avoidance_score": 11.412,
+          "avoidance_score": 11.511,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": true,
@@ -937,12 +937,12 @@
         {
           "price": 215.7903352355957,
           "kind": "resistance",
-          "weight_pct": 5.545957152729786,
-          "level_distance_pips": 302.8,
-          "avoidance_distance_pips": 263.3,
+          "weight_pct": 5.53162157504739,
+          "level_distance_pips": 300.9,
+          "avoidance_distance_pips": 265.8,
           "approached_pct": 0.0,
           "time_in_band_pct": 0.0,
-          "avoidance_score": 10.432,
+          "avoidance_score": 10.531,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": true,
@@ -958,8 +958,8 @@
       "best_level": {
         "price": 1.0663117933273316,
         "kind": "resistance",
-        "weight_pct": 4.738025246411897,
-        "level_distance_pips": 51.9,
+        "weight_pct": 4.725767506036564,
+        "level_distance_pips": 51.0,
         "avoidance_distance_pips": 39.1,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
@@ -1015,30 +1015,30 @@
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=+8.1 (NEUTRAL)"
+            "detail": "radar=+7.9 (NEUTRAL)"
           }
         ],
         "yes": 5,
         "total": 11
       },
-      "current_price": 1.0611200332641602
+      "current_price": 1.061210036277771
     },
     {
       "pair": "GBPAUD",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 1.893779993057251,
-      "atr_pips": 23.0,
+      "current_price": 1.8942899703979492,
+      "atr_pips": 23.3,
       "sample_levels": [
         {
           "price": 1.8858883309364318,
           "kind": "support",
-          "weight_pct": 3.5794570292235863,
-          "level_distance_pips": 78.9,
+          "weight_pct": 3.5701966195239736,
+          "level_distance_pips": 84.0,
           "avoidance_distance_pips": -24.5,
-          "approached_pct": 81.81,
-          "time_in_band_pct": 95.49,
-          "avoidance_score": -1.065,
+          "approached_pct": 81.25,
+          "time_in_band_pct": 94.93,
+          "avoidance_score": -1.052,
           "is_valid": false,
           "trade_direction": "BUY",
           "valid_extreme": false,
@@ -1048,12 +1048,12 @@
         {
           "price": 1.8861785292625428,
           "kind": "support",
-          "weight_pct": 4.115510980459969,
-          "level_distance_pips": 76.0,
+          "weight_pct": 4.104863746119351,
+          "level_distance_pips": 81.1,
           "avoidance_distance_pips": -27.4,
-          "approached_pct": 75.97,
-          "time_in_band_pct": 96.81,
-          "avoidance_score": -1.191,
+          "approached_pct": 75.14,
+          "time_in_band_pct": 95.97,
+          "avoidance_score": -1.177,
           "is_valid": false,
           "trade_direction": "BUY",
           "valid_extreme": false,
@@ -1063,12 +1063,12 @@
         {
           "price": 1.8864687275886536,
           "kind": "support",
-          "weight_pct": 4.219263358118623,
-          "level_distance_pips": 73.1,
+          "weight_pct": 4.208347706105553,
+          "level_distance_pips": 78.2,
           "avoidance_distance_pips": -30.3,
-          "approached_pct": 71.04,
-          "time_in_band_pct": 97.92,
-          "avoidance_score": -1.317,
+          "approached_pct": 70.28,
+          "time_in_band_pct": 97.15,
+          "avoidance_score": -1.301,
           "is_valid": false,
           "trade_direction": "BUY",
           "valid_extreme": false,
@@ -1079,70 +1079,88 @@
     },
     {
       "pair": "GBPCAD",
-      "skip_reason": "no_valid_avoidance_level",
-      "all_levels_count": 10,
-      "current_price": 1.84266996383667,
-      "atr_pips": 14.7,
-      "sample_levels": [
-        {
-          "price": 1.8477219700813294,
-          "kind": "resistance",
-          "weight_pct": 4.0283540802213,
-          "level_distance_pips": 50.5,
-          "avoidance_distance_pips": 8.3,
-          "approached_pct": 29.58,
-          "time_in_band_pct": 29.58,
-          "avoidance_score": 0.566,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 1.84745796918869,
-          "kind": "resistance",
-          "weight_pct": 4.097510373443983,
-          "level_distance_pips": 47.9,
-          "avoidance_distance_pips": 5.7,
-          "approached_pct": 33.47,
-          "time_in_band_pct": 33.47,
-          "avoidance_score": 0.386,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        },
-        {
-          "price": 1.8471939682960512,
-          "kind": "resistance",
-          "weight_pct": 4.512448132780083,
-          "level_distance_pips": 45.2,
-          "avoidance_distance_pips": 3.0,
-          "approached_pct": 43.26,
-          "time_in_band_pct": 43.26,
-          "avoidance_score": 0.207,
-          "is_valid": false,
-          "trade_direction": "SELL",
-          "valid_extreme": false,
-          "valid_distance": true,
-          "valid_approached": true
-        }
-      ]
+      "skip_reason": "forecast_prob_below_70_(57.9%)",
+      "direction": "SELL",
+      "best_level": {
+        "price": 1.8477219700813294,
+        "kind": "resistance",
+        "weight_pct": 4.017934126573547,
+        "level_distance_pips": 50.2,
+        "avoidance_distance_pips": 11.1,
+        "approached_pct": 28.54,
+        "time_in_band_pct": 28.54,
+        "avoidance_score": 0.756,
+        "is_valid": true,
+        "trade_direction": "SELL",
+        "valid_extreme": true,
+        "valid_distance": true,
+        "valid_approached": true
+      },
+      "votes": {
+        "votes": [
+          {
+            "name": "vp_no_return_dir",
+            "yes": false
+          },
+          {
+            "name": "forecast_prob_70",
+            "yes": false
+          },
+          {
+            "name": "forecast_side_match",
+            "yes": true
+          },
+          {
+            "name": "macro_tilt",
+            "yes": false
+          },
+          {
+            "name": "cot_contrarian",
+            "yes": false
+          },
+          {
+            "name": "rsi_not_extreme",
+            "yes": true
+          },
+          {
+            "name": "ema20_vs_ema50",
+            "yes": true
+          },
+          {
+            "name": "atr_not_spiking",
+            "yes": true
+          },
+          {
+            "name": "no_news_blackout",
+            "yes": true
+          },
+          {
+            "name": "poc_distance_ok",
+            "yes": true
+          },
+          {
+            "name": "market_radar_aligned",
+            "yes": false,
+            "detail": "radar=+0.7 (NEUTRAL)"
+          }
+        ],
+        "yes": 6,
+        "total": 11
+      },
+      "current_price": 1.8427000045776367
     },
     {
       "pair": "GBPNZD",
-      "skip_reason": "forecast_prob_below_70_(51.3%)",
+      "skip_reason": "forecast_prob_below_70_(57.9%)",
       "direction": "SELL",
       "best_level": {
         "price": 2.309329700469971,
         "kind": "resistance",
-        "weight_pct": 4.185402974749222,
-        "level_distance_pips": 56.9,
+        "weight_pct": 4.174573055028463,
+        "level_distance_pips": 59.4,
         "avoidance_distance_pips": 19.1,
-        "approached_pct": 67.78,
-        "time_in_band_pct": 67.78,
+        "approached_pct": 68.82,
+        "time_in_band_pct": 68.82,
         "avoidance_score": 0.735,
         "is_valid": true,
         "trade_direction": "SELL",
@@ -1162,7 +1180,7 @@
           },
           {
             "name": "forecast_side_match",
-            "yes": false
+            "yes": true
           },
           {
             "name": "macro_tilt",
@@ -1195,26 +1213,26 @@
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=+5.4 (NEUTRAL)"
+            "detail": "radar=-3.2 (NEUTRAL)"
           }
         ],
-        "yes": 4,
+        "yes": 5,
         "total": 11
       },
-      "current_price": 2.3036398887634277
+      "current_price": 2.3033900260925293
     },
     {
       "pair": "AUDJPY",
-      "skip_reason": "reversal_unlikely_1_of_5",
+      "skip_reason": "only_7_of_11_votes",
       "direction": "SELL",
       "best_level": {
         "price": 113.17404823303224,
         "kind": "resistance",
-        "weight_pct": 7.210790247276499,
-        "level_distance_pips": 83.9,
+        "weight_pct": 7.192135219041049,
+        "level_distance_pips": 86.0,
         "avoidance_distance_pips": 15.1,
-        "approached_pct": 79.51,
-        "time_in_band_pct": 79.51,
+        "approached_pct": 78.47,
+        "time_in_band_pct": 78.47,
         "avoidance_score": 0.753,
         "is_valid": true,
         "trade_direction": "SELL",
@@ -1266,44 +1284,14 @@
           },
           {
             "name": "market_radar_aligned",
-            "yes": true,
-            "detail": "radar=-5.9 (NEUTRAL)"
+            "yes": false,
+            "detail": "radar=-3.3 (NEUTRAL)"
           }
         ],
-        "yes": 8,
+        "yes": 7,
         "total": 11
       },
-      "reversal_filter": {
-        "signs": {
-          "rsi_5m_extreme": {
-            "yes": false,
-            "value": 51.5,
-            "threshold": 70
-          },
-          "short_term_momentum": {
-            "yes": true,
-            "recent_avg": 112.335,
-            "prior_avg": 112.34725
-          },
-          "bb_extreme": {
-            "yes": false,
-            "value": 0.52
-          },
-          "last_bar_thrust": {
-            "yes": false,
-            "dir": 0.0,
-            "range_vs_median": 0.0
-          },
-          "near_micro_level": {
-            "yes": false,
-            "level": 112.766,
-            "dist_atr": 3.59
-          }
-        },
-        "yes_count": 1,
-        "min_required": 3
-      },
-      "current_price": 112.33499908447266
+      "current_price": 112.31400299072266
     },
     {
       "pair": "CADJPY",
@@ -1312,8 +1300,8 @@
       "best_level": {
         "price": 115.72940078735351,
         "kind": "resistance",
-        "weight_pct": 3.699843668577384,
-        "level_distance_pips": 26.7,
+        "weight_pct": 3.6902286902286905,
+        "level_distance_pips": 28.1,
         "avoidance_distance_pips": 13.4,
         "approached_pct": 97.43,
         "time_in_band_pct": 97.43,
@@ -1369,27 +1357,27 @@
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=-5.0 (NEUTRAL)"
+            "detail": "radar=+0.1 (NEUTRAL)"
           }
         ],
         "yes": 4,
         "total": 11
       },
-      "current_price": 115.46199798583984
+      "current_price": 115.447998046875
     },
     {
       "pair": "CHFJPY",
-      "skip_reason": "forecast_prob_below_70_(64.3%)",
+      "skip_reason": "forecast_prob_below_70_(57.9%)",
       "direction": "SELL",
       "best_level": {
         "price": 202.25829559326172,
         "kind": "resistance",
-        "weight_pct": 8.23674042852125,
-        "level_distance_pips": 177.3,
-        "avoidance_distance_pips": 130.9,
+        "weight_pct": 8.215098966544053,
+        "level_distance_pips": 175.1,
+        "avoidance_distance_pips": 133.5,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
-        "avoidance_score": 5.143,
+        "avoidance_score": 5.245,
         "is_valid": true,
         "trade_direction": "SELL",
         "valid_extreme": true,
@@ -1441,13 +1429,13 @@
           {
             "name": "market_radar_aligned",
             "yes": true,
-            "detail": "radar=-11.8 (SELL)"
+            "detail": "radar=-9.1 (NEUTRAL)"
           }
         ],
         "yes": 7,
         "total": 11
       },
-      "current_price": 200.48500061035156
+      "current_price": 200.5070037841797
     },
     {
       "pair": "NZDJPY",
@@ -1456,12 +1444,12 @@
       "best_level": {
         "price": 93.60575218200682,
         "kind": "resistance",
-        "weight_pct": 8.193022044783891,
-        "level_distance_pips": 125.2,
-        "avoidance_distance_pips": 83.2,
+        "weight_pct": 8.171745152354571,
+        "level_distance_pips": 124.8,
+        "avoidance_distance_pips": 88.0,
         "approached_pct": 0.0,
         "time_in_band_pct": 0.0,
-        "avoidance_score": 5.231,
+        "avoidance_score": 5.494,
         "is_valid": true,
         "trade_direction": "SELL",
         "valid_extreme": true,
@@ -1513,29 +1501,29 @@
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=-3.9 (NEUTRAL)"
+            "detail": "radar=-2.9 (NEUTRAL)"
           }
         ],
         "yes": 5,
         "total": 11
       },
-      "current_price": 92.35399627685547
+      "current_price": 92.35800170898438
     },
     {
       "pair": "AUDCAD",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 0.9729300141334534,
+      "current_price": 0.9727399945259094,
       "atr_pips": 19.9,
       "sample_levels": [
         {
           "price": 0.9792080074548721,
           "kind": "resistance",
-          "weight_pct": 4.275575558248225,
-          "level_distance_pips": 62.8,
+          "weight_pct": 4.264502762430939,
+          "level_distance_pips": 64.7,
           "avoidance_distance_pips": -0.4,
-          "approached_pct": 95.69,
-          "time_in_band_pct": 95.69,
+          "approached_pct": 94.65,
+          "time_in_band_pct": 94.65,
           "avoidance_score": -0.021,
           "is_valid": false,
           "trade_direction": "SELL",
@@ -1546,11 +1534,11 @@
         {
           "price": 0.978969606757164,
           "kind": "resistance",
-          "weight_pct": 3.5831746581270556,
-          "level_distance_pips": 60.4,
+          "weight_pct": 3.5738950276243098,
+          "level_distance_pips": 62.3,
           "avoidance_distance_pips": -2.8,
-          "approached_pct": 94.72,
-          "time_in_band_pct": 96.94,
+          "approached_pct": 93.68,
+          "time_in_band_pct": 95.9,
           "avoidance_score": -0.141,
           "is_valid": false,
           "trade_direction": "SELL",
@@ -1561,10 +1549,10 @@
         {
           "price": 0.9780160039663315,
           "kind": "resistance",
-          "weight_pct": 3.998615198199758,
-          "level_distance_pips": 50.9,
+          "weight_pct": 3.988259668508287,
+          "level_distance_pips": 52.8,
           "avoidance_distance_pips": -12.3,
-          "approached_pct": 78.61,
+          "approached_pct": 79.65,
           "time_in_band_pct": 100.0,
           "avoidance_score": -0.621,
           "is_valid": false,
@@ -1579,14 +1567,14 @@
       "pair": "AUDCHF",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 0.5602899789810181,
+      "current_price": 0.5601500272750854,
       "atr_pips": 13.2,
       "sample_levels": [
         {
           "price": 0.5630922073125839,
           "kind": "resistance",
-          "weight_pct": 5.033731188375714,
-          "level_distance_pips": 28.0,
+          "weight_pct": 5.020703933747412,
+          "level_distance_pips": 29.4,
           "avoidance_distance_pips": -5.4,
           "approached_pct": 92.64,
           "time_in_band_pct": 100.0,
@@ -1600,8 +1588,8 @@
         {
           "price": 0.5629278069734573,
           "kind": "resistance",
-          "weight_pct": 6.3310845874416195,
-          "level_distance_pips": 26.4,
+          "weight_pct": 6.3146997929606625,
+          "level_distance_pips": 27.8,
           "avoidance_distance_pips": -7.0,
           "approached_pct": 85.21,
           "time_in_band_pct": 100.0,
@@ -1615,8 +1603,8 @@
         {
           "price": 0.5627634066343308,
           "kind": "resistance",
-          "weight_pct": 6.123508043591074,
-          "level_distance_pips": 24.7,
+          "weight_pct": 6.107660455486543,
+          "level_distance_pips": 26.1,
           "avoidance_distance_pips": -8.7,
           "approached_pct": 79.93,
           "time_in_band_pct": 100.0,
@@ -1633,17 +1621,17 @@
       "pair": "AUDNZD",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 1.2163499593734741,
-      "atr_pips": 17.6,
+      "current_price": 1.2159700393676758,
+      "atr_pips": 18.1,
       "sample_levels": [
         {
-          "price": 1.2215407943725585,
+          "price": 1.2215292787551881,
           "kind": "resistance",
-          "weight_pct": 5.020775623268698,
-          "level_distance_pips": 51.9,
-          "avoidance_distance_pips": -4.3,
-          "approached_pct": 99.31,
-          "time_in_band_pct": 99.65,
+          "weight_pct": 5.1631842514246244,
+          "level_distance_pips": 55.6,
+          "avoidance_distance_pips": -4.4,
+          "approached_pct": 98.47,
+          "time_in_band_pct": 99.03,
           "avoidance_score": -0.244,
           "is_valid": false,
           "trade_direction": "SELL",
@@ -1652,14 +1640,14 @@
           "valid_approached": true
         },
         {
-          "price": 1.2210583972930908,
+          "price": 1.2210438776016237,
           "kind": "resistance",
-          "weight_pct": 4.276315789473684,
-          "level_distance_pips": 47.1,
-          "avoidance_distance_pips": -9.1,
-          "approached_pct": 97.85,
-          "time_in_band_pct": 99.93,
-          "avoidance_score": -0.517,
+          "weight_pct": 4.317043688482127,
+          "level_distance_pips": 50.7,
+          "avoidance_distance_pips": -9.3,
+          "approached_pct": 97.64,
+          "time_in_band_pct": 99.86,
+          "avoidance_score": -0.512,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1667,14 +1655,14 @@
           "valid_approached": true
         },
         {
-          "price": 1.2208975982666015,
+          "price": 1.220882077217102,
           "kind": "resistance",
-          "weight_pct": 4.795706371191136,
-          "level_distance_pips": 45.5,
-          "avoidance_distance_pips": -10.7,
-          "approached_pct": 95.21,
+          "weight_pct": 5.042307028147125,
+          "level_distance_pips": 49.1,
+          "avoidance_distance_pips": -10.9,
+          "approached_pct": 95.0,
           "time_in_band_pct": 99.93,
-          "avoidance_score": -0.609,
+          "avoidance_score": -0.602,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1685,16 +1673,16 @@
     },
     {
       "pair": "CADCHF",
-      "skip_reason": "only_5_of_11_votes",
+      "skip_reason": "forecast_prob_below_70_(69.0%)",
       "direction": "SELL",
       "best_level": {
         "price": 0.5783631902933121,
         "kind": "resistance",
-        "weight_pct": 3.2525951557093427,
-        "level_distance_pips": 25.0,
+        "weight_pct": 3.244176013805004,
+        "level_distance_pips": 25.9,
         "avoidance_distance_pips": 20.0,
-        "approached_pct": 84.1,
-        "time_in_band_pct": 84.1,
+        "approached_pct": 85.14,
+        "time_in_band_pct": 85.14,
         "avoidance_score": 1.863,
         "is_valid": true,
         "trade_direction": "SELL",
@@ -1710,7 +1698,7 @@
           },
           {
             "name": "forecast_prob_70",
-            "yes": true
+            "yes": false
           },
           {
             "name": "forecast_side_match",
@@ -1730,7 +1718,7 @@
           },
           {
             "name": "ema20_vs_ema50",
-            "yes": false
+            "yes": true
           },
           {
             "name": "atr_not_spiking",
@@ -1742,35 +1730,35 @@
           },
           {
             "name": "poc_distance_ok",
-            "yes": true
+            "yes": false
           },
           {
             "name": "market_radar_aligned",
             "yes": false,
-            "detail": "radar=+17.8 (BUY)"
+            "detail": "radar=+8.5 (NEUTRAL)"
           }
         ],
-        "yes": 5,
+        "yes": 4,
         "total": 11
       },
-      "current_price": 0.5758600234985352
+      "current_price": 0.5757700204849243
     },
     {
       "pair": "NZDCAD",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 0.7997900247573853,
-      "atr_pips": 12.1,
+      "current_price": 0.7998899817466736,
+      "atr_pips": 12.2,
       "sample_levels": [
         {
           "price": 0.7974638086557388,
           "kind": "support",
-          "weight_pct": 2.977323870521032,
-          "level_distance_pips": 23.3,
+          "weight_pct": 2.9696132596685083,
+          "level_distance_pips": 24.3,
           "avoidance_distance_pips": -6.8,
-          "approached_pct": 71.39,
-          "time_in_band_pct": 71.39,
-          "avoidance_score": -0.567,
+          "approached_pct": 72.92,
+          "time_in_band_pct": 72.92,
+          "avoidance_score": -0.562,
           "is_valid": false,
           "trade_direction": "BUY",
           "valid_extreme": false,
@@ -1780,12 +1768,12 @@
         {
           "price": 0.802533809542656,
           "kind": "resistance",
-          "weight_pct": 3.5831746581270556,
-          "level_distance_pips": 27.4,
-          "avoidance_distance_pips": -9.4,
-          "approached_pct": 75.76,
-          "time_in_band_pct": 82.5,
-          "avoidance_score": -0.776,
+          "weight_pct": 3.5738950276243098,
+          "level_distance_pips": 26.4,
+          "avoidance_distance_pips": -8.1,
+          "approached_pct": 78.06,
+          "time_in_band_pct": 83.75,
+          "avoidance_score": -0.663,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1795,12 +1783,12 @@
         {
           "price": 0.8023310095071792,
           "kind": "resistance",
-          "weight_pct": 4.63908603081184,
-          "level_distance_pips": 25.4,
-          "avoidance_distance_pips": -11.4,
-          "approached_pct": 78.54,
-          "time_in_band_pct": 90.35,
-          "avoidance_score": -0.945,
+          "weight_pct": 4.62707182320442,
+          "level_distance_pips": 24.4,
+          "avoidance_distance_pips": -10.1,
+          "approached_pct": 80.35,
+          "time_in_band_pct": 91.11,
+          "avoidance_score": -0.83,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1813,18 +1801,18 @@
       "pair": "NZDCHF",
       "skip_reason": "no_valid_avoidance_level",
       "all_levels_count": 10,
-      "current_price": 0.4605900049209595,
-      "atr_pips": 9.9,
+      "current_price": 0.46062999963760376,
+      "atr_pips": 10.1,
       "sample_levels": [
         {
           "price": 0.46170849263668057,
           "kind": "resistance",
-          "weight_pct": 3.943954333160353,
-          "level_distance_pips": 11.2,
+          "weight_pct": 3.9337474120082816,
+          "level_distance_pips": 10.8,
           "avoidance_distance_pips": -4.1,
           "approached_pct": 92.43,
           "time_in_band_pct": 100.0,
-          "avoidance_score": -0.414,
+          "avoidance_score": -0.407,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1834,12 +1822,12 @@
         {
           "price": 0.4615514928102493,
           "kind": "resistance",
-          "weight_pct": 7.040304445597648,
-          "level_distance_pips": 9.6,
+          "weight_pct": 7.02208419599724,
+          "level_distance_pips": 9.2,
           "avoidance_distance_pips": -5.7,
-          "approached_pct": 88.96,
+          "approached_pct": 89.03,
           "time_in_band_pct": 100.0,
-          "avoidance_score": -0.572,
+          "avoidance_score": -0.562,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
@@ -1849,16 +1837,16 @@
         {
           "price": 0.46139449298381807,
           "kind": "resistance",
-          "weight_pct": 10.86317246151185,
-          "level_distance_pips": 8.0,
+          "weight_pct": 10.835058661145618,
+          "level_distance_pips": 7.6,
           "avoidance_distance_pips": -7.3,
-          "approached_pct": 80.49,
+          "approached_pct": 81.39,
           "time_in_band_pct": 100.0,
-          "avoidance_score": -0.73,
+          "avoidance_score": -0.718,
           "is_valid": false,
           "trade_direction": "SELL",
           "valid_extreme": false,
-          "valid_distance": true,
+          "valid_distance": false,
           "valid_approached": true
         }
       ]
