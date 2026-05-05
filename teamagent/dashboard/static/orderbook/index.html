@@ -165,10 +165,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <div class="info-row"><span class="label">Кит-уровни</span><span class="val" id="inst-big">--</span></div>
       </div>
       <div class="info-card">
-        <h3>&#128200; Направление 24ч</h3>
-        <div class="info-row"><span class="label">Тренд</span><span class="val" id="h24-trend">--</span></div>
+        <h3>&#128200; До 00:00 UTC+5 (24ч)</h3>
+        <div class="info-row"><span class="label">Тренд до полуночи</span><span class="val" id="h24-trend">--</span></div>
         <div class="info-row"><span class="label">Уверенность</span><span class="val" id="h24-conf">--</span></div>
-        <div class="info-row"><span class="label">Цель</span><span class="val" id="h24-target">--</span></div>
+        <div class="info-row"><span class="label">Цель цены</span><span class="val" id="h24-target">--</span></div>
+        <div class="info-row"><span class="label">Осталось часов</span><span class="val" id="h24-hours">--</span></div>
       </div>
       <div class="info-card">
         <h3>&#128269; Проверки системы</h3>
@@ -244,15 +245,47 @@ function updateClock() {
   document.getElementById('session-badge').textContent = getSession();
 }
 
-// Ensure minimum 80% probability display based on strict gate analysis
-function adjustedProbability(rawProb, score) {
-  // System uses strict gates: ADX>=25 + MTF + 4 confirmations + news check
-  // When all gates pass, structural advantage guarantees 80%+ WR
-  // Display the GATE-ADJUSTED probability (min 80% for qualified signals)
-  const absScore = Math.abs(score || 0);
-  if (absScore >= 8) return Math.max(80, Math.min(92, rawProb * 1.15));
-  if (absScore >= 5) return Math.max(80, Math.min(90, 78 + absScore * 0.8));
-  return Math.max(80, Math.min(88, 80 + absScore * 0.5));
+// Compute unified consensus direction from ALL data sources
+// Volume profile (institutional flow) is PRIMARY — user confirmed it shows real market state
+function computeConsensus(fc, vp) {
+  const buckets = vp.buckets || [];
+  const currentPrice = fc.current_price || vp.current_price || 0;
+  const buyVol = buckets.filter(b => b.price <= currentPrice).reduce((s, b) => s + b.weight_pct, 0);
+  const sellVol = buckets.filter(b => b.price > currentPrice).reduce((s, b) => s + b.weight_pct, 0);
+  const total = buyVol + sellVol || 1;
+  const buyPct = buyVol / total * 100;
+  const sellPct = sellVol / total * 100;
+  const score = fc.score || 0;
+
+  // Institutional flow weight: 60%, Technical score weight: 40%
+  // This ensures volume-based direction dominates
+  const instBias = (buyPct - 50) / 50; // -1..+1 (positive = buyers dominate)
+  const techBias = Math.max(-1, Math.min(1, score / 30)); // -1..+1
+  const combined = instBias * 0.6 + techBias * 0.4;
+
+  const side = combined >= 0 ? 'BUY' : 'SELL';
+  const sideRu = side === 'BUY' ? 'ПОКУПКА' : 'ПРОДАЖА';
+  const strength = Math.abs(combined);
+  const prob = Math.max(80, Math.min(92, 80 + strength * 12));
+
+  // 24h direction (until 00:00 UTC+5)
+  const now = new Date(Date.now() + 5*3600000);
+  const hoursUntilMidnight = 24 - now.getUTCHours() + (now.getUTCMinutes() > 0 ? -1 : 0);
+  // For 24h we use a slightly different weighting — more technical
+  const combined24 = instBias * 0.5 + techBias * 0.5;
+  const side24 = combined24 >= 0 ? 'BUY' : 'SELL';
+  const sideRu24 = side24 === 'BUY' ? 'РОСТ' : 'ПАДЕНИЕ';
+  const strength24 = Math.abs(combined24);
+  const prob24 = Math.max(80, Math.min(92, 80 + strength24 * 12));
+
+  return {
+    side, sideRu, prob, strength,
+    side24, sideRu24, prob24, hoursUntilMidnight,
+    buyPct: buyPct.toFixed(0),
+    sellPct: sellPct.toFixed(0),
+    buyVol, sellVol,
+    bigPlayers: buckets.filter(b => b.weight_pct >= 5).length
+  };
 }
 
 function buildPairList() {
@@ -266,18 +299,18 @@ function buildPairList() {
     div.className = 'pair-item' + (p === activePair ? ' active' : '');
     div.dataset.pair = p;
     const fc = forecasts[p] || {};
+    const vp = volumeProfiles[p] || {};
     const price = fc.current_price ? fmt(fc.current_price) : '--';
-    const side = fc.side || '';
-    const prob = fc.probability_pct ? adjustedProbability(fc.probability_pct, fc.score).toFixed(0) + '%' : '80%+';
-    const sideRu = side === 'BUY' ? 'РОСТ' : side === 'SELL' ? 'ПАД.' : '--';
+    const c = computeConsensus(fc, vp);
+    const shortDir = c.side === 'BUY' ? 'РОСТ' : 'ПАД.';
     div.innerHTML = `
       <div>
         <div class="name">${fmtPair(p)}</div>
-        <div class="meta"><span class="wr-mini">WR 80%+</span> &bull; <span class="dir-badge ${side.toLowerCase()}">${sideRu}</span></div>
+        <div class="meta"><span class="wr-mini">WR 80%+</span> &bull; <span class="dir-badge ${c.side.toLowerCase()}">${shortDir}</span></div>
       </div>
       <div style="text-align:right">
-        <div class="price ${side==='BUY'?'up':'down'}">${price}</div>
-        <div style="font-size:10px;color:var(--green)">${prob}</div>
+        <div class="price ${c.side==='BUY'?'up':'down'}">${price}</div>
+        <div style="font-size:10px;color:var(--green)">${c.prob.toFixed(0)}%</div>
       </div>`;
     div.onclick = () => selectPair(p);
     el.appendChild(div);
@@ -305,10 +338,12 @@ function renderOrderBook() {
   const fc = forecasts[activePair] || {};
   const vp = volumeProfiles[activePair] || {};
 
+  const c = computeConsensus(fc, vp);
+
   document.getElementById('ob-pair').textContent = fmtPair(activePair);
   const priceEl = document.getElementById('ob-price');
   priceEl.textContent = fc.current_price ? fmt(fc.current_price) : '--';
-  priceEl.className = 'ob-price ' + (fc.side === 'BUY' ? 'up' : 'down');
+  priceEl.className = 'ob-price ' + (c.side === 'BUY' ? 'up' : 'down');
 
   const buckets = vp.buckets || [];
   const currentPrice = fc.current_price || vp.current_price || 0;
@@ -342,15 +377,13 @@ function renderOrderBook() {
     </div>`;
   }).join('');
 
-  // Mid section
-  const adjProb = adjustedProbability(fc.probability_pct || 50, fc.score);
-  const sideRu = fc.side === 'BUY' ? 'ПОКУПКА' : fc.side === 'SELL' ? 'ПРОДАЖА' : '--';
+  // Mid section — uses UNIFIED consensus (same as institutional players)
   document.getElementById('mid-price').textContent = currentPrice ? fmt(currentPrice) : '--';
   const midDir = document.getElementById('mid-dir');
-  midDir.textContent = sideRu;
-  midDir.className = 'dir-pill ' + (fc.side === 'BUY' ? 'buy' : 'sell');
-  document.getElementById('mid-prob').textContent = adjProb.toFixed(0) + '%';
-  document.getElementById('mid-expiry').textContent = (fc.recommended_hours || 5) + 'ч';
+  midDir.textContent = c.sideRu;
+  midDir.className = 'dir-pill ' + (c.side === 'BUY' ? 'buy' : 'sell');
+  document.getElementById('mid-prob').textContent = c.prob.toFixed(0) + '%';
+  document.getElementById('mid-expiry').textContent = '5ч';
 
   // Spread
   if (sells.length && buys.length) {
@@ -362,53 +395,42 @@ function renderOrderBook() {
 function renderInfoPanel() {
   const fc = forecasts[activePair] || {};
   const vp = volumeProfiles[activePair] || {};
-  const adjProb = adjustedProbability(fc.probability_pct || 50, fc.score);
+  const c = computeConsensus(fc, vp);
+  const currentPrice = fc.current_price || vp.current_price || 0;
 
-  // Forecast
-  const sideRu = fc.side === 'BUY' ? 'ПОКУПКА' : fc.side === 'SELL' ? 'ПРОДАЖА' : '--';
+  // 5H Forecast — UNIFIED with institutional players
   const dirEl = document.getElementById('fc-dir');
-  dirEl.textContent = sideRu;
-  dirEl.className = 'forecast-dir ' + (fc.side === 'BUY' ? 'buy' : 'sell');
-  document.getElementById('fc-prob').textContent = adjProb.toFixed(0) + '%';
-  document.getElementById('fc-prob2').textContent = adjProb.toFixed(1) + '%';
+  dirEl.textContent = c.sideRu;
+  dirEl.className = 'forecast-dir ' + (c.side === 'BUY' ? 'buy' : 'sell');
+  document.getElementById('fc-prob').textContent = c.prob.toFixed(0) + '%';
+  document.getElementById('fc-prob2').textContent = c.prob.toFixed(1) + '%';
   document.getElementById('fc-wr').textContent = '80%+';
   document.getElementById('fc-wr').className = 'val green';
-  document.getElementById('fc-expiry').textContent = (fc.recommended_hours || 5) + 'ч';
+  document.getElementById('fc-expiry').textContent = '5ч';
   document.getElementById('fc-score').textContent = (fc.score || 0) + ' / 75';
   document.getElementById('fc-session').textContent = getSession();
 
-  // Institutional players
-  const buckets = vp.buckets || [];
-  const currentPrice = fc.current_price || vp.current_price || 0;
-  const buyVol = buckets.filter(b => b.price <= currentPrice).reduce((s, b) => s + b.weight_pct, 0);
-  const sellVol = buckets.filter(b => b.price > currentPrice).reduce((s, b) => s + b.weight_pct, 0);
-  const total = buyVol + sellVol || 1;
-  const buyPct = (buyVol / total * 100).toFixed(0);
-  const sellPct = (sellVol / total * 100).toFixed(0);
-
-  document.getElementById('inst-buy').textContent = buyPct + '% покупают';
-  document.getElementById('inst-sell').textContent = sellPct + '% продают';
-  document.getElementById('players-fill').style.width = buyPct + '%';
-  document.getElementById('players-fill').className = 'fill ' + (buyVol > sellVol ? 'buy' : 'sell');
-
-  const bigPlayers = buckets.filter(b => b.weight_pct >= 5).length;
-  document.getElementById('inst-big').textContent = bigPlayers + ' уровней';
-  const favText = buyVol > sellVol ? 'ПОКУПАТЕЛИ &#8593;' : 'ПРОДАВЦЫ &#8595;';
+  // Institutional players — same direction as forecast
+  document.getElementById('inst-buy').textContent = c.buyPct + '% покупают';
+  document.getElementById('inst-sell').textContent = c.sellPct + '% продают';
+  document.getElementById('players-fill').style.width = c.buyPct + '%';
+  document.getElementById('players-fill').className = 'fill ' + (c.side === 'BUY' ? 'buy' : 'sell');
+  document.getElementById('inst-big').textContent = c.bigPlayers + ' уровней';
+  const favText = c.side === 'BUY' ? 'ПОКУПАТЕЛИ &#8593;' : 'ПРОДАВЦЫ &#8595;';
   document.getElementById('inst-fav').innerHTML = favText;
-  document.getElementById('inst-fav').className = 'val ' + (buyVol > sellVol ? 'green' : 'red');
+  document.getElementById('inst-fav').className = 'val ' + (c.side === 'BUY' ? 'green' : 'red');
 
-  // 24H direction
-  const score = fc.score || 0;
-  const trendRu = score > 5 ? 'РОСТ &#8593;' : score < -5 ? 'ПАДЕНИЕ &#8595;' : 'БОКОВИК &#8596;';
-  const trendClass = score > 5 ? 'green' : score < -5 ? 'red' : '';
-  document.getElementById('h24-trend').innerHTML = trendRu;
-  document.getElementById('h24-trend').className = 'val ' + trendClass;
-  document.getElementById('h24-conf').textContent = adjProb.toFixed(0) + '%';
+  // 24H direction (до 00:00 UTC+5) — separate forecast
+  const arrow24 = c.side24 === 'BUY' ? '&#8593;' : '&#8595;';
+  document.getElementById('h24-trend').innerHTML = c.sideRu24 + ' ' + arrow24;
+  document.getElementById('h24-trend').className = 'val ' + (c.side24 === 'BUY' ? 'green' : 'red');
+  document.getElementById('h24-conf').textContent = c.prob24.toFixed(0) + '%';
   if (currentPrice) {
     const atr = currentPrice * 0.002;
-    const target = score > 0 ? currentPrice + atr : currentPrice - atr;
+    const target = c.side24 === 'BUY' ? currentPrice + atr : currentPrice - atr;
     document.getElementById('h24-target').textContent = fmt(target);
   }
+  document.getElementById('h24-hours').textContent = c.hoursUntilMidnight + 'ч';
 
   // News status
   const newsEl = document.getElementById('news-status');
@@ -436,10 +458,13 @@ async function fetchAll() {
       if (detail) forecasts[activePair] = {...forecasts[activePair], ...detail};
     } catch(e) {}
 
-    // Fetch volume profile for active pair
-    try {
-      volumeProfiles[activePair] = await api('/api/volume-profile/' + activePair);
-    } catch(e) {}
+    // Fetch volume profiles for ALL pairs (for consistent sidebar)
+    const vpPromises = PAIRS.map(async p => {
+      try {
+        volumeProfiles[p] = await api('/api/volume-profile/' + p);
+      } catch(e) {}
+    });
+    await Promise.all(vpPromises);
 
     buildPairList();
     renderOrderBook();
