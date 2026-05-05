@@ -278,6 +278,7 @@
         <div class="fx-press-mid"></div>
         <div class="fx-press-labels"><span class="l">SELL</span><span class="r">BUY</span></div>
       </div>
+      <div class="fx-peak-24h" data-peak-24h>24ч: —</div>
       <div class="fx-chart" data-chart></div>
       <div class="fx-metrics" data-metrics></div>
       <div class="fx-forecasts" data-forecasts></div>
@@ -361,11 +362,31 @@
     // Cell-anchor active marker (Phase 10) — small badge so the user knows the
     // probability is anchored to a measured 365-day historical WR cell, not
     // just to the technical-stack score.
+    let titleParts = [];
     if (f.cell_anchor_active && f.realized_cell_wr_pct != null) {
-      sideEl.title = `cell-anchor: ${f.realized_cell_side} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n})`;
+      titleParts.push(`cell-anchor: ${f.realized_cell_side} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n})`);
     } else if (f.realized_cell_wr_pct != null) {
-      sideEl.title = `cell ${f.realized_cell_side || "?"} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n}) — not anchored (guard: side or n<8)`;
+      titleParts.push(`cell ${f.realized_cell_side || "?"} hist WR=${f.realized_cell_wr_pct}% (n=${f.realized_cell_n}) — not anchored (guard: side or n<8)`);
     }
+    // Phase-12: 24h-ahead peak — show the best forecast hour for the next
+    // 24h next to the side-pill so the user can plan trades ahead. 5h
+    // expiry per Phase-12 spec.
+    const peak24 = f.forecast_24h_peak;
+    if (peak24 && peak24.score) {
+      const hh = String(peak24.hour_utc).padStart(2, "0");
+      const sign = (peak24.expected_pips || 0) >= 0 ? "+" : "";
+      const peakRow = root.querySelector("[data-peak-24h]");
+      if (peakRow) {
+        peakRow.textContent = `24ч: ${hh}:00 UTC ${peak24.side} ${sign}${(peak24.expected_pips||0).toFixed(1)}п · доверие ${peak24.confidence_pct}% · экспайри 5ч`;
+        peakRow.classList.remove("peak-buy", "peak-sell");
+        peakRow.classList.add(peak24.side === "BUY" ? "peak-buy" : "peak-sell");
+      }
+      titleParts.push(`24h peak: ${hh}:00 UTC ${peak24.side} ${sign}${peak24.expected_pips}p (conf ${peak24.confidence_pct}%, drivers: ${(peak24.drivers||[]).length})`);
+    } else {
+      const peakRow = root.querySelector("[data-peak-24h]");
+      if (peakRow) peakRow.textContent = "24ч: — нет 365-дневной поддержки";
+    }
+    if (titleParts.length) sideEl.title = titleParts.join(" · ");
 
     const radarScore = state.radar[f.pair]?.overall_score ?? 0;
 

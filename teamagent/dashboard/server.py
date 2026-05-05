@@ -190,9 +190,9 @@ async def _fly_state_refresher():
     async def _tick():
         loop = asyncio.get_running_loop()
         try:
-            from .. import forecast_scanner
+            from .. import forecast_scanner, forecast_24h
         except ImportError:
-            from teamagent import forecast_scanner
+            from teamagent import forecast_scanner, forecast_24h
         # First refresh: 30 sec after boot — give the request loop time to
         # serve initial requests before saturating Yahoo.
         await asyncio.sleep(30)
@@ -201,6 +201,11 @@ async def _fly_state_refresher():
                 log.info("[fly-refresh] scan_all_pairs() starting")
                 await loop.run_in_executor(pool, forecast_scanner.scan_all_pairs)
                 log.info("[fly-refresh] scan_all_pairs() done")
+                # Phase-12: rebuild 24h-ahead forecast on the same cadence.
+                # Cheap (no Yahoo calls — uses cached learned_rules.json).
+                log.info("[fly-refresh] forecast_24h.build_snapshot() starting")
+                await loop.run_in_executor(pool, forecast_24h.build_snapshot)
+                log.info("[fly-refresh] forecast_24h.build_snapshot() done")
             except Exception as e:
                 log.exception(f"[fly-refresh] failed: {e}")
             await asyncio.sleep(interval)
@@ -543,6 +548,9 @@ def api_forecasts():
     чтобы фронт мог прямо из одного запроса взять agents_for_count/against_count.
     """
     snap = _load(config.STATE_DIR / "forecasts.json", {"forecasts": {}, "rankings": []})
+    # Phase-12: per-pair 24h-ahead peak (best forecast hour for the next 24h).
+    snap_24h = _load(config.STATE_DIR / "forecast_24h.json", {"pairs": {}})
+    pairs_24h = snap_24h.get("pairs") or {}
     # Расширенная по-парамная инфа + сжатый набор ключевых indicators (нужны
     # cinematic Market-Intent карточкам без второго round-trip).
     forecasts_lite = {}
@@ -587,6 +595,10 @@ def api_forecasts():
             "realized_cell_side": f.get("realized_cell_side"),
             "cell_anchor_active": f.get("cell_anchor_active"),
             "session": f.get("session"),
+            # Phase-12: 24h-ahead peak (best hour to trade in next 24h, with
+            # 5h expiry per user's spec). None when no 365-day learned-cell
+            # support exists for any of the next 24 hours.
+            "forecast_24h_peak": (pairs_24h.get(pair) or {}).get("best_peak"),
         }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
@@ -595,6 +607,34 @@ def api_forecasts():
         "forecasts": forecasts_lite,
         "total_pairs": len(config.PAIRS),
     })
+
+
+@app.get("/api/forecast-24h")
+def api_forecast_24h(pair: str | None = None):
+    """Phase-12: 24-hour-ahead forecast for all 28 pairs (or one pair).
+
+    Each pair has a `best_peak` (the strongest hour in the next 24h) and a
+    full 24-row `timeline` of hourly forecasts anchored on
+    `learned_rules.json` (pair_hour_bias + pair_session_bias from 365-day
+    Yahoo 1H closes). Recommended trade expiry per signal is 5h (matches
+    `MAX_EXPIRY_HOURS` and the user's Phase-12 spec).
+    """
+    snap = _load(config.STATE_DIR / "forecast_24h.json", {
+        "as_of": None,
+        "horizon_hours": 24,
+        "expiry_hours_per_signal": 5,
+        "pairs": {},
+    })
+    if pair:
+        pair = pair.upper()
+        return JSONResponse({
+            "as_of": snap.get("as_of"),
+            "horizon_hours": snap.get("horizon_hours"),
+            "expiry_hours_per_signal": snap.get("expiry_hours_per_signal"),
+            "pair": pair,
+            "data": (snap.get("pairs") or {}).get(pair),
+        })
+    return JSONResponse(snap)
 
 
 @app.get("/api/backtest")

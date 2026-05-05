@@ -324,6 +324,24 @@
 .fx-card-side.ev-yellow { box-shadow: inset 0 0 0 2px rgba(255, 181, 71, .55); }
 .fx-card-side.ev-red    { box-shadow: inset 0 0 0 2px rgba(255, 85, 119, .65); }
 
+/* Phase-12: 24h-ahead peak badge — shows the strongest forecast hour for
+   the next 24h (with 5h expiry, anchored on 365-day learned-rules). */
+.fx-peak-24h {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--fx-muted, #9aa6b2);
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx-peak-24h.peak-buy  { color: var(--fx-buy);  border-color: rgba(32, 227, 165, .35); background: rgba(32, 227, 165, .06); }
+.fx-peak-24h.peak-sell { color: var(--fx-sell); border-color: rgba(255, 85, 119, .35); background: rgba(255, 85, 119, .06); }
+
 /* PRESSURE BAR — buy vs sell tug-of-war */
 .fx-press {
   position: relative;
