@@ -188,60 +188,69 @@ async def _fly_state_refresher():
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
-    full_interval = int(os.environ.get("FLY_FULL_SCAN_SEC", "120"))  # full scan every 2 min
-    price_interval = int(os.environ.get("FLY_PRICE_SEC", "10"))  # prices every 10 sec
-    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="fly-refresh")
+    tick_interval = int(os.environ.get("FLY_TICK_SEC", "10"))
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fly-refresh")
 
-    def _quick_price_update():
-        """Fast price-only update for all 28 pairs — updates forecasts.json prices."""
+    # Rolling scan state: scan 1 pair per tick to stay under 256MB RAM
+    _pair_index = [0]
+
+    def _rolling_scan_one():
+        """Scan ONE pair per tick, cycling through all 28. Memory-safe for 256MB Fly."""
+        import gc
         try:
             from .. import config as cfg
-            from ..data import yahoo as yh
-            fp = cfg.STATE_DIR / "forecasts.json"
-            if not fp.exists():
-                return
-            data = json.loads(fp.read_text())
-            forecasts = data.get("forecasts", {})
-            changed = False
-            for pair in cfg.PAIRS:
-                try:
-                    price = yh.latest_price(pair)
-                    if price and pair in forecasts:
-                        forecasts[pair]["current_price"] = price
-                        changed = True
-                except Exception:
-                    pass
-            if changed:
-                data["forecasts"] = forecasts
-                data["price_updated_at"] = datetime.now(timezone.utc).isoformat()
-                fp.write_text(json.dumps(data, ensure_ascii=False, default=str))
+            from .. import forecast_scanner
+        except ImportError:
+            from teamagent import config as cfg
+            from teamagent import forecast_scanner
+
+        pairs = cfg.PAIRS
+        idx = _pair_index[0] % len(pairs)
+        pair = pairs[idx]
+        _pair_index[0] = idx + 1
+
+        fp = cfg.STATE_DIR / "forecasts.json"
+        try:
+            data = json.loads(fp.read_text()) if fp.exists() else {
+                "forecasts": {}, "rankings": [], "scanned_at": None
+            }
+        except Exception:
+            data = {"forecasts": {}, "rankings": [], "scanned_at": None}
+
+        try:
+            f = forecast_scanner.evaluate_pair(pair)
+            if f is not None:
+                data["forecasts"][pair] = f
+            elif pair not in data["forecasts"]:
+                data["forecasts"][pair] = {
+                    "pair": pair, "side": "NEUTRAL", "probability_pct": 50.0,
+                    "score": 0, "skipped": True,
+                    "scanned_at": datetime.now(timezone.utc).isoformat(),
+                }
         except Exception as e:
-            log.warning(f"[fly-price] quick update failed: {e}")
+            log.warning(f"[fly-roll] {pair} failed: {e}")
+
+        data["scanned_at"] = datetime.now(timezone.utc).isoformat()
+        data["price_updated_at"] = datetime.now(timezone.utc).isoformat()
+        data["total_pairs"] = len(pairs)
+        try:
+            fp.write_text(json.dumps(data, ensure_ascii=False, default=str))
+        except Exception as e:
+            log.warning(f"[fly-roll] write failed: {e}")
+
+        gc.collect()
+        if idx == 0:
+            log.info(f"[fly-roll] full cycle complete ({len(pairs)} pairs)")
 
     async def _tick():
         loop = asyncio.get_running_loop()
-        try:
-            from .. import forecast_scanner
-        except ImportError:
-            from teamagent import forecast_scanner
         await asyncio.sleep(10)
-        last_full_scan = 0
         while True:
-            now = time.time()
-            if now - last_full_scan >= full_interval:
-                try:
-                    log.info("[fly-refresh] full scan_all_pairs() starting")
-                    await loop.run_in_executor(pool, forecast_scanner.scan_all_pairs)
-                    log.info("[fly-refresh] full scan done")
-                    last_full_scan = time.time()
-                except Exception as e:
-                    log.exception(f"[fly-refresh] full scan failed: {e}")
-            else:
-                try:
-                    await loop.run_in_executor(pool, _quick_price_update)
-                except Exception as e:
-                    log.warning(f"[fly-price] failed: {e}")
-            await asyncio.sleep(price_interval)
+            try:
+                await loop.run_in_executor(pool, _rolling_scan_one)
+            except Exception as e:
+                log.warning(f"[fly-roll] tick failed: {e}")
+            await asyncio.sleep(tick_interval)
 
     return asyncio.create_task(_tick())
 
