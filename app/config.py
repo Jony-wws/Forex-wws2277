@@ -1,8 +1,33 @@
 """Configuration for Forex Signals system."""
 from __future__ import annotations
-from datetime import timezone, timedelta
+from datetime import datetime, timezone, timedelta
 
 TZ_UTC5 = timezone(timedelta(hours=5))
+
+# Single source of truth for FX trading sessions (UTC hours, [start, end))
+# Aligned across the codebase so a given UTC hour belongs to exactly one session.
+SESSIONS: dict[str, tuple[int, int]] = {
+    "Asia": (0, 7),
+    "London": (7, 13),
+    "Overlap": (13, 17),
+    "NY": (17, 21),
+}
+
+
+def detect_session(now: datetime | None = None) -> str:
+    """Return the active session label for the given (or current) UTC time."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    else:
+        now = now.astimezone(timezone.utc)
+
+    hour = now.hour
+    for name, (start, end) in SESSIONS.items():
+        if start <= hour < end:
+            return name
+    return "Closed"
 
 # All major forex pairs + crosses
 PAIRS: list[str] = [

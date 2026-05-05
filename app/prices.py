@@ -20,7 +20,7 @@ _PRICE_TTL = 8  # seconds
 def fetch_bars(pair: str, interval: str = "1h", period: str = "1mo") -> pd.DataFrame:
     key = f"{pair}_{interval}_{period}"
     cached = _CACHE.get(key)
-    ttl = {"1m": 10, "5m": 30, "15m": 60, "1h": 90}.get(interval, 120)
+    ttl = {"1m": 10, "5m": 30, "15m": 60, "1h": 90, "4h": 240, "1d": 600}.get(interval, 120)
     if cached and time.time() - cached[0] < ttl:
         return cached[1].copy()
 
