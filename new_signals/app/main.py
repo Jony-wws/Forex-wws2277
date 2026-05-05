@@ -1,12 +1,11 @@
-"""Forex Signals - FastAPI server with real-time data."""
+"""Forex Signals - FastAPI server with real-time data and order book."""
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -17,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import PAIRS, PAIR_NAMES_RU, TZ_UTC5, MIN_CONFIDENCE, SCAN_INTERVAL_SEC
 from .prices import get_current_price, get_price_change
 from .analyzer import analyze_pair
+from .orderbook import get_orderbook
 
 log = logging.getLogger("server")
 logging.basicConfig(
@@ -26,27 +26,29 @@ logging.basicConfig(
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
-# Global state - updated by background scanner
 _signals: dict = {"pairs": {}, "updated_at": None, "scan_count": 0}
+_orderbooks: dict = {}
 _lock = threading.Lock()
 
 
 def _scanner_loop():
-    """Background thread that scans all pairs every SCAN_INTERVAL_SEC."""
+    """Background scanner - runs every SCAN_INTERVAL_SEC."""
     log.info("Scanner started")
+    scan_num = 0
     while True:
         start = time.time()
+        scan_num += 1
         results = {}
+
         for pair in PAIRS:
             try:
                 price = get_current_price(pair)
-                analysis = analyze_pair(pair)
-                price_info = get_price_change(pair)
-
                 if price is None:
                     continue
 
-                # Determine pip multiplier for display
+                analysis = analyze_pair(pair)
+                price_info = get_price_change(pair)
+
                 is_jpy = "JPY" in pair
                 pip_mult = 100 if is_jpy else 10000
 
@@ -58,50 +60,32 @@ def _scanner_loop():
                 }
 
                 if price_info:
-                    entry["change_24h"] = price_info["change"]
-                    entry["change_24h_pct"] = price_info["change_pct"]
                     entry["change_24h_pips"] = round(price_info["change"] * pip_mult, 1)
+                    entry["change_24h_pct"] = price_info["change_pct"]
                 else:
-                    entry["change_24h"] = 0
-                    entry["change_24h_pct"] = 0
                     entry["change_24h_pips"] = 0
+                    entry["change_24h_pct"] = 0
 
-                if analysis and analysis["side"] and analysis["confidence"] >= MIN_CONFIDENCE:
-                    entry["signal"] = analysis["side"]
+                if analysis:
+                    has_signal = (
+                        analysis["side"] is not None
+                        and analysis["confidence"] >= MIN_CONFIDENCE
+                    )
+                    entry["signal"] = analysis["side"] if has_signal else None
                     entry["confidence"] = analysis["confidence"]
-                    entry["strength"] = analysis["strength"]
+                    entry["strength"] = analysis["strength"] if has_signal else "Нет сигнала"
                     entry["score"] = analysis["score"]
                     entry["details"] = analysis["details"]
                     entry["indicators"] = analysis["indicators"]
-
-                    # 5h forecast
-                    entry["forecast_5h"] = {
-                        "direction": analysis["side"],
-                        "strength": analysis["strength"],
-                        "confidence": analysis["confidence"],
-                    }
-                    # 24h forecast based on trend strength
-                    abs_score = abs(analysis["score"])
-                    if abs_score >= 10:
-                        forecast_24h_dir = analysis["side"]
-                        forecast_24h_strength = "Сильное движение"
-                    elif abs_score >= 6:
-                        forecast_24h_dir = analysis["side"]
-                        forecast_24h_strength = "Умеренное движение"
-                    else:
-                        forecast_24h_dir = analysis["side"]
-                        forecast_24h_strength = "Слабое движение"
-
-                    entry["forecast_24h"] = {
-                        "direction": forecast_24h_dir,
-                        "strength": forecast_24h_strength,
-                    }
+                    entry["forecast_5h"] = analysis["forecast_5h"]
+                    entry["forecast_24h"] = analysis["forecast_24h"]
                 else:
                     entry["signal"] = None
-                    entry["confidence"] = analysis["confidence"] if analysis else 0
-                    entry["strength"] = "Нет сигнала"
-                    entry["details"] = analysis["details"] if analysis else []
-                    entry["indicators"] = analysis["indicators"] if analysis else {}
+                    entry["confidence"] = 0
+                    entry["strength"] = "Нет данных"
+                    entry["score"] = 0
+                    entry["details"] = []
+                    entry["indicators"] = {}
                     entry["forecast_5h"] = None
                     entry["forecast_24h"] = None
 
@@ -110,37 +94,41 @@ def _scanner_loop():
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
 
+        # Update order books (less frequently - every 3rd scan)
+        ob_data = {}
+        if scan_num % 3 == 1:
+            for pair in PAIRS:
+                try:
+                    ob_data[pair] = get_orderbook(pair)
+                except Exception as e:
+                    log.error(f"Error orderbook {pair}: {e}")
+
         now_utc5 = datetime.now(TZ_UTC5)
         with _lock:
             _signals["pairs"] = results
             _signals["updated_at"] = now_utc5.strftime("%Y-%m-%d %H:%M:%S")
-            _signals["scan_count"] = _signals.get("scan_count", 0) + 1
+            _signals["scan_count"] = scan_num
+            if ob_data:
+                _orderbooks.update(ob_data)
 
         elapsed = time.time() - start
-        log.info(
-            f"Scan #{_signals['scan_count']} complete: "
-            f"{len(results)} pairs in {elapsed:.1f}s"
-        )
+        log.info(f"Scan #{scan_num}: {len(results)} pairs in {elapsed:.1f}s")
 
         sleep_time = max(1, SCAN_INTERVAL_SEC - elapsed)
         time.sleep(sleep_time)
 
 
-app = FastAPI(title="Forex Signals", version="1.0.0")
-
+app = FastAPI(title="Forex Signals", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
 
 @app.on_event("startup")
 async def startup():
-    thread = threading.Thread(target=_scanner_loop, daemon=True)
-    thread.start()
-    log.info("Background scanner thread started")
+    t = threading.Thread(target=_scanner_loop, daemon=True)
+    t.start()
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -154,18 +142,37 @@ async def index():
 @app.get("/api/signals")
 async def get_signals():
     with _lock:
-        data = json.loads(json.dumps(_signals, default=str))
-    return JSONResponse(content=data)
+        return JSONResponse(content=json.loads(json.dumps(_signals, default=str)))
+
+
+@app.get("/api/orderbook/{pair}")
+async def get_orderbook_api(pair: str):
+    pair = pair.upper()
+    with _lock:
+        ob = _orderbooks.get(pair)
+    if not ob:
+        try:
+            ob = get_orderbook(pair)
+        except Exception:
+            return JSONResponse(content={"error": "Нет данных"}, status_code=404)
+    return JSONResponse(content=json.loads(json.dumps(ob, default=str)))
+
+
+@app.get("/api/orderbooks")
+async def get_all_orderbooks():
+    with _lock:
+        data = dict(_orderbooks)
+    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
 
 @app.get("/api/health")
 async def health():
     with _lock:
-        scan_count = _signals.get("scan_count", 0)
-        updated_at = _signals.get("updated_at")
+        sc = _signals.get("scan_count", 0)
+        ua = _signals.get("updated_at")
     return {
         "status": "ok",
-        "scan_count": scan_count,
-        "updated_at": updated_at,
+        "scan_count": sc,
+        "updated_at": ua,
         "time_utc5": datetime.now(TZ_UTC5).strftime("%Y-%m-%d %H:%M:%S"),
     }
