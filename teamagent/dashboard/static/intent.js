@@ -355,8 +355,19 @@
     const evPct = (f.ev_pct_per_trade != null) ? f.ev_pct_per_trade : null;
     const evStatus = f.ev_status || (evPct == null ? null : (evPct >= 5 ? "green" : evPct > 0 ? "yellow" : "red"));
     const evTxt = (evPct == null) ? "" : ` · EV ${evPct >= 0 ? "+" : ""}${evPct.toFixed(1)}%`;
+    // Phase-13: show calibrated probability when active. Format:
+    //   «BUY 78% (cal 71%) · EV +20.6%»
+    // The «cal X%» is the Wilson-90% lower bound on the realized WR for
+    // the bucket of the displayed probability — this is what the EV
+    // computation actually uses when calibration is active. Hidden
+    // entirely when calibration_active is false (small sample).
+    const calActive = !!f.calibration_active;
+    const calPct = f.calibrated_probability_pct;
+    const calTxt = (calActive && calPct != null && Math.round(calPct) !== Math.round(f.probability_pct))
+      ? ` (cal ${calPct.toFixed(0)}%)`
+      : "";
     const sideEl = root.querySelector("[data-side]");
-    sideEl.textContent = `${side} ${toFixedSafe(f.probability_pct, 0)}%${evTxt}`;
+    sideEl.textContent = `${side} ${toFixedSafe(f.probability_pct, 0)}%${calTxt}${evTxt}`;
     sideEl.classList.remove("ev-green", "ev-yellow", "ev-red");
     if (evStatus) sideEl.classList.add(`ev-${evStatus}`);
     // Cell-anchor active marker (Phase 10) — small badge so the user knows the

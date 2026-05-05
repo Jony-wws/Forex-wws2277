@@ -490,8 +490,6 @@ def evaluate_pair(pair: str) -> dict | None:
     # backtest backing. This is the single honest path to "math expectation
     # advantage on distance" — no inflation, just transparent EV.
     broker_payout = float(getattr(config, "BROKER_PAYOUT_PCT", 0.70))
-    ev_per_trade = round(p * (1 + broker_payout) - 1, 4)
-    ev_pct_per_trade = round(ev_per_trade * 100, 1)
     breakeven_wr_pct = round(100 / (1 + broker_payout), 2)
     realized_cell_wr_pct = None
     realized_cell_n = None
@@ -506,6 +504,33 @@ def evaluate_pair(pair: str) -> dict | None:
             realized_cell_side = info.get("dominant_side")
     except Exception:
         pass
+
+    # ───── BLOCK Q — Phase-13 probability calibration vs realized WR ─────
+    # Calibrate the displayed probability against actual closed-trades
+    # outcomes + 365-day per-(pair, session) cell WR. Returns the Wilson
+    # 90% lower bound for the bucket the displayed probability falls into.
+    # Calibration NEVER raises probability above the raw value — it can
+    # only lower it (conservative). This closes the loop the user asked for:
+    # «обучи систему что бы у меня был выше мат ожидания на дистанции».
+    # EV is then re-derived from the CALIBRATED probability so the badge
+    # reflects the broker-payout-adjusted realised expectation, not the
+    # theoretical sigmoid output.
+    calibrated_probability_pct = round(p * 100.0, 1)
+    calibration_n = 0
+    calibration_wilson_lower_pct = None
+    calibration_active = False
+    try:
+        from . import probability_calibrator as pcal
+        cal = pcal.calibrate(p * 100.0)
+        calibrated_probability_pct = cal["calibrated_probability_pct"]
+        calibration_n = cal["calibration_n"]
+        calibration_wilson_lower_pct = cal["calibration_wilson_lower_pct"]
+        calibration_active = cal["calibration_active"]
+    except Exception:
+        pass
+    p_for_ev = (calibrated_probability_pct / 100.0) if calibration_active else p
+    ev_per_trade = round(p_for_ev * (1 + broker_payout) - 1, 4)
+    ev_pct_per_trade = round(ev_per_trade * 100, 1)
     if ev_per_trade >= 0.05:
         ev_status = "green"      # ≥+5% EV — trade with confidence
     elif ev_per_trade > 0:
@@ -545,6 +570,11 @@ def evaluate_pair(pair: str) -> dict | None:
         "realized_cell_n": realized_cell_n,
         "realized_cell_side": realized_cell_side,
         "cell_anchor_active": bool(p10_reason),
+        # Phase-13 calibration fields (BLOCK Q)
+        "calibrated_probability_pct": calibrated_probability_pct,
+        "calibration_n": calibration_n,
+        "calibration_wilson_lower_pct": calibration_wilson_lower_pct,
+        "calibration_active": calibration_active,
     }
     return forecast
 

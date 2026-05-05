@@ -190,9 +190,9 @@ async def _fly_state_refresher():
     async def _tick():
         loop = asyncio.get_running_loop()
         try:
-            from .. import forecast_scanner, forecast_24h
+            from .. import forecast_scanner, forecast_24h, probability_calibrator
         except ImportError:
-            from teamagent import forecast_scanner, forecast_24h
+            from teamagent import forecast_scanner, forecast_24h, probability_calibrator
         # First refresh: 30 sec after boot — give the request loop time to
         # serve initial requests before saturating Yahoo.
         await asyncio.sleep(30)
@@ -206,6 +206,12 @@ async def _fly_state_refresher():
                 log.info("[fly-refresh] forecast_24h.build_snapshot() starting")
                 await loop.run_in_executor(pool, forecast_24h.build_snapshot)
                 log.info("[fly-refresh] forecast_24h.build_snapshot() done")
+                # Phase-13: rebuild probability calibration so newly-closed
+                # trades immediately influence the calibration table.
+                log.info("[fly-refresh] probability_calibrator.build_calibration() starting")
+                await loop.run_in_executor(pool, probability_calibrator.build_calibration)
+                probability_calibrator.reload()
+                log.info("[fly-refresh] probability_calibrator.build_calibration() done")
             except Exception as e:
                 log.exception(f"[fly-refresh] failed: {e}")
             await asyncio.sleep(interval)
@@ -599,6 +605,13 @@ def api_forecasts():
             # 5h expiry per user's spec). None when no 365-day learned-cell
             # support exists for any of the next 24 hours.
             "forecast_24h_peak": (pairs_24h.get(pair) or {}).get("best_peak"),
+            # Phase-13: probability calibrated against realized WR
+            # (Wilson-90% lower bound on bucket of displayed probability,
+            # pooled from closed_trades + 365-day strategy_locked cells).
+            "calibrated_probability_pct": f.get("calibrated_probability_pct"),
+            "calibration_n": f.get("calibration_n"),
+            "calibration_wilson_lower_pct": f.get("calibration_wilson_lower_pct"),
+            "calibration_active": f.get("calibration_active"),
         }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
@@ -607,6 +620,31 @@ def api_forecasts():
         "forecasts": forecasts_lite,
         "total_pairs": len(config.PAIRS),
     })
+
+
+@app.get("/api/calibration")
+def api_calibration():
+    """Phase-13: probability calibration table.
+
+    Returns the bucket-by-bucket calibration of `displayed_probability_pct`
+    vs realized WR — pooled from `closed_trades.json` (every actual paper-
+    trader outcome) + `strategy_config_locked.json` (365-day per-(pair ×
+    session) cells, capped at 30 per cell to avoid mega-cells dominating).
+    Each bucket reports `n`, `wins`, raw WR%, and the **Wilson 90% lower
+    bound** that's used to clamp `probability_pct` in `/api/forecasts`.
+    """
+    return _load(
+        config.STATE_DIR / "probability_calibration.json",
+        {
+            "as_of": None,
+            "min_bucket_n": 8,
+            "wilson_z": 1.645,
+            "n_closed_trades_used": 0,
+            "n_locked_cells_used": 0,
+            "buckets": {},
+            "note": "calibration not built yet — run `python -m teamagent.probability_calibrator`",
+        },
+    )
 
 
 @app.get("/api/forecast-24h")

@@ -291,6 +291,42 @@ Stop everything: `bash scripts/stop_all.sh`.
     exactly which 365-day cell vote produced its score).
     See `HISTORY/2026-05-05_phase12_24h_forecast.md`.
 
+23. **Phase 13 — probability calibration vs realized WR (added 2026-05-05)**:
+    new module `teamagent/probability_calibrator.py` builds a
+    bucket table (50-55, 55-60, …, 90-92) of `displayed_probability_pct →
+    realized_WR_pct` pooled from `closed_trades.json` (every actual paper-
+    trader outcome) + `strategy_config_locked.json` (each (pair × session)
+    cell with `trades >= 8` capped at 30 to prevent mega-cell domination).
+    For each bucket we compute the **Wilson 90% one-sided lower bound**
+    on the WR — `z=1.645` — and treat that as the calibrated probability
+    when `n >= MIN_BUCKET_N` (default 8).
+    
+    `forecast_scanner` BLOCK Q calls `pcal.calibrate(probability_pct)` and
+    appends four fields per forecast row:
+    `calibrated_probability_pct`, `calibration_n`,
+    `calibration_wilson_lower_pct`, `calibration_active`.
+    EV is then re-derived from the calibrated probability when active, so
+    the green/yellow/red EV badge represents the **realised** expectation
+    at the user's broker payout, not the theoretical sigmoid.
+    
+    `/api/calibration` exposes the table; `/api/forecasts` carries the
+    calibration fields per pair; `intent.js` shows `(cal X%)` next to the
+    raw probability when calibration is active and the value differs.
+    
+    **Calibration NEVER raises probability.** Wilson lower bound is
+    conservative — it can only stay equal to or below the raw value.
+    This satisfies the "do not inflate probability" rule (#21) while
+    closing the loop on "math expectation advantage on distance".
+    
+    **The free 70% gate (rule #7) is unchanged** — paper_trader still
+    opens trades on RAW `probability_pct >= 70`. Calibration is
+    informational + drives EV, not the trade-open gate. Tightening the
+    gate to use calibrated probability would be a Phase-14 user decision.
+    
+    `_fly_state_refresher` rebuilds calibration on every Fly refresh tick
+    so newly-closed trades influence the table immediately.
+    See `HISTORY/2026-05-05_phase13_probability_calibration.md`.
+
 ## Optional API keys (env vars)
 
 The 3 LLM agents are no-op if these aren't set; the rest of the system still
