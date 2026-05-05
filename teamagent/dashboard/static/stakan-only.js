@@ -242,8 +242,14 @@
     }
 
     // Buyers vs sellers bar
-    const bp = Number((v && v.buyers_pct) || 50);
-    const sp = Number((v && v.sellers_pct) || 50);
+    // Раньше брали v.buyers_pct / v.sellers_pct — это сырой VP big-players,
+    // ОДИН из 22 источников, и он часто противоречил итоговому Bayesian
+    // вердикту (пример: bar 51/49, но «ПРОДАТЬ 92%»). Теперь bar показывает
+    // реальный Bayesian fav-balance: bar совпадает с вердиктом.
+    const fav = (v && v.favorite_side) || "neutral";
+    const bal = Number((v && v.favorite_balance_pct) || 50);
+    const bp = fav === "buyers" ? bal : 100 - bal;
+    const sp = 100 - bp;
     const buy = document.getElementById("so-bs-buy");
     const sell = document.getElementById("so-bs-sell");
     buy.style.width  = bp + "%";
