@@ -239,7 +239,7 @@ async def _fly_state_refresher():
             log.warning(f"[fly-roll] write failed: {e}")
 
         gc.collect()
-        if idx == 0:
+        if _pair_index[0] % len(pairs) == 0:
             log.info(f"[fly-roll] full cycle complete ({len(pairs)} pairs)")
 
     async def _tick():
