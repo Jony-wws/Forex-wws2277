@@ -1719,4 +1719,46 @@
       _skRefreshNewsWatch();
     }
   });
+
+  // ═══ PAIR-STATS TABLE (2026-05-05) ═══
+  // Fetches /api/pair-stats and renders the 28-pair real WR table.
+  async function refreshPairStats() {
+    try {
+      const url = location.origin + "/api/pair-stats";
+      const r = await fetch(url, { cache: "no-store", credentials: "same-origin" });
+      if (!r.ok) return;
+      const data = await r.json();
+      const tbody = document.getElementById("ps-tbody");
+      const qEl = document.getElementById("ps-qualified");
+      const pillEl = document.getElementById("ps-summary-pill");
+      if (qEl) qEl.textContent = String(data.qualified_80_pairs || 0);
+      if (pillEl) pillEl.textContent = `REAL DATA · ${data.qualified_80_pairs || 0}/${data.total_pairs || 28} qualified`;
+      if (!tbody) return;
+      const pairs = data.pairs || {};
+      const sorted = Object.values(pairs).sort((a, b) => b.best_wr_pct - a.best_wr_pct);
+      tbody.innerHTML = sorted.map(p => {
+        const sessHtml = ["Asia", "London", "Overlap", "NY"].map(s => {
+          const sc = (p.sessions || {})[s] || {};
+          const wr = sc.win_rate_pct || 0;
+          const n = sc.trades || 0;
+          const q = sc.qualified;
+          const cls = wr >= 80 ? "mt-green" : wr >= 70 ? "mt-amber" : "mt-red";
+          return `<td class="${cls}" title="${n} trades, variant: ${sc.best_variant || '—'}">${wr.toFixed(1)}% <span style="font-size:10px;opacity:0.6">(${n})</span></td>`;
+        }).join("");
+        const statusCls = p.qualified_80 ? "mt-green" : "mt-red";
+        const statusText = p.qualified_80 ? "ACTIVE" : "FROZEN";
+        return `<tr>
+          <td><b>${p.pair}</b></td>
+          <td class="${p.best_wr_pct >= 80 ? 'mt-green' : p.best_wr_pct >= 70 ? 'mt-amber' : 'mt-red'}"><b>${p.best_wr_pct.toFixed(1)}%</b></td>
+          ${sessHtml}
+          <td class="${statusCls}"><b>${statusText}</b></td>
+        </tr>`;
+      }).join("");
+    } catch (e) {
+      console.warn("pair-stats fetch failed:", e);
+    }
+  }
+  refreshPairStats();
+  setInterval(refreshPairStats, 60_000);
+
 })();

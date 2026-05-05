@@ -137,11 +137,14 @@ Stop everything: `bash scripts/stop_all.sh`.
 6. **Watchdog `_scan()` MUST `continue`** on `heartbeat_watchdog.json` and
    `heartbeat_orchestrator.json` — never `pass` (that bug killed the whole
    orchestrator).
-7. **Free 70% gate (since 2026-05-01)**: paper_trader opens trades when
-   `forecast.probability_pct ≥ 70` — period. Per-session backtest WR is NOT a
-   blocker; it's used only to enrich the chosen variant (side flip / fixed expiry).
-   This is the user's explicit override of the earlier strict gate. Do NOT
-   reintroduce the strict gate without an equally explicit user request.
+7. **Strict 80% gate (since 2026-05-05, user explicit request)**: paper_trader
+   opens trades ONLY when `forecast.probability_pct >= 80` AND the
+   (pair, session) cell has `WR >= 80%` on 365-day Yahoo backtest
+   (`STRICT_QUALIFIED_GATE = True`, `MIN_PROBABILITY = 0.80`,
+   `MIN_WR_PCT = 80.0`). MTF confirmation (2/3 timeframes) required for
+   probability to exceed 65%. This replaces the earlier free-70% gate per
+   explicit user request on 2026-05-05: *"минимум 80% успешности на каждом
+   валюте ... реальный не симулятор"*.
 8. **strategy_search re-trains every 5 days** (since 2026-05-01, per user request
    to save ACU): `LOOP_INTERVAL_SEC = 5 * 24 * 3600`. Each sweep re-evaluates 120
    variants × 4 sessions × **365-day** Yahoo history per pair (≈50 min). Between

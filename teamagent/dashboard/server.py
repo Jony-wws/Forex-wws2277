@@ -558,6 +558,8 @@ def api_forecasts():
             "agents_against_count": f.get("agents_against_count", len(f.get("agents_against", []))),
             "recommended_hours": f.get("recommended_hours"),
             "as_of": f.get("as_of"),
+            "mtf_confirmed": f.get("mtf_confirmed"),
+            "mtf_agree": f.get("mtf_agree"),
         }
     return JSONResponse({
         "as_of": snap.get("scanned_at"),
@@ -754,6 +756,58 @@ def api_stats():
         "total": 0, "wins": 0, "losses": 0,
         "win_rate_pct": 0.0, "total_pnl_usd": 0.0,
     })
+
+
+@app.get("/api/pair-stats")
+def api_pair_stats():
+    """Per-pair win rate from strategy_config (365-day real Yahoo backtest).
+
+    Returns all 28 pairs with their best variant WR per session,
+    qualified status, and overall metrics. Source: REAL data only.
+    """
+    scfg = _load(config.STATE_DIR / "strategy_config.json", {"pairs": {}})
+    bt = _load(config.STATE_DIR / "backtest_30d.json", {"pairs": {}})
+    pairs_out = {}
+    qualified_pairs = 0
+    for pair in config.PAIRS:
+        p = (scfg.get("pairs") or {}).get(pair, {})
+        bp = (bt.get("pairs") or {}).get(pair, {})
+        sessions = {}
+        pair_qualified = False
+        best_wr = 0.0
+        for sess_name in ("Asia", "London", "Overlap", "NY"):
+            sc = (p.get("by_session") or {}).get(sess_name, {})
+            wr = sc.get("win_rate_pct") or 0.0
+            trades = sc.get("trades") or 0
+            q = sc.get("qualifies_70pct", False)
+            if q and wr >= 80:
+                pair_qualified = True
+            best_wr = max(best_wr, wr)
+            sessions[sess_name] = {
+                "win_rate_pct": round(wr, 1),
+                "trades": trades,
+                "qualified": q,
+                "best_variant": sc.get("best_variant"),
+            }
+        if pair_qualified:
+            qualified_pairs += 1
+        pairs_out[pair] = {
+            "pair": pair,
+            "best_wr_pct": round(best_wr, 1),
+            "qualified_80": pair_qualified,
+            "global_wr_pct": round(p.get("win_rate_pct") or 0.0, 1),
+            "global_trades": p.get("trades") or 0,
+            "backtest_30d_wr_pct": round(bp.get("win_rate_pct") or 0.0, 1),
+            "backtest_30d_trades": bp.get("trades") or 0,
+            "sessions": sessions,
+        }
+    return {
+        "total_pairs": len(config.PAIRS),
+        "qualified_80_pairs": qualified_pairs,
+        "min_wr_gate_pct": 80.0,
+        "data_source": "REAL Yahoo Finance 365-day backtest",
+        "pairs": pairs_out,
+    }
 
 
 @app.get("/api/volume-profile/{pair}")

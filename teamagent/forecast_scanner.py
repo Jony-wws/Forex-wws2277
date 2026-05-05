@@ -322,6 +322,15 @@ def evaluate_pair(pair: str) -> dict | None:
         delta = -penalty if score > 0 else (penalty if score < 0 else 0)
         vote("news_blackout", delta, f"high-impact новость ±30 мин — снижаем abs(score) на {penalty}")
 
+    # ───── MTF HARD GATE (2026-05-05) ─────
+    # Require at least 2/3 timeframes to agree on direction.
+    # Without MTF confirmation the signal is weak → cap probability at 65%.
+    mtf_buy = int(ind_4h["close"] > ind_4h["ema50"]) \
+            + int(ind_1h["close"] > ind_1h["ema20"]) \
+            + int(ind_15m["close"] > ind_15m["ema20"])
+    mtf_agree = mtf_buy if score > 0 else (3 - mtf_buy)
+    mtf_confirmed = mtf_agree >= 2
+
     # ───── итог ─────
     if score == 0:
         return None  # нейтрально, не показываем
@@ -330,6 +339,9 @@ def evaluate_pair(pair: str) -> dict | None:
     p_raw = _score_to_probability(abs(score), 75)
     # cap 50–92
     p = max(0.50, min(config.MAX_PROBABILITY, p_raw))
+    # Without multi-TF confirmation, cap at 65% (won't pass 80% gate)
+    if not mtf_confirmed:
+        p = min(p, 0.65)
 
     # рекомендованная экспирация: больше score → дольше держим
     abs_norm = min(1.0, abs(score) / 20.0)
@@ -365,6 +377,8 @@ def evaluate_pair(pair: str) -> dict | None:
         "volume_profile": vp,
         "as_of": now.isoformat(),
         "session": _current_session(now.hour),
+        "mtf_confirmed": mtf_confirmed,
+        "mtf_agree": mtf_agree,
     }
     return forecast
 

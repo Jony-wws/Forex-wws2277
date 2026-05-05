@@ -173,12 +173,51 @@
     <h3>Особый подход — стратегия по сессиям</h3>
     <p class="sk-strategy-help">
       Своя стратегия для каждой сессии (Asia · London · Overlap · NY) на 365-дневном
-      backtest. Зелёный — WR ≥ 70% (paper-trader будет открывать). Жёлтый — 60–70%
-      (нужен ансамбль). Красный — &lt; 60% (заморожен).
+      backtest (РЕАЛЬНЫЕ данные Yahoo Finance). Зелёный — WR ≥ 80% (paper-trader будет
+      открывать). Жёлтый — 70–80% (ансамбль). Красный — &lt; 70% (заморожен).
     </p>
     <div class="sk-strategy-grid" id="sk-strategy-grid">
       <div class="sk-empty">…</div>
     </div>
+  </div>
+</section>
+
+
+<!-- ═══ РАЗДЕЛ 1.5 · РЕАЛЬНАЯ СТАТИСТИКА — 28 ВАЛЮТ (2026-05-05) ═══ -->
+<section id="pair-stats-section" class="fs-multi-section">
+  <div class="fs-multi-header">
+    <h2><span style="font-size:22px">📊</span> РЕАЛЬНАЯ СТАТИСТИКА — 28 ВАЛЮТ</h2>
+    <span id="ps-summary-pill" class="fs-summary-pill">REAL DATA</span>
+  </div>
+  <p class="fs-multi-help">
+    Win Rate по каждой валютной паре на основе <b style="color:#4afaa3">реальных данных Yahoo Finance</b>
+    (365-дневный бэктест). <b>Минимум 80% WR</b> требуется для открытия сделки.
+    Минимум <b>70% WR</b> на каждой валюте и каждой сессии.
+    <br><b style="color:#ff6b6b">Это НЕ симулятор</b> — все данные от Yahoo Finance, Dukascopy, ForexFactory.
+  </p>
+  <div class="ps-overview" id="ps-overview">
+    <div class="mt-stat"><div class="mt-lbl">Всего пар</div><div class="mt-val" id="ps-total">28</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Qualified (WR≥80%)</div><div class="mt-val mt-green" id="ps-qualified">…</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Порог WR</div><div class="mt-val" id="ps-gate">80%</div></div>
+    <div class="mt-stat"><div class="mt-lbl">Источник</div><div class="mt-val mt-green" id="ps-source">REAL</div></div>
+  </div>
+  <div class="mt-table-wrap">
+    <table class="mt-table" id="ps-table">
+      <thead>
+        <tr>
+          <th>Пара</th>
+          <th>Лучший WR</th>
+          <th>Asia</th>
+          <th>London</th>
+          <th>Overlap</th>
+          <th>NY</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody id="ps-tbody">
+        <tr><td colspan="7" class="mt-empty">загружаю статистику по 28 парам…</td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
@@ -208,9 +247,9 @@
   <div class="mt-section">
     <h3>🔓 Открыты сейчас <span class="mt-pill" id="mt-open-count">0</span></h3>
     <div class="mt-help">
-      Каждая сделка открывается автоматически paper-trader-ом, как только probability ≥ 70%
-      и пара/сессия проходит strict-quorum ансамбль (или fallback на baseline). Live-цена
-      обновляется каждые 30 сек.
+      Каждая сделка открывается автоматически paper-trader-ом, как только probability ≥ 80%
+      и пара/сессия проходит strict-quorum ансамбль + WR ≥ 80% на 365д бэктесте. Live-цена
+      обновляется каждые 15 сек. Все данные РЕАЛЬНЫЕ (Yahoo Finance).
     </div>
     <div class="mt-table-wrap">
       <table class="mt-table">

@@ -68,10 +68,10 @@ HEARTBEAT_FILE = config.STATE_DIR / "heartbeat_paper_trader.json"
 #   strategy_config[pair].best_variant.win_rate_pct >= MIN_WR_PCT (на этой паре лучшая стратегия даёт ≥7О% WR на 30д) И
 #   forecast сейчас удовлетворяет фильтры этого best_variant (сессия, |score|, prob).
 # Это и есть «реальный 70% WR», а не теоретическая probability прямо из scanner-а.
-MIN_WR_PCT = 70.0
+MIN_WR_PCT = 80.0      # 2026-05-05: user wants ≥80% WR per pair
 MIN_TRADES = 5
 # fallback на backtest_30d.json если strategy_config ещё не рассчитан
-BACKTEST_MIN_WR_PCT = 70.0
+BACKTEST_MIN_WR_PCT = 80.0   # 2026-05-05: stricter gate
 BACKTEST_MIN_TRADES = 5
 
 # ───── Корреляционный фильтр (2026-05-03) ─────
