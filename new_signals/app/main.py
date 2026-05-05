@@ -103,8 +103,8 @@ def _scanner_loop():
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
 
-        # Update order books (less frequently - every 3rd scan)
-        if scan_num % 3 == 1:
+        # Update order books (skip first 3 scans, then every 3rd scan)
+        if scan_num >= 4 and scan_num % 3 == 1:
             for pair in PAIRS:
                 try:
                     ob = get_orderbook(pair)
@@ -138,7 +138,13 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    # Inject current data directly into HTML so mobile doesn't need API call
+    with _lock:
+        data_json = json.dumps(_signals, default=str, ensure_ascii=False)
+    inject = f'<script>window.__INITIAL_DATA__ = {data_json};</script>'
+    html = html.replace('</head>', inject + '</head>')
+    return html
 
 
 @app.get("/api/signals")

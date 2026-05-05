@@ -520,49 +520,69 @@
     let lastOB = null;
     let dataLoaded = false;
     let retryCount = 0;
+    let fetchErrors = 0;
+
+    // Use injected data from server if available (no API call needed)
+    if (window.__INITIAL_DATA__) {
+        lastSignals = window.__INITIAL_DATA__;
+        const hasPairs = lastSignals && lastSignals.pairs && Object.keys(lastSignals.pairs).length > 0;
+        if (hasPairs) {
+            dataLoaded = true;
+            renderSignalsTable(lastSignals);
+        }
+    }
 
     async function fetchSignals() {
         try {
-            const res = await fetch('/api/signals');
-            if (!res.ok) return;
+            const res = await fetch('/api/signals', {credentials: 'include'});
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
             lastSignals = await res.json();
+            fetchErrors = 0;
             const hasPairs = lastSignals && lastSignals.pairs && Object.keys(lastSignals.pairs).length > 0;
             if (hasPairs) {
                 dataLoaded = true;
                 renderSignalsTable(lastSignals);
             } else if (!dataLoaded) {
                 retryCount++;
-                const dots = '.'.repeat((retryCount % 3) + 1);
-                document.getElementById('signals-content').innerHTML = `
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div>Загрузка данных с рынка${dots}</div>
-                        <div style="font-size:12px;margin-top:6px;color:var(--text-dim)">
-                            Первый запуск: сканирование ${lastSignals.scan_count > 0 ? 'идёт' : 'запускается'}...
-                            Попытка ${retryCount}
-                        </div>
-                    </div>`;
+                showLoading('Сканирование рынка... Попытка ' + retryCount);
                 setTimeout(fetchSignals, 2000);
             }
         } catch(e) {
             console.error('fetch signals:', e);
+            fetchErrors++;
             if (!dataLoaded) {
                 retryCount++;
-                setTimeout(fetchSignals, 2000);
+                if (fetchErrors > 3) {
+                    showLoading('Ошибка подключения. Повтор через 3 сек... (' + e.message + ')');
+                } else {
+                    showLoading('Загрузка данных... Попытка ' + retryCount);
+                }
+                setTimeout(fetchSignals, fetchErrors > 3 ? 3000 : 2000);
             }
         }
     }
 
+    function showLoading(msg) {
+        document.getElementById('signals-content').innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>${msg}</div>
+            </div>`;
+    }
+
     async function fetchOrderbooks() {
         try {
-            const res = await fetch('/api/orderbooks');
+            const res = await fetch('/api/orderbooks', {credentials: 'include'});
             if (!res.ok) return;
             lastOB = await res.json();
             renderOrderbooks(lastOB);
         } catch(e) { console.error('fetch orderbooks:', e); }
     }
 
-    fetchSignals();
+    // Start fetching (initial data may already be rendered from __INITIAL_DATA__)
+    if (!dataLoaded) fetchSignals();
     setInterval(fetchSignals, 10000);
     setInterval(() => {
         if (document.querySelector('.tab[data-tab="orderbook"]').classList.contains('active')) {
