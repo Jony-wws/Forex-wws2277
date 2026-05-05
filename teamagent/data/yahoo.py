@@ -17,7 +17,9 @@ log = logging.getLogger("yahoo")
 # простой in-memory кэш чтобы не долбить API
 _CACHE: dict[tuple[str, str, str], tuple[float, pd.DataFrame]] = {}
 _TTL: dict[str, int] = {
-    "1m":  60,        # 1 мин кэш
+    # Live-цена: 15 сек кэш — иначе live-price endpoint мог отдавать 1-минутный
+    # бар, который уже устарел до 60 сек. На UI это выглядело как застывшая цена.
+    "1m":  15,
     "5m":  60,
     "15m": 90,
     "1h":  120,

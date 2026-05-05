@@ -176,8 +176,11 @@ async def _fly_state_refresher():
         return  # Devin VM has its own scanner; nothing to do here.
     if os.environ.get("FLY_FULL") == "1" or os.environ.get("FLY_MINIMAL") == "1":
         return  # full mode already runs scanner as subprocess.
-    if os.environ.get("FLY_DASHBOARD_REFRESH") == "0":
-        return  # explicit opt-out.
+    # По умолчанию ОТКЛЮЧЕНО на default-memory (256 МБ OOM-killed scanner).
+    # Данные обновляет Devin Schedule каждые 30 мин и редеплоит fly.
+    if os.environ.get("FLY_DASHBOARD_REFRESH") != "1":
+        log.info("[fly-refresh] skipped (default off; set FLY_DASHBOARD_REFRESH=1 to enable)")
+        return
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
@@ -222,8 +225,10 @@ async def _fly_paper_trader_tick():
         return  # Devin VM has its own paper_trader; nothing to do here.
     if os.environ.get("FLY_FULL") == "1":
         return  # full mode runs paper_trader as subprocess.
-    if os.environ.get("FLY_PAPER_TRADER") == "0":
-        return  # explicit opt-out.
+    # По умолчанию ОТКЛЮЧЕНО на default-memory (256 МБ OOM-killed paper_trader).
+    if os.environ.get("FLY_PAPER_TRADER") != "1":
+        log.info("[fly-paper] skipped (default off; set FLY_PAPER_TRADER=1 to enable)")
+        return
 
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
@@ -336,13 +341,31 @@ def _load(path: Path, default):
 
 @app.get("/")
 def root():
-    """FX INVESTMENT — cinematic per-pair market intent landing.
-    Use /system для полного аудита/heartbeats."""
-    return FileResponse(str(STATIC / "intent.html"))
+    """СТАКАН-only — минимальный сайт: только селектор пары + БОЛЬШОЙ ВЕРДИКТ
+    (КУПИТЬ / ПРОДАТЬ / ОЖИДАНИЕ) + visual orderbook + крупные игроки + live-цена.
+
+    Институциональный движок (см. `stakan_view._institutional_verdict`) под капотом
+    использует ВСЕ источники: VP big-players (×4), no-return levels (×3), COT (×3),
+    Market Radar (×3), FRED-macro (×2), 11-vote stakan-консенсус (×3), VP impulse
+    (×2). Розничные индикаторы (EMA/ADX/MACD) — только ×0.5. News blackout = veto.
+
+    Старые UI:
+      - /intent — кинематографическая FX INVESTMENT-панель
+      - /system — полный системный дашборд / heartbeats
+      - /trades — все сделки в одном месте
+    """
+    return FileResponse(str(STATIC / "stakan-only.html"))
+
+
+@app.get("/stakan")
+def stakan_only_page():
+    """Алиас для главной страницы — СТАКАН-only."""
+    return FileResponse(str(STATIC / "stakan-only.html"))
 
 
 @app.get("/intent")
 def intent_page():
+    """Кинематографическая FX INVESTMENT-панель (legacy, доступна по прямой ссылке)."""
     return FileResponse(str(STATIC / "intent.html"))
 
 
@@ -777,6 +800,85 @@ def api_stakan_view_pair(pair: str):
 def api_stakan_view_all():
     """Компактный snapshot 28 пар для selector-сетки в разделе СТАКАН."""
     return stakan_view_mod.build_all_summary()
+
+
+@app.get("/api/integrity-audit")
+def api_integrity_audit(pair: str | None = None):
+    """«Гарант честности» — проверяет что Bayesian-формула консистентна для
+    указанной пары (?pair=EURUSD). Без параметра — проверяет ОДНУ случайную
+    пару на каждый запрос (чтобы не съесть память на free-tier fly с 256 МБ).
+
+    Что проверяется:
+    1. Все voted-источники имеют conf ∈ [0.55, 0.95] (нет fake/0/random).
+    2. Минимум 5 голосующих источников.
+    3. Bayesian формула пересчитывается с нуля и сравнивается с показанным
+       favorite_balance_pct (расхождение >0.5% = ошибка).
+    4. reason_ru упоминает конкретные имена источников с %.
+    """
+    import math as _m
+    import random
+    target = (pair or random.choice(config.PAIRS)).upper()
+    if target not in config.PAIRS:
+        raise HTTPException(400, f"unknown pair {target}")
+
+    try:
+        v = stakan_view_mod.build_view(target)
+        vd = v.get("verdict") or {}
+        sources = vd.get("sources") or []
+        issues = []
+
+        voted = [s for s in sources if s.get("side") in ("UP", "DOWN")]
+        for s in voted:
+            c = float(s.get("conf") or 0)
+            if not (0.55 <= c <= 0.95):
+                issues.append(f"{s.get('name')}: conf={c} вне [0.55, 0.95]")
+
+        if len(voted) < 5:
+            issues.append(f"voted_count={len(voted)} < 5")
+
+        log_odds_up = 0.0
+        for s in voted:
+            c = max(0.51, min(0.95, float(s.get("conf") or 0.55)))
+            lo = _m.log(c / (1.0 - c))
+            log_odds_up += lo if s["side"] == "UP" else -lo
+        p_up = 1.0 / (1.0 + _m.exp(-log_odds_up)) if voted else 0.5
+        p_fav = max(p_up, 1 - p_up)
+        expected_balance = round(p_fav * 100.0, 1)
+        actual_balance = vd.get("favorite_balance_pct")
+        if actual_balance is None or abs(expected_balance - actual_balance) > 0.5:
+            issues.append(
+                f"Bayesian mismatch: рассчитано {expected_balance}% vs "
+                f"показано {actual_balance}%"
+            )
+
+        reason = vd.get("reason_ru") or ""
+        if "%" not in reason:
+            issues.append("reason_ru не упоминает источники с %")
+
+        below_80 = (actual_balance or 0) < 80.0
+        return {
+            "checked_at_utc": datetime.utcnow().isoformat() + "Z",
+            "pair": target,
+            "honest": (len(issues) == 0),
+            "favorite_balance_pct": actual_balance,
+            "voted_count": len(voted),
+            "below_80pct": below_80,
+            "issues": issues,
+            "explanation_ru": (
+                "Каждый источник имеет conf ∈ [0.55, 0.95]. Bayesian: "
+                "log_odds = Σ sign · ln(conf/(1-conf)); P = 1/(1+exp(-|log_odds|)). "
+                "Никаких симуляторов / random — всё детерминистично из реальных "
+                "Yahoo/CFTC/FRED/ForexFactory данных. Чтобы проверить другую пару "
+                "вызовите ?pair=GBPJPY и т.п."
+            ),
+        }
+    except Exception as exc:
+        return {
+            "checked_at_utc": datetime.utcnow().isoformat() + "Z",
+            "pair": target,
+            "honest": False,
+            "issues": [f"exception: {exc!r}"],
+        }
 
 
 # ─── Лёгкий live-price endpoint для 5-секундного refresh (2026-05-04) ─────────

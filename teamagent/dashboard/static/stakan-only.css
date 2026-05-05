@@ -1,0 +1,556 @@
+/* ─────────────────────────────────────────────────────────────────────
+   stakan-only.css — минимальный стиль для страницы СТАКАН-only.
+   Главный блок — большой яркий вердикт «КУПИТЬ / ПРОДАТЬ / ОЖИДАНИЕ».
+   ───────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: #04060d;
+  color: #e9eef7;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 600px at 12% -10%, rgba(0, 225, 255, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 90% 5%, rgba(124, 92, 255, 0.10), transparent 60%),
+    #04060d;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────── */
+.so-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid #1a2030;
+  background: rgba(8, 12, 22, 0.82);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.so-brand { display: flex; align-items: center; gap: 12px; }
+.so-logo { font-size: 24px; }
+.so-title { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; }
+.so-status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #9aa9bf; }
+.so-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #4afaa3; box-shadow: 0 0 8px #4afaa3;
+}
+.so-dot.warn  { background: #ffce5e; box-shadow: 0 0 8px #ffce5e; }
+.so-dot.error { background: #ff6979; box-shadow: 0 0 8px #ff6979; }
+.so-clock { color: #6f7e96; font-variant-numeric: tabular-nums; }
+
+/* ── Picker (28 пар) ────────────────────────────────────────────── */
+.so-picker-wrap {
+  padding: 14px 22px 6px;
+  border-bottom: 1px solid #1a2030;
+  background: #06090f;
+}
+.so-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 6px;
+}
+.so-empty {
+  padding: 14px;
+  color: #6f7e96;
+  font-size: 14px;
+}
+.so-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px 9px;
+  background: #0d121e;
+  border: 1px solid #1d2638;
+  border-radius: 9px;
+  color: #d0dbef;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  transition: transform .08s, border-color .12s, box-shadow .12s;
+}
+.so-chip:hover { border-color: #2f3c58; transform: translateY(-1px); }
+.so-chip.active {
+  border-color: #00e1ff;
+  box-shadow: 0 0 0 1px rgba(0, 225, 255, 0.45) inset, 0 0 14px rgba(0, 225, 255, 0.15);
+  background: linear-gradient(180deg, rgba(0,225,255,0.10), rgba(0,225,255,0.02));
+}
+.so-chip-pair { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+.so-chip-side { font-size: 10px; font-weight: 700; }
+.so-chip-side.buy  { color: #4afaa3; }
+.so-chip-side.sell { color: #ff8090; }
+.so-chip-verdict { font-size: 10px; font-weight: 800; letter-spacing: 0.4px; line-height: 1.2; }
+.so-chip-verdict.green     { color: #4afaa3; }
+.so-chip-verdict.red       { color: #ff6979; }
+.so-chip-verdict.yellow_buy  { color: #fbe05a; }
+.so-chip-verdict.yellow_sell { color: #ffaa70; }
+.so-chip-verdict.gray      { color: #6f7e96; }
+.so-chip-prob {
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+.so-chip-prob.buy  { background: rgba(74,250,163,0.12); color: #4afaa3; }
+.so-chip-prob.sell { background: rgba(255,128,144,0.12); color: #ff8090; }
+/* highlight chips by side */
+.so-chip:has(.so-chip-verdict.green) { border-color: rgba(74,250,163,0.35); }
+.so-chip:has(.so-chip-verdict.red) { border-color: rgba(255,105,121,0.35); }
+.so-chip:has(.so-chip-verdict.yellow_buy) { border-color: rgba(251,224,90,0.30); }
+.so-chip:has(.so-chip-verdict.yellow_sell) { border-color: rgba(255,170,112,0.30); }
+
+/* ── Pair bar (текущая пара + live-цена) ─────────────────────────── */
+.so-pair-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 6px 18px;
+  padding: 14px 22px;
+  border-bottom: 1px solid #1a2030;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.so-pair-name {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  grid-row: 1 / span 2;
+}
+.so-pair-price {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  text-align: right;
+  grid-row: 1;
+  grid-column: 3;
+}
+.so-pair-pulse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #9aa9bf;
+  grid-row: 1;
+  grid-column: 2;
+}
+.so-pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #4afaa3; box-shadow: 0 0 8px #4afaa3;
+  animation: so-pulse 1.4s ease-in-out infinite;
+}
+@keyframes so-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+.so-pair-meta {
+  font-size: 12px;
+  color: #6f7e96;
+  grid-row: 2;
+  grid-column: 2 / span 2;
+  text-align: right;
+}
+.so-sep { margin: 0 8px; color: #2f3c58; }
+
+/* ── ВЕРДИКТ — главный блок ──────────────────────────────────────── */
+.so-verdict {
+  margin: 18px 22px 0;
+  padding: 26px 28px;
+  border-radius: 18px;
+  border: 1px solid #1d2638;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0));
+  position: relative;
+  transition: border-color .25s, box-shadow .25s, background .25s;
+}
+.so-verdict[data-color="green"] {
+  border-color: rgba(74, 250, 163, 0.55);
+  background:
+    radial-gradient(700px 280px at 50% -40%, rgba(74, 250, 163, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(74, 250, 163, 0.06), rgba(0,0,0,0));
+  box-shadow: 0 0 30px rgba(74, 250, 163, 0.08) inset;
+}
+.so-verdict[data-color="red"] {
+  border-color: rgba(255, 105, 121, 0.55);
+  background:
+    radial-gradient(700px 280px at 50% -40%, rgba(255, 105, 121, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(255, 105, 121, 0.06), rgba(0,0,0,0));
+  box-shadow: 0 0 30px rgba(255, 105, 121, 0.08) inset;
+}
+.so-verdict[data-color="yellow_buy"],
+.so-verdict[data-color="yellow_sell"] {
+  border-color: rgba(255, 206, 94, 0.55);
+  background:
+    radial-gradient(700px 280px at 50% -40%, rgba(255, 206, 94, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(255, 206, 94, 0.05), rgba(0,0,0,0));
+  box-shadow: 0 0 30px rgba(255, 206, 94, 0.08) inset;
+}
+.so-verdict[data-color="gray"] {
+  border-color: #1d2638;
+}
+
+.so-verdict-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.so-verdict-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #6f7e96;
+  text-transform: uppercase;
+}
+.so-verdict-strength {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #2f3c58;
+  color: #9aa9bf;
+}
+.so-verdict-strength.strong { color: #ffffff; border-color: currentColor; }
+.so-verdict-strength.medium { color: #ffce5e; border-color: rgba(255,206,94,0.55); }
+.so-verdict-strength.weak   { color: #ffaa70; border-color: rgba(255,170,112,0.45); }
+.so-verdict-strength.wait   { color: #6f7e96; }
+
+.so-verdict-text {
+  font-size: clamp(48px, 9vw, 96px);
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  margin: 12px 0 18px;
+  color: #ffffff;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+.so-verdict[data-color="green"]       .so-verdict-text { color: #4afaa3; text-shadow: 0 0 30px rgba(74,250,163,0.45); }
+.so-verdict[data-color="red"]         .so-verdict-text { color: #ff6979; text-shadow: 0 0 30px rgba(255,105,121,0.45); }
+.so-verdict[data-color="yellow_buy"]  .so-verdict-text { color: #ffce5e; text-shadow: 0 0 30px rgba(255,206,94,0.45); }
+.so-verdict[data-color="yellow_sell"] .so-verdict-text { color: #ffce5e; text-shadow: 0 0 30px rgba(255,206,94,0.45); }
+.so-verdict[data-color="gray"]        .so-verdict-text { color: #6f7e96; }
+
+.so-verdict-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.so-stat {
+  background: rgba(8, 12, 22, 0.6);
+  border: 1px solid #1d2638;
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.so-stat-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #6f7e96;
+  margin-bottom: 4px;
+}
+.so-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e9eef7;
+  font-variant-numeric: tabular-nums;
+}
+
+.so-verdict-reason {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #c8d3e6;
+  background: rgba(8, 12, 22, 0.55);
+  border-left: 3px solid #2f3c58;
+  border-radius: 0 10px 10px 0;
+  padding: 12px 16px;
+  margin: 6px 0 14px;
+}
+.so-verdict[data-color="green"]       .so-verdict-reason { border-left-color: #4afaa3; }
+.so-verdict[data-color="red"]         .so-verdict-reason { border-left-color: #ff6979; }
+.so-verdict[data-color="yellow_buy"]  .so-verdict-reason,
+.so-verdict[data-color="yellow_sell"] .so-verdict-reason { border-left-color: #ffce5e; }
+
+/* План сделки — явный срок и время истечения */
+.so-trade-plan {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(74, 250, 163, 0.25);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(74,250,163,0.06), rgba(0,0,0,0));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+}
+@media (max-width: 600px) {
+  .so-trade-plan { grid-template-columns: 1fr; }
+}
+.so-tp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+}
+.so-tp-row[hidden] { display: none !important; }
+.so-tp-lbl { color: #9aa9bf; }
+.so-tp-val {
+  color: #e6edf6;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+#so-tp-news-row .so-tp-val { color: #ffce5e; }
+
+.so-verdict[data-color="red"] .so-trade-plan { border-color: rgba(255, 105, 121, 0.30); background: linear-gradient(180deg, rgba(255,105,121,0.06), rgba(0,0,0,0)); }
+.so-verdict[data-color="yellow_buy"] .so-trade-plan,
+.so-verdict[data-color="yellow_sell"] .so-trade-plan { border-color: rgba(255, 206, 94, 0.25); background: linear-gradient(180deg, rgba(255,206,94,0.05), rgba(0,0,0,0)); }
+
+/* Покупатели vs Продавцы — горизонтальная полоса */
+.so-bs { margin-top: 8px; }
+.so-bs-bar {
+  display: flex;
+  height: 26px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #14182a;
+}
+.so-bs-buy {
+  display: flex; align-items: center; justify-content: flex-start;
+  padding: 0 10px;
+  font-size: 12px; font-weight: 700; color: #04060d;
+  background: linear-gradient(90deg, #4afaa3, #2dd99c);
+  transition: width .35s ease;
+}
+.so-bs-sell {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 10px;
+  font-size: 12px; font-weight: 700; color: #04060d;
+  background: linear-gradient(90deg, #ff8090, #ff5470);
+  transition: width .35s ease;
+}
+.so-bs-legend {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: #6f7e96;
+  margin-top: 4px; letter-spacing: 0.5px;
+}
+.so-bs-buy-pin  { color: #4afaa3; }
+.so-bs-sell-pin { color: #ff8090; }
+
+/* Источники (раскрывающийся список) */
+.so-sources {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(8, 12, 22, 0.45);
+  border: 1px solid #1d2638;
+}
+.so-sources summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #9aa9bf;
+  letter-spacing: 0.3px;
+}
+.so-sources-list {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  font-size: 13px;
+  color: #b6c1d6;
+}
+.so-sources-list li {
+  padding: 5px 8px;
+  border-bottom: 1px dashed rgba(255,255,255,0.06);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.so-sources-list li:last-child { border-bottom: none; }
+.so-src-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #14182a;
+  color: #6f7e96;
+  flex-shrink: 0;
+  width: 86px;
+  text-align: center;
+}
+.so-src-tag.inst   { background: rgba(0, 225, 255, 0.10); color: #58dbff; }
+.so-src-tag.retail { background: rgba(124, 92, 255, 0.10); color: #b29dff; }
+.so-src-side {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+}
+.so-src-side.up   { color: #4afaa3; }
+.so-src-side.down { color: #ff8090; }
+.so-src-side.none { color: #2f3c58; }
+
+/* ── Стакан + крупные игроки ─────────────────────────────────────── */
+.so-mid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  padding: 18px 22px 22px;
+}
+@media (max-width: 880px) {
+  .so-mid { grid-template-columns: 1fr; }
+}
+
+.so-orderbook,
+.so-bigplayers {
+  background: rgba(8, 12, 22, 0.65);
+  border: 1px solid #1d2638;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.so-orderbook h3,
+.so-bigplayers h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #c8d3e6;
+}
+.so-help {
+  font-size: 12px;
+  color: #6f7e96;
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.so-help .g { color: #4afaa3; }
+.so-help .r { color: #ff8090; }
+
+.so-ob-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.so-ob-legend {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: #6f7e96;
+}
+.so-ob-pin {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #2f3c58;
+}
+.so-ob-pin.so-ob-poc { color: #ffce5e; border-color: rgba(255,206,94,0.45); }
+.so-ob-pin.so-ob-vah { color: #58dbff; border-color: rgba(88,219,255,0.45); }
+.so-ob-pin.so-ob-val { color: #b29dff; border-color: rgba(178,157,255,0.45); }
+.so-ob-pin.so-ob-cur { color: #4afaa3; border-color: rgba(74,250,163,0.45); }
+
+.so-ob-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+.so-ob-row {
+  display: grid;
+  grid-template-columns: 78px 1fr 64px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.so-ob-row.cur {
+  background: rgba(74, 250, 163, 0.10);
+  border: 1px solid rgba(74, 250, 163, 0.35);
+}
+.so-ob-row.poc { background: rgba(255, 206, 94, 0.10); }
+.so-ob-row.vah { background: rgba(88, 219, 255, 0.06); }
+.so-ob-row.val { background: rgba(178, 157, 255, 0.06); }
+
+.so-ob-price {
+  font-weight: 600;
+  color: #9aa9bf;
+}
+.so-ob-row.cur .so-ob-price { color: #4afaa3; font-weight: 700; }
+.so-ob-bar {
+  background: linear-gradient(90deg, rgba(0,225,255,0.45), rgba(0,225,255,0.10));
+  height: 12px;
+  border-radius: 4px;
+}
+.so-ob-row.above .so-ob-bar {
+  background: linear-gradient(90deg, rgba(255,128,144,0.45), rgba(255,128,144,0.10));
+}
+.so-ob-row.below .so-ob-bar {
+  background: linear-gradient(90deg, rgba(74,250,163,0.45), rgba(74,250,163,0.10));
+}
+.so-ob-vol {
+  font-size: 11px;
+  color: #6f7e96;
+  text-align: right;
+}
+
+/* Big players list */
+.so-bp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+.so-bp-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #0d121e;
+  border-left: 3px solid #2f3c58;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.so-bp-row.support { border-left-color: #4afaa3; }
+.so-bp-row.resistance { border-left-color: #ff8090; }
+.so-bp-price { font-weight: 700; }
+.so-bp-kind {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #9aa9bf;
+  text-transform: uppercase;
+}
+.so-bp-row.support .so-bp-kind { color: #4afaa3; }
+.so-bp-row.resistance .so-bp-kind { color: #ff8090; }
+.so-bp-weight {
+  font-size: 11px;
+  color: #6f7e96;
+}
+
+/* Footer */
+.so-footer {
+  padding: 12px 22px;
+  border-top: 1px solid #1a2030;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #6f7e96;
+}
+.so-build { font-variant-numeric: tabular-nums; opacity: 0.7; }

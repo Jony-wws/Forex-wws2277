@@ -232,9 +232,11 @@ For a permanent URL (Devin tunnel dies when the VM dies), use:
   `deploy backend` tool. The fly app runs the FastAPI dashboard +
   forecast_scanner + paper_trader + backtester (without the 64 subprocess
   agents — those stay Devin-session-only because of resource limits).
-- **Devin Schedule** (already configured, sched-083b11171a0841668f4608b075d769b5):
-  hourly recurring session that runs `start_all.sh`, waits 10 min,
-  commits state, exits. Survives because state_committer pushes to git.
+- **Devin Schedule** (currently active, `sched-5229cad67c5e4965aa6400ba6da8070a`):
+  recurring session **every 30 minutes** (`*/30 * * * *`) that runs
+  `start_all.sh`, waits 10 min, commits state, redeploys fly.io. Survives
+  because state_committer pushes to git. (Старое hourly расписание
+  `sched-083b11171a0841668f4608b075d769b5` устарело и удалено.)
 
 ## Cross-session continuity (no re-explanation needed)
 
@@ -251,25 +253,42 @@ Knowledge Note is loaded.
 
 ## Devin Schedule (already running)
 
-Schedule ID: `sched-083b11171a0841668f4608b075d769b5`
-Frequency: `0 * * * *` (every hour)
-Branch: `devin/1777586006-teamagent-rebuild`
+Schedule ID: `sched-5229cad67c5e4965aa6400ba6da8070a`
+Frequency: `*/30 * * * *` (каждые 30 минут — по требованию пользователя «каждый
+30 минут обновил данные на fly сайт»)
+Branch: `devin/1777915011-institutional-verdict-stakan-only`
 
-What it does each hour: pulls latest, runs `start_all.sh`, waits ~10 min for
-forecast_scanner / paper_trader / backtester / state_committer to do their
-thing, then `stop_all.sh` and exits. State is auto-committed via
-`state_committer`.
+What it does every 30 min: pulls latest, runs `start_all.sh`, waits 10 min for
+forecast_scanner / paper_trader / paper_trader_stakan / market_radar /
+state_committer to refresh state, then `stop_all.sh`, commits и **redeploys**
+fly.io через `deploy backend volume=true`. Если URL поменялся — обновляет
+AGENTS.md секцию «PERMANENT URL».
+
+Старый hourly schedule (`sched-083b11171a0841668f4608b075d769b5`) удалён.
 
 ## Where to find the user's data
 
 ### PERMANENT URL (Fly.io, 24/7, no Devin needed) — primary
 
-**`https://fxinvestment-nbmuknwe.fly.dev/`** (canonical, 2026-05-04)
-Old (still alive but pre-3-section reorg): `https://fxinvestment-lbtxlhtb.fly.dev/`
+**`https://fxinvestment-kwotgqny.fly.dev/`** (canonical, 2026-05-04 — feature-branch
+deploy of the «STAKAN-only» institutional verdict UI после правок «нигде не
+должно быть ОЖИДАНИЕ + min 70%»; будет канонической после merge PR #14
+в `devin/1777586006-teamagent-rebuild`).
+
+Старые:
+- `https://fxinvestment-ytjmvlnz.fly.dev/` (pre-30-min-refresh canonical)
+- `https://fxinvestment-jwodwfwy.fly.dev/` (pre-«no-ОЖИДАНИЕ» STAKAN-only)
+- `https://fxinvestment-nbmuknwe.fly.dev/` (pre-stakan-only, 3-section UI)
+- `https://fxinvestment-lbtxlhtb.fly.dev/` (pre-3-section reorg)
 
 - No login. No password. Just open it.
 - Routes:
-  - `/` and `/intent` → cinematic FX INVESTMENT landing (28 pairs, charts,
+  - `/` и `/stakan` → **STAKAN-only**: только селектор 28 пар + БОЛЬШОЙ
+    институциональный вердикт (КУПИТЬ / ПРОДАТЬ / СКОРЕЕ КУПИТЬ /
+    СКОРЕЕ ПРОДАТЬ / ВОЗМОЖНО КУПИТЬ / ВОЗМОЖНО ПРОДАТЬ — но
+    **никогда** ОЖИДАНИЕ; вероятность всегда ≥ 70%) +
+    Volume-Profile-стакан + крупные игроки + live-цена (5–10 сек).
+  - `/intent` → cinematic FX INVESTMENT landing (legacy, 28 pairs, charts,
     pressure bars, currency strength heatmap, СТАКАН раздел, 10-sec refresh).
   - `/system` → audit dashboard (heartbeats, agents, paper-trader stats,
     closed-trades history).
@@ -280,8 +299,9 @@ Old (still alive but pre-3-section reorg): `https://fxinvestment-lbtxlhtb.fly.de
   fly.toml (auto-stop machines, /data volume, region sjc).
 - Fly config: dashboard-only mode (auto-detected via `/data` mount). The
   scanner / paper_trader / 60+ subprocess agents run on the Devin VM via
-  the hourly Schedule (`sched-083b…`); state files are committed to git
-  and travel with each Fly redeploy.
+  the 30-min Schedule (`sched-5229cad6…`); state files are committed to
+  git and travel with each Fly redeploy (расписание само вызывает
+  `deploy backend` после каждого свежего скана).
 - Cold-start: ~10–20 sec on first request after idle (fly auto-stops the
   machine to save quota). Subsequent requests are instant.
 - To redeploy after code changes (in a Devin session):
@@ -317,7 +337,7 @@ this file so the user always has the latest.
 - PR #1: https://github.com/Jony-wws/Forex-wws2277/pull/1
 - All commits + state history:
   https://github.com/Jony-wws/Forex-wws2277/commits/devin/1777586006-teamagent-rebuild
-- Devin Schedule (hourly): `sched-083b11171a0841668f4608b075d769b5`
+- Devin Schedule (every 30 min): `sched-5229cad67c5e4965aa6400ba6da8070a`
 
 ## Honest known limitations (do NOT hide these)
 
