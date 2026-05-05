@@ -666,8 +666,11 @@
             const sideCls = f.side === 'BUY' ? 'buy' : 'sell';
             const sideTxt = f.side === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
             const sideColor = f.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
+            const isFallback = f.tier === 'PREMIUM' && f.tier_fallback;
             const tierCls = f.tier === 'PREMIUM' ? 'tier-premium' : 'tier-medium';
-            const tierTxt = f.tier === 'PREMIUM' ? 'ПРЕМИУМ' : 'Средний';
+            const tierTxt = f.tier === 'PREMIUM'
+                ? (isFallback ? 'ПРЕМИУМ*' : 'ПРЕМИУМ')
+                : 'Средний';
             const result5 = f.result_5h
                 ? (f.result_5h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
                 : '';

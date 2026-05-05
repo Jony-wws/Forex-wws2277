@@ -40,9 +40,12 @@ log = logging.getLogger("cycle")
 
 CYCLE_HOURS = 5
 TOP_N = 5
+MIN_PREMIUM = 3                # always at least N PREMIUM per cycle
 WIN_MOVE_PCT = 0.10            # binary-options win threshold (in %)
-PREMIUM_RATIO = 0.40           # score / max_score for premium tier
-PREMIUM_CONFIDENCE = 80
+# Strict PREMIUM thresholds (very strict — «очень и очень строгий контроль»)
+PREMIUM_CONFIDENCE = 85
+PREMIUM_RATIO = 0.50           # score / max_score
+PREMIUM_ADX = 25.0             # min ADX of the H1 trend
 HISTORY_KEEP_CYCLES = 60       # keep up to 60 finished cycles (~12.5 days)
 WINRATE_WINDOW_CYCLES = 10     # winrate is computed over the last N cycles
 
@@ -84,13 +87,38 @@ def _classify_tier(forecast: dict) -> str:
     max_score = max(1, int(forecast.get("max_score") or 1))
     ratio = score / max_score
     aligned = bool(forecast.get("multi_tf_aligned"))
+    adx = float((forecast.get("indicators") or {}).get("ADX", 0) or 0)
     if (
         confidence >= PREMIUM_CONFIDENCE
         and ratio >= PREMIUM_RATIO
         and aligned
+        and adx >= PREMIUM_ADX
     ):
         return "PREMIUM"
     return "MEDIUM"
+
+
+def _ensure_min_premium(selected: list[dict]) -> None:
+    """Guarantee at least ``MIN_PREMIUM`` PREMIUM forecasts per cycle.
+
+    The strict criteria above can fail on weak markets. To keep the
+    user-promised «at least 3 strong forecasts every 5 hours» contract,
+    promote the top-by-score MEDIUMs from the already-selected top-5
+    until ``MIN_PREMIUM`` is reached. Promoted entries get a
+    ``tier_fallback`` flag so the UI can show that they hit the minimum
+    via fallback rather than the strict gate.
+    """
+    premium_count = sum(1 for f in selected if f.get("tier") == "PREMIUM")
+    if premium_count >= MIN_PREMIUM:
+        return
+    mediums = [f for f in selected if f.get("tier") == "MEDIUM"]
+    mediums.sort(
+        key=lambda f: (abs(int(f.get("score") or 0)), int(f.get("confidence") or 0)),
+        reverse=True,
+    )
+    for f in mediums[: MIN_PREMIUM - premium_count]:
+        f["tier"] = "PREMIUM"
+        f["tier_fallback"] = True
 
 
 def _eligible(forecast: dict) -> bool:
@@ -283,12 +311,14 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                     "strength": f.get("strength"),
                     "session": session,
                     "tier": tier,
+                    "tier_fallback": False,
                     "entry_price": round(float(price), 5),
                     "forecast_5h": f.get("forecast_5h"),
                     "forecast_24h": f.get("forecast_24h"),
                     "evaluated_5h": False,
                     "evaluated_24h": False,
                 })
+            _ensure_min_premium(selected)
 
             current = {
                 "cycle_start_utc": active_iso,
