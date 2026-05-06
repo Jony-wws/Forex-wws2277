@@ -54,6 +54,63 @@ def read_text(path: Path, limit: int = 6000) -> str:
         return ""
 
 
+def call_cloudflare_workers_ai(
+    prompt: str,
+    account_id: str,
+    api_token: str,
+    model: str = "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+) -> str | None:
+    """Cloudflare Workers AI — primary narrator (Llama 3.3 70B, free tier).
+
+    Endpoint: ``https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}``
+    Auth:     ``Authorization: Bearer {api_token}``
+    Docs:     https://developers.cloudflare.com/workers-ai/
+    """
+    if not (account_id and api_token):
+        return None
+    body = json.dumps({
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 600,
+        "temperature": 0.4,
+    }).encode("utf-8")
+    url = (
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+        f"/ai/run/{model}"
+    )
+    req = Request(
+        url,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_token}",
+            "content-type": "application/json",
+            "accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        print(f"[ai_narrative] cloudflare workers ai failed: {e}", file=sys.stderr)
+        return None
+    if not data.get("success"):
+        errs = data.get("errors") or []
+        print(f"[ai_narrative] cloudflare returned errors: {errs}", file=sys.stderr)
+        return None
+    result = data.get("result") or {}
+    text = result.get("response")
+    if isinstance(text, str) and text.strip():
+        return text
+    choices = result.get("choices") or []
+    if choices:
+        msg = (choices[0] or {}).get("message") or {}
+        if isinstance(msg.get("content"), str):
+            return msg["content"]
+    return None
+
+
 def call_github_models(prompt: str, token: str) -> str | None:
     model = os.getenv("GITHUB_MODEL", "openai/gpt-4o-mini")
     body = json.dumps({
@@ -105,10 +162,21 @@ def main() -> int:
         return 0
 
     prompt = f"## Цикл 5h\n{cycle_md}\n\n## Деградировавшие\n{degraded_md or '(нет)'}"
-    token = os.getenv("GITHUB_TOKEN")
+
+    cf_account = os.getenv("CF_AI_ACCOUNT_ID")
+    cf_token = os.getenv("CF_AI_API_TOKEN")
+    cf_model = os.getenv("CF_AI_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+    gh_token = os.getenv("GITHUB_TOKEN")
+
     narrative: str | None = None
-    if token:
-        narrative = call_github_models(prompt, token)
+    # 1. Cloudflare Workers AI — PRIMARY (free Llama 3.3 70B).
+    if cf_account and cf_token:
+        narrative = call_cloudflare_workers_ai(
+            prompt, cf_account, cf_token, cf_model,
+        )
+    # 2. GitHub Models — transparent fallback when CF secrets missing/fail.
+    if not narrative and gh_token:
+        narrative = call_github_models(prompt, gh_token)
     if not narrative:
         narrative = "(LLM недоступен — повторим на следующем цикле)"
 
