@@ -128,15 +128,21 @@ f_h1_block() =>
     e20 = ta.ema(close, 20)
     e50 = ta.ema(close, 50)
     rsi14 = ta.rsi(close, 14)
-    [_macd, _signal, hist]   = ta.macd(close, 12, 26, 9)
+    macd_line                = 0.0
+    signal_line              = 0.0
+    hist                     = 0.0
+    [_m, _s, _h]             = ta.macd(close, 12, 26, 9)
+    macd_line               := _m
+    signal_line             := _s
+    hist                    := _h
     k                        = ta.stoch(close, high, low, 14)
     d_                       = ta.sma(k, 3)
-    [bb_m, bb_t_dummy, bb_b] = ta.bb(close, 20, 2.0)
-    bb_pct                   = (close - bb_b) / (bb_t_dummy - bb_b)
+    [bb_m, bb_up, bb_lo]     = ta.bb(close, 20, 2.0)
+    bb_pct                   = (close - bb_lo) / (bb_up - bb_lo)
     [dp, dm, ax]             = ta.dmi(14, 14)
     williams                 = ta.wpr(14)
     momentum                 = (close - close[12]) / close[12] * 100.0
-    [_aru, _ard, osc_a]      = f_aroon(25)
+    [aru_v, ard_v, osc_a]    = f_aroon(25)
     cci_v                    = f_cci(20)
     atr_v                    = ta.atr(14)
     atr_avg                  = ta.sma(atr_v, 50)
@@ -151,12 +157,12 @@ m15_d    = ta.sma(m15_k, 3)
 m15_atr  = ta.atr(14)
 m15_atr_avg = ta.sma(m15_atr, 50)
 m15_mom  = (close - close[12]) / close[12] * 100.0
-[_m_aru, _m_ard, m15_aro] = f_aroon(25)
+[m_aru_v, m_ard_v, m15_aro] = f_aroon(25)
 m15_cci  = f_cci(20)
 m15_wpr  = ta.wpr(14)
 m15_e20  = ta.ema(close, 20)
 m15_e50  = ta.ema(close, 50)
-[_, _, m15_macd_h] = ta.macd(close, 12, 26, 9)
+[m15_macd_l, m15_macd_s, m15_macd_h] = ta.macd(close, 12, 26, 9)
 
 // ──────────────────────────────────────────────────────────────────────
 //  VOTING BLOCKS  (mirror app/analyzer.py — 18 blocks A..R, weights matched)
@@ -169,77 +175,95 @@ addVote(condBuy, condSell, weight) =>
 
 // Block A — H1 EMA20 vs EMA50            ±3.0
 [sA, wA] = addVote(h1_e20 > h1_e50, h1_e20 < h1_e50, 3.0)
-score += sA, maxScore += wA
+score := score + sA
+maxScore := maxScore + wA
 
 // Block B — H1 RSI(14) momentum          ±2.0
 [sB, wB] = addVote(h1_rsi > 55, h1_rsi < 45, 2.0)
-score += sB, maxScore += wB
+score := score + sB
+maxScore := maxScore + wB
 
 // Block C — H1 MACD histogram            ±2.5
 [sC, wC] = addVote(h1_macd_h > 0, h1_macd_h < 0, 2.5)
-score += sC, maxScore += wC
+score := score + sC
+maxScore := maxScore + wC
 
 // Block D — H1 Stochastic                ±1.5
 [sD, wD] = addVote(h1_k > h1_d and h1_k < 80, h1_k < h1_d and h1_k > 20, 1.5)
-score += sD, maxScore += wD
+score := score + sD
+maxScore := maxScore + wD
 
 // Block E — H1 Bollinger %B              ±1.5
 [sE, wE] = addVote(h1_bb > 0.6, h1_bb < 0.4, 1.5)
-score += sE, maxScore += wE
+score := score + sE
+maxScore := maxScore + wE
 
 // Block F — H1 ADX + DI cross            ±3.0
 [sF, wF] = addVote(h1_adx > 20 and h1_dp > h1_dm, h1_adx > 20 and h1_dm > h1_dp, 3.0)
-score += sF, maxScore += wF
+score := score + sF
+maxScore := maxScore + wF
 
 // Block G — H1 Williams %R               ±1.5
 [sG, wG] = addVote(h1_wpr > -20, h1_wpr < -80, 1.5)
-score += sG, maxScore += wG
+score := score + sG
+maxScore := maxScore + wG
 
 // Block H — H1 Momentum                  ±2.0
 [sH, wH] = addVote(h1_mom > 0.05, h1_mom < -0.05, 2.0)
-score += sH, maxScore += wH
+score := score + sH
+maxScore := maxScore + wH
 
 // Block I — Multi-TF alignment           ±4.0
 [sI, wI] = addVote(mtf_dir == 1, mtf_dir == -1, 4.0)
-score += sI, maxScore += wI
+score := score + sI
+maxScore := maxScore + wI
 
 // Block J — M15 EMA cross                ±1.0
 [sJ, wJ] = addVote(m15_e20 > m15_e50, m15_e20 < m15_e50, 1.0)
-score += sJ, maxScore += wJ
+score := score + sJ
+maxScore := maxScore + wJ
 
 // Block K — M15 RSI                      ±1.0
 [sK, wK] = addVote(m15_rsi > 55, m15_rsi < 45, 1.0)
-score += sK, maxScore += wK
+score := score + sK
+maxScore := maxScore + wK
 
 // Block L — M15 MACD histogram           ±1.0
 [sL, wL] = addVote(m15_macd_h > 0, m15_macd_h < 0, 1.0)
-score += sL, maxScore += wL
+score := score + sL
+maxScore := maxScore + wL
 
 // Block M — M15 Williams %R              ±1.0
 [sM, wM] = addVote(m15_wpr > -20, m15_wpr < -80, 1.0)
-score += sM, maxScore += wM
+score := score + sM
+maxScore := maxScore + wM
 
 // Block N — M15 ATR / avg-ATR (vol regime) ±1.0
 volOk = m15_atr_avg > 0 and m15_atr / m15_atr_avg > 1.0
 [sN, wN] = addVote(volOk and score > 0, volOk and score < 0, 1.0)
-score += sN, maxScore += wN
+score := score + sN
+maxScore := maxScore + wN
 
 // Block P — H1 Aroon oscillator          ±2.0
 [sP, wP] = addVote(h1_aro >  50, h1_aro < -50, 2.0)
-score += sP, maxScore += wP
+score := score + sP
+maxScore := maxScore + wP
 
 // Block Q — H1 CCI                       ±2.0
 [sQ, wQ] = addVote(h1_cci > 100, h1_cci < -100, 2.0)
-score += sQ, maxScore += wQ
+score := score + sQ
+maxScore := maxScore + wQ
 
 // Block R — Heiken Ashi (M15 directional persistence + body) ±2.0
 [sR, wR] = addVote(ha_bull_ratio_6 >= 0.83 and ha_body_strength >= 0.5,
                    ha_bull_ratio_6 <= 0.17 and ha_body_strength >= 0.5, 2.0)
-score += sR, maxScore += wR
+score := score + sR
+maxScore := maxScore + wR
 
 // Block S — M15 Aroon                    ±1.0
 [sS, wS] = addVote(m15_aro >  50, m15_aro < -50, 1.0)
-score += sS, maxScore += wS
+score := score + sS
+maxScore := maxScore + wS
 
 absScore    = math.abs(score)
 score_ratio = maxScore > 0.0 ? absScore / maxScore : 0.0
