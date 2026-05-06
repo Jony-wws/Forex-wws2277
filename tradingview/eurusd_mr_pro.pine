@@ -1,0 +1,175 @@
+// (c) Jony-wws / Forex-wws2277
+// FOREX MR PRO  -  improved mean-reversion binary-options strategy.
+//
+// Built on top of the FOREX-28 MR script.  Adds:
+//   - Multi-TF trend alignment (D1 + H4 EMA50)
+//   - Session filter (London + NY, 07:00-21:00 UTC)
+//   - ATR floor + ADX cap (range market)
+//   - Hull MA slope confirmation of the reversal
+//   - Cooldown after exit
+//   - Two modes:  "WR_MAX" (strict, target ~70% WR, ~1-2 trades/day on M15)
+//                 "FREQ_MAX" (looser, target 5+ trades/day on M15)
+//
+// Trade model (binary options, NO TP / NO SL):
+//   - Open BUY/SELL on a fresh BB cross with confluence.
+//   - Hold exactly  expiryBars  bars (default 20 on M15 = 5 hours).
+//   - Close at market when the timer expires.
+//
+// HONEST disclaimer:
+//   - 70% WR + 5 trades/day on EUR/USD is at the edge of what technical-only
+//     can reach. WR_MAX targets the 70% number; FREQ_MAX targets the 5/day
+//     number. They cannot both be maximised at once.
+//   - Backtest WR != live WR. Always treat backtest as an upper bound.
+//
+//@version=5
+strategy(title="FOREX MR PRO - EURUSD M15 binary 5h", shorttitle="MR-PRO", overlay=true, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=5, commission_type=strategy.commission.percent, commission_value=0.0, calc_on_every_tick=false, process_orders_on_close=true, max_labels_count=500)
+
+// ── MODE ──────────────────────────────────────────────────────────────
+mode = input.string("FREQ_MAX", "Mode", options=["WR_MAX", "FREQ_MAX"], group="Mode")
+
+bbStdAuto    = mode == "WR_MAX" ? 2.3 : 2.0
+rsiOBauto    = mode == "WR_MAX" ? 75  : 68
+rsiOSauto    = mode == "WR_MAX" ? 25  : 32
+stochOBauto  = mode == "WR_MAX" ? 85  : 75
+stochOSauto  = mode == "WR_MAX" ? 15  : 25
+adxMaxAuto   = mode == "WR_MAX" ? 22  : 32
+needAllAuto  = mode == "WR_MAX" ? true : false
+
+// ── INPUTS ────────────────────────────────────────────────────────────
+expiryBars   = input.int(20, "Expiry bars (20*M15=5h)", minval=1, maxval=400, group="Trade")
+useLong      = input.bool(true, "BUY", group="Trade")
+useShort     = input.bool(true, "SELL", group="Trade")
+
+bbLen        = input.int(20, "BB length", group="MR")
+rsiLen       = input.int(14, "RSI length", group="MR")
+
+useHTF       = input.bool(true, "Multi-TF trend alignment (D1+H4)", group="Filters")
+useSession   = input.bool(true, "Session filter (London+NY)", group="Filters")
+useAtrFlr    = input.bool(true, "ATR floor (skip dead market)", group="Filters")
+useAdxCap    = input.bool(true, "ADX cap (only range market)", group="Filters")
+useHullCfm   = input.bool(true, "Hull MA slope confirmation", group="Filters")
+cooldownBars = input.int(4, "Cooldown bars after exit", minval=0, maxval=50, group="Filters")
+
+sess         = input.session("0700-2100:1234567", "UTC session", group="Filters")
+hullLen      = input.int(20, "Hull MA length", group="Hull")
+atrLen       = input.int(14, "ATR length", group="Volatility")
+atrAvgLen    = input.int(50, "avg ATR length", group="Volatility")
+atrFloor     = input.float(0.6, "ATR / avgATR min", step=0.05, group="Volatility")
+
+// ── HULL HELPER ───────────────────────────────────────────────────────
+f_hull(src, len) =>
+    half = math.max(1, math.floor(len / 2))
+    sqr  = math.max(1, math.floor(math.sqrt(len)))
+    ta.wma(2 * ta.wma(src, half) - ta.wma(src, len), sqr)
+
+// ── INDICATORS ────────────────────────────────────────────────────────
+[bbm, bbu, bbl] = ta.bb(close, bbLen, bbStdAuto)
+rsi             = ta.rsi(close, rsiLen)
+sk              = ta.stoch(close, high, low, 14)
+sd              = ta.sma(sk, 3)
+[dp, dm, ax]    = ta.dmi(14, 14)
+hull            = f_hull(close, hullLen)
+atr             = ta.atr(atrLen)
+avgAtr          = ta.sma(atr, atrAvgLen)
+
+// ── HTF ───────────────────────────────────────────────────────────────
+f_d1() => [close, ta.ema(close, 50)]
+f_h4() => [close, ta.ema(close, 50)]
+[d1_close, d1_ema] = request.security(syminfo.tickerid, "D",   f_d1(), barmerge.gaps_off, barmerge.lookahead_off)
+[h4_close, h4_ema] = request.security(syminfo.tickerid, "240", f_h4(), barmerge.gaps_off, barmerge.lookahead_off)
+d1Up = d1_close > d1_ema
+d1Dn = d1_close < d1_ema
+h4Up = h4_close > h4_ema
+h4Dn = h4_close < h4_ema
+
+// HTF allows mean-reversion: don't BUY when D1 AND H4 both down (catching a falling knife);
+//                            don't SELL when D1 AND H4 both up.
+htfBuyOk  = not useHTF or not (d1Dn and h4Dn)
+htfSellOk = not useHTF or not (d1Up and h4Up)
+
+// ── FILTERS ───────────────────────────────────────────────────────────
+inSession = not useSession or not na(time(timeframe.period, sess, "UTC"))
+volOk     = not useAtrFlr  or atr > avgAtr * atrFloor
+adxOk     = not useAdxCap  or ax  < adxMaxAuto
+
+hullSlopeUp   = hull > hull[1]
+hullSlopeDown = hull < hull[1]
+hullCfmBuy    = not useHullCfm or hullSlopeUp
+hullCfmSell   = not useHullCfm or hullSlopeDown
+
+// ── MR SIGNALS ────────────────────────────────────────────────────────
+bbBuy     = close <= bbl
+bbSell    = close >= bbu
+rsiBuy    = rsi   <= rsiOSauto
+rsiSell   = rsi   >= rsiOBauto
+stochBuy  = sk    <= stochOSauto and sd <= stochOSauto
+stochSell = sk    >= stochOBauto and sd >= stochOBauto
+
+buyCount  = (bbBuy  ? 1 : 0) + (rsiBuy  ? 1 : 0) + (stochBuy  ? 1 : 0)
+sellCount = (bbSell ? 1 : 0) + (rsiSell ? 1 : 0) + (stochSell ? 1 : 0)
+needN     = needAllAuto ? 3 : 2
+
+rawBuy  = buyCount  >= needN
+rawSell = sellCount >= needN
+
+baseFilter = inSession and volOk and adxOk
+canBuy  = rawBuy  and baseFilter and htfBuyOk  and hullCfmBuy
+canSell = rawSell and baseFilter and htfSellOk and hullCfmSell
+
+// Fresh trigger: bar where canBuy/canSell turns true (ignoring on first bar where prev is na)
+freshBuy  = canBuy  and not nz(canBuy[1],  false)
+freshSell = canSell and not nz(canSell[1], false)
+
+// ── ENTRY + TIME-EXIT ─────────────────────────────────────────────────
+var int lastExit = -1000000
+var int entryBar = -1000000
+canEnter = (bar_index - lastExit) > cooldownBars
+
+if useLong  and freshBuy  and strategy.position_size == 0 and canEnter and barstate.isconfirmed
+    strategy.entry("L", strategy.long, comment="BUY")
+    entryBar := bar_index
+
+if useShort and freshSell and strategy.position_size == 0 and canEnter and barstate.isconfirmed
+    strategy.entry("S", strategy.short, comment="SELL")
+    entryBar := bar_index
+
+if strategy.position_size > 0 and (bar_index - entryBar) >= expiryBars
+    strategy.close("L", comment="exp")
+    lastExit := bar_index
+
+if strategy.position_size < 0 and (bar_index - entryBar) >= expiryBars
+    strategy.close("S", comment="exp")
+    lastExit := bar_index
+
+// ── ALERTS ────────────────────────────────────────────────────────────
+alertcondition(freshBuy,  title="BUY",  message="MR-PRO BUY 5h binary")
+alertcondition(freshSell, title="SELL", message="MR-PRO SELL 5h binary")
+
+// ── PLOTS ─────────────────────────────────────────────────────────────
+plot(bbu,  "BB up",  color=color.new(color.gray, 50))
+plot(bbm,  "BB mid", color=color.new(color.gray, 70))
+plot(bbl,  "BB lo",  color=color.new(color.gray, 50))
+plot(hull, "Hull",   color=color.new(color.orange, 0), linewidth=2)
+
+bgcolor(useSession and not inSession ? color.new(color.gray, 92) : na)
+
+plotshape(freshBuy,  title="BUY",  text="BUY",  textcolor=color.white, style=shape.labelup,   location=location.belowbar, size=size.normal, color=color.new(color.green, 0))
+plotshape(freshSell, title="SELL", text="SELL", textcolor=color.white, style=shape.labeldown, location=location.abovebar, size=size.normal, color=color.new(color.red,   0))
+
+// ── STATS PANEL ───────────────────────────────────────────────────────
+var table stats = table.new(position.top_right, 2, 5, frame_color=color.gray, frame_width=1)
+if barstate.islast
+    tt = strategy.closedtrades
+    ww = strategy.wintrades
+    wr = tt > 0 ? ww / tt * 100.0 : 0.0
+    pf = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : 0.0
+    table.cell(stats, 0, 0, "MR-PRO " + mode, bgcolor=color.new(color.blue, 0), text_color=color.white, text_size=size.small)
+    table.cell(stats, 1, 0, str.tostring(expiryBars * timeframe.in_seconds() / 3600.0, "#.##") + "h", bgcolor=color.new(color.blue, 0), text_color=color.white, text_size=size.small)
+    table.cell(stats, 0, 1, "Trades", text_color=color.silver, text_size=size.small)
+    table.cell(stats, 1, 1, str.tostring(tt), text_color=color.white, text_size=size.small)
+    table.cell(stats, 0, 2, "Win Rate", text_color=color.silver, text_size=size.small)
+    table.cell(stats, 1, 2, str.tostring(wr, "#.##") + "%", bgcolor=wr>=70 ? color.new(color.green,0) : wr>=60 ? color.new(color.orange,0) : color.new(color.red,0), text_color=color.white, text_size=size.small)
+    table.cell(stats, 0, 3, "Profit Factor", text_color=color.silver, text_size=size.small)
+    table.cell(stats, 1, 3, str.tostring(pf, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(stats, 0, 4, "Net P&L", text_color=color.silver, text_size=size.small)
+    table.cell(stats, 1, 4, str.tostring(strategy.netprofit, "#.##"), text_color=strategy.netprofit>=0 ? color.lime : color.red, text_size=size.small)
