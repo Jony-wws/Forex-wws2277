@@ -246,6 +246,46 @@ def analyze_pair(pair: str) -> dict | None:
     elif ind_15m["ema20"] < ind_15m["ema50"]:
         vote("EMA Кросс 15М", -1, "EMA20 < EMA50 на 15М — медвежий кросс", 1)
 
+    # === BLOCK P: Aroon (weight: 2) — directional persistence ===
+    aro = ind_1h["aroon_osc"]
+    if aro > 70:
+        vote("Aroon", +2, f"Aroon осц. +{aro:.0f} — устойчивый восходящий тренд", 2)
+    elif aro < -70:
+        vote("Aroon", -2, f"Aroon осц. {aro:.0f} — устойчивый нисходящий тренд", 2)
+    elif aro > 30:
+        vote("Aroon", +1, f"Aroon осц. +{aro:.0f} — слабо вверх", 2)
+    elif aro < -30:
+        vote("Aroon", -1, f"Aroon осц. {aro:.0f} — слабо вниз", 2)
+    else:
+        vote("Aroon", 0, f"Aroon осц. {aro:.0f} — без направления", 2)
+
+    # === BLOCK Q: CCI (weight: 2) — overbought/oversold + trend strength ===
+    cci_val = ind_1h["cci"]
+    if cci_val > 200:
+        vote("CCI", -2, f"CCI {cci_val:.0f} — экстремальная перекупленность", 2)
+    elif cci_val < -200:
+        vote("CCI", +2, f"CCI {cci_val:.0f} — экстремальная перепроданность", 2)
+    elif cci_val > 100:
+        vote("CCI", +1, f"CCI {cci_val:.0f} — сильный бычий импульс", 2)
+    elif cci_val < -100:
+        vote("CCI", -1, f"CCI {cci_val:.0f} — сильный медвежий импульс", 2)
+    else:
+        vote("CCI", 0, f"CCI {cci_val:.0f} — в норме", 2)
+
+    # === BLOCK R: Heiken Ashi (weight: 2) — smoothed-candle direction ===
+    ha_bull = ind_1h["ha_bull_ratio"]
+    ha_body = ind_1h["ha_body_strength"]
+    if ha_bull >= 0.83 and ha_body >= 0.6:
+        vote("Heiken Ashi", +2, f"HA {ha_bull*100:.0f}% бычьих + сильное тело — крепкий тренд вверх", 2)
+    elif ha_bull <= 0.17 and ha_body >= 0.6:
+        vote("Heiken Ashi", -2, f"HA {(1-ha_bull)*100:.0f}% медвежьих + сильное тело — крепкий тренд вниз", 2)
+    elif ha_bull >= 0.66:
+        vote("Heiken Ashi", +1, f"HA {ha_bull*100:.0f}% бычьих свечей", 2)
+    elif ha_bull <= 0.34:
+        vote("Heiken Ashi", -1, f"HA {(1-ha_bull)*100:.0f}% медвежьих свечей", 2)
+    else:
+        vote("Heiken Ashi", 0, f"HA смешанный ({ha_bull*100:.0f}% бычьих)", 2)
+
     # === Calculate confidence (dynamic max_score) ===
     # max_possible accumulates the |weight| of every block that voted, so it
     # grows automatically when blocks are added/removed. Confidence is derived
@@ -293,6 +333,56 @@ def analyze_pair(pair: str) -> dict | None:
         bull_count == 0 and side == "SELL"
     )
 
+    # === TREND QUALITY (0..100) ===
+    # Composite measure of how strongly the price will actually move from
+    # the entry — designed for binary-options style forecasts where we
+    # want price to travel meaningfully, not chop sideways.
+    # Components (each 0..100, equal weight):
+    #   - score ratio:     |score|/max_score normalized (0.40 -> 100)
+    #   - ADX(1h):         <15 -> 0, >=30 -> 100, linear in between
+    #   - Aroon |osc|:     <30 -> 0, >=70 -> 100, linear in between
+    #   - Heiken Ashi:     bull_ratio extremity * body_strength
+    #   - Multi-TF agree:  bull_count==4 or 0 -> 100; 3/1 -> 50; 2 -> 0
+    #   - ATR vs avg:      atr/atr_avg50, capped at 1.5x -> 100
+    #   - |Momentum|:      <0.05 -> 0, >=0.30 -> 100, linear
+
+    def _scale(v: float, lo: float, hi: float) -> float:
+        if hi <= lo:
+            return 0.0
+        return max(0.0, min(100.0, (v - lo) * 100.0 / (hi - lo)))
+
+    score_ratio = abs_score / max_possible if max_possible > 0 else 0.0
+    score_q = _scale(score_ratio, 0.0, 0.40)
+
+    adx_q = _scale(ind_1h["adx"], 15.0, 30.0)
+
+    aroon_q = _scale(abs(ind_1h["aroon_osc"]), 30.0, 70.0)
+
+    ha_dir = abs(ind_1h["ha_bull_ratio"] - 0.5) * 2.0  # 0..1, 1 = fully one-sided
+    ha_q = max(0.0, min(100.0, ha_dir * 100.0 * (0.5 + 0.5 * ind_1h["ha_body_strength"])))
+
+    if bull_count == 4 or bull_count == 0:
+        mtf_q = 100.0
+    elif bull_count == 3 or bull_count == 1:
+        mtf_q = 50.0
+    else:
+        mtf_q = 0.0
+
+    atr_ratio = ind_1h["atr"] / ind_1h["atr_avg50"] if ind_1h["atr_avg50"] > 0 else 0.0
+    atr_q = _scale(atr_ratio, 0.7, 1.5)
+
+    mom_q = _scale(abs(ind_1h["momentum"]), 0.05, 0.30)
+
+    trend_quality = round(
+        (score_q + adx_q + aroon_q + ha_q + mtf_q + atr_q + mom_q) / 7.0, 1
+    )
+
+    # Expected move (in pips) over next 5h, derived from ATR(1h) * 5h.
+    # Price goes pip-mult * ATR_value. JPY = 100, others = 10000.
+    is_jpy = "JPY" in pair.upper()
+    pip_mult = 100 if is_jpy else 10000
+    expected_move_pips_5h = round(ind_1h["atr"] * 5.0 * pip_mult, 1)
+
     return {
         "pair": pair,
         "side": side,
@@ -304,6 +394,17 @@ def analyze_pair(pair: str) -> dict | None:
         "forecast_5h": forecast_5h,
         "forecast_24h": forecast_24h,
         "multi_tf_aligned": multi_tf_aligned,
+        "trend_quality": trend_quality,
+        "trend_quality_breakdown": {
+            "score_ratio": round(score_q, 1),
+            "adx": round(adx_q, 1),
+            "aroon": round(aroon_q, 1),
+            "heiken_ashi": round(ha_q, 1),
+            "multi_tf": round(mtf_q, 1),
+            "atr_vs_avg": round(atr_q, 1),
+            "momentum": round(mom_q, 1),
+        },
+        "expected_move_pips_5h": expected_move_pips_5h,
         "adx": round(ind_1h["adx"], 1),
         "indicators": {
             "RSI": round(ind_1h["rsi14"], 1),

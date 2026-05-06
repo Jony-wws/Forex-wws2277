@@ -112,6 +112,71 @@ def vwap(df: pd.DataFrame) -> pd.Series:
     return (cum_pv / cum_v).fillna(typical)
 
 
+def aroon(df: pd.DataFrame, period: int = 25):
+    """Aroon Up / Aroon Down / Aroon Oscillator.
+
+    Aroon measures how recently the period's high/low was made.
+    Values near 100 = the extreme was just made; near 0 = it was far back.
+    Oscillator = up - down (-100..+100). Strong trend when |osc| > 50.
+    """
+    high, low = df["High"], df["Low"]
+    rolling_high = high.rolling(period + 1)
+    rolling_low = low.rolling(period + 1)
+    days_since_high = rolling_high.apply(
+        lambda x: float(period - x.values.argmax()), raw=False
+    )
+    days_since_low = rolling_low.apply(
+        lambda x: float(period - x.values.argmin()), raw=False
+    )
+    up = 100.0 * (period - days_since_high) / period
+    down = 100.0 * (period - days_since_low) / period
+    return up.fillna(50.0), down.fillna(50.0), (up - down).fillna(0.0)
+
+
+def cci(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Commodity Channel Index — price vs typical price mean, scaled by mean abs deviation."""
+    typical = (df["High"] + df["Low"] + df["Close"]) / 3.0
+    sma_tp = typical.rolling(period, min_periods=period).mean()
+    mad = typical.rolling(period, min_periods=period).apply(
+        lambda x: float(np.mean(np.abs(x - x.mean()))), raw=False
+    )
+    cci_val = (typical - sma_tp) / (0.015 * mad.replace(0.0, np.nan))
+    return cci_val.fillna(0.0)
+
+
+def heiken_ashi_trend(df: pd.DataFrame, lookback: int = 6) -> tuple[float, float]:
+    """Heiken Ashi smoothed-candle trend.
+
+    Returns (bull_ratio, body_strength):
+    - bull_ratio in [0..1] — share of last `lookback` HA bars where close > open.
+    - body_strength in [0..1] — |HA_close - HA_open| / (HA_high - HA_low),
+      averaged over the last `lookback` bars. High = strong directional candles.
+    """
+    o, h, l, c = df["Open"], df["High"], df["Low"], df["Close"]
+    ha_close = (o + h + l + c) / 4.0
+    ha_open_list = []
+    prev = (o.iloc[0] + c.iloc[0]) / 2.0
+    for i in range(len(df)):
+        ha_open_list.append(prev)
+        prev = (prev + ha_close.iloc[i]) / 2.0
+    ha_open = pd.Series(ha_open_list, index=df.index)
+    ha_high = pd.concat([h, ha_open, ha_close], axis=1).max(axis=1)
+    ha_low = pd.concat([l, ha_open, ha_close], axis=1).min(axis=1)
+
+    last = df.tail(lookback)
+    if last.empty:
+        return 0.5, 0.0
+    sub_close = ha_close.tail(lookback)
+    sub_open = ha_open.tail(lookback)
+    sub_high = ha_high.tail(lookback)
+    sub_low = ha_low.tail(lookback)
+    bull_ratio = float((sub_close > sub_open).sum()) / float(lookback)
+    body = (sub_close - sub_open).abs()
+    rng = (sub_high - sub_low).replace(0.0, np.nan)
+    body_strength = float((body / rng).fillna(0.0).mean())
+    return bull_ratio, body_strength
+
+
 def compute_all(df: pd.DataFrame) -> dict | None:
     if df.empty or len(df) < 30:
         return None
@@ -131,6 +196,11 @@ def compute_all(df: pd.DataFrame) -> dict | None:
     tenkan, kijun, senkou_a, senkou_b, above_cloud, below_cloud = ichimoku(df)
     mom = momentum(close)
     vwap_val = vwap(df)
+    aroon_up, aroon_down, aroon_osc = aroon(df)
+    cci_val = cci(df)
+    ha_bull_ratio, ha_body_strength = heiken_ashi_trend(df)
+    atr_val = atr(df)
+    atr_avg = atr_val.rolling(50, min_periods=10).mean()
 
     return {
         "close": last_close,
@@ -157,4 +227,12 @@ def compute_all(df: pd.DataFrame) -> dict | None:
         "ichimoku_below_cloud": bool(below_cloud.iloc[-1]) if not pd.isna(below_cloud.iloc[-1]) else False,
         "momentum": float(mom.iloc[-1]) if not pd.isna(mom.iloc[-1]) else 0.0,
         "vwap": float(vwap_val.iloc[-1]),
+        "aroon_up": float(aroon_up.iloc[-1]) if not pd.isna(aroon_up.iloc[-1]) else 50.0,
+        "aroon_down": float(aroon_down.iloc[-1]) if not pd.isna(aroon_down.iloc[-1]) else 50.0,
+        "aroon_osc": float(aroon_osc.iloc[-1]) if not pd.isna(aroon_osc.iloc[-1]) else 0.0,
+        "cci": float(cci_val.iloc[-1]) if not pd.isna(cci_val.iloc[-1]) else 0.0,
+        "ha_bull_ratio": ha_bull_ratio,
+        "ha_body_strength": ha_body_strength,
+        "atr": float(atr_val.iloc[-1]) if not pd.isna(atr_val.iloc[-1]) else 0.0,
+        "atr_avg50": float(atr_avg.iloc[-1]) if not pd.isna(atr_avg.iloc[-1]) else 0.0,
     }

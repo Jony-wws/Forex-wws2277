@@ -16,7 +16,16 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from .config import PAIRS, PAIR_NAMES_RU, TZ_UTC5, MIN_CONFIDENCE, SCAN_INTERVAL_SEC
+from .config import (
+    PAIRS,
+    PAIR_NAMES_RU,
+    TZ_UTC5,
+    MIN_CONFIDENCE,
+    SCAN_INTERVAL_SEC,
+    STRICT_TREND_QUALITY,
+    STRICT_REQUIRE_MULTI_TF,
+    MIN_FORECASTS,
+)
 from .prices import get_current_price, get_price_change
 from .analyzer import analyze_pair
 from .orderbook import get_orderbook
@@ -66,37 +75,103 @@ def _build_entry(pair: str) -> dict | None:
         entry["change_24h_pct"] = 0
 
     if analysis:
-        has_signal = (
-            analysis["side"] is not None
-            and analysis["confidence"] >= MIN_CONFIDENCE
-        )
-        entry["signal"] = analysis["side"] if has_signal else None
-        # `side` is the raw analyser direction (independent of the 80% gate),
-        # used by the strict 5h cycle to always pick top-5 even on weak markets.
+        # `side` is the raw analyser direction; `signal` is set by the
+        # strict-gate post-pass in `_apply_strict_gate` after the full
+        # scan completes (we need to compare pairs across the whole
+        # universe to enforce the min-3 fallback).
+        entry["signal"] = None
+        entry["signal_kind"] = None
         entry["side"] = analysis["side"]
         entry["confidence"] = analysis["confidence"]
-        entry["strength"] = analysis["strength"] if has_signal else "Нет сигнала"
+        entry["strength"] = analysis["strength"]
         entry["score"] = analysis["score"]
         entry["max_score"] = analysis.get("max_score", 0)
         entry["multi_tf_aligned"] = bool(analysis.get("multi_tf_aligned"))
+        entry["trend_quality"] = analysis.get("trend_quality", 0.0)
+        entry["trend_quality_breakdown"] = analysis.get("trend_quality_breakdown", {})
+        entry["expected_move_pips_5h"] = analysis.get("expected_move_pips_5h", 0.0)
         entry["details"] = analysis["details"]
         entry["indicators"] = analysis["indicators"]
+        # Provisional forecasts from the analyser (kept only for pairs the
+        # post-pass promotes to a real signal).
         entry["forecast_5h"] = analysis["forecast_5h"]
         entry["forecast_24h"] = analysis["forecast_24h"]
     else:
         entry["signal"] = None
+        entry["signal_kind"] = None
         entry["side"] = None
         entry["confidence"] = 0
         entry["strength"] = "Нет данных"
         entry["score"] = 0
         entry["max_score"] = 0
         entry["multi_tf_aligned"] = False
+        entry["trend_quality"] = 0.0
+        entry["trend_quality_breakdown"] = {}
+        entry["expected_move_pips_5h"] = 0.0
         entry["details"] = []
         entry["indicators"] = {}
         entry["forecast_5h"] = None
         entry["forecast_24h"] = None
 
     return entry
+
+
+def _apply_strict_gate(pairs_dict: dict) -> None:
+    """Enforce the strict-trend-quality gate across all 28 pairs.
+
+    1. A pair gets a BUY/SELL `signal` only when `side` is set,
+       `confidence >= MIN_CONFIDENCE`, and `trend_quality >= STRICT_TREND_QUALITY`.
+    2. If fewer than `MIN_FORECASTS` pairs pass that gate, promote the
+       top-N pairs by `trend_quality` (desc) so the dashboard always shows
+       at least `MIN_FORECASTS` directional forecasts. Promoted entries
+       are flagged with `signal_kind = "fallback"` so the UI can mark them
+       as «лучший из доступных» rather than full strict signals.
+    3. For every pair that does NOT end up with a `signal`, clear its
+       provisional 5h/24h forecasts so the UI shows «нет сигнала» cleanly.
+    """
+    candidates = []
+    for pair, entry in pairs_dict.items():
+        side = entry.get("side")
+        tq = entry.get("trend_quality", 0.0)
+        conf = entry.get("confidence", 0)
+        mtf = bool(entry.get("multi_tf_aligned"))
+        entry["signal"] = None
+        entry["signal_kind"] = None
+        if side is not None:
+            candidates.append((pair, entry, side, tq, conf, mtf))
+
+    def _is_strict(c):
+        _pair, _entry, _side, tq, conf, mtf = c
+        if tq < STRICT_TREND_QUALITY:
+            return False
+        if conf < MIN_CONFIDENCE:
+            return False
+        if STRICT_REQUIRE_MULTI_TF and not mtf:
+            return False
+        return True
+
+    strict = [c for c in candidates if _is_strict(c)]
+    strict.sort(key=lambda c: c[3], reverse=True)
+    strict_pairs = {c[0] for c in strict}
+
+    promoted = list(strict)
+    if len(promoted) < MIN_FORECASTS:
+        rest = [c for c in candidates if c[0] not in strict_pairs]
+        rest.sort(key=lambda c: c[3], reverse=True)
+        promoted.extend(rest[: MIN_FORECASTS - len(promoted)])
+
+    promoted_pairs: set[str] = set()
+    for pair, entry, side, tq, _conf, _mtf in promoted:
+        entry["signal"] = side
+        entry["signal_kind"] = "strict" if pair in strict_pairs else "fallback"
+        promoted_pairs.add(pair)
+
+    for pair, entry in pairs_dict.items():
+        if pair not in promoted_pairs:
+            entry["forecast_5h"] = None
+            entry["forecast_24h"] = None
+            if entry.get("strength"):
+                entry["strength"] = "Нет сигнала"
 
 
 def _scanner_loop():
@@ -118,6 +193,28 @@ def _scanner_loop():
                         _signals["scan_count"] = scan_num
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
+
+        # Strict-quality post-pass: only promote pairs that pass the strict
+        # trend_quality + confidence gate. If <MIN_FORECASTS pass, promote
+        # the top-N by trend_quality so the dashboard always shows at least
+        # 3 forecasts.
+        try:
+            with _lock:
+                _apply_strict_gate(_signals["pairs"])
+                strict_n = sum(
+                    1 for e in _signals["pairs"].values()
+                    if e.get("signal_kind") == "strict"
+                )
+                fallback_n = sum(
+                    1 for e in _signals["pairs"].values()
+                    if e.get("signal_kind") == "fallback"
+                )
+            log.info(
+                f"Scan #{scan_num}: strict={strict_n} fallback={fallback_n} "
+                f"total_signals={strict_n + fallback_n}"
+            )
+        except Exception as e:
+            log.error(f"Error applying strict gate: {e}")
 
         # Update order books (skip first 3 scans, then every 3rd scan)
         if scan_num >= 4 and scan_num % 3 == 1:

@@ -80,6 +80,25 @@ def yahoo_ticker(pair: str) -> str:
     return f"{pair}=X"
 
 
-MIN_CONFIDENCE = 80
+MIN_CONFIDENCE = 82
 FORECAST_EXPIRY_HOURS = 5
 SCAN_INTERVAL_SEC = 10
+
+# Strict trend-quality gate. A pair only gets a BUY/SELL "strict" signal on
+# the dashboard when ALL of the following hold:
+#   - trend_quality >= STRICT_TREND_QUALITY (composite metric of ADX + Aroon
+#     + Heiken Ashi + multi-TF + ATR + momentum + score ratio)
+#   - confidence >= MIN_CONFIDENCE
+#   - multi_tf_aligned (all 4 senior timeframes D1+H4+H1+M15 in same direction)
+# Tuned to surface only forecasts that should travel meaningfully far from
+# the entry price, not chop sideways.
+STRICT_TREND_QUALITY = 75
+STRICT_REQUIRE_MULTI_TF = True
+
+# Minimum number of forecasts that the dashboard MUST always show, even
+# when the market is quiet and no pair clears the strict gate. We then
+# fall back to the top-N pairs sorted by trend_quality desc — the best
+# available even if they are not strictly above the gate. Marked with
+# `signal_kind = "fallback"` (badge "ТОП-3") so users know it's the best
+# available rather than a strict signal.
+MIN_FORECASTS = 3
