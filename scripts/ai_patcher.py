@@ -57,6 +57,7 @@ REPORTS.mkdir(exist_ok=True)
 PROPOSAL = REPORTS / "ai_patch_proposal.md"
 CYCLE_REPORT = REPORTS / "cycle_5h_latest.md"
 BACKTEST_REPORT = REPORTS / "backtest_latest.md"
+MEMORY_REPORT = REPORTS / "memory_neighbors_latest.md"
 STATE_FILE = ROOT / "state" / "forecasts.json"
 
 EDITABLE_FILES = [
@@ -169,6 +170,10 @@ def build_prompt(wr: float | None, decisions: int) -> str:
     backtest_md = read_text(BACKTEST_REPORT, limit=4000)
     if backtest_md:
         parts += ["", "## 28-парный бэктест (выдержка)", backtest_md]
+
+    memory_md = read_text(MEMORY_REPORT, limit=4000)
+    if memory_md:
+        parts += ["", "## Память аналогов (Supabase pgvector)", memory_md]
 
     parts.append("")
     parts.append("# Исходники, которые можно править")

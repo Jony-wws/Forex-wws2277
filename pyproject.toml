@@ -12,6 +12,12 @@ dependencies = [
     "slowapi>=0.1.9",
 ]
 
+# Optional extras — install via `pip install -e .[memory]`. Kept out of
+# the required `dependencies` list so the existing FastAPI app keeps
+# installing in lean environments that don't need Supabase.
+[project.optional-dependencies]
+memory = ["supabase>=2.0.0"]
+
 [build-system]
 requires = ["setuptools>=69.0"]
 build-backend = "setuptools.build_meta"

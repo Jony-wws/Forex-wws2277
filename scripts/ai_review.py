@@ -49,6 +49,7 @@ REPORTS.mkdir(exist_ok=True)
 CYCLE_REPORT = REPORTS / "cycle_5h_latest.md"
 BACKTEST_REPORT = REPORTS / "eurusd_backtest_latest.md"
 DEGRADATION_REPORT = REPORTS / "degradation_fix.md"
+MEMORY_REPORT = REPORTS / "memory_neighbors_latest.md"
 OUTPUT = REPORTS / "ai_review_latest.md"
 
 CONFIG_TARGETS = {
@@ -323,12 +324,15 @@ def llm_review() -> str | None:
     cycle_text = read_text(CYCLE_REPORT)
     backtest_text = read_text(BACKTEST_REPORT, 8_000)
     degraded_text = read_text(DEGRADATION_REPORT, 4_000)
+    memory_text = read_text(MEMORY_REPORT, 6_000)
 
     prompt_parts = ["# Отчёт 5-часового цикла", cycle_text]
     if backtest_text:
         prompt_parts += ["\n\n# 28-парный бэктест (выборка)", backtest_text]
     if degraded_text:
         prompt_parts += ["\n\n# Деградировавшие стратегии", degraded_text]
+    if memory_text:
+        prompt_parts += ["\n\n# Память аналогов (Supabase pgvector)", memory_text]
     prompt = "\n".join(prompt_parts)[:18_000]
 
     # 1. GitHub Models — FREE, no extra secrets required.  GITHUB_TOKEN is
