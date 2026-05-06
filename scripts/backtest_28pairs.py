@@ -51,8 +51,12 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-# Reuse the proven single-pair engine from backtest_eurusd.
-from scripts.backtest_eurusd import (
+# Make ``scripts/`` directly importable when this file is run as
+# ``python scripts/backtest_28pairs.py`` (CI default).  This way we can pull
+# helpers from the proven single-pair engine without packaging the directory.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from backtest_eurusd import (  # noqa: E402  (sys.path manipulation above)
     classify_dataframe,
     evaluate_horizon,
     fetch,
