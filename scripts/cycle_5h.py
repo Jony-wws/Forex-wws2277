@@ -156,6 +156,10 @@ def param_grid_aggressive() -> list[Params]:
 WR_TARGET = 70.0
 MIN_TOP_PAIRS = 3
 MIN_TRADES_FOR_VALID = 20
+# Minimum trades per day to show a pair in top/leaderboard — the user
+# wants actionable strategies that fire at least 3 times per day, not
+# rare-event strategies that trade once every 3 days.
+MIN_TRADES_PER_DAY = 3
 
 
 # ── FILTER + SCORE  (cheap step, reused across the param sweep) ────────
@@ -263,17 +267,19 @@ def sweep_pair(pair: str, extra_grid: Optional[list[Params]] = None,
     if not valid:
         valid = sorted(results, key=lambda r: -r.get("trades", 0))[:3]
 
-    # Ranking prefers WR ≥ WR_TARGET. Anything below that target is
-    # heavily discounted so the picker doesn't accidentally choose a
-    # high-volume but mediocre config.
+    # Ranking prefers WR ≥ WR_TARGET with sufficient frequency.
+    # A strategy that fires 3+ times/day is much more valuable than one
+    # firing 0.3 times/day (even if WR is higher on the rare strategy).
     def rank(r: dict) -> float:
         wr = r.get("wr", 0)
-        tpd = min(r.get("trades_per_day", 0), 5.0)
+        tpd = r.get("trades_per_day", 0)
         on_target = 1.0 if wr >= WR_TARGET else 0.0
+        freq_bonus = 1.0 if tpd >= MIN_TRADES_PER_DAY else 0.0
         return (
             on_target * 1000.0
+            + freq_bonus * 500.0
             + (wr - WR_TARGET) * 5.0
-            + tpd * 2.0
+            + min(tpd, 10.0) * 3.0
         )
 
     best = max(valid, key=rank) if valid else (results[0] if results else None)
@@ -575,8 +581,9 @@ def latest_direction(pair: str, m15: pd.DataFrame, h1: pd.DataFrame,
 
 # ── TOP-3 PICKER ───────────────────────────────────────────────────────
 def pick_top3_strict(per_pair: list[dict]) -> list[dict]:
-    """Strict picker: pairs whose backtested WR ≥ WR_TARGET and that have
-    enough trades for the WR to be statistically meaningful.
+    """Strict picker: pairs whose backtested WR ≥ WR_TARGET, that have
+    enough trades for the WR to be statistically meaningful, AND that
+    trade frequently enough to be actionable (≥ MIN_TRADES_PER_DAY).
 
     We do NOT require a live entry signal on the latest bar — a backtest
     that hit 70%+ over 365 days is the signal the user asked for, and we
@@ -587,15 +594,31 @@ def pick_top3_strict(per_pair: list[dict]) -> list[dict]:
         r for r in per_pair
         if r.get("wr", 0) >= WR_TARGET
         and r.get("trades", 0) >= MIN_TRADES_FOR_VALID
+        and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
     ]
     eligible.sort(key=lambda r: (-r.get("wr", 0), -r.get("trades_per_day", 0)))
     return eligible[:TOP_N]
 
 
 def best_effort_top3(per_pair: list[dict]) -> list[dict]:
-    """Fallback when fewer than MIN_TOP_PAIRS pass the strict filter."""
+    """Fallback when fewer than MIN_TOP_PAIRS pass the strict filter.
+    Prefer pairs with ≥ MIN_TRADES_PER_DAY; rank by composite score
+    that balances WR and frequency (so rare strategies don't dominate).
+    """
+    frequent = [
+        r for r in per_pair
+        if r.get("trades", 0) >= MIN_TRADES_FOR_VALID
+        and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
+    ]
+    if len(frequent) >= TOP_N:
+        frequent.sort(key=lambda r: -r.get("wr", 0))
+        return frequent[:TOP_N]
+    # Not enough frequent pairs — include infrequent but sort them lower.
     fallback = [r for r in per_pair if r.get("trades", 0) >= MIN_TRADES_FOR_VALID]
-    fallback.sort(key=lambda r: -r.get("wr", 0))
+    fallback.sort(key=lambda r: (
+        -(1 if r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY else 0),
+        -r.get("wr", 0),
+    ))
     return fallback[:TOP_N]
 
 
@@ -690,14 +713,21 @@ def format_report(payload: dict) -> str:
     top3 = payload.get("top3", [])
     on_target_n = payload.get("on_target_count", 0)
     sweep_attempts = payload.get("sweep_attempts", 1)
-    if on_target_n >= MIN_TOP_PAIRS:
+    on_target_freq_n = sum(
+        1 for r in payload.get("per_pair", [])
+        if r.get("wr", 0) >= WR_TARGET
+        and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
+    )
+    if on_target_freq_n >= MIN_TOP_PAIRS:
         out.append(
-            f"<b>🏆 Топ-{len(top3)} стратегий (WR ≥ {int(WR_TARGET)}% на бэктесте 365 дней):</b>"
+            f"<b>🏆 Топ-{len(top3)} стратегий "
+            f"(WR ≥ {int(WR_TARGET)}% и ≥ {MIN_TRADES_PER_DAY} сделок/день, бэктест 365 дней):</b>"
         )
     else:
         out.append(
-            f"<b>⚠️ Цель не достигнута: пар с WR≥{int(WR_TARGET)}% — {on_target_n} "
-            f"(нужно ≥{MIN_TOP_PAIRS}). Расширил параметры {sweep_attempts}× — "
+            f"<b>⚠️ Цель не достигнута: пар с WR≥{int(WR_TARGET)}% и ≥{MIN_TRADES_PER_DAY} сделок/день — "
+            f"{on_target_freq_n} (нужно ≥{MIN_TOP_PAIRS}). "
+            f"Прогнал {sweep_attempts} прохода сетки (всего ~{sweep_attempts * 60}+ комбинаций) — "
             f"лучшее что нашёл:</b>"
         )
     for i, r in enumerate(top3, 1):
@@ -791,9 +821,11 @@ def format_report(payload: dict) -> str:
             out.append(f"  💎 Стабильно держат WR≥{int(WR_TARGET)}%: <b>{names}</b>")
 
     # ── 7. Top-10 leaderboard. ───────────────────────────────────────
-    out.append(f"\n<b>📋 Лучшие 10 пар по винрейту (бэктест 365 дней):</b>")
+    out.append(f"\n<b>📋 Лучшие 10 пар по винрейту (бэктест 365 дней, ≥{MIN_TRADES_PER_DAY} сделок/день):</b>")
     sorted_pp = sorted(
-        [r for r in payload["per_pair"] if r.get("trades", 0) >= MIN_TRADES_FOR_VALID],
+        [r for r in payload["per_pair"]
+         if r.get("trades", 0) >= MIN_TRADES_FOR_VALID
+         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY],
         key=lambda r: -r.get("wr", 0),
     )[:10]
     for r in sorted_pp:
@@ -939,6 +971,39 @@ def main() -> None:
                                    cache=cache)
         on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
         print(f"[cycle] pass 2: {len(on_target)} pair(s) on target")
+
+    # Pass 3 — if we still don't have enough FREQUENT pairs on target,
+    # try a frequency-focused grid with lower thresholds to generate
+    # more trades (user wants ≥ 3/day, not 0.3/day).
+    on_target_freq = [
+        r for r in per_pair
+        if r.get("wr", 0) >= WR_TARGET
+        and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
+    ]
+    if len(on_target_freq) < MIN_TOP_PAIRS:
+        sweep_attempts = 3
+        print(f"[cycle] pass 3: frequency-focused grid (≥{MIN_TRADES_PER_DAY} trades/day) ...")
+        freq_grid: list[Params] = []
+        for hor in (4, 8, 12, 16, 20):
+            for adxmin in (12, 15, 18, 22):
+                for tq in (50, 55, 60, 65):
+                    for mc in (65, 70, 75):
+                        freq_grid.append(Params(
+                            horizon_bars=hor, adx_min=adxmin, adx_max=50.0,
+                            require_mtf=True, min_conf=mc, min_trend_q=tq,
+                        ))
+                        freq_grid.append(Params(
+                            horizon_bars=hor, adx_min=adxmin, adx_max=50.0,
+                            require_mtf=False, min_conf=mc, min_trend_q=tq,
+                        ))
+        per_pair = sweep_all_pairs(PAIRS, extra_grid=freq_grid, cache=cache)
+        on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
+        on_target_freq = [
+            r for r in per_pair
+            if r.get("wr", 0) >= WR_TARGET
+            and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
+        ]
+        print(f"[cycle] pass 3: {len(on_target_freq)} frequent pair(s) on target")
 
     print(f"[cycle] swept {len(per_pair)} / {len(PAIRS)} pairs · "
           f"on target ≥{WR_TARGET}%: {len(on_target)}")
