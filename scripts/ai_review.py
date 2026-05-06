@@ -49,6 +49,7 @@ REPORTS.mkdir(exist_ok=True)
 CYCLE_REPORT = REPORTS / "cycle_5h_latest.md"
 BACKTEST_REPORT = REPORTS / "eurusd_backtest_latest.md"
 DEGRADATION_REPORT = REPORTS / "degradation_fix.md"
+MEMORY_REPORT = REPORTS / "memory_neighbors_latest.md"
 OUTPUT = REPORTS / "ai_review_latest.md"
 
 CONFIG_TARGETS = {
@@ -205,6 +206,63 @@ SYSTEM_PROMPT = """Ты — эксперт по торговле на форек
 """
 
 
+def call_cloudflare_workers_ai(
+    prompt: str,
+    account_id: str,
+    api_token: str,
+    model: str = "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+) -> str | None:
+    """Cloudflare Workers AI — primary reviewer (Llama 3.3 70B, free tier).
+
+    Endpoint: ``https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}``
+    Auth:     ``Authorization: Bearer {api_token}``
+    Docs:     https://developers.cloudflare.com/workers-ai/
+    """
+    if not (account_id and api_token):
+        return None
+    body = json.dumps({
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 1500,
+        "temperature": 0.2,
+    }).encode("utf-8")
+    url = (
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+        f"/ai/run/{model}"
+    )
+    req = Request(
+        url,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_token}",
+            "content-type": "application/json",
+            "accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        print(f"[ai_review] cloudflare workers ai call failed: {e}", file=sys.stderr)
+        return None
+    if not data.get("success"):
+        errs = data.get("errors") or []
+        print(f"[ai_review] cloudflare returned errors: {errs}", file=sys.stderr)
+        return None
+    result = data.get("result") or {}
+    text = result.get("response")
+    if isinstance(text, str) and text.strip():
+        return text
+    choices = result.get("choices") or []
+    if choices:
+        msg = (choices[0] or {}).get("message") or {}
+        if isinstance(msg.get("content"), str):
+            return msg["content"]
+    return None
+
+
 def call_github_models(prompt: str, token: str) -> str | None:
     """Use GitHub Models — FREE, uses GITHUB_TOKEN that Actions already provides.
 
@@ -323,16 +381,32 @@ def llm_review() -> str | None:
     cycle_text = read_text(CYCLE_REPORT)
     backtest_text = read_text(BACKTEST_REPORT, 8_000)
     degraded_text = read_text(DEGRADATION_REPORT, 4_000)
+    memory_text = read_text(MEMORY_REPORT, 6_000)
 
     prompt_parts = ["# Отчёт 5-часового цикла", cycle_text]
     if backtest_text:
         prompt_parts += ["\n\n# 28-парный бэктест (выборка)", backtest_text]
     if degraded_text:
         prompt_parts += ["\n\n# Деградировавшие стратегии", degraded_text]
+    if memory_text:
+        prompt_parts += ["\n\n# Память аналогов (Supabase pgvector)", memory_text]
     prompt = "\n".join(prompt_parts)[:18_000]
 
-    # 1. GitHub Models — FREE, no extra secrets required.  GITHUB_TOKEN is
-    # auto-injected into every Actions run, so this is the default path.
+    # 1. Cloudflare Workers AI — PRIMARY (free Llama 3.3 70B).  Falls back
+    # transparently when CF_AI_ACCOUNT_ID / CF_AI_API_TOKEN are absent.
+    cf_account = os.getenv("CF_AI_ACCOUNT_ID")
+    cf_token = os.getenv("CF_AI_API_TOKEN")
+    cf_model = os.getenv("CF_AI_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+    if cf_account and cf_token:
+        out = call_cloudflare_workers_ai(prompt, cf_account, cf_token, cf_model)
+        if out:
+            return (
+                f"## 🧠 AI-обзор (Cloudflare Workers AI · {cf_model} · бесплатно)"
+                f"\n\n{out.strip()}"
+            )
+
+    # 2. GitHub Models — FREE fallback, no extra secrets required.
+    # GITHUB_TOKEN is auto-injected into every Actions run.
     gh_token = os.getenv("GITHUB_TOKEN")
     if gh_token:
         out = call_github_models(prompt, gh_token)
@@ -340,7 +414,7 @@ def llm_review() -> str | None:
             model_label = os.getenv("GITHUB_MODEL", "openai/gpt-4o-mini")
             return f"## 🧠 AI-обзор (GitHub Models · {model_label} · бесплатно)\n\n{out.strip()}"
 
-    # 2. HuggingFace Inference — also free with a HF token.
+    # 3. HuggingFace Inference — also free with a HF token.
     hf = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
     if hf:
         out = call_huggingface(prompt, hf)
@@ -348,7 +422,7 @@ def llm_review() -> str | None:
             model_label = os.getenv("HF_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
             return f"## 🧠 AI-обзор (HuggingFace · {model_label} · бесплатно)\n\n{out.strip()}"
 
-    # 3-4. Optional paid fallbacks — only used if explicit keys are set.
+    # 4-5. Optional paid fallbacks — only used if explicit keys are set.
     anth = os.getenv("ANTHROPIC_API_KEY")
     if anth:
         out = call_anthropic(prompt, anth)

@@ -47,10 +47,17 @@ jobs:
 
       - name: Run AI reviewer
         env:
-          # Free GitHub Models — no extra secrets required.
+          # Primary: Cloudflare Workers AI (free Llama 3.3 70B).
+          # If CF_AI_* secrets are absent, the script transparently falls
+          # back to GitHub Models (gpt-4o-mini), then HuggingFace, then the
+          # heuristic reviewer — never crashes.
+          CF_AI_ACCOUNT_ID: ${{ secrets.CF_AI_ACCOUNT_ID }}
+          CF_AI_API_TOKEN:  ${{ secrets.CF_AI_API_TOKEN }}
+          CF_AI_MODEL:      "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+          # Fallback 1: free GitHub Models — no extra secrets required.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODEL: openai/gpt-4o-mini
-          # Optional free fallback.
+          # Fallback 2: free HuggingFace Inference (optional).
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           # Optional paid keys — only used if you opt in.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

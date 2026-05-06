@@ -45,6 +45,12 @@ jobs:
 
       - name: Run AI patcher
         env:
+          # Primary: Cloudflare Workers AI (free Llama 3.3 70B).
+          # Falls back transparently to GitHub Models when these are absent.
+          CF_AI_ACCOUNT_ID: ${{ secrets.CF_AI_ACCOUNT_ID }}
+          CF_AI_API_TOKEN:  ${{ secrets.CF_AI_API_TOKEN }}
+          CF_AI_MODEL:      "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+          # Fallback: GitHub Models (gpt-4o-mini, free via auto-injected GITHUB_TOKEN).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_MODEL: openai/gpt-4o-mini
         run: |

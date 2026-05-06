@@ -57,6 +57,7 @@ REPORTS.mkdir(exist_ok=True)
 PROPOSAL = REPORTS / "ai_patch_proposal.md"
 CYCLE_REPORT = REPORTS / "cycle_5h_latest.md"
 BACKTEST_REPORT = REPORTS / "backtest_latest.md"
+MEMORY_REPORT = REPORTS / "memory_neighbors_latest.md"
 STATE_FILE = ROOT / "state" / "forecasts.json"
 
 EDITABLE_FILES = [
@@ -170,6 +171,10 @@ def build_prompt(wr: float | None, decisions: int) -> str:
     if backtest_md:
         parts += ["", "## 28-парный бэктест (выдержка)", backtest_md]
 
+    memory_md = read_text(MEMORY_REPORT, limit=4000)
+    if memory_md:
+        parts += ["", "## Память аналогов (Supabase pgvector)", memory_md]
+
     parts.append("")
     parts.append("# Исходники, которые можно править")
     for fp in EDITABLE_FILES:
@@ -181,6 +186,64 @@ def build_prompt(wr: float | None, decisions: int) -> str:
 
 
 # ── LLM call (GitHub Models, free) ────────────────────────────────────
+
+
+def call_cloudflare_workers_ai(
+    prompt: str,
+    account_id: str,
+    api_token: str,
+    model: str = "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+) -> str | None:
+    """Cloudflare Workers AI — primary path (Llama 3.3 70B, free tier).
+
+    Endpoint: ``https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}``
+    Auth:     ``Authorization: Bearer {api_token}``
+    Docs:     https://developers.cloudflare.com/workers-ai/
+    """
+    if not (account_id and api_token):
+        return None
+    body = json.dumps({
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 4096,
+        "temperature": 0.2,
+    }).encode("utf-8")
+    url = (
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+        f"/ai/run/{model}"
+    )
+    req = Request(
+        url,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_token}",
+            "content-type": "application/json",
+            "accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except (HTTPError, URLError, json.JSONDecodeError) as e:
+        print(f"[ai_patcher] cloudflare workers ai call failed: {e}", file=sys.stderr)
+        return None
+    if not data.get("success"):
+        errs = data.get("errors") or []
+        print(f"[ai_patcher] cloudflare returned errors: {errs}", file=sys.stderr)
+        return None
+    result = data.get("result") or {}
+    text = result.get("response")
+    if isinstance(text, str) and text.strip():
+        return text
+    # Some Workers AI models return chat-style payloads.
+    choices = result.get("choices") or []
+    if choices:
+        msg = (choices[0] or {}).get("message") or {}
+        if isinstance(msg.get("content"), str):
+            return msg["content"]
+    return None
 
 
 def call_github_models(prompt: str, token: str) -> str | None:
@@ -311,15 +374,36 @@ def smoke_compile() -> str | None:
 def main() -> int:
     wr, decisions = parse_recent_wr()
 
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        msg = "# 🤖 AI-patcher — нет GITHUB_TOKEN, пропуск.\n"
+    cf_account = os.getenv("CF_AI_ACCOUNT_ID")
+    cf_token = os.getenv("CF_AI_API_TOKEN")
+    cf_model = os.getenv("CF_AI_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
+    gh_token = os.getenv("GITHUB_TOKEN")
+
+    if not (cf_account and cf_token) and not gh_token:
+        msg = (
+            "# 🤖 AI-patcher — нет ни CF_AI_ACCOUNT_ID/CF_AI_API_TOKEN, "
+            "ни GITHUB_TOKEN, пропуск.\n"
+        )
         PROPOSAL.write_text(msg, encoding="utf-8")
         print(msg)
         return 0
 
     prompt = build_prompt(wr, decisions)
-    raw = call_github_models(prompt, token)
+
+    raw: str | None = None
+    used_provider = ""
+    if cf_account and cf_token:
+        raw = call_cloudflare_workers_ai(prompt, cf_account, cf_token, cf_model)
+        if raw:
+            used_provider = f"Cloudflare Workers AI ({cf_model})"
+    if not raw and gh_token:
+        raw = call_github_models(prompt, gh_token)
+        if raw:
+            used_provider = (
+                f"GitHub Models ({os.getenv('GITHUB_MODEL', 'openai/gpt-4o-mini')})"
+            )
+    if used_provider:
+        print(f"[ai_patcher] used provider: {used_provider}", file=sys.stderr)
     parsed = parse_response(raw or "")
     if parsed is None:
         msg = (

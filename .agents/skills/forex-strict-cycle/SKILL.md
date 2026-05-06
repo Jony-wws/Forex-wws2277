@@ -49,6 +49,8 @@ scripts/
 ├── ai_narrative.py        # AI written market narrative for Telegram
 ├── auto_fix_degraded.py   # Auto-blacklist losing pairs for 24 h
 ├── generate_pine.py       # Generate TradingView Pine strategies
+├── memory_index.py        # Daily — embed historical winners into Supabase pgvector
+├── memory_query.py        # After each cycle — KNN historical analogs report
 └── backtest_*.py          # Backtests
 .github/workflows/
 ├── cycle_5h.yml           # 5h cron — generates state/forecasts.json
@@ -58,6 +60,8 @@ scripts/
 ├── ai_narrative.yml       # After each cycle — Telegram narrative
 ├── auto_tune.yml          # Daily — heuristic threshold PR
 ├── backtest.yml           # On every push touching analyzer/config
+├── memory_index.yml       # Daily 03:00 UTC — re-index historical winners
+├── memory_query.yml       # After each cycle — refresh memory_neighbors_latest.md
 └── (others)
 state/                     # gitignored runtime state — forecasts.json, etc.
 reports/                   # Generated reports (committed)
@@ -108,6 +112,25 @@ through the auto-injected `GITHUB_TOKEN`.  Default model is
 
 **Do not** add `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` unless the user
 explicitly asks — they are paid.  The system already works free.
+
+### 4.1 Cloudflare Workers AI — primary model (free Llama 3.3 70B)
+
+`scripts/ai_patcher.py`, `scripts/ai_review.py` and `scripts/ai_narrative.py`
+now call **Cloudflare Workers AI** (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`)
+as the **primary** model and fall back transparently to GitHub Models
+(`openai/gpt-4o-mini`) when the Cloudflare secrets are missing or the
+call fails — the scripts never crash. Endpoint:
+`https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}`
+with `Authorization: Bearer {api_token}`. To enable Cloudflare, add two
+repository secrets in *Settings → Secrets and variables → Actions*:
+**`CF_AI_API_TOKEN`** — create a token with the *Workers AI* template at
+<https://dash.cloudflare.com/profile/api-tokens>; and **`CF_AI_ACCOUNT_ID`** —
+the 32-character hex ID visible at <https://dash.cloudflare.com/?to=/:account/ai>
+(also in the URL of the AI dashboard). Optional override:
+`CF_AI_MODEL` env var (default `@cf/meta/llama-3.3-70b-instruct-fp8-fast`).
+Cloudflare Workers AI has a generous free daily quota — far above our
+~5 cycles/day usage. If the token is later removed, the workflows keep
+working unchanged via the GitHub Models fallback.
 
 ## 5. Quick start (local dev)
 
@@ -210,7 +233,63 @@ opens the dashboard inside Telegram.
   on the standard library + `requests` only.
 - Do not change the `/` route's behaviour for non-Telegram clients.
 
-## 10. Useful one-liners
+## 10. Supabase pgvector — historical winning-setup memory
+
+A free **vector-memory** module lives in `scripts/memory_index.py` and
+`scripts/memory_query.py`.  It embeds every evaluated 5h forecast from
+`state/forecasts.json` as a deterministic 9-D feature vector
+(`confidence`, `score`, `score/max_score`, `adx_h1`, `adx_h4`,
+`persistence`, `multi_tf_aligned`, `side`, `win/loss`) — **no LLM call
+for embedding**, so it stays free and local.  It then asks Supabase
+`pgvector` for the K=10 nearest historical setups by cosine distance,
+and writes a markdown summary to `reports/memory_neighbors_latest.md`
+(e.g. "Current EURUSD BUY setup matches 7/10 past winners").  Both
+`scripts/ai_review.py` and `scripts/ai_patcher.py` read that file and
+inject it into their LLM prompt so the model sees historical analogs.
+
+Workflows:
+- `.github/workflows/memory_index.yml` — daily 03:00 UTC re-index.
+- `.github/workflows/memory_query.yml` — after each 5h cycle (with cron
+  fallback `14 19,0,5,10,15 * * *`).
+
+Both workflows skip silently when `SUPABASE_URL` / `SUPABASE_KEY`
+secrets aren't set, so a fresh fork keeps green CI without any setup.
+
+### One-time Supabase setup (free tier — 500 MB Postgres)
+
+1. Create a free project at <https://supabase.com/dashboard/projects>
+   (free tier, no credit card).
+2. Project Settings → API → copy `Project URL` and `service_role` key.
+3. Add them as repo secrets `SUPABASE_URL` and `SUPABASE_KEY`
+   (Repo → Settings → Secrets and variables → Actions).
+4. SQL editor → run the bootstrap SQL printed by
+   `python scripts/memory_index.py` on first run, or paste:
+
+   ```sql
+   create extension if not exists vector;
+   create table if not exists trade_memory (
+       id text primary key, pair text not null, side text not null,
+       cycle_start timestamptz not null,
+       confidence int, score int, max_score int,
+       adx_h1 double precision, adx_h4 double precision,
+       persistence double precision, multi_tf boolean,
+       result_5h text, move_pct_5h double precision,
+       features vector(9) not null
+   );
+   create index if not exists trade_memory_features_ivf
+     on trade_memory using ivfflat (features vector_cosine_ops)
+     with (lists = 100);
+   ```
+5. (Optional, faster KNN) deploy the `match_trade_memory` RPC printed
+   by `scripts/memory_query.py` — Python falls back to a SELECT + sort
+   if the RPC is missing, so this is purely a performance step.
+
+The `supabase` Python client is **not** in `pyproject.toml` — the
+workflows install it ad-hoc with `pip install supabase>=2.0.0` and the
+scripts import it lazily so existing local installs that don't need
+the memory keep working without it.
+
+## 11. Useful one-liners
 
 ```bash
 # Latest cycle WR
@@ -224,4 +303,12 @@ python scripts/ai_review.py
 
 # Run AI patcher (requires GITHUB_TOKEN env var)
 GITHUB_TOKEN=$(gh auth token) python scripts/ai_patcher.py
+
+# Index winning-setup memory into Supabase pgvector
+SUPABASE_URL=https://<id>.supabase.co SUPABASE_KEY=ey... \
+  python scripts/memory_index.py
+
+# Refresh historical-analogs report
+SUPABASE_URL=https://<id>.supabase.co SUPABASE_KEY=ey... \
+  python scripts/memory_query.py
 ```
