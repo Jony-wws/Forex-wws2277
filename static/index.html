@@ -274,6 +274,12 @@
             background: rgba(0,230,118,0.14); color: var(--buy);
             border: 1px solid rgba(0,230,118,0.35);
         }
+        .wr-badge {
+            font-size: 10px; padding: 2px 7px; border-radius: 10px;
+            font-weight: 700; margin-left: 4px;
+            background: rgba(0,230,118,0.14); color: var(--buy);
+            border: 1px solid rgba(0,230,118,0.35);
+        }
         .tier-medium {
             background: rgba(84,110,122,0.16); color: var(--text-dim);
             border: 1px solid rgba(84,110,122,0.3);
@@ -709,6 +715,9 @@
             if (f.tier === 'PREMIUM')      { tierCls = 'tier-premium'; tierTxt = '★ ПРЕМИУМ'; }
             else if (f.tier === 'STRONG')  { tierCls = 'tier-strong';  tierTxt = '⚡ СИЛЬНЫЙ'; }
             else if (f.tier === 'MEDIUM')  { tierCls = 'tier-medium';  tierTxt = '⊙ ОБЫЧНЫЙ'; }
+            const wrBadge = f.high_wr === true
+                ? '<span class="wr-badge" title="Исторический винрейт ≥ 70%">★ WR ≥70%</span>'
+                : '';
             const result5 = f.result_5h
                 ? (f.result_5h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
                 : '';
@@ -732,7 +741,7 @@
                         <div class="cycle-pair">${f.pair}</div>
                         <div class="cycle-pair-sub">${f.name_ru || ''}</div>
                     </div>
-                    <span class="tier-badge ${tierCls}">${tierTxt}</span>
+                    <span><span class="tier-badge ${tierCls}">${tierTxt}</span>${wrBadge}</span>
                 </div>
                 <div class="cycle-card-row">
                     <span style="color:${sideColor};font-weight:700;font-size:12px">${sideTxt}</span>
