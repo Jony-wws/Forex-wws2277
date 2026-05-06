@@ -121,12 +121,10 @@ mtfAligned = mtfBull or mtfBear
 v01_rsi = rsi14 <= 30 ? +1 : rsi14 >= 70 ? -1 : rsi14 > 55 ? +1 : rsi14 < 45 ? -1 : 0
 
 // 2. MACD(12,26,9): line vs signal AND histogram direction
-v02_macd = macdLine > macdSig and macdH > macdH[1] ? +1 :
-           macdLine < macdSig and macdH < macdH[1] ? -1 : 0
+v02_macd = (macdLine > macdSig and macdH > macdH[1]) ? +1 : (macdLine < macdSig and macdH < macdH[1]) ? -1 : 0
 
 // 3. ADX(14) ≥ 25 trend strength — directional
-v03_adx = adx14 >= 25.0 and diPlus  > diMinus ? +1 :
-          adx14 >= 25.0 and diMinus > diPlus  ? -1 : 0
+v03_adx = (adx14 >= 25.0 and diPlus > diMinus) ? +1 : (adx14 >= 25.0 and diMinus > diPlus) ? -1 : 0
 
 // 4. EMA50 vs EMA200 (long-term trend bias)
 v04_ema50_200 = ema50 > ema200 ? +1 : ema50 < ema200 ? -1 : 0
@@ -135,23 +133,16 @@ v04_ema50_200 = ema50 > ema200 ? +1 : ema50 < ema200 ? -1 : 0
 v05_ema20 = close > ema20 ? +1 : close < ema20 ? -1 : 0
 
 // 6. Stochastic(14,3,3)
-v06_stoch = stochK < 20.0 and stochD < 20.0 ? +1 :
-            stochK > 80.0 and stochD > 80.0 ? -1 :
-            stochK > stochD and stochK < 80.0 ? +1 :
-            stochK < stochD and stochK > 20.0 ? -1 : 0
+v06_stoch = (stochK < 20.0 and stochD < 20.0) ? +1 : (stochK > 80.0 and stochD > 80.0) ? -1 : (stochK > stochD and stochK < 80.0) ? +1 : (stochK < stochD and stochK > 20.0) ? -1 : 0
 
 // 7. CCI(20): vote only when leaving extreme zones
-v07_cci = cci20 >  100.0 ? +1 :
-          cci20 < -100.0 ? -1 : 0
+v07_cci = cci20 > 100.0 ? +1 : cci20 < -100.0 ? -1 : 0
 
 // 8. Williams %R(14)
 v08_wpr = wprc < -80.0 ? +1 : wprc > -20.0 ? -1 : 0
 
 // 9. Bollinger Bands(20,2)
-v09_bb = bbPct < 0.05 ? +1 :
-         bbPct > 0.95 ? -1 :
-         bbPct > 0.65 ? +1 :
-         bbPct < 0.35 ? -1 : 0
+v09_bb = bbPct < 0.05 ? +1 : bbPct > 0.95 ? -1 : bbPct > 0.65 ? +1 : bbPct < 0.35 ? -1 : 0
 
 // 10. OBV slope (5-bar)
 v10_obv = obvSlope > 0 ? +1 : obvSlope < 0 ? -1 : 0
@@ -160,13 +151,10 @@ v10_obv = obvSlope > 0 ? +1 : obvSlope < 0 ? -1 : 0
 v11_st = stDir < 0 ? +1 : stDir > 0 ? -1 : 0
 
 // 12. Ichimoku(9,26,52) cloud
-v12_ichi = aboveCloud and ichTenkan > ichKijun ? +1 :
-           belowCloud and ichTenkan < ichKijun ? -1 :
-           aboveCloud ? +1 : belowCloud ? -1 : 0
+v12_ichi = (aboveCloud and ichTenkan > ichKijun) ? +1 : (belowCloud and ichTenkan < ichKijun) ? -1 : aboveCloud ? +1 : belowCloud ? -1 : 0
 
 // 13. Donchian(20) breakout
-v13_don = close >= donHi[1] ? +1 :
-          close <= donLo[1] ? -1 : 0
+v13_don = close >= donHi[1] ? +1 : close <= donLo[1] ? -1 : 0
 
 // 14. Multi-TF alignment M15+H1+H4
 v14_mtf = mtfBull ? +1 : mtfBear ? -1 : 0
@@ -175,9 +163,7 @@ v14_mtf = mtfBull ? +1 : mtfBear ? -1 : 0
 v15_emax = ema20 > ema50 ? +1 : ema20 < ema50 ? -1 : 0
 
 // ---------- Score ----------
-score = v01_rsi + v02_macd + v03_adx + v04_ema50_200 + v05_ema20 +
-        v06_stoch + v07_cci + v08_wpr + v09_bb + v10_obv +
-        v11_st + v12_ichi + v13_don + v14_mtf + v15_emax
+score = v01_rsi + v02_macd + v03_adx + v04_ema50_200 + v05_ema20 + v06_stoch + v07_cci + v08_wpr + v09_bb + v10_obv + v11_st + v12_ichi + v13_don + v14_mtf + v15_emax
 
 // ---------- ATR-based "flat market" kill-switch ----------
 isFlat = i_useATR and not na(atrSMA) and atr14 < atrSMA * i_atrFlatRat
@@ -203,12 +189,8 @@ if fireSell
     lastSig := -1
 
 // ---------- Plot ----------
-plotshape(fireBuy,  title="BUY",  style=shape.triangleup,
-          location=location.belowbar, color=color.new(color.green, 0),
-          size=size.small, text="BUY")
-plotshape(fireSell, title="SELL", style=shape.triangledown,
-          location=location.abovebar, color=color.new(color.red, 0),
-          size=size.small, text="SELL")
+plotshape(fireBuy,  title="BUY",  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.small, text="BUY")
+plotshape(fireSell, title="SELL", style=shape.triangledown, location=location.abovebar, color=color.new(color.red,   0), size=size.small, text="SELL")
 
 // ---------- Compact info table ----------
 var table tbl = table.new(position.top_right, 2, 6, border_width=1)
@@ -229,9 +211,5 @@ if barstate.islast
     table.cell(tbl, 1, 5, lastSig == 1 ? "BUY" : lastSig == -1 ? "SELL" : "—", bgcolor=bg2)
 
 // ---------- Alerts ----------
-alertcondition(fireBuy,
-     title   = "WWS2277 BUY",
-     message = "Forex-WWS2277 BUY {{ticker}} {{interval}} score>=12, M15+H1+H4 align, persist 14/20")
-alertcondition(fireSell,
-     title   = "WWS2277 SELL",
-     message = "Forex-WWS2277 SELL {{ticker}} {{interval}} score<=-12, M15+H1+H4 align, persist 14/20")
+alertcondition(fireBuy,  title="WWS2277 BUY",  message="Forex-WWS2277 BUY {{ticker}} {{interval}} score>=12, M15+H1+H4 align, persist 14/20")
+alertcondition(fireSell, title="WWS2277 SELL", message="Forex-WWS2277 SELL {{ticker}} {{interval}} score<=-12, M15+H1+H4 align, persist 14/20")
