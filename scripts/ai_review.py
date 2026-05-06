@@ -5,19 +5,27 @@ latest cycle outputs and produces a critical review with concrete,
 actionable parameter suggestions for ``app/cycle.py`` and
 ``scripts/cycle_5h.py``.
 
-Two review modes:
+Three review modes, in priority order, ALL FREE:
 
-1. **LLM mode** (preferred) — when ``ANTHROPIC_API_KEY`` is set we send the
-   reports to Claude and ask it to flag weak spots and propose tighter
-   thresholds. Same with ``OPENAI_API_KEY`` (GPT-4o fallback).
+1. **GitHub Models** (preferred, FREE) — uses the ``GITHUB_TOKEN`` that
+   GitHub Actions already injects into every workflow run.  No paid API
+   key needed.  Endpoint: ``https://models.github.ai/inference``.
+   Default model: ``openai/gpt-4o-mini`` (free tier ~50 req/day, plenty
+   for our 5 cycles/day).  Override with the ``GITHUB_MODEL`` env var.
 
-2. **Heuristic mode** (always available, no API needed) — a deterministic
-   rule-based reviewer that:
+2. **HuggingFace Inference** (FREE with HF token) — backup when the
+   GitHub Models quota is exhausted.  Set ``HF_TOKEN`` to enable.
+
+3. **Heuristic mode** (always works, no key needed) — deterministic
+   rule-based reviewer:
    - Reads the rolling 5h winrate and the 28-pair backtest WR.
    - Flags pairs whose WR fell ≥10pp over 3 consecutive cycles.
    - Suggests raising ``STRONG_CONFIDENCE``, ``STRONG_RATIO`` or
      ``STRONG_PERSISTENCE`` when WR < 60 % across the last 10 cycles.
    - Suggests dropping pairs that consistently lose.
+
+Anthropic / OpenAI paid keys are still honoured if present, but they are
+NOT required and NOT recommended — keep things free.
 
 Outputs:
 - ``reports/ai_review_latest.md`` — full review text.
@@ -197,6 +205,68 @@ SYSTEM_PROMPT = """Ты — эксперт по торговле на форек
 """
 
 
+def call_github_models(prompt: str, token: str) -> str | None:
+    """Use GitHub Models — FREE, uses GITHUB_TOKEN that Actions already provides.
+
+    Endpoint docs: https://docs.github.com/en/github-models
+    Free tier: roughly 50 requests/day, more than enough for 5 cycles/day.
+    """
+    model = os.getenv("GITHUB_MODEL", "openai/gpt-4o-mini")
+    body = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 1500,
+        "temperature": 0.2,
+    }).encode("utf-8")
+    req = Request(
+        "https://models.github.ai/inference/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "content-type": "application/json",
+            "accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"[ai_review] github models call failed: {e}", file=sys.stderr)
+        return None
+
+
+def call_huggingface(prompt: str, token: str) -> str | None:
+    """HuggingFace Inference API — also free with a HF token."""
+    model = os.getenv(
+        "HF_MODEL", "meta-llama/Llama-3.3-70B-Instruct"
+    )
+    body = json.dumps({
+        "inputs": f"{SYSTEM_PROMPT}\n\nЗадание:\n{prompt}",
+        "parameters": {"max_new_tokens": 1500, "temperature": 0.2},
+    }).encode("utf-8")
+    req = Request(
+        f"https://api-inference.huggingface.co/models/{model}",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "content-type": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read())
+        if isinstance(data, list) and data:
+            return data[0].get("generated_text", "").strip()
+        return None
+    except Exception as e:
+        print(f"[ai_review] hf call failed: {e}", file=sys.stderr)
+        return None
+
+
 def call_anthropic(prompt: str, api_key: str) -> str | None:
     body = json.dumps({
         "model": "claude-sonnet-4-5-20250929",
@@ -261,6 +331,24 @@ def llm_review() -> str | None:
         prompt_parts += ["\n\n# Деградировавшие стратегии", degraded_text]
     prompt = "\n".join(prompt_parts)[:18_000]
 
+    # 1. GitHub Models — FREE, no extra secrets required.  GITHUB_TOKEN is
+    # auto-injected into every Actions run, so this is the default path.
+    gh_token = os.getenv("GITHUB_TOKEN")
+    if gh_token:
+        out = call_github_models(prompt, gh_token)
+        if out:
+            model_label = os.getenv("GITHUB_MODEL", "openai/gpt-4o-mini")
+            return f"## 🧠 AI-обзор (GitHub Models · {model_label} · бесплатно)\n\n{out.strip()}"
+
+    # 2. HuggingFace Inference — also free with a HF token.
+    hf = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+    if hf:
+        out = call_huggingface(prompt, hf)
+        if out:
+            model_label = os.getenv("HF_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
+            return f"## 🧠 AI-обзор (HuggingFace · {model_label} · бесплатно)\n\n{out.strip()}"
+
+    # 3-4. Optional paid fallbacks — only used if explicit keys are set.
     anth = os.getenv("ANTHROPIC_API_KEY")
     if anth:
         out = call_anthropic(prompt, anth)

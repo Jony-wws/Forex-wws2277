@@ -1,0 +1,60 @@
+name: Auto-tune thresholds
+
+# Daily auto-tuner that reads the rolling 5h winrate from state/forecasts.json
+# and tightens / relaxes the strict gate by one notch when WR drifts out of
+# the [55 %, 75 %] target band. Opens a PR for the user to review.
+#
+# 100 % free — pure Python over local JSON, no LLM required.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # daily at 03:30 UTC (08:30 UTC+5)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  tune:
+    name: Auto-tune strict thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run auto-tuner
+        env:
+          AUTO_TUNE_APPLY: "1"
+        run: |
+          python scripts/auto_tune.py
+
+      - name: Append proposal to job summary
+        if: always()
+        run: |
+          if [ -f reports/auto_tune_proposal.md ]; then
+            cat reports/auto_tune_proposal.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open PR with threshold change
+        if: always()
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: auto-tune/${{ github.run_id }}
+          base: main
+          title: "chore(auto-tune): подстройка порогов по свежему WR"
+          body-path: reports/auto_tune_proposal.md
+          commit-message: "chore(auto-tune): подстройка порогов на 1 ступень"
+          add-paths: |
+            app/cycle.py
+            reports/auto_tune_proposal.md
+          delete-branch: true
