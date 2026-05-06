@@ -130,12 +130,18 @@ class Params:
     cooldown_bars: int = 4
     payout: float = 0.80           # binary 80% payout
 
+    # Setup logic kind:
+    #   "and"      — RSI extreme AND price beyond BB band  (very strict, fewer trades, higher WR)
+    #   "rsi_only" — RSI cross-out of extreme zone          (more trades, slightly lower WR)
+    #   "bb_only"  — BB-band re-entry from outside          (medium frequency)
+    setup_kind: str = "and"
+
     # Optional session filter (UTC hours kept). Empty list = no filter.
     allowed_hours: tuple = ()
 
 
 def evaluate_setup(df: pd.DataFrame, p: Params):
-    """Pre-compute the heavy indicator outputs once per (rsi/bb/adx) combo."""
+    """Pre-compute the heavy indicator outputs once per (rsi/bb/adx/setup) combo."""
     rsi_v = rsi(df["Close"], p.rsi_period)
     bb_lo, _, bb_hi = bollinger(df["Close"], p.bb_period, p.bb_std)
     adx_v = adx_only(df, p.adx_period)
@@ -150,10 +156,27 @@ def evaluate_setup(df: pd.DataFrame, p: Params):
     bb_lo_prev = np.roll(bb_lo_arr, 1)
     bb_hi_prev = np.roll(bb_hi_arr, 1)
 
-    is_oversold_prev = (rsi_prev < p.rsi_os) & (close_prev < bb_lo_prev)
-    is_overbought_prev = (rsi_prev > p.rsi_ob) & (close_prev > bb_hi_prev)
-    is_buy = is_oversold_prev & (rsi_arr > p.rsi_os) & (adx_arr < p.adx_max)
-    is_sell = is_overbought_prev & (rsi_arr < p.rsi_ob) & (adx_arr < p.adx_max)
+    rsi_was_os = rsi_prev < p.rsi_os
+    rsi_was_ob = rsi_prev > p.rsi_ob
+    rsi_xup = rsi_arr > p.rsi_os
+    rsi_xdn = rsi_arr < p.rsi_ob
+    px_below = close_prev < bb_lo_prev
+    px_above = close_prev > bb_hi_prev
+    px_back_in_lo = closes >= bb_lo_arr  # price has come back inside the band
+    px_back_in_hi = closes <= bb_hi_arr
+    range_ok = adx_arr < p.adx_max
+
+    if p.setup_kind == "and":
+        is_buy = rsi_was_os & px_below & rsi_xup & range_ok
+        is_sell = rsi_was_ob & px_above & rsi_xdn & range_ok
+    elif p.setup_kind == "rsi_only":
+        is_buy = rsi_was_os & rsi_xup & range_ok
+        is_sell = rsi_was_ob & rsi_xdn & range_ok
+    elif p.setup_kind == "bb_only":
+        is_buy = px_below & px_back_in_lo & range_ok
+        is_sell = px_above & px_back_in_hi & range_ok
+    else:
+        raise ValueError(f"Unknown setup_kind: {p.setup_kind}")
     return closes, is_buy, is_sell
 
 
@@ -267,26 +290,28 @@ def sweep(df: pd.DataFrame) -> list[dict]:
     setup masks once per unique combination, then iterates horizon + cooldown
     on top — about 6× faster than the naïve sweep."""
     grid = []
-    for rsi_os in (22, 25, 28, 30, 32, 35):
-        for bb_std in (1.6, 1.8, 2.0, 2.2, 2.5):
-            for adx_max in (22, 25, 28, 32, 36):
-                for horizon in (2, 3, 4, 6, 8):
-                    for cooldown in (1, 2, 4):
-                        grid.append(
-                            Params(
-                                rsi_os=float(rsi_os),
-                                rsi_ob=float(100 - rsi_os),
-                                bb_std=float(bb_std),
-                                adx_max=float(adx_max),
-                                horizon_bars=int(horizon),
-                                cooldown_bars=int(cooldown),
+    for setup_kind in ("and", "rsi_only", "bb_only"):
+        for rsi_os in (22, 25, 28, 30, 32, 35):
+            for bb_std in (1.6, 1.8, 2.0, 2.2, 2.5):
+                for adx_max in (22, 25, 28, 32, 36):
+                    for horizon in (2, 3, 4, 6, 8):
+                        for cooldown in (1, 2, 4):
+                            grid.append(
+                                Params(
+                                    rsi_os=float(rsi_os),
+                                    rsi_ob=float(100 - rsi_os),
+                                    bb_std=float(bb_std),
+                                    adx_max=float(adx_max),
+                                    horizon_bars=int(horizon),
+                                    cooldown_bars=int(cooldown),
+                                    setup_kind=setup_kind,
+                                )
                             )
-                        )
 
     results = []
     cache: dict[tuple, tuple] = {}
     for p in grid:
-        key = (p.rsi_os, p.bb_std, p.adx_max)
+        key = (p.setup_kind, p.rsi_os, p.bb_std, p.adx_max)
         if key not in cache:
             cache[key] = evaluate_setup(df, p)
         results.append(_evaluate_with_setup(df, p, cache[key]))
@@ -386,6 +411,7 @@ def render_report(top: list[dict], best: dict, info: dict) -> str:
     lines.append("")
     lines.append("| Param | Value |")
     lines.append("|---|---:|")
+    lines.append(f"| Setup kind | **{p.setup_kind}** |")
     lines.append(f"| RSI oversold / overbought | {p.rsi_os:.0f} / {p.rsi_ob:.0f} |")
     lines.append(f"| Bollinger std | {p.bb_std:.1f} |")
     lines.append(f"| ADX max (range cap) | {p.adx_max:.0f} |")
@@ -403,16 +429,38 @@ def render_report(top: list[dict], best: dict, info: dict) -> str:
     lines.append(f"| Avg winner (pips) | {best['avg_win_pp']:+.1f} |")
     lines.append(f"| Avg loser (pips) | {best['avg_loss_pp']:+.1f} |")
     lines.append("")
-    lines.append("## Top 5 parameter combos")
+    lines.append("## Top 10 parameter combos")
     lines.append("")
-    lines.append("| WR | Trades | PnL | T/10d | RSI os | BB std | ADX max | Horiz |")
-    lines.append("|---:|---:|---:|---:|---:|---:|---:|---:|")
-    for r in top[:5]:
+    lines.append("| Setup | WR | Trades | PnL | T/day | RSI os | BB std | ADX max | Horiz | CD |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for r in top[:10]:
         pp = r["params"]
         lines.append(
-            f"| {r['wr']:.1f} % | {r['n_trades']} | {r['pnl']:+.2f} | "
-            f"{r['trades_per_10d']:.1f} | {pp.rsi_os:.0f} | {pp.bb_std:.1f} | "
-            f"{pp.adx_max:.0f} | {pp.horizon_bars} |"
+            f"| {pp.setup_kind} | {r['wr']:.1f} % | {r['n_trades']} | {r['pnl']:+.2f} | "
+            f"{r['trades_per_day']:.2f} | {pp.rsi_os:.0f} | {pp.bb_std:.1f} | "
+            f"{pp.adx_max:.0f} | {pp.horizon_bars} | {pp.cooldown_bars} |"
+        )
+
+    # Extra view: best combo that *also* meets the volume targets, even if WR
+    # has to drop a bit. Helps the user see the high-frequency option side by
+    # side with the high-WR option.
+    high_freq = [
+        r for r in top
+        if r["n_trades"] >= TARGET_TOTAL_TRADES and r["trades_per_day"] >= TARGET_TRADES_PER_DAY and r["pnl"] > 0
+    ]
+    if high_freq:
+        high_freq.sort(key=lambda r: (r["wr"], r["pnl"]), reverse=True)
+        hf = high_freq[0]
+        ph = hf["params"]
+        lines.append("")
+        lines.append("### High-frequency variant (≥100 trades, ≥3/day, PnL>0)")
+        lines.append("")
+        lines.append("| Setup | WR | Trades | PnL | T/day | RSI os | BB std | ADX max | Horiz | CD |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+        lines.append(
+            f"| {ph.setup_kind} | **{hf['wr']:.2f} %** | **{hf['n_trades']}** | "
+            f"**{hf['pnl']:+.2f}** | **{hf['trades_per_day']:.2f}** | {ph.rsi_os:.0f} | "
+            f"{ph.bb_std:.1f} | {ph.adx_max:.0f} | {ph.horizon_bars} | {ph.cooldown_bars} |"
         )
     lines.append("")
     target_met = (
