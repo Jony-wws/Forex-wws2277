@@ -191,16 +191,16 @@ def _scanner_loop():
                         _signals["pairs"][pair] = entry
                         _signals["updated_at"] = now_utc5.strftime("%Y-%m-%d %H:%M:%S")
                         _signals["scan_count"] = scan_num
+                        # Re-run the strict gate after every pair so the API
+                        # stays internally consistent even while the scan is
+                        # in progress (avoids races where some pairs hold
+                        # stale `signal_kind` from the previous scan).
+                        _apply_strict_gate(_signals["pairs"])
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
 
-        # Strict-quality post-pass: only promote pairs that pass the strict
-        # trend_quality + confidence gate. If <MIN_FORECASTS pass, promote
-        # the top-N by trend_quality so the dashboard always shows at least
-        # 3 forecasts.
         try:
             with _lock:
-                _apply_strict_gate(_signals["pairs"])
                 strict_n = sum(
                     1 for e in _signals["pairs"].values()
                     if e.get("signal_kind") == "strict"
