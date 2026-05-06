@@ -163,8 +163,24 @@ MIN_TRADES_PER_DAY = 3
 
 
 # ── FILTER + SCORE  (cheap step, reused across the param sweep) ────────
-def filter_and_score(sig: pd.DataFrame, direction: pd.Series,
-                     multi_tf_aligned: pd.Series, pair: str, p: Params) -> dict:
+def filter_and_score_window(sig: pd.DataFrame, direction: pd.Series,
+                             multi_tf_aligned: pd.Series, pair: str,
+                             p: Params, days: int | None = None) -> dict:
+    """Like :func:`filter_and_score` but optionally restricted to the last
+    `days` days of data.  When `days is None` it evaluates the full window
+    (back-compat).  This is used to compute WR on 5d / 30d / 365d windows
+    for the same chosen strategy."""
+    if days is not None and len(sig) > 0:
+        cutoff = sig.index[-1] - pd.Timedelta(days=days)
+        mask_window = sig.index >= cutoff
+        sig = sig[mask_window]
+        direction = direction[mask_window]
+        multi_tf_aligned = multi_tf_aligned[mask_window]
+    return _filter_and_score_impl(sig, direction, multi_tf_aligned, pair, p)
+
+
+def _filter_and_score_impl(sig: pd.DataFrame, direction: pd.Series,
+                            multi_tf_aligned: pd.Series, pair: str, p: Params) -> dict:
     """Apply the cheap filter/horizon evaluation on a pre-classified
     DataFrame. `sig`, `direction` and `multi_tf_aligned` are computed
     once per pair in :func:`sweep_pair`."""
@@ -206,6 +222,11 @@ def filter_and_score(sig: pd.DataFrame, direction: pd.Series,
         avg_win_pp=round(avg_win, 1), avg_loss_pp=round(avg_loss, 1),
         trades_per_day=round(n / span_days, 2),
     )
+
+
+# Back-compat alias — used in places that called the original function.
+def filter_and_score(sig, direction, multi_tf_aligned, pair, p):
+    return _filter_and_score_impl(sig, direction, multi_tf_aligned, pair, p)
 
 
 # ── PER-PAIR SWEEP & PICK BEST STRATEGY ────────────────────────────────
@@ -286,13 +307,28 @@ def sweep_pair(pair: str, extra_grid: Optional[list[Params]] = None,
     if best is None:
         return dict(pair=pair, error="no valid candidates")
 
+    # ── STABILITY CHECK ─ evaluate the chosen strategy on 5d / 30d / 365d
+    # windows so we can require WR ≥ target on EVERY window (more robust).
+    p_chosen = Params(**best["params"])
+    for days_label, days in (("wr_5d", 5), ("wr_30d", 30), ("wr_365d", 365)):
+        try:
+            r_window = filter_and_score_window(
+                sig, direction, multi_tf_aligned, pair, p_chosen, days=days
+            )
+            best[days_label] = r_window.get("wr", 0.0)
+            best[f"{days_label}_trades"] = r_window.get("trades", 0)
+        except Exception as e:
+            print(f"  ! {pair} window {days}d failed: {e}")
+            best[days_label] = 0.0
+            best[f"{days_label}_trades"] = 0
+
     # Snapshot last 5h activity on this pair for context.
     last_close = float(m15["Close"].iloc[-1])
     last_open  = float(m15["Close"].iloc[-LOOKBACK_5H_BARS]) if len(m15) > LOOKBACK_5H_BARS else float(m15["Close"].iloc[0])
     last_5h_pp = (last_close - last_open) * pip_mult(pair)
 
-    # Compute direction at the latest classified bar using the chosen params.
-    p_chosen = Params(**best["params"])
+    # Compute direction at the latest classified bar using the chosen params
+    # (p_chosen was already constructed above for the stability check).
     last_row = sig.iloc[-1]
     aligned = (last_row["bull_count"] >= 3) or (last_row["bear_count"] >= 3)
     side = last_row["side"]
@@ -581,43 +617,63 @@ def latest_direction(pair: str, m15: pd.DataFrame, h1: pd.DataFrame,
 
 # ── TOP-3 PICKER ───────────────────────────────────────────────────────
 def pick_top3_strict(per_pair: list[dict]) -> list[dict]:
-    """Strict picker: pairs whose backtested WR ≥ WR_TARGET, that have
-    enough trades for the WR to be statistically meaningful, AND that
-    trade frequently enough to be actionable (≥ MIN_TRADES_PER_DAY).
+    """Strict picker — STABILITY filter across MULTIPLE windows.
 
-    We do NOT require a live entry signal on the latest bar — a backtest
-    that hit 70%+ over 365 days is the signal the user asked for, and we
-    surface in the report whether the latest bar is currently inside the
-    strategy's entry conditions or not.
+    A pair makes it into the top only if it satisfies *all* of:
+
+      • WR ≥ WR_TARGET on the full backtest (default 365d)
+      • WR ≥ WR_TARGET on the 30-day window
+      • WR ≥ WR_TARGET on the 5-day window
+      • ≥ MIN_TRADES_FOR_VALID total trades
+      • ≥ MIN_TRADES_PER_DAY trade frequency
+
+    This protects against rare-event strategies that look great on a
+    long horizon but break the moment regime changes.  It also avoids
+    showing the user a pair where 365d WR is 70% but 5d WR is 30% (which
+    is exactly what happened in the cycle the user complained about).
     """
     eligible = [
         r for r in per_pair
         if r.get("wr", 0) >= WR_TARGET
+        and r.get("wr_30d", 0) >= WR_TARGET
+        and r.get("wr_5d", 0) >= WR_TARGET
         and r.get("trades", 0) >= MIN_TRADES_FOR_VALID
         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
     ]
-    eligible.sort(key=lambda r: (-r.get("wr", 0), -r.get("trades_per_day", 0)))
+    eligible.sort(key=lambda r: (-r.get("wr_5d", 0), -r.get("wr", 0),
+                                  -r.get("trades_per_day", 0)))
     return eligible[:TOP_N]
 
 
 def best_effort_top3(per_pair: list[dict]) -> list[dict]:
     """Fallback when fewer than MIN_TOP_PAIRS pass the strict filter.
-    Prefer pairs with ≥ MIN_TRADES_PER_DAY; rank by composite score
-    that balances WR and frequency (so rare strategies don't dominate).
+    Rank by a stability composite that rewards passing more windows.
     """
+    def stability_score(r: dict) -> float:
+        # Each window passing target adds 100 pts; raw WRs add fractional.
+        return (
+            (100 if r.get("wr_5d", 0) >= WR_TARGET else 0)
+            + (100 if r.get("wr_30d", 0) >= WR_TARGET else 0)
+            + (100 if r.get("wr", 0) >= WR_TARGET else 0)
+            + r.get("wr", 0) * 0.3
+            + r.get("wr_30d", 0) * 0.5
+            + r.get("wr_5d", 0) * 0.7
+            + (50 if r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY else 0)
+        )
+
     frequent = [
         r for r in per_pair
         if r.get("trades", 0) >= MIN_TRADES_FOR_VALID
         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
     ]
     if len(frequent) >= TOP_N:
-        frequent.sort(key=lambda r: -r.get("wr", 0))
+        frequent.sort(key=lambda r: -stability_score(r))
         return frequent[:TOP_N]
     # Not enough frequent pairs — include infrequent but sort them lower.
     fallback = [r for r in per_pair if r.get("trades", 0) >= MIN_TRADES_FOR_VALID]
     fallback.sort(key=lambda r: (
         -(1 if r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY else 0),
-        -r.get("wr", 0),
+        -stability_score(r),
     ))
     return fallback[:TOP_N]
 
@@ -713,22 +769,26 @@ def format_report(payload: dict) -> str:
     top3 = payload.get("top3", [])
     on_target_n = payload.get("on_target_count", 0)
     sweep_attempts = payload.get("sweep_attempts", 1)
-    on_target_freq_n = sum(
+    # Stable pairs = pass WR≥target on ALL THREE windows (5d, 30d, 365d)
+    # AND have ≥3 trades/day. This is the new "actionable" definition.
+    stable_n = sum(
         1 for r in payload.get("per_pair", [])
         if r.get("wr", 0) >= WR_TARGET
+        and r.get("wr_30d", 0) >= WR_TARGET
+        and r.get("wr_5d", 0) >= WR_TARGET
         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
     )
-    if on_target_freq_n >= MIN_TOP_PAIRS:
+    if stable_n >= MIN_TOP_PAIRS:
         out.append(
-            f"<b>🏆 Топ-{len(top3)} стратегий "
-            f"(WR ≥ {int(WR_TARGET)}% и ≥ {MIN_TRADES_PER_DAY} сделок/день, бэктест 365 дней):</b>"
+            f"<b>🏆 Топ-{len(top3)} СТАБИЛЬНЫХ стратегий "
+            f"(WR ≥ {int(WR_TARGET)}% на 5д И 30д И 365д, ≥ {MIN_TRADES_PER_DAY} сделок/день):</b>"
         )
     else:
         out.append(
-            f"<b>⚠️ Цель не достигнута: пар с WR≥{int(WR_TARGET)}% и ≥{MIN_TRADES_PER_DAY} сделок/день — "
-            f"{on_target_freq_n} (нужно ≥{MIN_TOP_PAIRS}). "
-            f"Прогнал {sweep_attempts} прохода сетки (всего ~{sweep_attempts * 60}+ комбинаций) — "
-            f"лучшее что нашёл:</b>"
+            f"<b>⚠️ Цель не достигнута: стабильных пар "
+            f"(WR≥{int(WR_TARGET)}% на 5д+30д+365д, ≥{MIN_TRADES_PER_DAY}/день) — "
+            f"{stable_n} (нужно ≥{MIN_TOP_PAIRS}). "
+            f"Прогнал {sweep_attempts} прохода сетки — лучшее что нашёл:</b>"
         )
     for i, r in enumerate(top3, 1):
         d = r.get("direction", 0)
@@ -743,10 +803,24 @@ def format_report(payload: dict) -> str:
                 f"(текущий уклон рынка: <b>{raw}</b>)"
             )
         tpd = r.get("trades_per_day", 0)
+        # Show stability across 3 backtest windows so the user can see
+        # at a glance whether the strategy is genuinely robust or only
+        # works on one window.
+        wr_5d = r.get("wr_5d", 0)
+        wr_30d = r.get("wr_30d", 0)
+        wr_365d = r.get("wr", 0)
+        def mark(wr: float) -> str:
+            return "✅" if wr >= WR_TARGET else "⚠️"
+        stability_line = (
+            f"   <b>Стабильность:</b> 5д {mark(wr_5d)} {wr_5d:.1f}%"
+            f"  ·  30д {mark(wr_30d)} {wr_30d:.1f}%"
+            f"  ·  365д {mark(wr_365d)} {wr_365d:.1f}%"
+        )
         out.append(
             f"\n<b>{i}. {r['pair']}</b>  {side_ru}"
-            f"\n   Винрейт <b>{r['wr']}%</b>  ·  всего сделок {r['trades']}  ·  "
+            f"\n   Винрейт (365д) <b>{r['wr']}%</b>  ·  всего сделок {r['trades']}  ·  "
             f"{humanize_trades_per_day(tpd)}  ·  прибыль {r['pnl']:+.1f} пунктов"
+            f"\n{stability_line}"
         )
         out.append(f"  • <b>Стратегия:</b> {describe_strategy_ru(r.get('params', {}))}")
         if r.get("indicators_now"):
@@ -972,15 +1046,17 @@ def main() -> None:
         on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
         print(f"[cycle] pass 2: {len(on_target)} pair(s) on target")
 
-    # Pass 3 — if we still don't have enough FREQUENT pairs on target,
-    # try a frequency-focused grid with lower thresholds to generate
-    # more trades (user wants ≥ 3/day, not 0.3/day).
-    on_target_freq = [
+    # Pass 3 — if we still don't have enough STABLE pairs (passing target
+    # on 5d, 30d, AND 365d windows), try a frequency-focused grid with
+    # lower thresholds to generate more trades + more diverse strategies.
+    stable = [
         r for r in per_pair
         if r.get("wr", 0) >= WR_TARGET
+        and r.get("wr_30d", 0) >= WR_TARGET
+        and r.get("wr_5d", 0) >= WR_TARGET
         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
     ]
-    if len(on_target_freq) < MIN_TOP_PAIRS:
+    if len(stable) < MIN_TOP_PAIRS:
         sweep_attempts = 3
         print(f"[cycle] pass 3: frequency-focused grid (≥{MIN_TRADES_PER_DAY} trades/day) ...")
         freq_grid: list[Params] = []
@@ -998,15 +1074,18 @@ def main() -> None:
                         ))
         per_pair = sweep_all_pairs(PAIRS, extra_grid=freq_grid, cache=cache)
         on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
-        on_target_freq = [
+        stable = [
             r for r in per_pair
             if r.get("wr", 0) >= WR_TARGET
+            and r.get("wr_30d", 0) >= WR_TARGET
+            and r.get("wr_5d", 0) >= WR_TARGET
             and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY
         ]
-        print(f"[cycle] pass 3: {len(on_target_freq)} frequent pair(s) on target")
+        print(f"[cycle] pass 3: {len(stable)} stable pair(s) (5d+30d+365d ≥{WR_TARGET}%, ≥{MIN_TRADES_PER_DAY}/day)")
 
     print(f"[cycle] swept {len(per_pair)} / {len(PAIRS)} pairs · "
-          f"on target ≥{WR_TARGET}%: {len(on_target)}")
+          f"365d-on-target ≥{WR_TARGET}%: {len(on_target)} · "
+          f"stable (5d+30d+365d): {len(stable)}")
 
     # Pick top-3.
     strict = pick_top3_strict(per_pair)
