@@ -180,13 +180,23 @@ async def startup():
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
+def _render_index(for_telegram: bool = False) -> str:
+    """Render `static/index.html` with embedded initial data.
+
+    When ``for_telegram`` is True we additionally inject:
+      * the Telegram Web App SDK (``telegram-web-app.js``);
+      * a small ``<style>`` block that maps the existing dark theme to
+        Telegram theme variables so the page blends with the user's
+        Telegram colour scheme without changing the standalone look.
+
+    The page degrades gracefully in a normal browser: if
+    ``window.Telegram.WebApp`` is undefined the SDK is a no-op and the
+    CSS variables fall back to the existing dark palette.
+    """
     html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    # Inject current data directly into HTML so mobile doesn't need API call
     with _lock:
         data_json = json.dumps(_signals, default=str, ensure_ascii=False)
-        ob_json   = json.dumps(dict(_orderbooks), default=str, ensure_ascii=False)
+        ob_json = json.dumps(dict(_orderbooks), default=str, ensure_ascii=False)
     cycle_json = json.dumps(
         cycle_mod.snapshot(), default=str, ensure_ascii=False
     )
@@ -195,8 +205,46 @@ async def index():
         f'window.__INITIAL_CYCLE__ = {cycle_json};'
         f'window.__INITIAL_OB__ = {ob_json};</script>'
     )
-    html = html.replace('</head>', inject + '</head>')
-    return html
+    if for_telegram:
+        tg_block = (
+            '<script src="https://telegram.org/js/telegram-web-app.js?56"></script>'
+            '<style>'
+            ':root{'
+            '--bg: var(--tg-theme-bg-color, #0a0e17);'
+            '--card-bg: var(--tg-theme-secondary-bg-color, #141b2d);'
+            '--header-bg: var(--tg-theme-secondary-bg-color, #0d1321);'
+            '--text: var(--tg-theme-text-color, #e2e8f0);'
+            '--text-dim: var(--tg-theme-hint-color, #8892a4);'
+            '--accent: var(--tg-theme-link-color, #4fc3f7);'
+            '}'
+            'html,body{overscroll-behavior-y:contain;}'
+            '</style>'
+            '<script>'
+            'try{var tg=window.Telegram&&window.Telegram.WebApp;'
+            'if(tg){tg.ready();tg.expand();'
+            'document.documentElement.classList.add("tg-mini-app");}'
+            '}catch(e){}'
+            '</script>'
+        )
+        inject = tg_block + inject
+    return html.replace('</head>', inject + '</head>')
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return _render_index(for_telegram=False)
+
+
+@app.get("/tg", response_class=HTMLResponse)
+async def index_telegram():
+    """Telegram Mini App entry point.
+
+    Same dashboard as ``/`` but with the Telegram Web App SDK loaded and
+    theme variables wired up.  Open this URL via a BotFather menu button
+    or a ``web_app`` inline button to launch the dashboard inside
+    Telegram without leaving the chat.
+    """
+    return _render_index(for_telegram=True)
 
 
 @app.get("/api/signals")

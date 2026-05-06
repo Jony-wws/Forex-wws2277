@@ -1,0 +1,60 @@
+name: Telegram bot keepalive
+
+# Cheapest free-tier way to keep a Telegram Mini App bot reachable: run
+# the long-poll loop for a few minutes every 30 minutes from GitHub
+# Actions.  This is enough for an interactive user — when they press
+# the bot's /start button we usually answer within seconds.  If the
+# TELEGRAM_BOT_TOKEN secret is missing the job still runs but exits
+# cleanly so unconfigured forks don't see red builds.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-bot-keepalive
+  cancel-in-progress: true
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --quiet "requests>=2.31"
+
+      - name: Skip if no bot token
+        id: gate
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ]; then
+            echo "TELEGRAM_BOT_TOKEN secret not configured — skipping bot run."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Long-poll Telegram bot for ~5 minutes
+        if: steps.gate.outputs.skip == '0'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          RUN_SECONDS: "300"
+          POLL_TIMEOUT: "25"
+        run: |
+          python scripts/telegram_bot.py
