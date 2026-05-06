@@ -1,0 +1,39 @@
+# Fly.io deployment for the FOREX 28-pair dashboard.
+#
+# One push to `main` (touching app/, static/, fly.toml, Dockerfile or
+# pyproject.toml) → auto-deploy to Fly.io's free tier via
+# `.github/workflows/deploy_fly.yml`.
+#
+# Free-tier sizing: 1 × shared-cpu-1x VM with 256 MB RAM in `fra`.
+# `state/` is intentionally NOT mounted — it is regenerated every 5h
+# by the `cycle_5h` workflow committing back to the repo, so no
+# persistent volume is needed and the deploy stays inside the free tier.
+
+app = "forex-wws2277"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PYTHONUNBUFFERED = "1"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/cycle"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
