@@ -1,15 +1,26 @@
-"""Multi-broker aggregator — compares forex bid/ask across free sources.
+"""Multi-broker aggregator — sanity-check Yahoo against secondary feeds.
+
+**Yahoo Finance is the trusted source of truth** for the live site
+(`app/prices.py`).  This workflow exists only to detect the rare case
+when Yahoo itself lags or stale-prints — *not* to flag the slower free
+feeds as suspicious every 30 minutes.
 
 Sources:
-- Yahoo Finance (default — same as the live site)
-- ExchangeRate-API (free tier)
-- Frankfurter.app (ECB rates, free)
-- Open Exchange Rates (only if APP_OXR_KEY is set)
+- Yahoo Finance      (primary, same feed the site uses)
+- ExchangeRate-API   (free, ECB-style daily fallback)
+- Frankfurter.app    (free, ECB rates, daily)
 
-For each pair we compute the *median* of the available sources and the
-spread of the discrete sources to the median.  When ≥1 source diverges
-by more than 8 pips from the median, a Telegram alert is fired with the
-"odd one out" so the user knows which feed lagged."""
+Algorithm:
+1. Pull Yahoo + ER-API + Frankfurter for each pair.
+2. Pip distance from Yahoo is computed for each secondary source.
+3. **Alert ONLY when BOTH secondary sources disagree with Yahoo by
+   ≥ 25 pips simultaneously** — that's the only case Yahoo itself is
+   plausibly the laggy one.  Single-source noise is silently logged.
+
+Result: no more false "Yahoo vs ExchangeRate расхождение" alerts —
+ER-API/Frankfurter naturally lag by tens of pips because they use
+end-of-day ECB fixings, not live tick data.  We only ping you when
+*both* of them disagree with Yahoo, which is a real anomaly."""
 from __future__ import annotations
 
 import json
@@ -41,10 +52,18 @@ def pip_mult(pair: str) -> float:
 def fetch_yahoo(pair: str) -> Optional[float]:
     try:
         df = yf.download(f"{pair}=X", period="1d", interval="5m",
-                         progress=False, auto_adjust=False)
-        if df.empty:
+                         progress=False, auto_adjust=False, group_by="column")
+        if df is None or df.empty:
             return None
-        return float(df["Close"].iloc[-1])
+        # yfinance can return either a flat DF or a multi-index DF depending
+        # on version.  In both cases the last close is the final value of
+        # the Close column squeezed to a scalar.
+        close = df["Close"]
+        if hasattr(close, "values"):
+            arr = close.values.flatten()
+        else:
+            arr = list(close)
+        return float(arr[-1]) if len(arr) else None
     except Exception as e:
         print(f"[multi-broker] yahoo {pair} failed: {e}")
         return None
@@ -81,6 +100,12 @@ def median(xs: list[float]) -> float:
     return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
 
 
+# Yahoo is treated as the source of truth.  An alert is only fired when
+# both alternate sources simultaneously disagree with Yahoo by this many
+# pips, which would suggest Yahoo itself is lagging.
+YAHOO_SUSPECT_PIPS = 25.0
+
+
 def main() -> int:
     rows: list[dict] = []
     alerts: list[dict] = []
@@ -95,54 +120,79 @@ def main() -> int:
             val = fn(pair)
             if val is not None and val > 0:
                 sources[name] = val
-        if len(sources) < 2:
+        if "yahoo" not in sources or len(sources) < 2:
             continue
 
-        med = median(list(sources.values()))
+        yahoo_px = sources["yahoo"]
         pm = pip_mult(pair)
-        diffs_pips = {n: (v - med) * pm for n, v in sources.items()}
-        worst = max(diffs_pips, key=lambda k: abs(diffs_pips[k]))
-        worst_pips = abs(diffs_pips[worst])
+        diffs_pips = {
+            n: (v - yahoo_px) * pm for n, v in sources.items() if n != "yahoo"
+        }
+        worst_source = (
+            max(diffs_pips, key=lambda k: abs(diffs_pips[k])) if diffs_pips else "—"
+        )
+        worst_pips = abs(diffs_pips[worst_source]) if diffs_pips else 0.0
         rows.append({
             "pair": pair,
-            "median": med,
+            "yahoo": yahoo_px,
             "sources": sources,
-            "worst_source": worst,
+            "diffs_pips": diffs_pips,
+            "worst_source": worst_source,
             "worst_pips": worst_pips,
         })
-        if worst_pips >= 8.0:
+        # Only flag Yahoo as suspect when we have ≥ 2 alternate sources
+        # AND ALL of them disagree with Yahoo by ≥ YAHOO_SUSPECT_PIPS —
+        # that's the only realistic scenario in which Yahoo itself is the
+        # laggy feed.  A single ER-API outlier is not enough.
+        secondaries = [abs(p) for p in diffs_pips.values()]
+        if (
+            len(secondaries) >= 2
+            and all(p >= YAHOO_SUSPECT_PIPS for p in secondaries)
+        ):
             alerts.append(rows[-1])
 
     ts = datetime.now(timezone.utc)
     lines = [
         f"# Multi-broker price aggregator — {ts.strftime('%Y-%m-%d %H:%M UTC')}",
         "",
-        "| Пара | Yahoo | ER-API | Frankfurter | Медиана | Макс. отклонение |",
-        "|------|-------|--------|-------------|---------|------------------|",
+        "_Yahoo Finance — основной источник, остальные показаны только для "
+        "проверки на случай если **сам Yahoo лагает**._  "
+        f"Алерт срабатывает только когда **обе** альтернативы расходятся с Yahoo "
+        f"на ≥ {int(YAHOO_SUSPECT_PIPS)} пп одновременно.",
+        "",
+        "| Пара | Yahoo (truth) | ER-API | Frankfurter | Δ ER-API | Δ Frank |",
+        "|------|---------------|--------|-------------|---------:|--------:|",
     ]
     for r in rows:
         s = r["sources"]
+        d = r["diffs_pips"]
+        ya = s.get("yahoo")
+        er = s.get("er-api")
+        fr = s.get("frankfurter")
         lines.append(
             f"| {r['pair']} "
-            f"| {s.get('yahoo','—'):.5f} "
-            f"| {s.get('er-api','—'):.5f} "
-            f"| {s.get('frankfurter','—'):.5f} "
-            f"| {r['median']:.5f} "
-            f"| {r['worst_source']} {r['worst_pips']:+.1f} пп |"
+            f"| **{ya:.5f}** "
+            f"| {(f'{er:.5f}' if er is not None else '—')} "
+            f"| {(f'{fr:.5f}' if fr is not None else '—')} "
+            f"| {d.get('er-api', 0):+.1f} пп "
+            f"| {d.get('frankfurter', 0):+.1f} пп |"
         )
 
     (REPORTS / "multi_broker_latest.md").write_text(
         "\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[multi-broker] wrote {len(rows)} pairs ({len(alerts)} alerts)")
+    print(f"[multi-broker] wrote {len(rows)} pairs ({len(alerts)} yahoo-suspect alerts)")
 
     bot = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT_ID")
     if bot and chat and alerts:
-        msg = "📊 Multi-broker: расхождение цен >8 пп от медианы\n" + \
-              "\n".join(
-                  f"  • {a['pair']}: {a['worst_source']} лагает на {a['worst_pips']:.1f} пп"
-                  for a in alerts[:5]
-              )
+        msg = (
+            "⚠ Yahoo, возможно, лагает (обе альтернативы расходятся "
+            f"≥ {int(YAHOO_SUSPECT_PIPS)} пп):\n"
+        ) + "\n".join(
+            f"  • {a['pair']}: ER-API {a['diffs_pips'].get('er-api',0):+.1f} пп, "
+            f"Frank {a['diffs_pips'].get('frankfurter',0):+.1f} пп"
+            for a in alerts[:5]
+        )
         try:
             urlopen(Request(
                 f"https://api.telegram.org/bot{bot}/sendMessage",
