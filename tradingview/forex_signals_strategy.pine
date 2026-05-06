@@ -2,12 +2,13 @@
 // Backtestable strategy: same multi-TF signal as the indicator,
 // wired into TradingView Strategy Tester for honest win-rate stats.
 //
-// Trading rule (binary, mirrors cycle.py):
+// Trading rule (asymmetric R:R, mirrors cycle.py):
 //   On a fresh BUY signal (conf >= gate)  → enter long.
-//     Exit when: TP +0.10% (win) | SL −0.10% (loss) | Horizon hours elapsed (close at market).
+//     Exit when: TP +tpPct% (win) | SL −slPct% (loss) | Horizon hours elapsed (close at market).
 //   Same for SELL (mirrored).  No pyramiding.
+//   Defaults tuned for «strong moves»: gate=90, TP=0.30%, SL=0.15% → R:R 2:1.
 //@version=5
-strategy(title              = "FOREX-28 Strategy — 0.10% binary, 5h/24h horizon",
+strategy(title              = "FOREX-28 Strategy — strong moves, asymmetric R:R",
          shorttitle         = "FX-28-S",
          overlay            = true,
          pyramiding         = 0,
@@ -20,9 +21,10 @@ strategy(title              = "FOREX-28 Strategy — 0.10% binary, 5h/24h horizo
          process_orders_on_close = true)
 
 // ── INPUTS ─────────────────────────────────────────────────────────────
-gateConf = input.int  (80,   "Уверенность для входа, %", minval=50, maxval=95)
-horizonH = input.int  (5,    "Горизонт сделки, часов",   minval=1,  maxval=72)
-winPct   = input.float(0.10, "Порог TP / SL, %",         minval=0.01, maxval=2.0, step=0.01)
+gateConf = input.int  (90,   "Уверенность для входа, %",     minval=50, maxval=95)
+horizonH = input.int  (12,   "Горизонт сделки, часов",       minval=1,  maxval=72)
+tpPct    = input.float(0.30, "TP, % (целевое движение)",     minval=0.01, maxval=5.0, step=0.01)
+slPct    = input.float(0.15, "SL, % (стоп-лосс)",            minval=0.01, maxval=5.0, step=0.01)
 useLong  = input.bool (true, "Торговать BUY")
 useShort = input.bool (true, "Торговать SELL")
 showLbl  = input.bool (true, "Показывать метки на графике")
@@ -231,13 +233,13 @@ if strategy.position_size != 0 and na(entryP)
     entryT := time
 
 if strategy.position_size > 0
-    tp = entryP * (1 + winPct / 100)
-    sl = entryP * (1 - winPct / 100)
+    tp = entryP * (1 + tpPct / 100)
+    sl = entryP * (1 - slPct / 100)
     strategy.exit("Lx", "L", limit=tp, stop=sl)
 
 if strategy.position_size < 0
-    tp = entryP * (1 - winPct / 100)
-    sl = entryP * (1 + winPct / 100)
+    tp = entryP * (1 - tpPct / 100)
+    sl = entryP * (1 + slPct / 100)
     strategy.exit("Sx", "S", limit=tp, stop=sl)
 
 horizonMs = horizonH * 60 * 60 * 1000
