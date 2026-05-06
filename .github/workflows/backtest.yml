@@ -44,7 +44,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance pandas numpy
+          pip install yfinance pandas numpy matplotlib
 
       - name: Run 28-pair full-system backtest (premium / strict / daily TOP-3)
         run: python scripts/backtest_28pairs.py
@@ -55,13 +55,20 @@ jobs:
       - name: Run mean-reversion backtest (BB+RSI extreme, 1-2h binary)
         run: python scripts/backtest_eurusd_mr.py
 
-      - name: Upload reports artifact
+      - name: Render chart proofs (TradingView-style PNG with overlay markers)
+        run: |
+          for pair in EURUSD GBPUSD USDJPY AUDUSD; do
+            python scripts/render_chart_proof.py "$pair" || true
+          done
+
+      - name: Upload reports artifact (markdown + json + chart PNGs)
         uses: actions/upload-artifact@v4
         with:
           name: forex-backtest-reports
           path: |
             reports/*.md
             reports/*.json
+            reports/*.png
           if-no-files-found: error
 
       - name: Append all reports to job summary
