@@ -1,0 +1,294 @@
+// © Jony-wws / Forex-wws2277
+// EUR/USD SIGNAL INDICATOR (Pine v5) — full forecast-system logic on the chart.
+//
+// What this is:
+//   This is the *visualisation* of the same multi-timeframe + multi-block voting
+//   system that powers the live dashboard at /api/signals. It is an INDICATOR
+//   (not a strategy) — no trades are placed; only BUY / SELL labels are drawn
+//   on the chart so you can see at a glance where to enter on the 5h binary.
+//
+// Where to use it:
+//   1. Open EUR/USD on M15 in TradingView.
+//   2. Pine Editor → New blank indicator → paste this whole file → Save → Add to chart.
+//   3. Wait for a fresh ★ ПРЕМИУМ or СТРОГИЙ label — that's the entry.
+//
+// Logic mirrors `app/analyzer.py` + `app/main.py` strict-gate:
+//   - 4-TF agreement (D1 + H4 + H1 + M15) on EMA20 vs EMA50 trend.
+//   - Multi-block consensus: EMA, MACD, RSI, Stoch, Bollinger %B, ADX/+DI/-DI,
+//     Williams %R, momentum, Aroon, CCI, Heiken Ashi.
+//   - Composite `trend_quality` (0..100) = avg of: score-ratio, ADX, |Aroon|,
+//     HA directionality × body, multi-TF agreement, ATR/avgATR, |momentum|.
+//   - Confidence (50..92 %) from voting score ratio.
+//   - Three tiers: ПРЕМИУМ (gold ★), СТРОГИЙ (green), or no label.
+
+//@version=5
+indicator(title              = "EUR/USD Signal — Forex-wws2277",
+          shorttitle         = "EUR/USD-SIG",
+          overlay            = true,
+          max_labels_count   = 500,
+          max_lines_count    = 50)
+
+// ──────────────────────────────────────────────────────────────────────
+//  INPUTS
+// ──────────────────────────────────────────────────────────────────────
+showStrict     = input.bool(true,  "Show СТРОГИЙ (green) labels", group="Display")
+showPremium    = input.bool(true,  "Show ★ ПРЕМИУМ (gold) labels", group="Display")
+showHorizonLn  = input.bool(true,  "Draw 5h horizon line",        group="Display")
+showInfoTable  = input.bool(true,  "Show stats table (top right)", group="Display")
+warnNonEur     = input.bool(true,  "Warn if not on EUR/USD",      group="Display")
+
+minConfidence  = input.int(82,  "Min confidence (СТРОГИЙ)",  minval=50, maxval=92, group="Strict gate")
+minTrendQ      = input.int(75,  "Min trend_quality (СТРОГИЙ)", minval=0, maxval=100, group="Strict gate")
+requireMTF     = input.bool(true, "Require multi-TF aligned",   group="Strict gate")
+
+premMinConf    = input.int(88,  "ПРЕМИУМ: min confidence",     minval=50, maxval=95, group="Premium gate")
+premMinTrendQ  = input.int(85,  "ПРЕМИУМ: min trend_quality",  minval=0, maxval=100, group="Premium gate")
+premMinAdx     = input.float(28.0, "ПРЕМИУМ: min ADX(1h)",     minval=10, maxval=60, step=1, group="Premium gate")
+premMinAroon   = input.float(70.0, "ПРЕМИУМ: min |Aroon osc|", minval=0, maxval=100, step=5, group="Premium gate")
+premMinHA      = input.float(0.83, "ПРЕМИУМ: min HA bull-ratio extreme", minval=0.5, maxval=1.0, step=0.01, group="Premium gate")
+premMinHABody  = input.float(0.55, "ПРЕМИУМ: min HA body strength", minval=0.0, maxval=1.0, step=0.05, group="Premium gate")
+premMinMom     = input.float(0.20, "ПРЕМИУМ: min |Momentum %|", minval=0.0, maxval=1.0, step=0.05, group="Premium gate")
+premMinMovePp  = input.float(60.0, "ПРЕМИУМ: min expected 5h move (pips)", minval=10, maxval=300, step=5, group="Premium gate")
+
+expiryHours    = input.float(5.0, "Forecast horizon (hours)", minval=1, maxval=24, step=0.5, group="Forecast")
+
+// ──────────────────────────────────────────────────────────────────────
+//  PAIR SAFETY
+// ──────────────────────────────────────────────────────────────────────
+isEurUsd = str.contains(syminfo.ticker, "EURUSD")
+if warnNonEur and not isEurUsd and barstate.islast
+    label.new(bar_index, high, "Indicator is tuned for EUR/USD only", color=color.new(color.red, 0), textcolor=color.white, style=label.style_label_down, size=size.normal)
+
+// ──────────────────────────────────────────────────────────────────────
+//  HELPERS
+// ──────────────────────────────────────────────────────────────────────
+f_aroon(period) =>
+    upPos   = ta.highestbars(high, period + 1)
+    downPos = ta.lowestbars (low,  period + 1)
+    upVal   = 100.0 * (period + upPos)   / period
+    dnVal   = 100.0 * (period + downPos) / period
+    [upVal, dnVal, upVal - dnVal]
+
+f_cci(period) =>
+    typ  = (high + low + close) / 3.0
+    sma  = ta.sma(typ, period)
+    mad  = ta.dev(typ, period)
+    safe = mad == 0 ? 1.0 : 0.015 * mad
+    (typ - sma) / safe
+
+// Heiken Ashi smoothed candles + bull-ratio + body-strength over last 6 bars.
+var float ha_open_prev = na
+ha_close_v = (open + high + low + close) / 4.0
+ha_open_v  = na(ha_open_prev) ? (open + close) / 2.0 : (ha_open_prev + ha_close_v[1]) / 2.0
+ha_open_prev := ha_open_v
+ha_high_v  = math.max(high, math.max(ha_open_v, ha_close_v))
+ha_low_v   = math.min(low,  math.min(ha_open_v, ha_close_v))
+ha_bull_bar = ha_close_v > ha_open_v ? 1 : 0
+ha_body_pct = ha_high_v == ha_low_v ? 0.0 : math.abs(ha_close_v - ha_open_v) / (ha_high_v - ha_low_v)
+ha_bull_ratio_6  = ta.sma(ha_bull_bar, 6)
+ha_body_strength = ta.sma(ha_body_pct, 6)
+
+// ──────────────────────────────────────────────────────────────────────
+//  MULTI-TIMEFRAME TREND (D1 + H4 + H1 + M15)
+// ──────────────────────────────────────────────────────────────────────
+f_tf_dir() =>
+    e20 = ta.ema(close, 20)
+    e50 = ta.ema(close, 50)
+    close > e20 and e20 > e50 ? 1 : (close < e20 and e20 < e50 ? -1 : 0)
+
+dir_d1  = request.security(syminfo.tickerid, "D",   f_tf_dir(), barmerge.gaps_off, barmerge.lookahead_off)
+dir_h4  = request.security(syminfo.tickerid, "240", f_tf_dir(), barmerge.gaps_off, barmerge.lookahead_off)
+dir_h1  = request.security(syminfo.tickerid, "60",  f_tf_dir(), barmerge.gaps_off, barmerge.lookahead_off)
+dir_m15 = f_tf_dir()
+
+bull_count = (dir_d1==1?1:0) + (dir_h4==1?1:0) + (dir_h1==1?1:0) + (dir_m15==1?1:0)
+bear_count = (dir_d1==-1?1:0) + (dir_h4==-1?1:0) + (dir_h1==-1?1:0) + (dir_m15==-1?1:0)
+multi_tf_aligned = bull_count >= 3 or bear_count >= 3
+mtf_dir          = bull_count >= 3 ? 1 : (bear_count >= 3 ? -1 : 0)
+
+// ──────────────────────────────────────────────────────────────────────
+//  H1 INDICATORS (used as the "decision timeframe", same as analyzer.py)
+// ──────────────────────────────────────────────────────────────────────
+f_h1_block() =>
+    e20 = ta.ema(close, 20)
+    e50 = ta.ema(close, 50)
+    rsi14 = ta.rsi(close, 14)
+    [macd_line, signal_line, hist] = ta.macd(close, 12, 26, 9)
+    [k, d_]   = ta.stoch(close, high, low, 14), ta.sma(ta.stoch(close, high, low, 14), 3)
+    [bb_b, bb_m, bb_t] = ta.bb(close, 20, 2.0)
+    bb_pct = (close - bb_b) / (bb_t - bb_b)
+    [dp, dm, ax]   = ta.dmi(14, 14)
+    williams = ta.wpr(14)
+    momentum = (close - close[12]) / close[12] * 100.0
+    [up_a, dn_a, osc_a] = f_aroon(25)
+    cci_v = f_cci(20)
+    atr_v = ta.atr(14)
+    atr_avg = ta.sma(atr_v, 50)
+    [e20, e50, rsi14, hist, k, d_, bb_pct, dp, dm, ax, williams, momentum, up_a, dn_a, osc_a, cci_v, atr_v, atr_avg]
+
+[h1_e20, h1_e50, h1_rsi, h1_macd_h, h1_k, h1_d, h1_bb, h1_dp, h1_dm, h1_adx, h1_wpr, h1_mom, h1_aru, h1_ard, h1_aro, h1_cci, h1_atr, h1_atr_avg] = request.security(syminfo.tickerid, "60", f_h1_block(), barmerge.gaps_off, barmerge.lookahead_off)
+
+// ──────────────────────────────────────────────────────────────────────
+//  VOTING BLOCKS (mirror app/analyzer.py — letters A..R)
+//  Each block contributes ±weight to `score`; max_score is the sum of weights.
+// ──────────────────────────────────────────────────────────────────────
+score = 0.0
+maxScore = 0.0
+addVote(condBuy, condSell, weight) =>
+    s = condBuy ? weight : (condSell ? -weight : 0.0)
+    [s, weight]
+
+// Block A — EMA(20) vs EMA(50)
+[sA, wA] = addVote(h1_e20 > h1_e50, h1_e20 < h1_e50, 3.0)
+score += sA, maxScore += wA
+
+// Block B — RSI(14) momentum (>55 buy / <45 sell)
+[sB, wB] = addVote(h1_rsi > 55, h1_rsi < 45, 2.0)
+score += sB, maxScore += wB
+
+// Block C — MACD histogram sign
+[sC, wC] = addVote(h1_macd_h > 0, h1_macd_h < 0, 2.5)
+score += sC, maxScore += wC
+
+// Block D — Stochastic K vs D
+[sD, wD] = addVote(h1_k > h1_d and h1_k < 80, h1_k < h1_d and h1_k > 20, 1.5)
+score += sD, maxScore += wD
+
+// Block E — Bollinger %B
+[sE, wE] = addVote(h1_bb > 0.6, h1_bb < 0.4, 1.5)
+score += sE, maxScore += wE
+
+// Block F — ADX strength + DI cross
+[sF, wF] = addVote(h1_adx > 20 and h1_dp > h1_dm, h1_adx > 20 and h1_dm > h1_dp, 3.0)
+score += sF, maxScore += wF
+
+// Block G — Williams %R
+[sG, wG] = addVote(h1_wpr > -20, h1_wpr < -80, 1.5)
+score += sG, maxScore += wG
+
+// Block H — Momentum
+[sH, wH] = addVote(h1_mom > 0.05, h1_mom < -0.05, 2.0)
+score += sH, maxScore += wH
+
+// Block I — Multi-TF alignment
+[sI, wI] = addVote(mtf_dir ==  1, mtf_dir == -1, 4.0)
+score += sI, maxScore += wI
+
+// Block P — Aroon oscillator
+[sP, wP] = addVote(h1_aro >  50, h1_aro < -50, 2.0)
+score += sP, maxScore += wP
+
+// Block Q — CCI
+[sQ, wQ] = addVote(h1_cci > 100, h1_cci < -100, 2.0)
+score += sQ, maxScore += wQ
+
+// Block R — Heiken Ashi (computed on M15 already — directional persistence)
+[sR, wR] = addVote(ha_bull_ratio_6 >= 0.83 and ha_body_strength >= 0.5,
+                   ha_bull_ratio_6 <= 0.17 and ha_body_strength >= 0.5, 2.0)
+score += sR, maxScore += wR
+
+absScore   = math.abs(score)
+score_ratio = maxScore > 0.0 ? absScore / maxScore : 0.0
+
+// Confidence: 50 + 45 * (1 - exp(-3.66 * score_ratio)), clamped 50..92.
+confidence = math.min(92.0, math.max(50.0, 50.0 + 45.0 * (1.0 - math.exp(-3.66 * score_ratio))))
+
+// ──────────────────────────────────────────────────────────────────────
+//  TREND QUALITY (0..100), 7 equal-weight components
+// ──────────────────────────────────────────────────────────────────────
+f_scale(v, lo, hi) =>
+    hi <= lo ? 0.0 : math.max(0.0, math.min(100.0, (v - lo) * 100.0 / (hi - lo)))
+
+q_score   = f_scale(score_ratio, 0.0, 0.40)
+q_adx     = f_scale(h1_adx, 15.0, 30.0)
+q_aroon   = f_scale(math.abs(h1_aro), 30.0, 70.0)
+q_ha_dir  = math.abs(ha_bull_ratio_6 - 0.5) * 2.0
+q_ha      = math.max(0.0, math.min(100.0, q_ha_dir * 100.0 * (0.5 + 0.5 * ha_body_strength)))
+q_mtf     = bull_count == 4 or bull_count == 0 ? 100.0 : (bull_count == 3 or bull_count == 1 ? 50.0 : 0.0)
+q_atr     = h1_atr_avg > 0 ? f_scale(h1_atr / h1_atr_avg, 0.7, 1.5) : 0.0
+q_mom     = f_scale(math.abs(h1_mom), 0.05, 0.30)
+trend_quality = (q_score + q_adx + q_aroon + q_ha + q_mtf + q_atr + q_mom) / 7.0
+
+// Expected 5h move in pips (EUR/USD pip = 0.0001 → multiplier 10000).
+expected_move_pips_5h = h1_atr * 5.0 * 10000.0
+
+// ──────────────────────────────────────────────────────────────────────
+//  CLASSIFICATION (СТРОГИЙ / ★ ПРЕМИУМ)
+// ──────────────────────────────────────────────────────────────────────
+side_buy  = score > 0
+side_sell = score < 0
+
+is_strict_buy = side_buy and confidence >= minConfidence and trend_quality >= minTrendQ and (not requireMTF or multi_tf_aligned and mtf_dir == 1)
+is_strict_sell = side_sell and confidence >= minConfidence and trend_quality >= minTrendQ and (not requireMTF or multi_tf_aligned and mtf_dir == -1)
+
+is_prem_common = trend_quality >= premMinTrendQ and confidence >= premMinConf and h1_adx >= premMinAdx and math.abs(h1_aro) >= premMinAroon and ha_body_strength >= premMinHABody and math.abs(h1_mom) >= premMinMom and expected_move_pips_5h >= premMinMovePp and (not requireMTF or multi_tf_aligned)
+
+is_prem_buy  = is_strict_buy  and is_prem_common and ha_bull_ratio_6 >= premMinHA and mtf_dir == 1
+is_prem_sell = is_strict_sell and is_prem_common and ha_bull_ratio_6 <= 1.0 - premMinHA and mtf_dir == -1
+
+// Fresh-trigger logic: only fire on the bar that newly entered the gate
+// (avoid placing a label on every bar in a long trend).
+var int last_kind = 0  // 0 none, 1 strict buy, 2 strict sell, 3 prem buy, 4 prem sell
+new_strict_buy  = is_strict_buy  and not is_strict_buy[1]
+new_strict_sell = is_strict_sell and not is_strict_sell[1]
+new_prem_buy    = is_prem_buy    and not is_prem_buy[1]
+new_prem_sell   = is_prem_sell   and not is_prem_sell[1]
+
+// ──────────────────────────────────────────────────────────────────────
+//  PLOT LABELS
+// ──────────────────────────────────────────────────────────────────────
+prem_buy_color  = color.new(color.yellow, 0)
+prem_sell_color = color.new(color.orange, 0)
+strict_buy_col  = color.new(color.green, 0)
+strict_sell_col = color.new(color.red,   0)
+
+if showPremium and barstate.isconfirmed and new_prem_buy
+    label.new(bar_index, low,  "★ ПРЕМИУМ\nBUY  " + str.tostring(confidence, "#") + "% | TQ " + str.tostring(trend_quality, "#") + "\n→ " + str.tostring(expected_move_pips_5h, "#") + " pp / 5h", style=label.style_label_up,   color=prem_buy_color, textcolor=color.black, size=size.normal)
+if showPremium and barstate.isconfirmed and new_prem_sell
+    label.new(bar_index, high, "★ ПРЕМИУМ\nSELL " + str.tostring(confidence, "#") + "% | TQ " + str.tostring(trend_quality, "#") + "\n→ " + str.tostring(expected_move_pips_5h, "#") + " pp / 5h", style=label.style_label_down, color=prem_sell_color, textcolor=color.black, size=size.normal)
+
+if showStrict and barstate.isconfirmed and new_strict_buy and not new_prem_buy
+    label.new(bar_index, low,  "СТРОГИЙ\nBUY " + str.tostring(confidence, "#") + "% / TQ " + str.tostring(trend_quality, "#"), style=label.style_label_up,   color=strict_buy_col, textcolor=color.white, size=size.small)
+if showStrict and barstate.isconfirmed and new_strict_sell and not new_prem_sell
+    label.new(bar_index, high, "СТРОГИЙ\nSELL " + str.tostring(confidence, "#") + "% / TQ " + str.tostring(trend_quality, "#"), style=label.style_label_down, color=strict_sell_col, textcolor=color.white, size=size.small)
+
+// 5h horizon line — visualise where the binary expires.
+expiryBars = math.round(expiryHours * 60.0 / timeframe.in_seconds() * 60.0)
+if showHorizonLn and barstate.isconfirmed and (new_strict_buy or new_strict_sell or new_prem_buy or new_prem_sell)
+    is_buy = new_strict_buy or new_prem_buy
+    line.new(x1=bar_index, y1=close, x2=bar_index + expiryBars, y2=close, color=color.new(is_buy ? color.green : color.red, 30), style=line.style_dashed, width=2)
+
+// Entry-quality background tint on the chart (subtle).
+bg_col = is_prem_buy ? color.new(color.yellow, 90) : (is_prem_sell ? color.new(color.orange, 90) : (is_strict_buy ? color.new(color.green, 92) : (is_strict_sell ? color.new(color.red, 92) : na)))
+bgcolor(bg_col, title="Signal tint")
+
+// ──────────────────────────────────────────────────────────────────────
+//  STATS TABLE (top right)
+// ──────────────────────────────────────────────────────────────────────
+var table tbl = table.new(position.top_right, 2, 8, frame_color=color.gray, frame_width=1)
+if showInfoTable and barstate.islast
+    side_text = is_prem_buy or is_prem_sell ? "★ ПРЕМИУМ " : (is_strict_buy or is_strict_sell ? "СТРОГИЙ " : "—")
+    side_text := side_text + (side_buy ? "BUY" : side_sell ? "SELL" : "")
+    side_col  = is_prem_buy or is_prem_sell ? color.yellow : (is_strict_buy ? color.green : (is_strict_sell ? color.red : color.gray))
+    table.cell(tbl, 0, 0, "EUR/USD signal", bgcolor=color.new(color.blue, 0), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 0, side_text, bgcolor=color.new(side_col, 0), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "Confidence",     text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 1, str.tostring(confidence, "#") + " %", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 2, "Trend quality",  text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(trend_quality, "#") + " / 100", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 3, "Multi-TF",       text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(bull_count) + " bull / " + str.tostring(bear_count) + " bear", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 4, "Expected 5h move", text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 4, str.tostring(expected_move_pips_5h, "#") + " pp", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 5, "ADX(1h)",         text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 5, str.tostring(h1_adx, "#"),  text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 6, "Aroon osc",       text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 6, str.tostring(h1_aro, "#"),  text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 7, "HA bull%",        text_color=color.silver, text_size=size.small)
+    table.cell(tbl, 1, 7, str.tostring(ha_bull_ratio_6 * 100.0, "#") + " % / body " + str.tostring(ha_body_strength, "#.##"), text_color=color.white, text_size=size.small)
+
+// Alerts so you can subscribe to push notifications on TradingView.
+alertcondition(new_prem_buy,    title="★ ПРЕМИУМ BUY",  message="EUR/USD ★ ПРЕМИУМ BUY")
+alertcondition(new_prem_sell,   title="★ ПРЕМИУМ SELL", message="EUR/USD ★ ПРЕМИУМ SELL")
+alertcondition(new_strict_buy,  title="СТРОГИЙ BUY",    message="EUR/USD СТРОГИЙ BUY")
+alertcondition(new_strict_sell, title="СТРОГИЙ SELL",   message="EUR/USD СТРОГИЙ SELL")
