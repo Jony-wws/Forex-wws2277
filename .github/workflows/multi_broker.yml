@@ -1,0 +1,35 @@
+name: Multi-broker price aggregator
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 minutes
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -q yfinance pandas
+      - run: python scripts/multi_broker.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit report
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/multi_broker_latest.md 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(multi-broker): price comparison snapshot"
+            git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "push failed (non-fatal)"
+          fi

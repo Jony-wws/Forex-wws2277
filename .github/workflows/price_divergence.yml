@@ -1,0 +1,29 @@
+name: Price source divergence watcher
+
+# Compares Yahoo Finance vs exchangerate-api.com on 7 major pairs.
+# Alerts via Telegram if any source diverges by more than 5 pips.
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 minutes
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    name: Compare price sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run divergence check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/price_divergence.py

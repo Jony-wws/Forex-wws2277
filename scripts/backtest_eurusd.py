@@ -138,6 +138,92 @@ def cci(df: pd.DataFrame, period: int = 20) -> pd.Series:
     return ((typ - sma) / (0.015 * mad.replace(0.0, np.nan))).fillna(0.0)
 
 
+def ichimoku_signals(df: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Vectorised Ichimoku Cloud signal — mirrors app/indicators.ichimoku.
+
+    Returns (above_cloud, below_cloud, tenkan_gt_kijun) as boolean Series.
+    Used to add the analyzer.py `Block J — Ichimoku` voting weight (±3) to
+    the historical backtest, which previously didn't include Ichimoku."""
+    high, low = df["High"], df["Low"]
+    tenkan = (high.rolling(9).max() + low.rolling(9).min()) / 2.0
+    kijun  = (high.rolling(26).max() + low.rolling(26).min()) / 2.0
+    senkou_a = (tenkan + kijun) / 2.0
+    senkou_b = (high.rolling(52).max() + low.rolling(52).min()) / 2.0
+    close = df["Close"]
+    above = (close > senkou_a) & (close > senkou_b)
+    below = (close < senkou_a) & (close < senkou_b)
+    tk_gt = tenkan > kijun
+    return above.fillna(False), below.fillna(False), tk_gt.fillna(False)
+
+
+def vwap_signal(df: pd.DataFrame) -> pd.Series:
+    """Vectorised VWAP signal: +1 if price > VWAP*1.001, -1 if <0.999, else 0.
+    Mirrors analyzer.py Block L (VWAP, weight ±1).  Falls back to 20-bar
+    typical-price MA if Volume is missing or zero (matches indicators.py).
+    """
+    typical = (df["High"] + df["Low"] + df["Close"]) / 3.0
+    vol = df.get("Volume", pd.Series(0.0, index=df.index))
+    if (vol.fillna(0).sum()) <= 0:
+        vwap = typical.rolling(20, min_periods=1).mean()
+    else:
+        cum_pv = (typical * vol).cumsum()
+        cum_v  = vol.cumsum().replace(0.0, np.nan)
+        vwap   = (cum_pv / cum_v).ffill()
+    out = pd.Series(0, index=df.index, dtype=int)
+    out[df["Close"] > vwap * 1.001] = 1
+    out[df["Close"] < vwap * 0.999] = -1
+    return out
+
+
+def price_action_score_vec(df: pd.DataFrame) -> pd.Series:
+    """Vectorised price-action score, capped at ±5 (mirrors price_action.py).
+
+    Detects: strong-body candles (body/range > 0.8), engulfing patterns,
+    and three-soldiers / three-crows. Returns an integer score per bar.
+    Used to add analyzer.py Block N — Price Action (weight ±3) to the
+    historical backtest."""
+    o = df["Open"]
+    h = df["High"]
+    l = df["Low"]
+    c = df["Close"]
+    body = (c - o).abs()
+    rng = (h - l).replace(0.0, np.nan)
+    body_ratio = (body / rng).fillna(0.0)
+    bullish = c > o
+    bearish = c < o
+
+    score = pd.Series(0, index=df.index, dtype=float)
+
+    # Strong momentum candle (±1)
+    score = score + ((body_ratio > 0.8) & bullish).astype(int) * 1
+    score = score - ((body_ratio > 0.8) & bearish).astype(int) * 1
+
+    # Engulfing (±2): current body > 1.3× previous body and opposite color
+    prev_o = o.shift(1)
+    prev_c = c.shift(1)
+    prev_body = (prev_c - prev_o).abs()
+    big_body = body > prev_body * 1.3
+    bull_engulf = big_body & bullish & (prev_c < prev_o)
+    bear_engulf = big_body & bearish & (prev_c > prev_o)
+    score = score + bull_engulf.astype(int) * 2
+    score = score - bear_engulf.astype(int) * 2
+
+    # Three soldiers / three crows (±3) — three consecutive same-color bars
+    # with strictly increasing/decreasing closes.
+    three_up = (
+        (c > o) & (c.shift(1) > o.shift(1)) & (c.shift(2) > o.shift(2))
+        & (c > c.shift(1)) & (c.shift(1) > c.shift(2))
+    )
+    three_dn = (
+        (c < o) & (c.shift(1) < o.shift(1)) & (c.shift(2) < o.shift(2))
+        & (c < c.shift(1)) & (c.shift(1) < c.shift(2))
+    )
+    score = score + three_up.astype(int) * 3
+    score = score - three_dn.astype(int) * 3
+
+    return score.clip(-5, 5).fillna(0)
+
+
 def heiken_ashi(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     o, h, l, c = df["Open"], df["High"], df["Low"], df["Close"]
     ha_close = (o + h + l + c) / 4.0
@@ -256,6 +342,10 @@ def classify_dataframe(
     h1_mom   = (h1["Close"] - h1["Close"].shift(12)) / h1["Close"].shift(12) * 100.0
     h1_au, h1_ad, h1_ao = aroon(h1, 25)
     h1_cci   = cci(h1, 20)
+    # NEW: blocks ported from app/analyzer.py for parity with the live site.
+    h1_above_cloud, h1_below_cloud, h1_tk_gt = ichimoku_signals(h1)
+    h1_vwap_sig = vwap_signal(h1)
+    h1_pa_score = price_action_score_vec(h1)
 
     # Project H1 outputs onto M15 timeline.
     def proj(s: pd.Series) -> pd.Series:
@@ -275,6 +365,12 @@ def classify_dataframe(
     mom_  = proj(h1_mom)
     aro_  = proj(h1_ao)
     cci_  = proj(h1_cci)
+    # NEW projected signals.
+    above_cloud_ = proj(h1_above_cloud.astype(int)).astype(bool)
+    below_cloud_ = proj(h1_below_cloud.astype(int)).astype(bool)
+    tk_gt_       = proj(h1_tk_gt.astype(int)).astype(bool)
+    vwap_sig_    = proj(h1_vwap_sig)
+    pa_score_    = proj(h1_pa_score)
 
     # Heiken Ashi on M15.
     ha_bull_ratio_6, ha_body_strength_6 = heiken_ashi(m15)
@@ -304,8 +400,22 @@ def classify_dataframe(
         # Block A (EMA20 vs EMA50 H1) using the projected H1 EMAs.
         + vote(proj(h1["EMA20"]) > proj(h1["EMA50"]),
                proj(h1["EMA20"]) < proj(h1["EMA50"]), 3.0)
+        # NEW analyzer.py-parity blocks ─────────────────────────────────
+        # Block J — Ichimoku Cloud (weight ±3, full strength when Tenkan
+        # confirms direction; ±1 if just the cloud position agrees).
+        + vote(above_cloud_ & tk_gt_, below_cloud_ & ~tk_gt_, 3.0)     # J strong
+        + vote(above_cloud_ & ~tk_gt_, below_cloud_ & tk_gt_, 1.0)     # J weak
+        # Block L — VWAP (weight ±1)
+        + vote(vwap_sig_ > 0, vwap_sig_ < 0, 1.0)                      # L  VWAP
+        # Block N — Price Action: capped at ±5 already; weight scales it
+        # up to the analyzer's ±3 block contribution.
+        + (pa_score_ * 0.6).clip(-3.0, 3.0)                            # N  PA
     )
-    max_score = 2.0 + 2.5 + 1.5 + 1.5 + 3.0 + 1.5 + 2.0 + 4.0 + 2.0 + 2.0 + 2.0 + 3.0
+    max_score = (
+        2.0 + 2.5 + 1.5 + 1.5 + 3.0 + 1.5 + 2.0 + 4.0
+        + 2.0 + 2.0 + 2.0 + 3.0    # original blocks
+        + 3.0 + 1.0 + 1.0 + 3.0    # Ichimoku strong/weak + VWAP + PA
+    )
     score_ratio = score.abs() / max_score
     confidence = (50.0 + 45.0 * (1.0 - np.exp(-3.66 * score_ratio))).clip(50.0, 92.0)
 

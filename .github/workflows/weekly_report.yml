@@ -1,0 +1,53 @@
+name: Weekly performance report
+
+# Compares this week vs last week on per-pair WR.
+# Sends Telegram digest every Monday at 06:00 UTC+5 (01:00 UTC).
+on:
+  schedule:
+    - cron: "0 1 * * 1"   # Monday 01:00 UTC = 06:00 UTC+5
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  weekly:
+    name: Weekly performance comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # need history to find old cycle_*.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run weekly report
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/weekly_report.py
+
+      - name: Append weekly report to job summary
+        if: always()
+        run: |
+          if [ -f reports/weekly_latest.md ]; then
+            cat reports/weekly_latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit weekly report
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f reports/weekly_latest.md 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "chore(weekly): performance report $(date -u '+%Y-%m-%d')"
+            git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "push failed"
+          fi
