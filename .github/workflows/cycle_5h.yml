@@ -6,8 +6,13 @@ name: 5-hour adaptive cycle
 #   TELEGRAM_CHAT_ID    — destination chat id
 on:
   schedule:
-    # 00:05 UTC, 05:05 UTC, 10:05 UTC, 15:05 UTC, 20:05 UTC.
-    - cron: "5 0,5,10,15,20 * * *"
+    # Aligned to UTC+5 (Russia) cycle boundaries:
+    #   00:05 UTC+5  = 19:05 UTC (prev day)
+    #   05:05 UTC+5  = 00:05 UTC
+    #   10:05 UTC+5  = 05:05 UTC
+    #   15:05 UTC+5  = 10:05 UTC
+    #   20:05 UTC+5  = 15:05 UTC
+    - cron: "5 19,0,5,10,15 * * *"
   workflow_dispatch: {}
   push:
     branches:

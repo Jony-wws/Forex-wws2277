@@ -36,6 +36,9 @@ import os
 import sys
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
+
+# Project timezone — Russia / UTC+5. All user-visible timestamps go through this.
+TZ_UTC5 = timezone(timedelta(hours=5))
 from typing import Optional
 
 import numpy as np
@@ -362,13 +365,31 @@ def latest_direction(pair: str, m15: pd.DataFrame, h1: pd.DataFrame,
 
 # ── TOP-3 PICKER ───────────────────────────────────────────────────────
 def pick_top3(per_pair: list[dict]) -> list[dict]:
-    """Top-3 for the next 5h: rank by composite (WR × trend_quality × directional confidence)."""
-    valid = [r for r in per_pair if r.get("trades", 0) >= 20 and r.get("direction", 0) != 0]
-    valid.sort(key=lambda r: (
-        -(0.5 * (r["wr"] - 50.0) + 0.3 * min(r.get("trades_per_day", 0), 5) * 10.0
-          + 0.2 * (r.get("last_5h_pp", 0) * (1 if r.get("direction", 0) == 1 else -1)))
-    ))
-    return valid[:TOP_N]
+    """Top-3 picks for the next 5h.
+
+    Ranking favours pairs that are both **profitable** (WR > breakeven for an
+    80%-payout binary, i.e. WR > 55.5%) and **moving in the right direction
+    right now**. Pairs without a current direction or below breakeven get
+    progressively penalised but still scored — we never return fewer than
+    three names so the report always has content.
+    """
+    candidates = [r for r in per_pair if r.get("trades", 0) >= 20]
+
+    def score(r: dict) -> float:
+        wr = r.get("wr", 0)
+        tpd = min(r.get("trades_per_day", 0), 5.0)
+        d = r.get("direction", 0)
+        last5h = r.get("last_5h_pp", 0)
+        # WR bonus is in % points above breakeven, capped at 25 to avoid
+        # outsized influence from low-trade-count pairs.
+        wr_edge = max(min(wr - 55.6, 25.0), -25.0)
+        # Direction bonus: positive only if pair is currently aligned with
+        # its strategy direction over the last 5h price move.
+        dir_bonus = (last5h * d * 0.1) if d != 0 else -3.0
+        return 0.7 * wr_edge + 0.2 * tpd * 10.0 + 0.1 * dir_bonus
+
+    candidates.sort(key=lambda r: -score(r))
+    return candidates[:TOP_N]
 
 
 # ── TELEGRAM ───────────────────────────────────────────────────────────
@@ -404,6 +425,7 @@ def format_report(payload: dict) -> str:
     """Build the human-readable Telegram message."""
     out = []
     out.append(f"<b>🎯 5h cycle {payload['cycle_utc']}</b>\n")
+    # cycle_utc is already labelled in UTC+5; key kept for backwards compat.
 
     out.append(f"\n<b>📈 ТОП-3 на следующие 5 часов:</b>")
     for i, r in enumerate(payload["top3"], 1):
@@ -464,8 +486,9 @@ def compute_indicator_attribution(per_pair: list[dict]) -> list[tuple[str, float
 
 # ── MAIN ───────────────────────────────────────────────────────────────
 def main() -> None:
-    cycle_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    print(f"[cycle] starting cycle {cycle_utc}")
+    now_utc5 = datetime.now(TZ_UTC5)
+    cycle_label = now_utc5.strftime("%Y-%m-%d %H:%M UTC+5")
+    print(f"[cycle] starting cycle {cycle_label}")
 
     per_pair: list[dict] = []
     pair_to_data: dict[str, tuple] = {}
@@ -495,7 +518,7 @@ def main() -> None:
     update_baseline(baseline, current_pp_dict)
 
     payload = dict(
-        cycle_utc=cycle_utc,
+        cycle_utc=cycle_label,
         top3=top3,
         per_pair=per_pair,
         diff=diff,
@@ -504,14 +527,14 @@ def main() -> None:
     )
 
     # Persist state.
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M")
+    ts = now_utc5.strftime("%Y%m%dT%H%M")
     json.dump(payload, open(os.path.join(STATE_DIR, f"cycle_{ts}.json"), "w"), indent=2, default=str)
     json.dump(payload, open(os.path.join(STATE_DIR, "cycle_latest.json"), "w"), indent=2, default=str)
 
     # Markdown report (also posted as PR comment by the workflow).
     report_md = format_report(payload).replace("<b>", "**").replace("</b>", "**").replace("<i>", "*").replace("</i>", "*")
     with open(os.path.join(REPORTS_DIR, "cycle_5h_latest.md"), "w") as f:
-        f.write(f"# 5-hour adaptive cycle — {cycle_utc}\n\n")
+        f.write(f"# 5-hour adaptive cycle — {cycle_label}\n\n")
         f.write(report_md)
 
     # Send to Telegram.
