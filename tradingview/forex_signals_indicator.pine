@@ -247,5 +247,8 @@ if barstate.islast and showInfoTable
     table.cell(tbl, 1, 5, str.tostring(close, format.mintick),         text_color=color.white, bgcolor=bgDk, text_size=size.small)
 
 // ── ALERTS ─────────────────────────────────────────────────────────────
-alertcondition(freshBuy,  title="FX-28 BUY",  message="BUY {{ticker}} | conf>=" + str.tostring(gateConf) + "%")
-alertcondition(freshSell, title="FX-28 SELL", message="SELL {{ticker}} | conf>=" + str.tostring(gateConf) + "%")
+// Pine `alertcondition` requires a *const* message string, so we keep the
+// alert text static.  The actual confidence/gate value at signal time is
+// available in the chart's info table and via the {{ticker}} placeholder.
+alertcondition(freshBuy,  title="FX-28 BUY",  message="BUY {{ticker}} — FOREX-28 signal (conf >= gateConf)")
+alertcondition(freshSell, title="FX-28 SELL", message="SELL {{ticker}} — FOREX-28 signal (conf >= gateConf)")
