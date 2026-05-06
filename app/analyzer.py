@@ -36,6 +36,35 @@ def _confidence_from_ratio(abs_score: int, max_score: int) -> int:
     return max(50, min(95, int(round(confidence))))
 
 
+def _trend_persistence_5h(bars_1h, side_hint: str | None) -> tuple[float, int]:
+    """Measure how persistent the directional trend was over the last 5 H1 bars.
+
+    Returns (persistence_pct, agreeing_bars) where ``persistence_pct`` is
+    the share of the last 5 closed H1 candles that agree with ``side_hint``
+    (BUY = green/up close, SELL = red/down close).  When the analyser has
+    no directional bias yet we fall back to the dominant direction so the
+    metric is still informative.
+
+    The strict 5-hour cycle uses this to require that a top pick has
+    actually been moving in one direction for the last 5 hours, not just
+    that the current bar happens to print a strong score.
+    """
+    if bars_1h is None or len(bars_1h) < 6:
+        return 0.0, 0
+    last5 = bars_1h.tail(5)
+    closes = last5["Close"].to_numpy()
+    opens = last5["Open"].to_numpy()
+    bull_bars = int((closes > opens).sum())
+    bear_bars = int((closes < opens).sum())
+    if side_hint == "BUY":
+        agreeing = bull_bars
+    elif side_hint == "SELL":
+        agreeing = bear_bars
+    else:
+        agreeing = max(bull_bars, bear_bars)
+    return round(100.0 * agreeing / 5.0, 1), agreeing
+
+
 def analyze_pair(pair: str) -> dict | None:
     """Full multi-TF analysis of one pair on M15 / H1 / H4 / D1."""
     # Real timeframes — NOT a 1h proxy for 4h.
@@ -293,6 +322,33 @@ def analyze_pair(pair: str) -> dict | None:
         bull_count == 0 and side == "SELL"
     )
 
+    # Trend persistence over the last 5 H1 bars — needed by the strict
+    # 5-hour cycle to require that the trend has actually been going in
+    # the predicted direction for at least the last 5 hours, not just one
+    # strong bar.
+    persistence_pct, agreeing_bars = _trend_persistence_5h(bars_1h, side)
+    adx_h1 = ind_1h["adx"]
+    adx_h4 = ind_4h["adx"]
+    ratio_now = abs_score / max_possible if max_possible > 0 else 0.0
+
+    # Hard "strong sustained trend" gate — strictly tighter than the legacy
+    # PREMIUM gate.  All five conditions must hold simultaneously, which is
+    # ~100x harder than the previous "≥80% confidence" gate alone:
+    #   1. confidence ≥ 88 (was 80)
+    #   2. score / max ≥ 0.55 (was 0.40)
+    #   3. multi_tf_aligned — D1 + H4 + H1 + M15 all in one direction
+    #   4. ADX H1 ≥ 25 AND ADX H4 ≥ 20 (real trend, both timeframes)
+    #   5. trend_persistence_5h ≥ 80% (≥4 of 5 H1 bars in direction)
+    is_strong_trend = bool(
+        side is not None
+        and confidence >= 88
+        and ratio_now >= 0.55
+        and multi_tf_aligned
+        and adx_h1 >= 25.0
+        and adx_h4 >= 20.0
+        and persistence_pct >= 80.0
+    )
+
     return {
         "pair": pair,
         "side": side,
@@ -304,16 +360,23 @@ def analyze_pair(pair: str) -> dict | None:
         "forecast_5h": forecast_5h,
         "forecast_24h": forecast_24h,
         "multi_tf_aligned": multi_tf_aligned,
-        "adx": round(ind_1h["adx"], 1),
+        "adx": round(adx_h1, 1),
+        "adx_h1": round(adx_h1, 1),
+        "adx_h4": round(adx_h4, 1),
+        "trend_persistence_5h": persistence_pct,
+        "trend_persistence_bars": agreeing_bars,
+        "is_strong_trend": is_strong_trend,
         "indicators": {
             "RSI": round(ind_1h["rsi14"], 1),
             "MACD": round(ind_1h["macd_hist"], 6),
             "Stochastic_K": round(ind_1h["stoch_k"], 1),
-            "ADX": round(ind_1h["adx"], 1),
+            "ADX": round(adx_h1, 1),
+            "ADX_H4": round(adx_h4, 1),
             "Williams_R": round(ind_1h["williams_r"], 1),
             "Bollinger_%B": round(ind_1h["bb_pct"], 2),
             "Momentum": round(ind_1h["momentum"], 3),
             "EMA20": round(ind_1h["ema20"], 5),
             "EMA50": round(ind_1h["ema50"], 5),
+            "Persistence_5h": persistence_pct,
         },
     }

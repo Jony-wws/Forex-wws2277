@@ -1,0 +1,78 @@
+name: AI strategy review
+
+# Devin-level automated reviewer that critically reads the latest 5h cycle
+# report and proposes tighter parameter values. Runs in two modes:
+#   1. LLM mode  — when ANTHROPIC_API_KEY or OPENAI_API_KEY is set, sends
+#      the cycle report to Claude / GPT-4o and asks for a critical review
+#      and concrete parameter suggestions.
+#   2. Heuristic mode — always runs, no API key needed. Rule-based review.
+#
+# Optional Telegram delivery via TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID.
+
+on:
+  workflow_run:
+    workflows: ["5-hour adaptive cycle"]
+    types: [completed]
+  schedule:
+    # Independent fallback — runs 12 minutes after each cycle boundary
+    # so we get a review even if the cycle workflow hasn't fired this run.
+    - cron: "12 19,0,5,10,15 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ai-review:
+    name: AI strategy review (LLM + heuristic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run AI reviewer
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/ai_review.py
+
+      - name: Append review to job summary
+        if: always()
+        run: |
+          if [ -f reports/ai_review_latest.md ]; then
+            cat reports/ai_review_latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review-latest
+          path: reports/ai_review_latest.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit review back to repo
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f reports/ai_review_latest.md 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no review changes to commit"
+          else
+            git commit -m "chore(ai-review): $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "push failed (non-fatal)"
+          fi
