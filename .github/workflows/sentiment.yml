@@ -1,0 +1,34 @@
+name: Reddit sentiment scraper
+
+on:
+  schedule:
+    - cron: "15 * * * *"   # hourly @ :15
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python scripts/sentiment.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit report
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/sentiment_latest.md 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(sentiment): hourly Reddit forex sentiment update"
+            git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "push failed (non-fatal)"
+          fi

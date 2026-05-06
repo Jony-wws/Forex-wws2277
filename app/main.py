@@ -119,8 +119,9 @@ def _scanner_loop():
             except Exception as e:
                 log.error(f"Error scanning {pair}: {e}")
 
-        # Update order books (skip first 3 scans, then every 3rd scan)
-        if scan_num >= 4 and scan_num % 3 == 1:
+        # Update order books on the FIRST scan so the tab is never empty,
+        # then refresh every 3rd scan to keep load light.
+        if scan_num == 1 or scan_num % 3 == 1:
             for pair in PAIRS:
                 try:
                     ob = get_orderbook(pair)
@@ -175,12 +176,14 @@ async def index():
     # Inject current data directly into HTML so mobile doesn't need API call
     with _lock:
         data_json = json.dumps(_signals, default=str, ensure_ascii=False)
+        ob_json   = json.dumps(dict(_orderbooks), default=str, ensure_ascii=False)
     cycle_json = json.dumps(
         cycle_mod.snapshot(), default=str, ensure_ascii=False
     )
     inject = (
         f'<script>window.__INITIAL_DATA__ = {data_json};'
-        f'window.__INITIAL_CYCLE__ = {cycle_json};</script>'
+        f'window.__INITIAL_CYCLE__ = {cycle_json};'
+        f'window.__INITIAL_OB__ = {ob_json};</script>'
     )
     html = html.replace('</head>', inject + '</head>')
     return html
