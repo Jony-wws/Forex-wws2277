@@ -2,6 +2,14 @@
 
 Система анализа рынка Forex в реальном времени для 28 валютных пар.
 
+🌐 **Публичный URL:** <https://forex-wws2277.fly.dev/>
+(Telegram Mini App: <https://forex-wws2277.fly.dev/tg>)
+
+> Постоянный деплой на Fly.io free tier — каждый push в `main`
+> автоматически разворачивает дашборд через
+> `.github/workflows/deploy_fly.yml`. Подробности и one-time setup —
+> в `.agents/skills/forex-strict-cycle/SKILL.md` § 12.
+
 ## Возможности
 
 - **Реальные данные** — Yahoo Finance (без симуляторов)
