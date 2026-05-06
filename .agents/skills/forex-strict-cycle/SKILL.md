@@ -109,6 +109,25 @@ through the auto-injected `GITHUB_TOKEN`.  Default model is
 **Do not** add `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` unless the user
 explicitly asks — they are paid.  The system already works free.
 
+### 4.1 Cloudflare Workers AI — primary model (free Llama 3.3 70B)
+
+`scripts/ai_patcher.py`, `scripts/ai_review.py` and `scripts/ai_narrative.py`
+now call **Cloudflare Workers AI** (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`)
+as the **primary** model and fall back transparently to GitHub Models
+(`openai/gpt-4o-mini`) when the Cloudflare secrets are missing or the
+call fails — the scripts never crash. Endpoint:
+`https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}`
+with `Authorization: Bearer {api_token}`. To enable Cloudflare, add two
+repository secrets in *Settings → Secrets and variables → Actions*:
+**`CF_AI_API_TOKEN`** — create a token with the *Workers AI* template at
+<https://dash.cloudflare.com/profile/api-tokens>; and **`CF_AI_ACCOUNT_ID`** —
+the 32-character hex ID visible at <https://dash.cloudflare.com/?to=/:account/ai>
+(also in the URL of the AI dashboard). Optional override:
+`CF_AI_MODEL` env var (default `@cf/meta/llama-3.3-70b-instruct-fp8-fast`).
+Cloudflare Workers AI has a generous free daily quota — far above our
+~5 cycles/day usage. If the token is later removed, the workflows keep
+working unchanged via the GitHub Models fallback.
+
 ## 5. Quick start (local dev)
 
 ```bash
