@@ -24,6 +24,16 @@ from .config import (
     SCAN_INTERVAL_SEC,
     STRICT_TREND_QUALITY,
     STRICT_REQUIRE_MULTI_TF,
+    PREMIUM_TREND_QUALITY,
+    PREMIUM_MIN_CONFIDENCE,
+    PREMIUM_MIN_ADX,
+    PREMIUM_MIN_AROON_OSC,
+    PREMIUM_MIN_HA_BULL_EXTREME,
+    PREMIUM_MIN_HA_BODY,
+    PREMIUM_MIN_MOMENTUM,
+    PREMIUM_MIN_MOVE_PIPS_NONJPY,
+    PREMIUM_MIN_MOVE_PIPS_JPY,
+    PREMIUM_REQUIRE_MULTI_TF,
     MIN_FORECASTS,
 )
 from .prices import get_current_price, get_price_change
@@ -90,6 +100,7 @@ def _build_entry(pair: str) -> dict | None:
         entry["trend_quality"] = analysis.get("trend_quality", 0.0)
         entry["trend_quality_breakdown"] = analysis.get("trend_quality_breakdown", {})
         entry["expected_move_pips_5h"] = analysis.get("expected_move_pips_5h", 0.0)
+        entry["premium_metrics"] = analysis.get("premium_metrics", {})
         entry["details"] = analysis["details"]
         entry["indicators"] = analysis["indicators"]
         # Provisional forecasts from the analyser (kept only for pairs the
@@ -108,6 +119,7 @@ def _build_entry(pair: str) -> dict | None:
         entry["trend_quality"] = 0.0
         entry["trend_quality_breakdown"] = {}
         entry["expected_move_pips_5h"] = 0.0
+        entry["premium_metrics"] = {}
         entry["details"] = []
         entry["indicators"] = {}
         entry["forecast_5h"] = None
@@ -140,7 +152,7 @@ def _apply_strict_gate(pairs_dict: dict) -> None:
         if side is not None:
             candidates.append((pair, entry, side, tq, conf, mtf))
 
-    def _is_strict(c):
+    def _is_strict(c) -> bool:
         _pair, _entry, _side, tq, conf, mtf = c
         if tq < STRICT_TREND_QUALITY:
             return False
@@ -150,20 +162,63 @@ def _apply_strict_gate(pairs_dict: dict) -> None:
             return False
         return True
 
-    strict = [c for c in candidates if _is_strict(c)]
+    def _is_premium(c) -> bool:
+        pair, entry, side, tq, conf, mtf = c
+        if tq < PREMIUM_TREND_QUALITY:
+            return False
+        if conf < PREMIUM_MIN_CONFIDENCE:
+            return False
+        if PREMIUM_REQUIRE_MULTI_TF and not mtf:
+            return False
+        pm = entry.get("premium_metrics") or {}
+        if pm.get("adx", 0.0) < PREMIUM_MIN_ADX:
+            return False
+        if abs(pm.get("aroon_osc", 0.0)) < PREMIUM_MIN_AROON_OSC:
+            return False
+        # Heiken Ashi must be heavily one-sided AND with strong bodies.
+        bull = pm.get("ha_bull_ratio", 0.5)
+        if side == "BUY":
+            if bull < PREMIUM_MIN_HA_BULL_EXTREME:
+                return False
+        else:  # SELL
+            if (1.0 - bull) < PREMIUM_MIN_HA_BULL_EXTREME:
+                return False
+        if pm.get("ha_body_strength", 0.0) < PREMIUM_MIN_HA_BODY:
+            return False
+        if abs(pm.get("momentum", 0.0)) < PREMIUM_MIN_MOMENTUM:
+            return False
+        is_jpy = "JPY" in pair.upper()
+        move_floor = (
+            PREMIUM_MIN_MOVE_PIPS_JPY if is_jpy else PREMIUM_MIN_MOVE_PIPS_NONJPY
+        )
+        if entry.get("expected_move_pips_5h", 0.0) < move_floor:
+            return False
+        return True
+
+    premium = [c for c in candidates if _is_premium(c)]
+    premium.sort(key=lambda c: c[3], reverse=True)
+    premium_pairs = {c[0] for c in premium}
+
+    strict = [c for c in candidates if c[0] not in premium_pairs and _is_strict(c)]
     strict.sort(key=lambda c: c[3], reverse=True)
     strict_pairs = {c[0] for c in strict}
 
-    promoted = list(strict)
+    promoted = list(premium) + list(strict)
     if len(promoted) < MIN_FORECASTS:
-        rest = [c for c in candidates if c[0] not in strict_pairs]
+        already = premium_pairs | strict_pairs
+        rest = [c for c in candidates if c[0] not in already]
         rest.sort(key=lambda c: c[3], reverse=True)
         promoted.extend(rest[: MIN_FORECASTS - len(promoted)])
 
     promoted_pairs: set[str] = set()
-    for pair, entry, side, tq, _conf, _mtf in promoted:
+    for pair, entry, side, _tq, _conf, _mtf in promoted:
         entry["signal"] = side
-        entry["signal_kind"] = "strict" if pair in strict_pairs else "fallback"
+        if pair in premium_pairs:
+            entry["signal_kind"] = "premium"
+        elif pair in strict_pairs:
+            entry["signal_kind"] = "strict"
+        else:
+            entry["signal_kind"] = "fallback"
         promoted_pairs.add(pair)
 
     for pair, entry in pairs_dict.items():
@@ -201,6 +256,10 @@ def _scanner_loop():
 
         try:
             with _lock:
+                premium_n = sum(
+                    1 for e in _signals["pairs"].values()
+                    if e.get("signal_kind") == "premium"
+                )
                 strict_n = sum(
                     1 for e in _signals["pairs"].values()
                     if e.get("signal_kind") == "strict"
@@ -210,8 +269,8 @@ def _scanner_loop():
                     if e.get("signal_kind") == "fallback"
                 )
             log.info(
-                f"Scan #{scan_num}: strict={strict_n} fallback={fallback_n} "
-                f"total_signals={strict_n + fallback_n}"
+                f"Scan #{scan_num}: premium={premium_n} strict={strict_n} "
+                f"fallback={fallback_n} total={premium_n + strict_n + fallback_n}"
             )
         except Exception as e:
             log.error(f"Error applying strict gate: {e}")

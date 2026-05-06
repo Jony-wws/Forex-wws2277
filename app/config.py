@@ -84,21 +84,42 @@ MIN_CONFIDENCE = 82
 FORECAST_EXPIRY_HOURS = 5
 SCAN_INTERVAL_SEC = 10
 
-# Strict trend-quality gate. A pair only gets a BUY/SELL "strict" signal on
-# the dashboard when ALL of the following hold:
-#   - trend_quality >= STRICT_TREND_QUALITY (composite metric of ADX + Aroon
-#     + Heiken Ashi + multi-TF + ATR + momentum + score ratio)
-#   - confidence >= MIN_CONFIDENCE
-#   - multi_tf_aligned (all 4 senior timeframes D1+H4+H1+M15 in same direction)
-# Tuned to surface only forecasts that should travel meaningfully far from
-# the entry price, not chop sideways.
+# === THREE-TIER SIGNAL CLASSIFICATION =================================
+#
+# After a pair is analysed it is classified into one of four buckets,
+# strongest first:
+#
+#   1. "premium"   — final control. ALL premium criteria below must pass.
+#                    Designed to surface only pairs with an obvious,
+#                    powerful trend that should travel a meaningful
+#                    distance from the entry over the 5h forecast window.
+#   2. "strict"    — solid setup. Multi-TF aligned + composite quality
+#                    + confidence above MIN_CONFIDENCE.
+#   3. "fallback"  — no premium nor strict pair on the board OR fewer
+#                    than MIN_FORECASTS qualified. The top-N by
+#                    trend_quality are promoted so the dashboard never
+#                    shows zero forecasts.
+#   4. None        — no signal shown for this pair right now.
+#
+# Premium is intended to be RARE. On a quiet market session it is normal
+# for the premium count to be 0 — that just means there is no obviously
+# powerful trend right now. The min-3 fallback still kicks in.
+
+# --- Premium tier (strongest filter) ---
+PREMIUM_TREND_QUALITY = 85          # composite trend_quality 0..100
+PREMIUM_MIN_CONFIDENCE = 88         # signal-confidence 50..92
+PREMIUM_MIN_ADX = 28.0              # ADX(1h) — strong-trend cutoff
+PREMIUM_MIN_AROON_OSC = 70.0        # |Aroon osc| — directional persistence
+PREMIUM_MIN_HA_BULL_EXTREME = 0.83  # bull_ratio >= 0.83 (5/6 candles same dir)
+PREMIUM_MIN_HA_BODY = 0.55          # body_strength — strong directional candles
+PREMIUM_MIN_MOMENTUM = 0.20         # |momentum %| over 1h
+PREMIUM_MIN_MOVE_PIPS_NONJPY = 60.0 # expected ATR-implied 5h move
+PREMIUM_MIN_MOVE_PIPS_JPY = 100.0   # JPY pairs travel more pips per ATR unit
+PREMIUM_REQUIRE_MULTI_TF = True
+
+# --- Strict tier (solid) ---
 STRICT_TREND_QUALITY = 75
 STRICT_REQUIRE_MULTI_TF = True
 
-# Minimum number of forecasts that the dashboard MUST always show, even
-# when the market is quiet and no pair clears the strict gate. We then
-# fall back to the top-N pairs sorted by trend_quality desc — the best
-# available even if they are not strictly above the gate. Marked with
-# `signal_kind = "fallback"` (badge "ТОП-3") so users know it's the best
-# available rather than a strict signal.
+# --- Fallback (always show at least MIN_FORECASTS rows) ---
 MIN_FORECASTS = 3

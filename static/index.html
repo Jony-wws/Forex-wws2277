@@ -409,11 +409,15 @@
         document.getElementById('neutral-count').textContent = neutC;
         document.getElementById('scan-info').textContent = 'Обн. #' + data.scan_count;
 
-        // Sort — default order is "promoted signals first, then by trend_quality desc"
-        // so the best forecasts always sit at the top of the table.
+        // Sort — default order is "premium signals first, then strict, then fallback,
+        // then non-signals. Within each tier sorted by trend_quality desc.
         pairs.sort((a, b) => {
             if (sortCol === 'signal') {
-                const sigOrder = (x) => x.signal_kind === 'strict' ? 3 : x.signal_kind === 'fallback' ? 2 : x.signal ? 1 : 0;
+                const sigOrder = (x) =>
+                    x.signal_kind === 'premium' ? 4 :
+                    x.signal_kind === 'strict' ? 3 :
+                    x.signal_kind === 'fallback' ? 2 :
+                    x.signal ? 1 : 0;
                 const so = sigOrder(b) - sigOrder(a);
                 if (so !== 0) return so * sortDir;
                 return ((b.trend_quality||0) - (a.trend_quality||0)) * sortDir;
@@ -467,7 +471,12 @@
                 fc24 = `<span class="forecast-text ${cls}">${arr} ${d.forecast_24h.strength}</span>`;
             }
 
-            const rowBg = hasSig ? (d.signal === 'BUY' ? 'background:var(--buy-bg)' : 'background:var(--sell-bg)') : '';
+            let rowBg = hasSig ? (d.signal === 'BUY' ? 'background:var(--buy-bg)' : 'background:var(--sell-bg)') : '';
+            if (d.signal_kind === 'premium') {
+                // Premium gets a gold left border so it stands out from
+                // regular strict/fallback rows.
+                rowBg += ';box-shadow:inset 4px 0 0 #f59e0b';
+            }
 
             const tq = (d.trend_quality !== undefined && d.trend_quality !== null) ? d.trend_quality : 0;
             const tqColor = tq >= 75 ? '#16a34a' : tq >= 60 ? '#eab308' : tq >= 45 ? '#f97316' : '#9ca3af';
@@ -476,7 +485,9 @@
             const moveVal = d.expected_move_pips_5h !== undefined ? d.expected_move_pips_5h : 0;
             const moveHtml = `<span style="font-size:13px;color:var(--text)">≈ ${moveVal} пп</span>`;
 
-            const kindHtml = d.signal_kind === 'strict'
+            const kindHtml = d.signal_kind === 'premium'
+                ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;font-size:11px;font-weight:800;box-shadow:0 0 0 1px #f59e0b inset" title="Финальный фильтр — сильнейший тренд: ADX≥28, Aroon≥70, HA 5/6 свечей, momentum≥0.2%, ход ≥60пп">★ ПРЕМИУМ</span>'
+                : d.signal_kind === 'strict'
                 ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:#16a34a;color:#fff;font-size:11px;font-weight:700">СТРОГИЙ</span>'
                 : d.signal_kind === 'fallback'
                 ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:#f97316;color:#fff;font-size:11px;font-weight:700" title="Лучший доступный — пар выше строгого порога нет">ТОП-3</span>'

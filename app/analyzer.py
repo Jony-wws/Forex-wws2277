@@ -406,6 +406,16 @@ def analyze_pair(pair: str) -> dict | None:
         },
         "expected_move_pips_5h": expected_move_pips_5h,
         "adx": round(ind_1h["adx"], 1),
+        # Raw 1h indicator values consumed by the premium-tier gate in
+        # `app.main._apply_strict_gate`. Keep these as floats (not rounded
+        # for display) so the gate compares against precise thresholds.
+        "premium_metrics": {
+            "adx": float(ind_1h["adx"]),
+            "aroon_osc": float(ind_1h["aroon_osc"]),
+            "ha_bull_ratio": float(ind_1h["ha_bull_ratio"]),
+            "ha_body_strength": float(ind_1h["ha_body_strength"]),
+            "momentum": float(ind_1h["momentum"]),
+        },
         "indicators": {
             "RSI": round(ind_1h["rsi14"], 1),
             "MACD": round(ind_1h["macd_hist"], 6),
