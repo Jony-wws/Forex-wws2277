@@ -133,49 +133,61 @@ if new_buy or new_sell
     last_signal_bar := bar_index
 
 // Target price = entry + (ATR * horizon_bars * 0.6) (rough 5h move estimate)
-target_pp = atr_now * horizon_bars_input * 0.6
+target_pp   = atr_now * horizon_bars_input * 0.6
 buy_target  = close + target_pp
 sell_target = close - target_pp
+target_bar  = bar_index + horizon_bars_input
+target_pp_str = str.tostring(target_pp / syminfo.mintick, "#.#")
+buy_label_text  = "цель +" + target_pp_str + " пп"
+sell_label_text = "цель -" + target_pp_str + " пп"
 
 // ============================ PLOTTING =======================================
-plot(show_emas ? ema21  : na, "EMA21",  color=color.new(color.aqua, 30),  linewidth=1)
-plot(show_emas ? ema55  : na, "EMA55",  color=color.new(color.orange, 30), linewidth=2)
-plot(show_emas ? ema200 : na, "EMA200", color=color.new(color.gray, 30),   linewidth=2)
+plot(show_emas ? ema21  : na, title="EMA21",  color=color.new(color.aqua, 30),   linewidth=1)
+plot(show_emas ? ema55  : na, title="EMA55",  color=color.new(color.orange, 30), linewidth=2)
+plot(show_emas ? ema200 : na, title="EMA200", color=color.new(color.gray, 30),   linewidth=2)
 
-plotshape(show_labels and new_buy,  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.normal, title="BUY",  text="BUY",  textcolor=color.white)
-plotshape(show_labels and new_sell, style=shape.triangledown, location=location.abovebar, color=color.new(color.red,   0), size=size.normal, title="SELL", text="SELL", textcolor=color.white)
+plotshape(show_labels and new_buy,  title="BUY",  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.normal, text="BUY",  textcolor=color.white)
+plotshape(show_labels and new_sell, title="SELL", style=shape.triangledown, location=location.abovebar, color=color.new(color.red,   0), size=size.normal, text="SELL", textcolor=color.white)
 
-if show_target and new_buy
-    line.new(bar_index, close, bar_index + horizon_bars_input, buy_target, color=color.new(color.green, 50), style=line.style_dashed, width=1)
-    label.new(bar_index + horizon_bars_input, buy_target, "цель +" + str.tostring(target_pp / syminfo.mintick, "#.#") + " пп", color=color.new(color.green, 80), textcolor=color.white, size=size.small, style=label.style_label_left)
+draw_buy  = show_target and new_buy
+draw_sell = show_target and new_sell
 
-if show_target and new_sell
-    line.new(bar_index, close, bar_index + horizon_bars_input, sell_target, color=color.new(color.red, 50), style=line.style_dashed, width=1)
-    label.new(bar_index + horizon_bars_input, sell_target, "цель -" + str.tostring(target_pp / syminfo.mintick, "#.#") + " пп", color=color.new(color.red, 80), textcolor=color.white, size=size.small, style=label.style_label_left)
+dummy_buy_line  = draw_buy  ? line.new(bar_index, close, target_bar, buy_target,  color=color.new(color.green, 50), style=line.style_dashed) : na
+dummy_buy_lbl   = draw_buy  ? label.new(target_bar, buy_target,  buy_label_text,  color=color.new(color.green, 80), textcolor=color.white, size=size.small, style=label.style_label_left) : na
+dummy_sell_line = draw_sell ? line.new(bar_index, close, target_bar, sell_target, color=color.new(color.red, 50),   style=line.style_dashed) : na
+dummy_sell_lbl  = draw_sell ? label.new(target_bar, sell_target, sell_label_text, color=color.new(color.red, 80),   textcolor=color.white, size=size.small, style=label.style_label_left) : na
 
 // Status panel (top-right)
+side_now_str = new_buy ? "BUY" : new_sell ? "SELL" : buy_raw ? "BUY-pending" : sell_raw ? "SELL-pending" : "WAIT"
+side_color_v = (new_buy or buy_raw) ? color.new(color.green, 0) : (new_sell or sell_raw) ? color.new(color.red, 0) : color.new(color.gray, 0)
+ema_stack_str = bull_stack_m15 ? "BULL" : bear_stack_m15 ? "BEAR" : "—"
+ema_stack_col = bull_stack_m15 ? color.green : bear_stack_m15 ? color.red : color.gray
+mtf_str = (h1_bull_ok and h4_bull_ok) ? "BUY-OK" : (h1_bear_ok and h4_bear_ok) ? "SELL-OK" : "no"
+adx_str = str.tostring(adxVal, "#.#")
+di_str  = str.tostring(diPlus, "#.#") + " / " + str.tostring(diMinus, "#.#")
+rsi_str = str.tostring(rsi_now, "#.#")
+atr_str = target_pp_str + " пп"
+
 if show_panel and barstate.islast
     var table panel = table.new(position.top_right, 2, 7, frame_color=color.gray, frame_width=1, border_color=color.gray, border_width=1)
-    side_now = new_buy ? "BUY" : (new_sell ? "SELL" : (buy_raw ? "BUY-pending" : (sell_raw ? "SELL-pending" : "WAIT")))
-    side_color = (new_buy or buy_raw) ? color.new(color.green, 0) : ((new_sell or sell_raw) ? color.new(color.red, 0) : color.new(color.gray, 0))
-    table.cell(panel, 0, 0, "5h Trend", bgcolor=color.new(color.black, 0), text_color=color.white)
-    table.cell(panel, 1, 0, side_now,   bgcolor=side_color,                text_color=color.white)
-    table.cell(panel, 0, 1, "ADX",      text_color=color.white)
-    table.cell(panel, 1, 1, str.tostring(adxVal, "#.#"), text_color=adx_gate ? color.green : color.red)
-    table.cell(panel, 0, 2, "DI+/DI-",  text_color=color.white)
-    table.cell(panel, 1, 2, str.tostring(diPlus, "#.#") + " / " + str.tostring(diMinus, "#.#"), text_color=color.white)
-    table.cell(panel, 0, 3, "RSI",      text_color=color.white)
-    table.cell(panel, 1, 3, str.tostring(rsi_now, "#.#"), text_color=color.white)
-    table.cell(panel, 0, 4, "EMA stack",text_color=color.white)
-    table.cell(panel, 1, 4, bull_stack_m15 ? "▲ BULL" : (bear_stack_m15 ? "▼ BEAR" : "—"), text_color=bull_stack_m15 ? color.green : (bear_stack_m15 ? color.red : color.gray))
-    table.cell(panel, 0, 5, "H1/H4",    text_color=color.white)
-    table.cell(panel, 1, 5, (h1_bull_ok and h4_bull_ok ? "▲" : (h1_bear_ok and h4_bear_ok ? "▼" : "✗")), text_color=color.white)
-    table.cell(panel, 0, 6, "ATR/5h",   text_color=color.white)
-    table.cell(panel, 1, 6, str.tostring(target_pp / syminfo.mintick, "#.#") + " пп", text_color=color.white)
+    table.cell(panel, 0, 0, "5h Trend",  bgcolor=color.new(color.black, 0), text_color=color.white)
+    table.cell(panel, 1, 0, side_now_str, bgcolor=side_color_v,             text_color=color.white)
+    table.cell(panel, 0, 1, "ADX",        text_color=color.white)
+    table.cell(panel, 1, 1, adx_str,      text_color=adx_gate ? color.green : color.red)
+    table.cell(panel, 0, 2, "DI+/DI-",    text_color=color.white)
+    table.cell(panel, 1, 2, di_str,       text_color=color.white)
+    table.cell(panel, 0, 3, "RSI",        text_color=color.white)
+    table.cell(panel, 1, 3, rsi_str,      text_color=color.white)
+    table.cell(panel, 0, 4, "EMA stack",  text_color=color.white)
+    table.cell(panel, 1, 4, ema_stack_str, text_color=ema_stack_col)
+    table.cell(panel, 0, 5, "H1/H4",      text_color=color.white)
+    table.cell(panel, 1, 5, mtf_str,      text_color=color.white)
+    table.cell(panel, 0, 6, "ATR/5h",     text_color=color.white)
+    table.cell(panel, 1, 6, atr_str,      text_color=color.white)
 
 // ============================ ALERTS =========================================
-alertcondition(new_buy,  title="FOREX 5h BUY",  message="BUY: устойчивый тренд минимум 5 часов на {{ticker}} M15. ADX силен, EMA9>21>55>200, H1+H4 согласны.")
-alertcondition(new_sell, title="FOREX 5h SELL", message="SELL: устойчивый тренд минимум 5 часов на {{ticker}} M15. ADX силен, EMA9<21<55<200, H1+H4 согласны.")
+alertcondition(new_buy,  title="FOREX 5h BUY",  message="BUY 5h trend on {{{{ticker}}}} M15")
+alertcondition(new_sell, title="FOREX 5h SELL", message="SELL 5h trend on {{{{ticker}}}} M15")
 '''
 
 
