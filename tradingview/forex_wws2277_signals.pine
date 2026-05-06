@@ -1,0 +1,237 @@
+//@version=5
+// =====================================================================
+//  Forex-WWS2277 Signals (M15, 5h-trend, non-repainting)
+// =====================================================================
+//
+//  Описание (русский):
+//  Индикатор повторяет на TradingView логику системы Forex-wws2277
+//  (28 валютных пар, app/analyzer.py). Считает голоса 15 технических
+//  блоков на текущем графике (рассчитан на M15) с дополнительным
+//  подтягиванием EMA20/EMA50 со старших таймфреймов H1 и H4. Сигнал
+//  BUY / SELL появляется только когда выполнены ВСЕ условия одновременно:
+//
+//    1. |score| ≥ 12 из 15 (≈80% голосов в одну сторону)
+//    2. Согласие направлений на M15 + H1 + H4 (multi-TF alignment)
+//    3. Устойчивость тренда: ≥ 14 из последних 20 M15-баров (≈5 часов)
+//       закрылись в ту же сторону (filter "trend_persistence_5h")
+//    4. ADX(14) ≥ 25 на M15 (реальный тренд, не флэт)
+//    5. ATR(14) выше 60% своей средней (рынок не плоский)
+//
+//  NON-REPAINTING:
+//    • Сигналы плоттятся только при `barstate.isconfirmed` (закрытый бар).
+//    • Все запросы старших ТФ через request.security(...) идут с
+//      `lookahead = barmerge.lookahead_off` и со сдвигом [1], поэтому
+//      значения берутся с уже закрытого H1/H4-бара и не подменяются
+//      внутри текущего интрабара.
+//
+//  Источник логики и весовых коэффициентов: 15 блоков из
+//  https://github.com/Jony-wws/Forex-wws2277 — app/analyzer.py
+//  (RSI, MACD, ADX, EMA50/200, EMA20, Stoch, CCI, W%R, BB, OBV,
+//   SuperTrend, Ichimoku, Donchian, Multi-TF, EMA20/EMA50 cross).
+//
+//  Стрелки: BUY = зелёный треугольник вверх под баром,
+//           SELL = красный треугольник вниз над баром.
+//  Выводится только на момент смены направления, чтобы избежать «частокола».
+// =====================================================================
+
+indicator(title       = "Forex-WWS2277 Signals (M15, 5h-trend, non-repainting)",
+          shorttitle  = "WWS2277",
+          overlay     = true,
+          max_labels_count = 500)
+
+// ---------- Inputs ----------
+i_minScore   = input.int(12,  "Минимальный |score| (из 15)",            minval=1, maxval=15)
+i_persistN   = input.int(20,  "Окно устойчивости тренда (M15 баров)",   minval=5)
+i_persistMin = input.int(14,  "Минимум M15-баров в одну сторону",       minval=1)
+i_adxMin     = input.float(25.0, "Минимальный ADX(14) на M15",          minval=0.0)
+i_useATR     = input.bool(true,  "Фильтр ATR (отсекать плоский рынок)")
+i_atrFlatRat = input.float(0.6,  "Порог ATR / SMA(ATR,50) для «плоский»", minval=0.0)
+
+// ---------- Helpers: non-repainting HTF read ----------
+f_htfClose(_tf) =>
+    request.security(syminfo.tickerid, _tf, close[1], lookahead = barmerge.lookahead_off)
+
+f_htfEma(_tf, _len) =>
+    e = ta.ema(close, _len)
+    request.security(syminfo.tickerid, _tf, e[1], lookahead = barmerge.lookahead_off)
+
+// ---------- M15 indicators (chart timeframe) ----------
+rsi14                      = ta.rsi(close, 14)
+[macdLine, macdSig, macdH] = ta.macd(close, 12, 26, 9)
+[diPlus, diMinus, adx14]   = ta.dmi(14, 14)
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+
+stochKraw = ta.stoch(close, high, low, 14)
+stochK    = ta.sma(stochKraw, 3)
+stochD    = ta.sma(stochK,    3)
+
+cci20  = ta.cci(close, 20)
+wprc   = ta.wpr(14)
+atr14  = ta.atr(14)
+atrSMA = ta.sma(atr14, 50)
+
+[bbMid, bbUp, bbLo] = ta.bb(close, 20, 2.0)
+bbPct = (close - bbLo) / math.max(bbUp - bbLo, syminfo.mintick)
+
+obvVal   = ta.obv
+obvSlope = obvVal - obvVal[5]
+
+[stLine, stDir] = ta.supertrend(3.0, 10)   // stDir: -1 = uptrend, +1 = downtrend (Pine v5)
+
+// Ichimoku (9, 26, 52)
+ichTenkan = (ta.highest(high,  9) + ta.lowest(low,  9)) / 2.0
+ichKijun  = (ta.highest(high, 26) + ta.lowest(low, 26)) / 2.0
+ichSpanA  = (ichTenkan + ichKijun) / 2.0
+ichSpanB  = (ta.highest(high, 52) + ta.lowest(low, 52)) / 2.0
+aboveCloud = close > ichSpanA and close > ichSpanB
+belowCloud = close < ichSpanA and close < ichSpanB
+
+// Donchian (20)
+donHi = ta.highest(high, 20)
+donLo = ta.lowest(low,  20)
+
+// ---------- HTF reads (H1 + H4) ----------
+ema20_h1 = f_htfEma("60",  20)
+ema50_h1 = f_htfEma("60",  50)
+ema20_h4 = f_htfEma("240", 20)
+ema50_h4 = f_htfEma("240", 50)
+close_h1 = f_htfClose("60")
+close_h4 = f_htfClose("240")
+
+m15Bull = close   > ema20    and ema20    > ema50
+m15Bear = close   < ema20    and ema20    < ema50
+h1Bull  = close_h1 > ema20_h1 and ema20_h1 > ema50_h1
+h1Bear  = close_h1 < ema20_h1 and ema20_h1 < ema50_h1
+h4Bull  = close_h4 > ema20_h4 and ema20_h4 > ema50_h4
+h4Bear  = close_h4 < ema20_h4 and ema20_h4 < ema50_h4
+mtfBull = m15Bull and h1Bull and h4Bull
+mtfBear = m15Bear and h1Bear and h4Bear
+mtfAligned = mtfBull or mtfBear
+
+// =====================================================================
+// 15 voting blocks — each contributes -1, 0, or +1 (max |score| = 15)
+// Mapping mirrors app/analyzer.py (block letters A0..O), but each block
+// is normalized to a single ±1 vote here so threshold "12 of 15" is
+// directly comparable to the user's spec.
+// =====================================================================
+
+// 1. RSI(14): bias 50, flips at 30/70
+v01_rsi = rsi14 <= 30 ? +1 : rsi14 >= 70 ? -1 : rsi14 > 55 ? +1 : rsi14 < 45 ? -1 : 0
+
+// 2. MACD(12,26,9): line vs signal AND histogram direction
+v02_macd = macdLine > macdSig and macdH > macdH[1] ? +1 :
+           macdLine < macdSig and macdH < macdH[1] ? -1 : 0
+
+// 3. ADX(14) ≥ 25 trend strength — directional
+v03_adx = adx14 >= 25.0 and diPlus  > diMinus ? +1 :
+          adx14 >= 25.0 and diMinus > diPlus  ? -1 : 0
+
+// 4. EMA50 vs EMA200 (long-term trend bias)
+v04_ema50_200 = ema50 > ema200 ? +1 : ema50 < ema200 ? -1 : 0
+
+// 5. EMA20 vs price (short-term bias)
+v05_ema20 = close > ema20 ? +1 : close < ema20 ? -1 : 0
+
+// 6. Stochastic(14,3,3)
+v06_stoch = stochK < 20.0 and stochD < 20.0 ? +1 :
+            stochK > 80.0 and stochD > 80.0 ? -1 :
+            stochK > stochD and stochK < 80.0 ? +1 :
+            stochK < stochD and stochK > 20.0 ? -1 : 0
+
+// 7. CCI(20): vote only when leaving extreme zones
+v07_cci = cci20 >  100.0 ? +1 :
+          cci20 < -100.0 ? -1 : 0
+
+// 8. Williams %R(14)
+v08_wpr = wprc < -80.0 ? +1 : wprc > -20.0 ? -1 : 0
+
+// 9. Bollinger Bands(20,2)
+v09_bb = bbPct < 0.05 ? +1 :
+         bbPct > 0.95 ? -1 :
+         bbPct > 0.65 ? +1 :
+         bbPct < 0.35 ? -1 : 0
+
+// 10. OBV slope (5-bar)
+v10_obv = obvSlope > 0 ? +1 : obvSlope < 0 ? -1 : 0
+
+// 11. SuperTrend(10,3): stDir = -1 → uptrend, +1 → downtrend
+v11_st = stDir < 0 ? +1 : stDir > 0 ? -1 : 0
+
+// 12. Ichimoku(9,26,52) cloud
+v12_ichi = aboveCloud and ichTenkan > ichKijun ? +1 :
+           belowCloud and ichTenkan < ichKijun ? -1 :
+           aboveCloud ? +1 : belowCloud ? -1 : 0
+
+// 13. Donchian(20) breakout
+v13_don = close >= donHi[1] ? +1 :
+          close <= donLo[1] ? -1 : 0
+
+// 14. Multi-TF alignment M15+H1+H4
+v14_mtf = mtfBull ? +1 : mtfBear ? -1 : 0
+
+// 15. EMA20 vs EMA50 cross on M15 (early-entry block from analyzer.py)
+v15_emax = ema20 > ema50 ? +1 : ema20 < ema50 ? -1 : 0
+
+// ---------- Score ----------
+score = v01_rsi + v02_macd + v03_adx + v04_ema50_200 + v05_ema20 +
+        v06_stoch + v07_cci + v08_wpr + v09_bb + v10_obv +
+        v11_st + v12_ichi + v13_don + v14_mtf + v15_emax
+
+// ---------- ATR-based "flat market" kill-switch ----------
+isFlat = i_useATR and not na(atrSMA) and atr14 < atrSMA * i_atrFlatRat
+
+// ---------- Persistence: 14 of last 20 M15 bars in same direction ----------
+dirM15  = close > ema20 ? 1 : close < ema20 ? -1 : 0
+bullBars = math.sum(dirM15 ==  1 ? 1 : 0, i_persistN)
+bearBars = math.sum(dirM15 == -1 ? 1 : 0, i_persistN)
+persistBull = bullBars >= i_persistMin
+persistBear = bearBars >= i_persistMin
+
+// ---------- Hard signal gates ----------
+strongBuy  = barstate.isconfirmed and score >=  i_minScore and mtfBull and persistBull and adx14 >= i_adxMin and not isFlat
+strongSell = barstate.isconfirmed and score <= -i_minScore and mtfBear and persistBear and adx14 >= i_adxMin and not isFlat
+
+// Edge-trigger so we don't paint an arrow on every bar of a long trend
+var int lastSig = 0
+fireBuy  = strongBuy  and lastSig != 1
+fireSell = strongSell and lastSig != -1
+if fireBuy
+    lastSig := 1
+if fireSell
+    lastSig := -1
+
+// ---------- Plot ----------
+plotshape(fireBuy,  title="BUY",  style=shape.triangleup,
+          location=location.belowbar, color=color.new(color.green, 0),
+          size=size.small, text="BUY")
+plotshape(fireSell, title="SELL", style=shape.triangledown,
+          location=location.abovebar, color=color.new(color.red, 0),
+          size=size.small, text="SELL")
+
+// ---------- Compact info table ----------
+var table tbl = table.new(position.top_right, 2, 6, border_width=1)
+if barstate.islast
+    bg = color.new(color.gray, 80)
+    bg2 = color.new(color.gray, 90)
+    table.cell(tbl, 0, 0, "Score",     bgcolor=bg)
+    table.cell(tbl, 1, 0, str.tostring(score) + " / 15", bgcolor=bg2)
+    table.cell(tbl, 0, 1, "ADX(14)",   bgcolor=bg)
+    table.cell(tbl, 1, 1, str.tostring(adx14, "#.#"),    bgcolor=bg2)
+    table.cell(tbl, 0, 2, "Multi-TF",  bgcolor=bg)
+    table.cell(tbl, 1, 2, mtfBull ? "BULL" : mtfBear ? "BEAR" : "—", bgcolor=bg2)
+    table.cell(tbl, 0, 3, "Persist20", bgcolor=bg)
+    table.cell(tbl, 1, 3, str.tostring(math.max(bullBars, bearBars)) + "/" + str.tostring(i_persistN), bgcolor=bg2)
+    table.cell(tbl, 0, 4, "Flat?",     bgcolor=bg)
+    table.cell(tbl, 1, 4, isFlat ? "ДА" : "нет",        bgcolor=bg2)
+    table.cell(tbl, 0, 5, "Last sig",  bgcolor=bg)
+    table.cell(tbl, 1, 5, lastSig == 1 ? "BUY" : lastSig == -1 ? "SELL" : "—", bgcolor=bg2)
+
+// ---------- Alerts ----------
+alertcondition(fireBuy,
+     title   = "WWS2277 BUY",
+     message = "Forex-WWS2277 BUY {{ticker}} {{interval}} score>=12, M15+H1+H4 align, persist 14/20")
+alertcondition(fireSell,
+     title   = "WWS2277 SELL",
+     message = "Forex-WWS2277 SELL {{ticker}} {{interval}} score<=-12, M15+H1+H4 align, persist 14/20")
