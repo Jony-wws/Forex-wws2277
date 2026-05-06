@@ -409,18 +409,25 @@
         document.getElementById('neutral-count').textContent = neutC;
         document.getElementById('scan-info').textContent = 'Обн. #' + data.scan_count;
 
-        // Sort
+        // Sort — default order is "premium signals first, then strict, then fallback,
+        // then non-signals. Within each tier sorted by trend_quality desc.
         pairs.sort((a, b) => {
             if (sortCol === 'signal') {
-                const sa = a.signal ? (a.signal === 'BUY' ? 2 : 1) : 0;
-                const sb = b.signal ? (b.signal === 'BUY' ? 2 : 1) : 0;
-                if (sa !== sb) return (sb - sa) * sortDir;
-                return (Math.abs(b.score||0) - Math.abs(a.score||0)) * sortDir;
+                const sigOrder = (x) =>
+                    x.signal_kind === 'premium' ? 4 :
+                    x.signal_kind === 'strict' ? 3 :
+                    x.signal_kind === 'fallback' ? 2 :
+                    x.signal ? 1 : 0;
+                const so = sigOrder(b) - sigOrder(a);
+                if (so !== 0) return so * sortDir;
+                return ((b.trend_quality||0) - (a.trend_quality||0)) * sortDir;
             }
             if (sortCol === 'pair') return a.pair.localeCompare(b.pair) * sortDir;
             if (sortCol === 'price') return ((b.price||0) - (a.price||0)) * sortDir;
             if (sortCol === 'change') return ((b.change_24h_pips||0) - (a.change_24h_pips||0)) * sortDir;
             if (sortCol === 'confidence') return ((b.confidence||0) - (a.confidence||0)) * sortDir;
+            if (sortCol === 'trend_quality') return ((b.trend_quality||0) - (a.trend_quality||0)) * sortDir;
+            if (sortCol === 'expected_move_pips_5h') return ((b.expected_move_pips_5h||0) - (a.expected_move_pips_5h||0)) * sortDir;
             return 0;
         });
 
@@ -430,10 +437,12 @@
                 <th data-sort="price">Цена</th>
                 <th data-sort="change">Изм. 24ч</th>
                 <th data-sort="signal">Сигнал</th>
+                <th data-sort="trend_quality">Сила тренда</th>
+                <th data-sort="expected_move_pips_5h">Ожид. ход 5ч (пп)</th>
                 <th data-sort="confidence">Уверенность</th>
                 <th>Прогноз 5ч</th>
                 <th>Прогноз 24ч</th>
-                <th>Сила</th>
+                <th>Тип</th>
             </tr></thead><tbody>`;
 
         pairs.forEach((d, i) => {
@@ -462,20 +471,42 @@
                 fc24 = `<span class="forecast-text ${cls}">${arr} ${d.forecast_24h.strength}</span>`;
             }
 
-            const rowBg = hasSig ? (d.signal === 'BUY' ? 'background:var(--buy-bg)' : 'background:var(--sell-bg)') : '';
+            let rowBg = hasSig ? (d.signal === 'BUY' ? 'background:var(--buy-bg)' : 'background:var(--sell-bg)') : '';
+            if (d.signal_kind === 'premium') {
+                // Premium gets a gold left border so it stands out from
+                // regular strict/fallback rows.
+                rowBg += ';box-shadow:inset 4px 0 0 #f59e0b';
+            }
+
+            const tq = (d.trend_quality !== undefined && d.trend_quality !== null) ? d.trend_quality : 0;
+            const tqColor = tq >= 75 ? '#16a34a' : tq >= 60 ? '#eab308' : tq >= 45 ? '#f97316' : '#9ca3af';
+            const tqHtml = `<span style="display:inline-block;min-width:40px;padding:2px 8px;border-radius:8px;background:${tqColor};color:#fff;font-weight:700;font-size:13px">${tq}</span>`;
+
+            const moveVal = d.expected_move_pips_5h !== undefined ? d.expected_move_pips_5h : 0;
+            const moveHtml = `<span style="font-size:13px;color:var(--text)">≈ ${moveVal} пп</span>`;
+
+            const kindHtml = d.signal_kind === 'premium'
+                ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#1f2937;font-size:11px;font-weight:800;box-shadow:0 0 0 1px #f59e0b inset" title="Финальный фильтр — сильнейший тренд: ADX≥28, Aroon≥70, HA 5/6 свечей, momentum≥0.2%, ход ≥60пп">★ ПРЕМИУМ</span>'
+                : d.signal_kind === 'strict'
+                ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:#16a34a;color:#fff;font-size:11px;font-weight:700">СТРОГИЙ</span>'
+                : d.signal_kind === 'fallback'
+                ? '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:#f97316;color:#fff;font-size:11px;font-weight:700" title="Лучший доступный — пар выше строгого порога нет">ТОП-3</span>'
+                : '<span style="font-size:12px;color:var(--text-dim)">—</span>';
 
             html += `<tr style="${rowBg}" class="data-row" data-idx="${i}" onclick="toggleDetail(${i})">
                 <td><div class="pair-cell">${d.pair}</div><div class="pair-sub">${d.name_ru}</div></td>
                 <td class="price-cell">${d.price_display}</td>
                 <td class="${chClass}">${chSign}${d.change_24h_pips} пп</td>
                 <td><span class="signal-badge ${badgeClass}">${arrow}${badgeText}</span></td>
+                <td>${tqHtml}</td>
+                <td>${moveHtml}</td>
                 <td>
                     <span class="conf-bar"><span class="conf-fill ${confColor}" style="width:${confPct}%"></span></span>
                     ${confPct}%
                 </td>
                 <td>${fc5}</td>
                 <td>${fc24}</td>
-                <td style="font-size:12px;color:var(--text-dim)">${d.strength || '—'}</td>
+                <td>${kindHtml}</td>
             </tr>`;
 
             // Detail row
@@ -495,7 +526,7 @@
                 ).join('');
             }
 
-            html += `<tr class="detail-row" id="detail-${i}"><td colspan="8">
+            html += `<tr class="detail-row" id="detail-${i}"><td colspan="10">
                 <div class="detail-grid">
                     <div class="detail-block"><h4>Анализ индикаторов</h4>${detailsHtml || '<div style="color:var(--text-dim)">Нет данных</div>'}</div>
                     <div class="detail-block"><h4>Значения индикаторов</h4>${indHtml || '<div style="color:var(--text-dim)">Нет данных</div>'}</div>
