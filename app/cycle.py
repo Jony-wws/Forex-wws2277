@@ -158,7 +158,7 @@ def _eligible(forecast: dict) -> bool:
     return forecast.get("side") in ("BUY", "SELL")
 
 
-def _quality_score(f: dict) -> tuple:
+def _quality_score(f: dict, wr_by_pair: dict[str, float] | None = None) -> tuple:
     """Sort key — higher is better.
 
     Order of precedence:
@@ -166,48 +166,137 @@ def _quality_score(f: dict) -> tuple:
       2. Trend persistence over last 5 H1 bars (more bars = better).
       3. ADX H1 (stronger trend = better).
       4. ADX H4 (confirmation on the higher timeframe).
-      5. |score| (raw indicator agreement).
-      6. confidence.
+      5. High historical win-rate (≥ 70 % over 30d/365d) — preference,
+         not a hard gate; never lowers the slate below MIN_PICKS.
+      6. |score| (raw indicator agreement).
+      7. confidence.
     """
+    pair = f.get("pair") or ""
+    wr = (wr_by_pair or {}).get(pair, 0.0)
+    high_wr = 1 if wr >= 70.0 else 0
     return (
         1 if _passes_strong_gate(f) else 0,
         float(f.get("trend_persistence_5h") or 0.0),
         float(f.get("adx_h1") or f.get("adx") or 0.0),
         float(f.get("adx_h4") or 0.0),
+        high_wr,
         abs(int(f.get("score") or 0)),
         int(f.get("confidence") or 0),
     )
 
 
+def _load_wr_by_pair() -> dict[str, float]:
+    """Best-effort read of ``state/cycle_latest.json`` → ``{pair: max(wr_30d, wr_365d)}``.
+
+    Only pairs with statistically meaningful trade counts (≥ 50 over 30d
+    OR ≥ 200 over 365d) are kept so noisy backtest rows don't sway the
+    selector. All exceptions are swallowed — backtest stats are a
+    preference, never a precondition for the cycle to publish.
+    """
+    path = STATE_DIR / "cycle_latest.json"
+    out: dict[str, float] = {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return out
+    rows: list[dict] = []
+    try:
+        rows.extend(data.get("top3") or [])
+        rows.extend(data.get("per_pair") or [])
+    except Exception:
+        return out
+    for row in rows:
+        try:
+            pair = row.get("pair")
+            if not pair:
+                continue
+            n30 = int(row.get("wr_30d_trades") or 0)
+            n365 = int(row.get("wr_365d_trades") or 0)
+            if n30 < 50 and n365 < 200:
+                continue
+            wr = max(
+                float(row.get("wr_30d") or 0.0),
+                float(row.get("wr_365d") or 0.0),
+            )
+            if wr > out.get(pair, 0.0):
+                out[pair] = wr
+        except Exception:
+            continue
+    return out
+
+
 def _select_strict(
     forecasts_by_pair: dict[str, dict],
+    wr_by_pair: dict[str, float] | None = None,
 ) -> tuple[list[dict], bool]:
     """Pick up to ``MAX_PICKS`` forecasts, preferring strong sustained trends.
 
     Returns ``(selected, weak_market)`` — ``weak_market`` is True when
     fewer than ``MIN_PICKS`` candidates pass the strong gate, signalling
     the UI to warn that no clear 5-hour trends exist this cycle.
+
+    ``MIN_PICKS = 3`` is a hard invariant: even if every pair is flat
+    (``side=None``, ``score=0``) we still emit three picks by deriving
+    ``side`` from the sign of the raw indicator score. ``weak_market``
+    stays True in that case so the UI banner warns honestly.
     """
     candidates = [f for f in forecasts_by_pair.values() if _eligible(f)]
-    candidates.sort(key=_quality_score, reverse=True)
+    candidates.sort(key=lambda f: _quality_score(f, wr_by_pair), reverse=True)
 
     strong = [f for f in candidates if _passes_strong_gate(f)]
     weak_market = len(strong) < MIN_PICKS
 
     if not weak_market:
         # Plenty of strong trends — publish up to MAX_PICKS of them.
-        return strong[:MAX_PICKS], False
+        selected = strong[:MAX_PICKS]
+    else:
+        # Not enough strong trends — pad with the next best candidates so the
+        # cycle is never empty, but mark weak_market so the UI can warn.
+        selected = list(strong)
+        for f in candidates:
+            if f in selected:
+                continue
+            if len(selected) >= MIN_PICKS:
+                break
+            selected.append(f)
 
-    # Not enough strong trends — pad with the next best candidates so the
-    # cycle is never empty, but mark weak_market so the UI can warn.
-    selected = list(strong)
-    for f in candidates:
-        if f in selected:
-            continue
-        if len(selected) >= MIN_PICKS:
-            break
-        selected.append(f)
-    return selected, True
+        # Last-resort: even completely flat pairs are eligible — derive side
+        # from the sign of the raw indicator score so MIN_PICKS=3 is a hard
+        # invariant rather than a best-effort one.
+        if len(selected) < MIN_PICKS:
+            rest = [
+                f for f in forecasts_by_pair.values()
+                if f not in selected
+            ]
+            rest.sort(
+                key=lambda f: (
+                    abs(int(f.get('score') or 0)),
+                    float(f.get('adx_h1') or f.get('adx') or 0.0),
+                    int(f.get('confidence') or 0),
+                ),
+                reverse=True,
+            )
+            for f in rest:
+                if len(selected) >= MIN_PICKS:
+                    break
+                if f.get('side') in ('BUY', 'SELL'):
+                    selected.append(f)
+                    continue
+                # side is None — patch a copy with sign-derived side so the
+                # downstream pipeline (entry_price, evaluation, UI) still works.
+                score = int(f.get('score') or 0)
+                patched = dict(f)
+                patched['side'] = 'BUY' if score >= 0 else 'SELL'
+                selected.append(patched)
+
+    # Tag selected picks with high_wr so the UI can render the WR ≥ 70 % badge.
+    if wr_by_pair:
+        for f in selected:
+            pair = f.get("pair") or ""
+            if wr_by_pair.get(pair, 0.0) >= 70.0:
+                f["high_wr"] = True
+
+    return selected, weak_market
 
 
 # ---------- persistence -----------------------------------------------------
@@ -366,8 +455,11 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                     history[:] = history[-HISTORY_KEEP_CYCLES:]
                 changed = True
 
-            # Build the new cycle from the current snapshot
-            top, weak_market = _select_strict(forecasts_by_pair)
+            # Build the new cycle from the current snapshot. Backtest
+            # win-rates from the previous GitHub-Actions cycle bias the
+            # selector toward historically-winning pairs as a tie-breaker.
+            wr_by_pair = _load_wr_by_pair()
+            top, weak_market = _select_strict(forecasts_by_pair, wr_by_pair)
             session = detect_session(active_start)
             selected: list[dict] = []
             for f in top:
@@ -394,6 +486,7 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                         f.get("trend_persistence_bars") or 0
                     ),
                     "multi_tf_aligned": bool(f.get("multi_tf_aligned")),
+                    "high_wr": bool(f.get("high_wr")),
                     "entry_price": round(float(price), 5),
                     "forecast_5h": f.get("forecast_5h"),
                     "forecast_24h": f.get("forecast_24h"),
