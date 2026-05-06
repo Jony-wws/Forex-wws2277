@@ -310,6 +310,113 @@
         .res-win  { color: var(--buy);  font-weight: 700; }
         .res-loss { color: var(--sell); font-weight: 700; }
 
+        /* === STATS TAB === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 12px;
+        }
+        .stats-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .stats-card.full { grid-column: 1 / -1; }
+        .stats-card h3 {
+            font-size: 12px; color: var(--accent);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-bottom: 12px; font-weight: 700;
+        }
+        .summary-row {
+            display: flex; justify-content: space-between;
+            padding: 6px 0; font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-label { color: var(--text-dim); }
+        .summary-value { font-weight: 700; color: var(--text); }
+        .summary-value.win { color: var(--buy); }
+        .summary-value.loss { color: var(--sell); }
+
+        .wr-chart-wrap {
+            width: 100%;
+            position: relative;
+        }
+        .wr-chart-wrap svg {
+            width: 100%; height: auto; display: block;
+            font-family: inherit;
+        }
+        .wr-chart-axis { stroke: var(--card-border); stroke-width: 1; }
+        .wr-chart-grid { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
+        .wr-chart-tick { fill: var(--text-dim); font-size: 10px; }
+        .wr-chart-line {
+            fill: none; stroke: var(--accent);
+            stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+        }
+        .wr-chart-area { fill: rgba(79,195,247,0.10); }
+        .wr-chart-dot { fill: var(--accent); }
+        .wr-chart-empty {
+            fill: var(--text-dim); font-size: 12px;
+            text-anchor: middle;
+        }
+
+        .tier-bars { display: flex; flex-direction: column; gap: 10px; }
+        .tier-row { display: flex; flex-direction: column; gap: 4px; }
+        .tier-row-head {
+            display: flex; justify-content: space-between;
+            font-size: 12px;
+        }
+        .tier-row-name { font-weight: 700; }
+        .tier-row-meta { color: var(--text-dim); }
+        .tier-bar-track {
+            height: 12px; border-radius: 6px;
+            background: rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+        .tier-bar-fill {
+            height: 100%; border-radius: 6px;
+            transition: width 0.4s ease;
+        }
+        .tier-fill-premium { background: linear-gradient(90deg, #ffc107, #ffb300); }
+        .tier-fill-strong  { background: linear-gradient(90deg, #4fc3f7, #29b6f6); }
+        .tier-fill-normal  { background: linear-gradient(90deg, #78909c, #546e7a); }
+        .tier-name-premium { color: #ffc107; }
+        .tier-name-strong  { color: #4fc3f7; }
+        .tier-name-normal  { color: #8892a4; }
+
+        .pairs-table {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .pairs-table th {
+            position: static;
+            text-align: left; padding: 8px 10px;
+            font-size: 11px; color: var(--text-dim);
+            text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--card-border);
+            background: transparent;
+            cursor: pointer; user-select: none;
+        }
+        .pairs-table th:hover { color: var(--accent); }
+        .pairs-table th.sort-active { color: var(--accent); }
+        .pairs-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(30,42,58,0.4);
+        }
+        .pairs-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .pairs-table .pair-name { font-weight: 700; }
+
+        .stats-empty {
+            color: var(--text-dim); font-size: 13px;
+            text-align: center; padding: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .stats-card { padding: 12px; }
+            .pairs-table th, .pairs-table td { padding: 6px 8px; font-size: 12px; }
+        }
+
         /* === RESPONSIVE === */
         @media (max-width: 768px) {
             .header { padding: 10px 12px; }
@@ -354,6 +461,7 @@
 
     <div class="tabs">
         <div class="tab active" data-tab="signals">Сигналы и прогнозы</div>
+        <div class="tab" data-tab="stats">Статистика</div>
         <div class="tab" data-tab="orderbook">Стакан ордеров</div>
     </div>
 
@@ -392,6 +500,16 @@
             </div>
         </div>
 
+        <!-- STATS -->
+        <div class="tab-content" id="tab-stats">
+            <div id="stats-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Открой вкладку «Статистика», чтобы загрузить данные</div>
+                </div>
+            </div>
+        </div>
+
         <!-- ORDER BOOK -->
         <div class="tab-content" id="tab-orderbook">
             <div id="ob-content">
@@ -412,6 +530,7 @@
             tab.classList.add('active');
             document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
             if (tab.dataset.tab === 'orderbook') fetchOrderbooks();
+            if (tab.dataset.tab === 'stats') fetchStats();
         });
     });
 
@@ -827,6 +946,265 @@
             lastOB = await res.json();
             renderOrderbooks(lastOB);
         } catch(e) { console.error('fetch orderbooks:', e); }
+    }
+
+    // === СТАТИСТИКА ===
+    let lastStats = null;
+    let statsLoading = false;
+    let statsSortCol = 'picks';
+    let statsSortDir = -1;  // -1 desc, 1 asc
+
+    const TIER_LABELS = {
+        PREMIUM: '★ ПРЕМИУМ',
+        STRONG:  '⚡ СИЛЬНЫЙ',
+        NORMAL:  '⊙ ОБЫЧНЫЙ'
+    };
+    const TIER_FILL_CLS = {
+        PREMIUM: 'tier-fill-premium',
+        STRONG:  'tier-fill-strong',
+        NORMAL:  'tier-fill-normal'
+    };
+    const TIER_NAME_CLS = {
+        PREMIUM: 'tier-name-premium',
+        STRONG:  'tier-name-strong',
+        NORMAL:  'tier-name-normal'
+    };
+
+    function svgEscape(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    function renderWrChart(daily) {
+        const W = 600, H = 200;
+        const pad = { top: 10, right: 12, bottom: 28, left: 32 };
+        const innerW = W - pad.left - pad.right;
+        const innerH = H - pad.top - pad.bottom;
+        const decided = (daily || []).filter(d => (d.wins + d.losses) > 0);
+
+        const gridLines = [];
+        for (let pct = 0; pct <= 100; pct += 25) {
+            const y = pad.top + innerH * (1 - pct / 100);
+            gridLines.push(`<line class="wr-chart-grid" x1="${pad.left}" y1="${y.toFixed(1)}" x2="${pad.left + innerW}" y2="${y.toFixed(1)}"/>`);
+            gridLines.push(`<text class="wr-chart-tick" x="${pad.left - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${pct}%</text>`);
+        }
+
+        if (!decided.length) {
+            return `<div class="wr-chart-wrap">
+                <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="WR по дням">
+                    ${gridLines.join('')}
+                    <line class="wr-chart-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + innerH}"/>
+                    <line class="wr-chart-axis" x1="${pad.left}" y1="${pad.top + innerH}" x2="${pad.left + innerW}" y2="${pad.top + innerH}"/>
+                    <text class="wr-chart-empty" x="${pad.left + innerW / 2}" y="${pad.top + innerH / 2}">Нет завершённых циклов за 30 дней</text>
+                </svg>
+            </div>`;
+        }
+
+        const n = daily.length;
+        const xStep = n > 1 ? innerW / (n - 1) : innerW;
+        const points = [];
+        const dots = [];
+        const labels = [];
+        daily.forEach((d, i) => {
+            const decisions = d.wins + d.losses;
+            if (decisions <= 0) return;
+            const x = pad.left + i * xStep;
+            const y = pad.top + innerH * (1 - d.wr_pct / 100);
+            points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+            dots.push(`<circle class="wr-chart-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5"><title>${d.date_utc5}: ${d.wr_pct}% (${d.wins}W / ${d.losses}L)</title></circle>`);
+        });
+
+        // X-axis date labels: show first / middle / last decided point
+        const tickIdx = [0, Math.floor((n - 1) / 2), n - 1];
+        tickIdx.forEach(i => {
+            const x = pad.left + i * xStep;
+            const lbl = (daily[i] && daily[i].date_utc5) ? daily[i].date_utc5.slice(5) : '';
+            labels.push(`<text class="wr-chart-tick" x="${x.toFixed(1)}" y="${pad.top + innerH + 16}" text-anchor="middle">${lbl}</text>`);
+        });
+
+        const polyline = points.length
+            ? `<polyline class="wr-chart-line" points="${points.join(' ')}"/>`
+            : '';
+        const areaPts = points.length
+            ? [`${points[0].split(',')[0]},${pad.top + innerH}`, ...points, `${points[points.length-1].split(',')[0]},${pad.top + innerH}`].join(' ')
+            : '';
+        const area = areaPts
+            ? `<polygon class="wr-chart-area" points="${areaPts}"/>`
+            : '';
+
+        return `<div class="wr-chart-wrap">
+            <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="WR по дням за 30 дней">
+                ${gridLines.join('')}
+                <line class="wr-chart-axis" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + innerH}"/>
+                <line class="wr-chart-axis" x1="${pad.left}" y1="${pad.top + innerH}" x2="${pad.left + innerW}" y2="${pad.top + innerH}"/>
+                ${area}
+                ${polyline}
+                ${dots.join('')}
+                ${labels.join('')}
+            </svg>
+        </div>`;
+    }
+
+    function renderTierBars(perTier) {
+        if (!perTier || !perTier.length) {
+            return '<div class="stats-empty">Нет данных по тирам</div>';
+        }
+        // Scale bars by max picks among the tiers (or 1 to avoid div-by-zero).
+        const maxPicks = Math.max(1, ...perTier.map(t => t.picks || 0));
+        return '<div class="tier-bars">' + perTier.map(t => {
+            const fillCls = TIER_FILL_CLS[t.tier] || 'tier-fill-normal';
+            const nameCls = TIER_NAME_CLS[t.tier] || 'tier-name-normal';
+            const label = TIER_LABELS[t.tier] || t.tier;
+            const widthPct = Math.max(2, (t.picks / maxPicks) * 100);
+            const decisions = (t.wins || 0) + (t.losses || 0);
+            const wrTxt = decisions ? `${t.wr_pct}%` : '—';
+            return `<div class="tier-row">
+                <div class="tier-row-head">
+                    <span class="tier-row-name ${nameCls}">${label}</span>
+                    <span class="tier-row-meta">${t.picks} пиков · WR ${wrTxt} (${t.wins}W / ${t.losses}L)</span>
+                </div>
+                <div class="tier-bar-track">
+                    <div class="tier-bar-fill ${fillCls}" style="width:${widthPct.toFixed(1)}%"></div>
+                </div>
+            </div>`;
+        }).join('') + '</div>';
+    }
+
+    function renderPairsTable(perPair) {
+        if (!perPair || !perPair.length) {
+            return '<div class="stats-empty">Пока нет ни одной пары</div>';
+        }
+        const sorted = perPair.slice().sort((a, b) => {
+            const col = statsSortCol;
+            let av, bv;
+            if (col === 'pair') { av = a.pair; bv = b.pair; }
+            else if (col === 'last_seen') { av = a.last_seen || ''; bv = b.last_seen || ''; }
+            else { av = a[col] || 0; bv = b[col] || 0; }
+            if (av < bv) return -1 * statsSortDir;
+            if (av > bv) return 1 * statsSortDir;
+            return 0;
+        });
+        const head = (col, label, num) => {
+            const cls = (statsSortCol === col ? 'sort-active ' : '') + (num ? 'num' : '');
+            const arrow = statsSortCol === col ? (statsSortDir === 1 ? ' ▲' : ' ▼') : '';
+            return `<th class="${cls}" data-stats-sort="${col}">${label}${arrow}</th>`;
+        };
+        const rows = sorted.map(r => `<tr>
+            <td class="pair-name">${svgEscape(r.pair)}</td>
+            <td class="num">${r.picks}</td>
+            <td class="num" style="color:var(--buy)">${r.wins}</td>
+            <td class="num" style="color:var(--sell)">${r.losses}</td>
+            <td class="num">${(r.wins + r.losses) ? r.wr_pct + '%' : '—'}</td>
+            <td>${svgEscape(r.last_seen || '—')}</td>
+        </tr>`).join('');
+        return `<table class="pairs-table">
+            <thead><tr>
+                ${head('pair', 'Пара', false)}
+                ${head('picks', 'Пиков', true)}
+                ${head('wins', 'Побед', true)}
+                ${head('losses', 'Лоссов', true)}
+                ${head('wr_pct', 'WR%', true)}
+                ${head('last_seen', 'Последний', false)}
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function renderStats(data) {
+        if (!data) return;
+        const s = data.summary || {};
+        const decisions = (s.total_wins || 0) + (s.total_losses || 0);
+        const overallWr = decisions ? `${s.overall_wr_pct}%` : '—';
+        const lastCycle = s.last_cycle_utc5 || '—';
+
+        const summaryHtml = `
+            <div class="stats-card">
+                <h3>Сводка</h3>
+                <div class="summary-row">
+                    <span class="summary-label">Общий WR</span>
+                    <span class="summary-value ${decisions && s.overall_wr_pct >= 50 ? 'win' : (decisions ? 'loss' : '')}">${overallWr}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Всего пиков</span>
+                    <span class="summary-value">${s.total_picks || 0}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Победы</span>
+                    <span class="summary-value win">${s.total_wins || 0}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Лоссы</span>
+                    <span class="summary-value loss">${s.total_losses || 0}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Последний цикл (UTC+5)</span>
+                    <span class="summary-value">${svgEscape(lastCycle)}</span>
+                </div>
+            </div>`;
+
+        const tierHtml = `
+            <div class="stats-card">
+                <h3>Эффективность тиров</h3>
+                ${renderTierBars(data.per_tier)}
+            </div>`;
+
+        const chartHtml = `
+            <div class="stats-card full">
+                <h3>WR по дням (30 дней, UTC+5)</h3>
+                ${renderWrChart(data.daily_wr)}
+            </div>`;
+
+        const pairsHtml = `
+            <div class="stats-card full">
+                <h3>По парам</h3>
+                ${renderPairsTable(data.per_pair)}
+            </div>`;
+
+        const html = `<div class="stats-grid">
+            ${summaryHtml}
+            ${tierHtml}
+            ${chartHtml}
+            ${pairsHtml}
+        </div>`;
+        document.getElementById('stats-content').innerHTML = html;
+
+        // Wire sortable header clicks
+        document.querySelectorAll('th[data-stats-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.statsSort;
+                if (statsSortCol === col) {
+                    statsSortDir *= -1;
+                } else {
+                    statsSortCol = col;
+                    // Numeric columns default to descending so the best
+                    // performers float to the top on first click.
+                    statsSortDir = (col === 'pair' || col === 'last_seen') ? 1 : -1;
+                }
+                if (lastStats) renderStats(lastStats);
+            });
+        });
+    }
+
+    async function fetchStats() {
+        if (statsLoading) return;
+        statsLoading = true;
+        try {
+            const res = await fetch('/api/stats', {credentials: 'include'});
+            if (!res.ok) {
+                document.getElementById('stats-content').innerHTML =
+                    `<div class="stats-empty">Не удалось загрузить статистику (HTTP ${res.status})</div>`;
+                return;
+            }
+            lastStats = await res.json();
+            renderStats(lastStats);
+        } catch (e) {
+            console.error('fetch stats:', e);
+            document.getElementById('stats-content').innerHTML =
+                '<div class="stats-empty">Ошибка загрузки статистики</div>';
+        } finally {
+            statsLoading = false;
+        }
     }
 
     // Start fetching (initial data may already be rendered from __INITIAL_DATA__)

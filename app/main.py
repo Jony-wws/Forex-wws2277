@@ -21,6 +21,7 @@ from .prices import get_current_price, get_price_change
 from .analyzer import analyze_pair
 from .orderbook import get_orderbook
 from . import cycle as cycle_mod
+from . import stats as stats_mod
 
 log = logging.getLogger("server")
 logging.basicConfig(
@@ -32,11 +33,14 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 STATE_DIR = Path(__file__).resolve().parent.parent / "state"
 ORDERBOOKS_SUMMARY_FILE = STATE_DIR / "orderbooks_summary.json"
 ORDERBOOKS_SUMMARY_TTL = 60  # seconds
+STATS_CACHE_TTL = 60  # seconds — Статистика is read-mostly, cache aggressively
 
 _signals: dict = {"pairs": {}, "updated_at": None, "scan_count": 0}
 _orderbooks: dict = {}
 _lock = threading.Lock()
 _orderbooks_summary_cache: dict = {"ts": 0.0, "data": None}
+_stats_cache: dict = {"ts": 0.0, "data": None}
+_stats_lock = threading.Lock()
 
 
 def _build_entry(pair: str) -> dict | None:
@@ -307,6 +311,34 @@ async def get_all_orderbooks(request: Request):
     except Exception as e:
         log.warning(f"Could not persist orderbooks summary: {e}")
 
+    return JSONResponse(content=data)
+
+
+@app.get("/api/stats")
+@limiter.limit("60/minute")
+async def get_stats(request: Request):
+    """Aggregated track-record statistics for the «Статистика» dashboard.
+
+    Reads ``state/forecasts.json`` and returns daily WR over the last 30
+    days, per-pair and per-tier performance, and an overall summary.
+    Result is cached in-memory for ``STATS_CACHE_TTL`` seconds.
+    """
+    now = time.time()
+    with _stats_lock:
+        cached = _stats_cache["data"]
+        cached_ts = _stats_cache["ts"]
+    if cached is not None and now - cached_ts < STATS_CACHE_TTL:
+        return JSONResponse(content=cached)
+
+    try:
+        data = stats_mod.compute_stats()
+    except Exception as e:
+        log.error(f"Error computing stats: {e}")
+        data = stats_mod._empty_payload()
+
+    with _stats_lock:
+        _stats_cache["data"] = data
+        _stats_cache["ts"] = now
     return JSONResponse(content=data)
 
 
