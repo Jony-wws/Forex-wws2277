@@ -273,9 +273,7 @@ direction = score_v > 0 ? 1 : score_v < 0 ? -1 : 0    // +1=BUY, -1=SELL
 // ── PER-PAIR ALLOWLIST ─────────────────────────────────────────────────
 // Comma-separated list of TradingView tickerids that have historical WR >= 70%.
 // Run the strategy file in Strategy Tester per pair, copy the symbols that pass.
-allowlist_inp = input.string("FX:EURUSD,FX:GBPUSD,FX:USDJPY,FX:AUDUSD,FX:USDCAD,FX:NZDUSD,FX:USDCHF,OANDA:EURUSD,OANDA:GBPUSD,OANDA:USDJPY,OANDA:AUDUSD,OANDA:USDCAD,OANDA:NZDUSD,OANDA:USDCHF,FX_IDC:EURUSD",
-                            "Allowlist (comma-separated symbols, исторический WR >= порог)",
-                            group="Фильтры качества")
+allowlist_inp = input.string("FX:EURUSD,FX:GBPUSD,FX:USDJPY,FX:AUDUSD,FX:USDCAD,FX:NZDUSD,FX:USDCHF,OANDA:EURUSD,OANDA:GBPUSD,OANDA:USDJPY,OANDA:AUDUSD,OANDA:USDCAD,OANDA:NZDUSD,OANDA:USDCHF,FX_IDC:EURUSD", "Allowlist (comma-separated symbols, hist WR >= threshold)", group="Quality filters")
 
 f_in_allowlist(s) =>
     found = false
@@ -294,10 +292,11 @@ pair_allowed = not useAllowlist or f_in_allowlist(pair_id)
 var float dayStartEquity = 100.0
 var float curEquity      = 100.0
 var int   curDay         = na
-isNewDay = na(curDay) or curDay != dayofyear
+utcDayIdx = math.floor(time / 86400000)
+isNewDay = na(curDay) or curDay != utcDayIdx
 if isNewDay
     dayStartEquity := curEquity
-    curDay         := dayofyear
+    curDay         := utcDayIdx
 dayDD = dayStartEquity > 0 ? math.max(0.0, (dayStartEquity - curEquity) / dayStartEquity * 100.0) : 0.0
 ddHalted = muteOnDD and dayDD >= dailyDDLimit
 
