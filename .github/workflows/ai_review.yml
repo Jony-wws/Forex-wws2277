@@ -1,12 +1,17 @@
 name: AI strategy review
 
 # Devin-level automated reviewer that critically reads the latest 5h cycle
-# report and proposes tighter parameter values. Runs in two modes:
-#   1. LLM mode  — when ANTHROPIC_API_KEY or OPENAI_API_KEY is set, sends
-#      the cycle report to Claude / GPT-4o and asks for a critical review
-#      and concrete parameter suggestions.
-#   2. Heuristic mode — always runs, no API key needed. Rule-based review.
+# report and proposes tighter parameter values.  Always FREE — uses the
+# built-in GITHUB_TOKEN against GitHub Models (no extra secrets needed).
 #
+# Mode order:
+#   1. GitHub Models (FREE, default) — sends the cycle report to
+#      openai/gpt-4o-mini via models.github.ai using GITHUB_TOKEN.
+#   2. HuggingFace Inference (FREE) — fallback if HF_TOKEN is set.
+#   3. Heuristic mode — always runs in parallel; pure rule-based review.
+#
+# Optional paid fallbacks (NOT recommended — keep things free): set
+# ANTHROPIC_API_KEY or OPENAI_API_KEY in repo secrets to override.
 # Optional Telegram delivery via TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID.
 
 on:
@@ -22,6 +27,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  models: read   # required for free GitHub Models API access
 
 jobs:
   ai-review:
@@ -41,8 +47,15 @@ jobs:
 
       - name: Run AI reviewer
         env:
+          # Free GitHub Models — no extra secrets required.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODEL: openai/gpt-4o-mini
+          # Optional free fallback.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          # Optional paid keys — only used if you opt in.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          # Optional Telegram delivery.
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |

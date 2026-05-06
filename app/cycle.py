@@ -3,7 +3,8 @@
 Every 5 hours (UTC boundaries 00, 05, 10, 15, 20) the system:
 
 1. Picks the **strong sustained trends** from all 28 pairs.  A pair must
-   pass the hard `is_strong_trend` gate from ``analyzer.py`` to qualify:
+   pass the hard `is_strong_trend` gate from ``analyzer.py`` to qualify
+   for the STRONG / PREMIUM tier:
 
        confidence ≥ 88
        score / max_score ≥ 0.55
@@ -11,17 +12,20 @@ Every 5 hours (UTC boundaries 00, 05, 10, 15, 20) the system:
        ADX H1 ≥ 25 AND ADX H4 ≥ 20
        trend_persistence_5h ≥ 80 % (≥ 4 of 5 H1 bars in direction)
 
-   At least 3 such picks are needed to publish a "normal" cycle
-   (``MIN_PICKS = 3``); the cap is 5 (``MAX_PICKS = 5``).  When fewer
-   than 3 pairs qualify the cycle still publishes the best available
-   candidates but flips ``weak_market = True`` so the UI can warn the
-   user that no clear 5-hour trends exist this round.
+   The cycle ALWAYS publishes between ``MIN_PICKS = 3`` and
+   ``MAX_PICKS = 5`` forecasts so the user is guaranteed at least three
+   ideas every 5 hours.  When more than 3 pairs pass the hard gate they
+   are ranked by composite quality (persistence × ADX × confidence) and
+   the top ``MAX_PICKS`` are kept.  When fewer than 3 pass, the slate is
+   topped up with the next-best candidates by the same composite score —
+   those backups are tagged with the ``NORMAL`` tier so the UI shows
+   honestly that the 5-hour trend isn't perfectly clean.
 
 2. Records each forecast with the entry price and a quality tier:
    - **PREMIUM** — ``is_strong_trend`` AND ADX H1 ≥ 28 AND persistence = 100 %
    - **STRONG**  — ``is_strong_trend`` (passes the hard gate)
-   - **MEDIUM**  — fallback only used when fewer than 3 STRONG candidates
-     exist (weak market).
+   - **NORMAL**  — best of the rest, used to top the slate up to MIN_PICKS
+     when fewer than 3 pairs cleared the strong gate.
 
 3. Evaluates earlier cycles (5h-ago for the 5h forecast, 24h-ago for the
    24h forecast) against the current price.
@@ -131,14 +135,17 @@ def _passes_strong_gate(f: dict) -> bool:
 
 
 def _classify_tier(forecast: dict) -> str:
-    """PREMIUM > STRONG > MEDIUM.
+    """PREMIUM > STRONG > NORMAL.
 
     PREMIUM is reserved for forecasts that not only pass the strong gate
     but also have a very strong H1 trend (ADX ≥ 28) and *every* one of
     the last five H1 bars in the predicted direction.
+    NORMAL is used for top-up picks when fewer than ``MIN_PICKS`` pairs
+    pass the strong gate — those still represent the best available
+    direction the system can find at that moment.
     """
     if not _passes_strong_gate(forecast):
-        return "MEDIUM"
+        return "NORMAL"
     adx_h1 = float(forecast.get("adx_h1") or forecast.get("adx") or 0.0)
     persistence = float(forecast.get("trend_persistence_5h") or 0.0)
     if adx_h1 >= PREMIUM_ADX_H1 and persistence >= PREMIUM_PERSISTENCE:

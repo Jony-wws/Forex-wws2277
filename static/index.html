@@ -291,6 +291,13 @@
             padding: 8px 12px; border-radius: 6px;
             margin-bottom: 8px; line-height: 1.4;
         }
+        .cycle-info {
+            background: rgba(33,150,243,0.06);
+            border: 1px solid rgba(33,150,243,0.25);
+            color: var(--accent); font-size: 12px;
+            padding: 8px 12px; border-radius: 6px;
+            margin-bottom: 8px; line-height: 1.4;
+        }
         .trend-bar {
             display: inline-block; vertical-align: middle;
             width: 38px; height: 4px; background: rgba(84,110,122,0.25);
@@ -687,7 +694,8 @@
         let warnHtml = '';
         if (cycle.weak_market) {
             const sc = cycle.strong_count || 0;
-            warnHtml = `<div class="cycle-warn">⚠ Слабый рынок: только ${sc} пар${sc === 1 ? 'а' : ''} прошл${sc === 1 ? 'а' : 'и'} строгий фильтр (нужно минимум 3). Показанные пары имеют низкую уверенность — лучше пропустить этот цикл.</div>`;
+            const noun = sc === 1 ? 'пара' : (sc >= 2 && sc <= 4 ? 'пары' : 'пар');
+            warnHtml = `<div class="cycle-info">ℹ Строгий фильтр прошл${sc === 1 ? 'а' : 'и'} ${sc} ${noun} — добавили лучшие из остальных по композитной оценке (тир ⊙ ОБЫЧНЫЙ). Прогнозов всегда 3+.</div>`;
         }
 
         const cardsHtml = cycle.selected.map(f => {
@@ -697,9 +705,10 @@
             const sideTxt = f.side === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
             const sideColor = f.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
             let tierCls = 'tier-medium';
-            let tierTxt = 'Слабый';
+            let tierTxt = '⊙ ОБЫЧНЫЙ';
             if (f.tier === 'PREMIUM')      { tierCls = 'tier-premium'; tierTxt = '★ ПРЕМИУМ'; }
             else if (f.tier === 'STRONG')  { tierCls = 'tier-strong';  tierTxt = '⚡ СИЛЬНЫЙ'; }
+            else if (f.tier === 'MEDIUM')  { tierCls = 'tier-medium';  tierTxt = '⊙ ОБЫЧНЫЙ'; }
             const result5 = f.result_5h
                 ? (f.result_5h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
                 : '';
