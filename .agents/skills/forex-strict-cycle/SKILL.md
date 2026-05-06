@@ -159,7 +159,58 @@ The same applies to GitHub Actions: free-tier models access is
 per-account, not per-Devin-org.  As long as the repo lives in an
 account that has GitHub Models enabled, the workflows will work.
 
-## 9. Useful one-liners
+## 9. Telegram Mini App
+
+The dashboard can be opened **inside Telegram** (no browser switch) via
+a Mini App.  Three pieces make this work:
+
+- `GET /tg` in `app/main.py` — same dashboard as `/`, but with the
+  Telegram Web App SDK (`telegram-web-app.js`) and Telegram theme
+  variables wired up.  Degrades gracefully in a normal browser.
+- `scripts/telegram_bot.py` — tiny stdlib + `requests` long-poll bot.
+  On `/start` it replies with one inline `web_app` button labelled
+  "Открыть FOREX 28" pointing at the public `/tg` URL.  Reads
+  `TELEGRAM_BOT_TOKEN` and `DASHBOARD_URL` from env.  No heavy deps —
+  do **not** add `python-telegram-bot`.
+- `.github/workflows/telegram_bot_keepalive.yml` — runs the bot for ~5
+  minutes every 30 minutes (cron + `workflow_dispatch`) on the free
+  tier.  Skips silently if `TELEGRAM_BOT_TOKEN` is unset.
+
+### Setup checklist (one-time)
+
+1. **BotFather → /newbot** → save the token as repo secret
+   `TELEGRAM_BOT_TOKEN`.
+2. Deploy the dashboard to a stable HTTPS URL (e.g. `deploy backend`
+   to Fly.io, or any free host).  Add the **base** URL (no `/tg`) as
+   repo secret `DASHBOARD_URL`.
+3. **BotFather → /setmenubutton** → choose the bot → enter button text
+   ("FOREX 28") and the URL `<DASHBOARD_URL>/tg`.  Telegram will then
+   render a persistent Mini App button next to the chat input.
+4. Optional: **/setdomain** the public origin so Telegram trusts
+   `web_app` buttons from arbitrary chats.
+5. Trigger the workflow once via the **Actions → Telegram bot
+   keepalive → Run workflow** button to verify everything works, then
+   let cron take over.
+
+### Local manual test
+
+```bash
+TELEGRAM_BOT_TOKEN=... DASHBOARD_URL=https://example.com \
+RUN_SECONDS=60 python scripts/telegram_bot.py
+```
+
+Then DM the bot `/start` — you should receive an inline button that
+opens the dashboard inside Telegram.
+
+### Constraints / forbidden edits
+
+- `/tg` must stay a thin wrapper over `static/index.html` — never fork
+  the page or duplicate the UI.
+- Do not add heavy Telegram libraries; keep `scripts/telegram_bot.py`
+  on the standard library + `requests` only.
+- Do not change the `/` route's behaviour for non-Telegram clients.
+
+## 10. Useful one-liners
 
 ```bash
 # Latest cycle WR
