@@ -1,0 +1,98 @@
+name: 5-hour adaptive cycle
+
+# Runs every 5 hours: per-pair param sweep + adaptive strategy + Telegram report.
+# Telegram delivery requires repo secrets:
+#   TELEGRAM_BOT_TOKEN  — bot API token
+#   TELEGRAM_CHAT_ID    — destination chat id
+on:
+  schedule:
+    # 00:05 UTC, 05:05 UTC, 10:05 UTC, 15:05 UTC, 20:05 UTC.
+    - cron: "5 0,5,10,15,20 * * *"
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - "devin/**"
+    paths:
+      - "scripts/cycle_5h.py"
+      - ".github/workflows/cycle_5h.yml"
+
+permissions:
+  contents: write    # so the job can commit `state/` snapshots
+  pull-requests: write
+
+jobs:
+  cycle:
+    name: 5h adaptive cycle on 28 pairs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -q --upgrade pip
+          pip install -q numpy pandas yfinance lightgbm scikit-learn
+
+      - name: Run 5h adaptive cycle
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/cycle_5h.py 2>&1 | tee cycle_log.txt
+
+      - name: Append report to job summary
+        if: always()
+        run: |
+          if [ -f reports/cycle_5h_latest.md ]; then
+            cat reports/cycle_5h_latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cycle-5h-report
+          path: |
+            reports/cycle_5h_latest.md
+            state/cycle_*.json
+            state/baseline_7d.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Commit state back to repo
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/ reports/cycle_5h_latest.md || true
+          if git diff --cached --quiet; then
+            echo "no state changes to commit"
+          else
+            git commit -m "chore(cycle): 5h cycle snapshot $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "push failed (non-fatal)"
+          fi
+
+      - name: Comment report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const body = fs.readFileSync('reports/cycle_5h_latest.md', 'utf8');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            } catch (e) {
+              console.log('No report file to post:', e.message);
+            }

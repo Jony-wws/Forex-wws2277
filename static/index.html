@@ -622,6 +622,10 @@
             renderSignalsTable(lastSignals);
         }
     }
+    if (window.__INITIAL_OB__ && Object.keys(window.__INITIAL_OB__).length > 0) {
+        lastOB = window.__INITIAL_OB__;
+        renderOrderbooks(lastOB);
+    }
     if (window.__INITIAL_CYCLE__) {
         lastCycle = window.__INITIAL_CYCLE__;
         renderCycle(lastCycle);
