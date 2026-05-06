@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - "scripts/backtest_eurusd.py"
+      - "scripts/backtest_eurusd_mr.py"
       - "tradingview/**.pine"
       - "app/analyzer.py"
       - "app/indicators.py"
@@ -39,34 +40,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance pandas numpy
 
-      - name: Run EUR/USD backtest
-        id: backtest
-        run: |
-          python scripts/backtest_eurusd.py
-          echo "report_path=reports/eurusd_backtest_latest.md" >> "$GITHUB_OUTPUT"
+      - name: Run trend-system backtest (★ ПРЕМИУМ / СТРОГИЙ, 5h binary)
+        run: python scripts/backtest_eurusd.py
 
-      - name: Upload report artifact
+      - name: Run mean-reversion backtest (BB+RSI extreme, 1-2h binary)
+        run: python scripts/backtest_eurusd_mr.py
+
+      - name: Upload reports artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eurusd-backtest-report
-          path: reports/eurusd_backtest_latest.md
+          name: eurusd-backtest-reports
+          path: reports/*.md
           if-no-files-found: error
 
-      - name: Append report to job summary
-        # GITHUB_STEP_SUMMARY is always writable — appears on the run page.
-        run: cat reports/eurusd_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Append both reports to job summary
+        run: |
+          echo "## Trend system" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/eurusd_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Mean-reversion strategy" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/eurusd_mr_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Comment report on PR (when run on a PR)
-        # Only runs when a PR for the head branch already exists. We have
-        # `pull-requests: write` so this works without elevating contents
-        # permissions to write.
+      - name: Comment both reports on PR (when run on a PR push)
         if: github.event_name == 'push'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const body = fs.readFileSync('reports/eurusd_backtest_latest.md', 'utf8');
+            const trend = fs.readFileSync('reports/eurusd_backtest_latest.md', 'utf8');
+            const mr    = fs.readFileSync('reports/eurusd_mr_backtest_latest.md', 'utf8');
+            const body  = '## Trend system\n\n' + trend + '\n\n---\n\n## Mean-reversion strategy\n\n' + mr +
+                          '\n\n_Posted automatically by the backtest workflow._';
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo:  context.repo.repo,
@@ -78,6 +83,6 @@ jobs:
                 owner: context.repo.owner,
                 repo:  context.repo.repo,
                 issue_number: pr.number,
-                body: body + '\n\n_Posted automatically by the backtest workflow._',
+                body,
               });
             }
