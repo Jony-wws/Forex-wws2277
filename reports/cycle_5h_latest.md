@@ -1,12 +1,12 @@
-# 5-hour adaptive cycle — 2026-05-06 14:07 UTC
+# 5-hour adaptive cycle — 2026-05-06 19:13 UTC+5
 
-**🎯 5h cycle 2026-05-06 14:07 UTC**
+**🎯 5h cycle 2026-05-06 19:13 UTC+5**
 
 
 **📈 ТОП-3 на следующие 5 часов:**
-1. **CADJPY** SELL  WR **49.92%** · trades 3582 · last 5h: -13.8 pp
-2. **GBPCAD** BUY  WR **50.44%** · trades 1138 · last 5h: +12.1 pp
-3. **GBPJPY** SELL  WR **48.67%** · trades 415 · last 5h: -13.7 pp
+1. **AUDNZD** SELL  WR **70.95%** · trades 475 · last 5h: -16.1 pp
+2. **AUDCHF** SELL  WR **59.62%** · trades 899 · last 5h: -14.9 pp
+3. **EURAUD** SELL  WR **56.02%** · trades 548 · last 5h: +24.6 pp
 
 **⚙ Индикаторы за этот цикл:**
   trend (ADX/MTF): 57%
