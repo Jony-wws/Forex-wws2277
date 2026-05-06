@@ -50,7 +50,16 @@ import numpy as np
 import pandas as pd
 
 
-PAIR = "EURUSD=X"
+PAIR = "EURUSD=X"  # legacy single-pair label used by the sweep cache key
+
+# Multi-pair configuration. JPY pairs need a different pip multiplier.
+# (yfinance symbol, display label, pip_multiplier)
+PAIRS: list[tuple[str, str, float]] = [
+    ("EURUSD=X", "EUR/USD", 10000.0),
+    ("GBPUSD=X", "GBP/USD", 10000.0),
+    ("AUDUSD=X", "AUD/USD", 10000.0),
+    ("USDJPY=X", "USD/JPY", 100.0),
+]
 
 
 # ── INDICATORS ─────────────────────────────────────────────────────────
@@ -97,14 +106,15 @@ def atr_only(df: pd.DataFrame, period: int = 14) -> pd.Series:
 
 
 # ── DATA ───────────────────────────────────────────────────────────────
-def fetch_eurusd_m15() -> pd.DataFrame:
+def fetch_pair_m15(symbol: str) -> pd.DataFrame:
+    """Fetch the last 60 days of M15 candles from Yahoo for a single FX symbol."""
     import yfinance as yf
     df = yf.download(
-        PAIR, period="60d", interval="15m",
+        symbol, period="60d", interval="15m",
         progress=False, auto_adjust=False, threads=False,
     )
     if df.empty:
-        raise RuntimeError("yfinance returned empty M15")
+        raise RuntimeError(f"yfinance returned empty M15 for {symbol}")
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
     df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
@@ -113,6 +123,10 @@ def fetch_eurusd_m15() -> pd.DataFrame:
     else:
         df.index = df.index.tz_convert("UTC")
     return df
+
+
+# Backwards-compat alias used by the original single-pair script.
+fetch_eurusd_m15 = lambda: fetch_pair_m15("EURUSD=X")
 
 
 # ── STRATEGY ───────────────────────────────────────────────────────────
@@ -129,6 +143,7 @@ class Params:
     horizon_bars: int = 4          # 4 × M15 = 1h binary
     cooldown_bars: int = 4
     payout: float = 0.80           # binary 80% payout
+    pip_mult: float = 10000.0      # 10 000 for non-JPY pairs, 100 for JPY pairs
 
     # Setup logic kind:
     #   "and"      — RSI extreme AND price beyond BB band  (very strict, fewer trades, higher WR)
@@ -226,7 +241,7 @@ def run_backtest(df: pd.DataFrame, p: Params) -> dict:
         entry_close = closes[i]
         exit_idx = i + p.horizon_bars
         exit_close = closes[exit_idx]
-        pip_move = (exit_close - entry_close) * 10000.0  # EUR/USD pip
+        pip_move = (exit_close - entry_close) * p.pip_mult  # EUR/USD pip
         if side == "BUY":
             won = exit_close > entry_close
         else:
@@ -355,7 +370,7 @@ def _evaluate_with_setup(df: pd.DataFrame, p: Params, setup) -> dict:
         side = "BUY" if is_buy_setup[i] else "SELL"
         entry_close = float(closes[i])
         exit_close = float(closes[i + p.horizon_bars])
-        pip_move = (exit_close - entry_close) * 10000.0
+        pip_move = (exit_close - entry_close) * p.pip_mult
         if side == "BUY":
             won = exit_close > entry_close
         else:
@@ -395,6 +410,76 @@ def _evaluate_with_setup(df: pd.DataFrame, p: Params, setup) -> dict:
         "first_ts": str(trades[0][0]),
         "last_ts": str(trades[-1][0]),
         "trades": trades,
+    }
+
+
+# ── MULTI-PAIR ─────────────────────────────────────────────────────────
+def sweep_for_pair(df: pd.DataFrame, pip_mult: float) -> list[dict]:
+    """Run the same parameter sweep but baked with the pair's pip multiplier."""
+    out = []
+    cache: dict[tuple, tuple] = {}
+    setups = ("and", "rsi_only", "bb_only")
+    for setup_kind in setups:
+        for rsi_os in (22, 25, 28, 30, 32, 35):
+            for bb_std in (1.6, 1.8, 2.0, 2.2, 2.5):
+                for adx_max in (22, 25, 28, 32, 36):
+                    for horizon in (2, 3, 4, 6, 8):
+                        for cooldown in (1, 2, 4):
+                            p = Params(
+                                rsi_os=float(rsi_os),
+                                rsi_ob=float(100 - rsi_os),
+                                bb_std=float(bb_std),
+                                adx_max=float(adx_max),
+                                horizon_bars=int(horizon),
+                                cooldown_bars=int(cooldown),
+                                setup_kind=setup_kind,
+                                pip_mult=pip_mult,
+                            )
+                            key = (setup_kind, p.rsi_os, p.bb_std, p.adx_max)
+                            if key not in cache:
+                                cache[key] = evaluate_setup(df, p)
+                            out.append(_evaluate_with_setup(df, p, cache[key]))
+
+    def score(r):
+        meets = (
+            r["wr"] >= TARGET_WR
+            and r["pnl"] > 0
+        )
+        return (1 if meets else 0, r["pnl"], r["wr"], r["n_trades"])
+
+    out.sort(key=score, reverse=True)
+    return out
+
+
+def aggregate_per_pair_bests(per_pair: list[dict]) -> dict:
+    """Combine the best-per-pair backtests into one merged trade list."""
+    all_trades = []
+    for entry in per_pair:
+        best = entry["best"]
+        label = entry["label"]
+        for t in best["trades"]:
+            ts, side, ec, xc, won, pp = t
+            all_trades.append((ts, label, side, ec, xc, won, pp))
+    all_trades.sort(key=lambda x: x[0])
+
+    n = len(all_trades)
+    if n == 0:
+        return {"n_trades": 0, "wr": 0.0, "pnl": 0.0,
+                "trades_per_day": 0.0, "first_ts": None, "last_ts": None,
+                "trades": []}
+    wins = sum(1 for t in all_trades if t[5])
+    losses = n - wins
+    wr = wins / n * 100.0
+    pnl = wins * 0.80 + losses * (-1.0)
+    span_days = max(1.0, (all_trades[-1][0] - all_trades[0][0]).total_seconds() / 86400.0)
+    return {
+        "n_trades": n,
+        "wr": wr,
+        "pnl": pnl,
+        "trades_per_day": n / span_days,
+        "first_ts": str(all_trades[0][0]),
+        "last_ts": str(all_trades[-1][0]),
+        "trades": all_trades,
     }
 
 
@@ -487,19 +572,84 @@ def render_report(top: list[dict], best: dict, info: dict) -> str:
     return "\n".join(lines)
 
 
+def render_multi_report(per_pair: list[dict], combined: dict, as_of: str) -> str:
+    """Multi-pair report: best params per pair + aggregated WR / trades / PnL."""
+    lines = []
+    lines.append(f"# Multi-pair MR backtest — {as_of}")
+    lines.append("")
+    lines.append(f"**Pairs:** {', '.join(e['label'] for e in per_pair)}")
+    lines.append(f"**Strategy:** RSI / BB extreme + bounce, range-market only (ADX cap),")
+    lines.append("              binary 80% payout, M15 candles, 60 days Yahoo Finance.")
+    lines.append("")
+    lines.append("## Per-pair best (sweep ran independently on each symbol)")
+    lines.append("")
+    lines.append("| Pair | Setup | Trades | WR | PnL | T/day | RSI os | BB std | ADX max | Horiz |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for entry in per_pair:
+        b = entry["best"]
+        p = b["params"]
+        lines.append(
+            f"| {entry['label']} | {p.setup_kind} | {b['n_trades']} | "
+            f"{b['wr']:.2f} % | {b['pnl']:+.2f} | {b['trades_per_day']:.2f} | "
+            f"{p.rsi_os:.0f} | {p.bb_std:.1f} | {p.adx_max:.0f} | {p.horizon_bars} |"
+        )
+    lines.append("")
+    lines.append("## Combined (all four pairs, signals from each pair's best params)")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("|---|---:|")
+    lines.append(f"| Total trades | **{combined['n_trades']}** |")
+    lines.append(f"| Combined WR | **{combined['wr']:.2f} %** |")
+    lines.append(f"| Combined PnL (80% payout) | **{combined['pnl']:+.2f}** |")
+    lines.append(f"| Trades / day | **{combined['trades_per_day']:.2f}** |")
+    lines.append(f"| First trade | {combined['first_ts']} |")
+    lines.append(f"| Last trade  | {combined['last_ts']} |")
+    lines.append("")
+    lines.append("## Target check (multi-pair)")
+    lines.append("")
+    lines.append(f"- WR ≥ {TARGET_WR:.0f} %  …  {'✓' if combined['wr'] >= TARGET_WR else '✗'}  ({combined['wr']:.2f} %)")
+    lines.append(f"- Trades ≥ {TARGET_TOTAL_TRADES}  …  {'✓' if combined['n_trades'] >= TARGET_TOTAL_TRADES else '✗'}  ({combined['n_trades']})")
+    lines.append(f"- Trades / day ≥ {TARGET_TRADES_PER_DAY:.0f}  …  {'✓' if combined['trades_per_day'] >= TARGET_TRADES_PER_DAY else '✗'}  ({combined['trades_per_day']:.2f})")
+    lines.append(f"- PnL > 0  …  {'✓' if combined['pnl'] > 0 else '✗'}  ({combined['pnl']:+.2f})")
+    lines.append("")
+    lines.append("**Note on PnL model:** binary 80 % payout — win = +0.80, loss = −1.00. Breakeven WR is 55.56 %.")
+    lines.append("Generated by `scripts/backtest_eurusd_mr.py` — Yahoo Finance data, 60-day M15 window per pair.")
+    return "\n".join(lines)
+
+
 def main() -> int:
-    print("[mr-backtest] downloading EUR/USD M15 (60 days) …", flush=True)
-    df = fetch_eurusd_m15()
-    print(f"[mr-backtest] bars: {len(df)}", flush=True)
-    results = sweep(df)
-    best = results[0]
-    info = {
-        "as_of": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "start": str(df.index[0]),
-        "end": str(df.index[-1]),
-        "bars": len(df),
-    }
-    report = render_report(results, best, info)
+    per_pair: list[dict] = []
+    for symbol, label, pip_mult in PAIRS:
+        print(f"[mr-backtest] {label} ({symbol}) — downloading M15 …", flush=True)
+        try:
+            df = fetch_pair_m15(symbol)
+        except Exception as exc:  # pragma: no cover
+            print(f"[mr-backtest] {label}: FAILED — {exc}", flush=True)
+            continue
+        print(f"[mr-backtest] {label}: {len(df)} bars; sweeping …", flush=True)
+        results = sweep_for_pair(df, pip_mult)
+        best = results[0]
+        per_pair.append({
+            "symbol": symbol,
+            "label": label,
+            "pip_mult": pip_mult,
+            "bars": len(df),
+            "best": best,
+        })
+        print(
+            f"[mr-backtest] {label}: best WR={best['wr']:.2f}% "
+            f"trades={best['n_trades']} pnl={best['pnl']:+.2f}",
+            flush=True,
+        )
+
+    if not per_pair:
+        print("[mr-backtest] no pair data — aborting", flush=True)
+        return 2
+
+    combined = aggregate_per_pair_bests(per_pair)
+    as_of = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    report = render_multi_report(per_pair, combined, as_of)
+
     os.makedirs("reports", exist_ok=True)
     out_path = "reports/eurusd_mr_backtest_latest.md"
     with open(out_path, "w") as f:
