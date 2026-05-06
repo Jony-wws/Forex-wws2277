@@ -76,7 +76,15 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state/ reports/cycle_5h_latest.md || true
+          # state/ is in .gitignore, but the cycle history files are
+          # intentional repo state — force-add them explicitly so they
+          # survive across CI runs and feed walk-forward / 24h aging.
+          git add -f \
+            state/cycle_latest.json \
+            state/baseline_7d.json \
+            state/strategy_memory.json \
+            state/cycle_*.json 2>/dev/null || true
+          git add reports/cycle_5h_latest.md || true
           if git diff --cached --quiet; then
             echo "no state changes to commit"
           else
