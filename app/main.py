@@ -79,6 +79,11 @@ def _build_entry(pair: str) -> dict | None:
         entry["score"] = analysis["score"]
         entry["max_score"] = analysis.get("max_score", 0)
         entry["multi_tf_aligned"] = bool(analysis.get("multi_tf_aligned"))
+        entry["adx_h1"] = analysis.get("adx_h1", 0.0)
+        entry["adx_h4"] = analysis.get("adx_h4", 0.0)
+        entry["trend_persistence_5h"] = analysis.get("trend_persistence_5h", 0.0)
+        entry["trend_persistence_bars"] = analysis.get("trend_persistence_bars", 0)
+        entry["is_strong_trend"] = bool(analysis.get("is_strong_trend"))
         entry["details"] = analysis["details"]
         entry["indicators"] = analysis["indicators"]
         entry["forecast_5h"] = analysis["forecast_5h"]
@@ -91,6 +96,11 @@ def _build_entry(pair: str) -> dict | None:
         entry["score"] = 0
         entry["max_score"] = 0
         entry["multi_tf_aligned"] = False
+        entry["adx_h1"] = 0.0
+        entry["adx_h4"] = 0.0
+        entry["trend_persistence_5h"] = 0.0
+        entry["trend_persistence_bars"] = 0
+        entry["is_strong_trend"] = False
         entry["details"] = []
         entry["indicators"] = {}
         entry["forecast_5h"] = None

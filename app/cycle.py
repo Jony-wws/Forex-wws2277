@@ -2,13 +2,27 @@
 
 Every 5 hours (UTC boundaries 00, 05, 10, 15, 20) the system:
 
-1. Picks the top 5 strongest signals from all 28 pairs (always exactly 5,
-   even when the market is weak).
+1. Picks the **strong sustained trends** from all 28 pairs.  A pair must
+   pass the hard `is_strong_trend` gate from ``analyzer.py`` to qualify:
+
+       confidence ≥ 88
+       score / max_score ≥ 0.55
+       all 4 senior timeframes aligned (D1 + H4 + H1 + M15)
+       ADX H1 ≥ 25 AND ADX H4 ≥ 20
+       trend_persistence_5h ≥ 80 % (≥ 4 of 5 H1 bars in direction)
+
+   At least 3 such picks are needed to publish a "normal" cycle
+   (``MIN_PICKS = 3``); the cap is 5 (``MAX_PICKS = 5``).  When fewer
+   than 3 pairs qualify the cycle still publishes the best available
+   candidates but flips ``weak_market = True`` so the UI can warn the
+   user that no clear 5-hour trends exist this round.
+
 2. Records each forecast with the entry price and a quality tier:
-   - **PREMIUM** when ``confidence >= 80%`` AND ``score / max_score >= 0.40``
-     AND all four senior timeframes (M15+H1+H4+D1) are aligned in the same
-     direction.
-   - **MEDIUM** otherwise — still in the top-5 but flagged as weaker.
+   - **PREMIUM** — ``is_strong_trend`` AND ADX H1 ≥ 28 AND persistence = 100 %
+   - **STRONG**  — ``is_strong_trend`` (passes the hard gate)
+   - **MEDIUM**  — fallback only used when fewer than 3 STRONG candidates
+     exist (weak market).
+
 3. Evaluates earlier cycles (5h-ago for the 5h forecast, 24h-ago for the
    24h forecast) against the current price.
 4. Tracks a rolling winrate over the last 10 cycles for both horizons.
@@ -39,10 +53,23 @@ from .prices import get_current_price
 log = logging.getLogger("cycle")
 
 CYCLE_HOURS = 5
-TOP_N = 5
+MIN_PICKS = 3                  # always try to publish at least 3 strong picks
+MAX_PICKS = 5                  # never publish more than 5
 WIN_MOVE_PCT = 0.10            # binary-options win threshold (in %)
-PREMIUM_RATIO = 0.40           # score / max_score for premium tier
-PREMIUM_CONFIDENCE = 80
+
+# Hard gate for the STRONG tier (matches analyzer.is_strong_trend) — the
+# strict 5-hour cycle promotes a forecast only when every one of these
+# holds simultaneously.
+STRONG_CONFIDENCE = 88
+STRONG_RATIO = 0.55
+STRONG_ADX_H1 = 25.0
+STRONG_ADX_H4 = 20.0
+STRONG_PERSISTENCE = 80.0
+
+# PREMIUM is a strict subset of STRONG with even tighter ADX/persistence.
+PREMIUM_ADX_H1 = 28.0
+PREMIUM_PERSISTENCE = 100.0
+
 HISTORY_KEEP_CYCLES = 60       # keep up to 60 finished cycles (~12.5 days)
 WINRATE_WINDOW_CYCLES = 10     # winrate is computed over the last N cycles
 
@@ -78,19 +105,45 @@ def _parse_iso(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
 
-def _classify_tier(forecast: dict) -> str:
-    confidence = int(forecast.get("confidence") or 0)
-    score = abs(int(forecast.get("score") or 0))
-    max_score = max(1, int(forecast.get("max_score") or 1))
-    ratio = score / max_score
-    aligned = bool(forecast.get("multi_tf_aligned"))
-    if (
-        confidence >= PREMIUM_CONFIDENCE
-        and ratio >= PREMIUM_RATIO
+def _passes_strong_gate(f: dict) -> bool:
+    """Return True iff the forecast passes the hard "strong sustained trend" gate."""
+    if f.get("side") not in ("BUY", "SELL"):
+        return False
+    # Trust the analyzer flag when present — it already encodes the same
+    # five conditions — but recompute defensively from raw fields so older
+    # snapshots stored before the gate existed don't accidentally pass.
+    confidence = int(f.get("confidence") or 0)
+    score_abs = abs(int(f.get("score") or 0))
+    max_score = max(1, int(f.get("max_score") or 1))
+    ratio = score_abs / max_score
+    aligned = bool(f.get("multi_tf_aligned"))
+    adx_h1 = float(f.get("adx_h1") or f.get("adx") or 0.0)
+    adx_h4 = float(f.get("adx_h4") or 0.0)
+    persistence = float(f.get("trend_persistence_5h") or 0.0)
+    return (
+        confidence >= STRONG_CONFIDENCE
+        and ratio >= STRONG_RATIO
         and aligned
-    ):
+        and adx_h1 >= STRONG_ADX_H1
+        and adx_h4 >= STRONG_ADX_H4
+        and persistence >= STRONG_PERSISTENCE
+    )
+
+
+def _classify_tier(forecast: dict) -> str:
+    """PREMIUM > STRONG > MEDIUM.
+
+    PREMIUM is reserved for forecasts that not only pass the strong gate
+    but also have a very strong H1 trend (ADX ≥ 28) and *every* one of
+    the last five H1 bars in the predicted direction.
+    """
+    if not _passes_strong_gate(forecast):
+        return "MEDIUM"
+    adx_h1 = float(forecast.get("adx_h1") or forecast.get("adx") or 0.0)
+    persistence = float(forecast.get("trend_persistence_5h") or 0.0)
+    if adx_h1 >= PREMIUM_ADX_H1 and persistence >= PREMIUM_PERSISTENCE:
         return "PREMIUM"
-    return "MEDIUM"
+    return "STRONG"
 
 
 def _eligible(forecast: dict) -> bool:
@@ -98,14 +151,56 @@ def _eligible(forecast: dict) -> bool:
     return forecast.get("side") in ("BUY", "SELL")
 
 
-def _select_top5(forecasts_by_pair: dict[str, dict]) -> list[dict]:
-    """Pick the top 5 forecasts by ``|score|`` then by confidence."""
-    candidates = [f for f in forecasts_by_pair.values() if _eligible(f)]
-    candidates.sort(
-        key=lambda f: (abs(int(f.get("score") or 0)), int(f.get("confidence") or 0)),
-        reverse=True,
+def _quality_score(f: dict) -> tuple:
+    """Sort key — higher is better.
+
+    Order of precedence:
+      1. Passes the strong sustained-trend gate (hard yes/no).
+      2. Trend persistence over last 5 H1 bars (more bars = better).
+      3. ADX H1 (stronger trend = better).
+      4. ADX H4 (confirmation on the higher timeframe).
+      5. |score| (raw indicator agreement).
+      6. confidence.
+    """
+    return (
+        1 if _passes_strong_gate(f) else 0,
+        float(f.get("trend_persistence_5h") or 0.0),
+        float(f.get("adx_h1") or f.get("adx") or 0.0),
+        float(f.get("adx_h4") or 0.0),
+        abs(int(f.get("score") or 0)),
+        int(f.get("confidence") or 0),
     )
-    return candidates[:TOP_N]
+
+
+def _select_strict(
+    forecasts_by_pair: dict[str, dict],
+) -> tuple[list[dict], bool]:
+    """Pick up to ``MAX_PICKS`` forecasts, preferring strong sustained trends.
+
+    Returns ``(selected, weak_market)`` — ``weak_market`` is True when
+    fewer than ``MIN_PICKS`` candidates pass the strong gate, signalling
+    the UI to warn that no clear 5-hour trends exist this cycle.
+    """
+    candidates = [f for f in forecasts_by_pair.values() if _eligible(f)]
+    candidates.sort(key=_quality_score, reverse=True)
+
+    strong = [f for f in candidates if _passes_strong_gate(f)]
+    weak_market = len(strong) < MIN_PICKS
+
+    if not weak_market:
+        # Plenty of strong trends — publish up to MAX_PICKS of them.
+        return strong[:MAX_PICKS], False
+
+    # Not enough strong trends — pad with the next best candidates so the
+    # cycle is never empty, but mark weak_market so the UI can warn.
+    selected = list(strong)
+    for f in candidates:
+        if f in selected:
+            continue
+        if len(selected) >= MIN_PICKS:
+            break
+        selected.append(f)
+    return selected, True
 
 
 # ---------- persistence -----------------------------------------------------
@@ -265,10 +360,10 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                 changed = True
 
             # Build the new cycle from the current snapshot
-            top5 = _select_top5(forecasts_by_pair)
+            top, weak_market = _select_strict(forecasts_by_pair)
             session = detect_session(active_start)
             selected: list[dict] = []
-            for f in top5:
+            for f in top:
                 price = f.get("price") or get_current_price(f["pair"])
                 if price is None:
                     continue
@@ -283,6 +378,15 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                     "strength": f.get("strength"),
                     "session": session,
                     "tier": tier,
+                    "adx_h1": float(f.get("adx_h1") or f.get("adx") or 0.0),
+                    "adx_h4": float(f.get("adx_h4") or 0.0),
+                    "trend_persistence_5h": float(
+                        f.get("trend_persistence_5h") or 0.0
+                    ),
+                    "trend_persistence_bars": int(
+                        f.get("trend_persistence_bars") or 0
+                    ),
+                    "multi_tf_aligned": bool(f.get("multi_tf_aligned")),
                     "entry_price": round(float(price), 5),
                     "forecast_5h": f.get("forecast_5h"),
                     "forecast_24h": f.get("forecast_24h"),
@@ -294,6 +398,10 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
                 "cycle_start_utc": active_iso,
                 "next_cycle_utc": _iso(active_start + timedelta(hours=CYCLE_HOURS)),
                 "selected": selected,
+                "weak_market": weak_market,
+                "strong_count": sum(
+                    1 for s in selected if s["tier"] in ("PREMIUM", "STRONG")
+                ),
             }
             _STATE["current"] = current
             _STATE["history"] = history
@@ -311,6 +419,13 @@ def snapshot(now: datetime | None = None) -> dict:
         current = _STATE.get("current")
         history = list(_STATE.get("history", []))
 
+    strong_gate = {
+        "confidence": STRONG_CONFIDENCE,
+        "ratio": STRONG_RATIO,
+        "adx_h1": STRONG_ADX_H1,
+        "adx_h4": STRONG_ADX_H4,
+        "persistence_5h": STRONG_PERSISTENCE,
+    }
     if current is None:
         next_start = _next_cycle_start(now)
         return {
@@ -320,6 +435,10 @@ def snapshot(now: datetime | None = None) -> dict:
             "winrate_5h": _winrate_over([], "5h"),
             "winrate_24h": _winrate_over([], "24h"),
             "history_cycles": 0,
+            "win_threshold_pct": WIN_MOVE_PCT,
+            "min_picks": MIN_PICKS,
+            "max_picks": MAX_PICKS,
+            "strong_gate": strong_gate,
         }
 
     next_start = _parse_iso(current["next_cycle_utc"])
@@ -333,4 +452,7 @@ def snapshot(now: datetime | None = None) -> dict:
         "winrate_24h": _winrate_over(history, "24h"),
         "history_cycles": len(history),
         "win_threshold_pct": WIN_MOVE_PCT,
+        "min_picks": MIN_PICKS,
+        "max_picks": MAX_PICKS,
+        "strong_gate": strong_gate,
     }

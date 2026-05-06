@@ -270,6 +270,10 @@
             background: rgba(255,193,7,0.16); color: #ffc107;
             border: 1px solid rgba(255,193,7,0.35);
         }
+        .tier-strong {
+            background: rgba(0,230,118,0.14); color: var(--buy);
+            border: 1px solid rgba(0,230,118,0.35);
+        }
         .tier-medium {
             background: rgba(84,110,122,0.16); color: var(--text-dim);
             border: 1px solid rgba(84,110,122,0.3);
@@ -279,6 +283,22 @@
         .cycle-empty {
             color: var(--text-dim); font-size: 12px; padding: 14px 0;
             text-align: center;
+        }
+        .cycle-warn {
+            background: rgba(255,82,82,0.06);
+            border: 1px solid rgba(255,82,82,0.25);
+            color: var(--sell); font-size: 12px;
+            padding: 8px 12px; border-radius: 6px;
+            margin-bottom: 8px; line-height: 1.4;
+        }
+        .trend-bar {
+            display: inline-block; vertical-align: middle;
+            width: 38px; height: 4px; background: rgba(84,110,122,0.25);
+            border-radius: 2px; overflow: hidden; margin-right: 6px;
+        }
+        .trend-bar > span {
+            display: block; height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--buy));
         }
         .res-win  { color: var(--buy);  font-weight: 700; }
         .res-loss { color: var(--sell); font-weight: 700; }
@@ -311,11 +331,11 @@
         </div>
     </div>
 
-    <!-- Strict 5h cycle: top-5 forecasts + countdown + winrate -->
+    <!-- Strict 5h cycle: only strong sustained trends + countdown + winrate -->
     <div class="cycle-block" id="cycle-block">
         <div class="cycle-head">
             <div>
-                <span class="cycle-title">ТОП-5 СЕЙЧАС<span class="sub">— строгий 5-часовой цикл</span></span>
+                <span class="cycle-title">САМЫЕ СИЛЬНЫЕ ТРЕНДЫ<span class="sub">— строгий 5-часовой цикл (мин. 3, макс. 5)</span></span>
             </div>
             <div class="cycle-countdown" id="cycle-countdown">--:--:--</div>
             <div class="cycle-winrate" id="cycle-winrate">Нет истории</div>
@@ -664,14 +684,22 @@
             return;
         }
 
-        cards.innerHTML = cycle.selected.map(f => {
+        let warnHtml = '';
+        if (cycle.weak_market) {
+            const sc = cycle.strong_count || 0;
+            warnHtml = `<div class="cycle-warn">⚠ Слабый рынок: только ${sc} пар${sc === 1 ? 'а' : ''} прошл${sc === 1 ? 'а' : 'и'} строгий фильтр (нужно минимум 3). Показанные пары имеют низкую уверенность — лучше пропустить этот цикл.</div>`;
+        }
+
+        const cardsHtml = cycle.selected.map(f => {
             const isJpy = (f.pair || '').includes('JPY');
             const fmtP = (p) => p == null ? '—' : (isJpy ? Number(p).toFixed(3) : Number(p).toFixed(5));
             const sideCls = f.side === 'BUY' ? 'buy' : 'sell';
             const sideTxt = f.side === 'BUY' ? '▲ ПОКУПКА' : '▼ ПРОДАЖА';
             const sideColor = f.side === 'BUY' ? 'var(--buy)' : 'var(--sell)';
-            const tierCls = f.tier === 'PREMIUM' ? 'tier-premium' : 'tier-medium';
-            const tierTxt = f.tier === 'PREMIUM' ? 'ПРЕМИУМ' : 'Средний';
+            let tierCls = 'tier-medium';
+            let tierTxt = 'Слабый';
+            if (f.tier === 'PREMIUM')      { tierCls = 'tier-premium'; tierTxt = '★ ПРЕМИУМ'; }
+            else if (f.tier === 'STRONG')  { tierCls = 'tier-strong';  tierTxt = '⚡ СИЛЬНЫЙ'; }
             const result5 = f.result_5h
                 ? (f.result_5h === 'win' ? '<span class="res-win">+</span>' : '<span class="res-loss">−</span>')
                 : '';
@@ -684,6 +712,11 @@
             const move24 = f.move_pct_24h != null
                 ? ` (${f.move_pct_24h >= 0 ? '+' : ''}${Number(f.move_pct_24h).toFixed(2)}%)`
                 : '';
+            const persistence = Number(f.trend_persistence_5h || 0);
+            const persistBars = Number(f.trend_persistence_bars || 0);
+            const adxH1 = Number(f.adx_h1 || 0);
+            const adxH4 = Number(f.adx_h4 || 0);
+            const mtf = f.multi_tf_aligned ? '4/4' : '<4/4';
             return `<div class="cycle-card ${sideCls}">
                 <div class="cycle-card-row">
                     <div>
@@ -701,11 +734,24 @@
                     <span class="price-cell" style="font-size:12px">${fmtP(f.entry_price)}</span>
                 </div>
                 <div class="cycle-card-row">
+                    <span class="cycle-meta">Тренд 5ч</span>
+                    <span style="font-size:11px">
+                        <span class="trend-bar"><span style="width:${Math.min(100, persistence).toFixed(0)}%"></span></span>
+                        ${persistBars}/5 баров (${persistence.toFixed(0)}%)
+                    </span>
+                </div>
+                <div class="cycle-card-row">
+                    <span class="cycle-meta">ADX H1/H4 · TF</span>
+                    <span style="font-size:11px">${adxH1.toFixed(0)} / ${adxH4.toFixed(0)} · ${mtf}</span>
+                </div>
+                <div class="cycle-card-row">
                     <span class="cycle-meta">5ч / 24ч</span>
                     <span style="font-size:11px">${result5}${move5} · ${result24}${move24}</span>
                 </div>
             </div>`;
         }).join('');
+
+        cards.innerHTML = warnHtml + cardsHtml;
     }
 
     async function fetchCycle() {
