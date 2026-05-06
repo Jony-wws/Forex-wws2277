@@ -340,13 +340,16 @@ def save_strategy_memory(mem: dict) -> None:
               indent=2, default=str)
 
 
-def walk_forward_check(prev_top3: list[dict]) -> list[dict]:
+def walk_forward_check(prev_top3: list[dict], min_pp: float = 1.0) -> list[dict]:
     """Take the strategy that was chosen for each pair in the *previous*
     cycle and check whether the predicted direction actually played out
     over the 5-hour horizon that has since elapsed.
 
     Returns one record per pair with the verdict (`hit` / `miss` /
-    `neutral`) plus the realized pip move and the elapsed time."""
+    `neutral`) plus the realized pip move and the elapsed time.
+
+    `min_pp`: a price move smaller than this many pips is treated as
+    `neutral` (too small to declare a hit/miss honestly)."""
     out: list[dict] = []
     for r in prev_top3 or []:
         pair = r.get("pair")
@@ -375,10 +378,11 @@ def walk_forward_check(prev_top3: list[dict]) -> list[dict]:
         end_close = float(future["Close"].iloc[n_ahead])
         moved_pp = (end_close - float(prev_close)) * pip_mult(pair)
         verdict = "neutral"
-        if (prev_dir == 1 and moved_pp > 0) or (prev_dir == -1 and moved_pp < 0):
-            verdict = "hit"
-        elif (prev_dir == 1 and moved_pp < 0) or (prev_dir == -1 and moved_pp > 0):
-            verdict = "miss"
+        if abs(moved_pp) >= min_pp:
+            if (prev_dir == 1 and moved_pp > 0) or (prev_dir == -1 and moved_pp < 0):
+                verdict = "hit"
+            elif (prev_dir == 1 and moved_pp < 0) or (prev_dir == -1 and moved_pp > 0):
+                verdict = "miss"
         out.append(dict(
             pair=pair,
             predicted_dir="BUY" if prev_dir == 1 else "SELL",
@@ -393,19 +397,35 @@ def walk_forward_check(prev_top3: list[dict]) -> list[dict]:
 
 
 # ── RUSSIAN-LANGUAGE DESCRIPTIONS ──────────────────────────────────────
+def humanize_trades_per_day(tpd: float) -> str:
+    """`5.7/день` → `≈6 сделок в день`; `0.3/день` → `1 сделка раз в 3 дня`."""
+    if tpd <= 0:
+        return "сделок нет"
+    if tpd >= 1:
+        if tpd >= 10:
+            return f"{tpd:.0f} сделок в день"
+        return f"≈{round(tpd)} сделок в день"
+    days = max(1, round(1 / tpd))
+    return f"1 сделка раз в {days} {'день' if days == 1 else 'дня' if 2 <= days <= 4 else 'дней'}"
+
+
 def describe_strategy_ru(p: dict) -> str:
     """Plain-Russian description of a chosen strategy for a pair."""
     parts: list[str] = []
-    style = "ТРЕНД" if p.get("require_mtf") else "ОТКАТ"
-    parts.append(f"стиль: {style}")
-    parts.append(f"горизонт {p.get('horizon_bars', 20) * 15} мин")
-    parts.append(f"ADX {p.get('adx_min', 0):.0f}–{p.get('adx_max', 60):.0f}")
-    parts.append(f"мин. уверенность {p.get('min_conf', 0)}%")
-    parts.append(f"мин. качество тренда {p.get('min_trend_q', 0)}")
+    style = "тренд (ловим направление)" if p.get("require_mtf") else "откат (ловим разворот)"
+    parts.append(f"стиль — {style}")
+    horizon_min = p.get("horizon_bars", 20) * 15
+    if horizon_min >= 60:
+        parts.append(f"проверяем результат через {horizon_min // 60} ч {horizon_min % 60} мин".replace(" 0 мин", ""))
+    else:
+        parts.append(f"проверяем результат через {horizon_min} мин")
+    parts.append(f"ADX от {int(p.get('adx_min', 0))} до {int(p.get('adx_max', 60))}")
+    parts.append(f"уверенность ≥ {p.get('min_conf', 0)}%")
+    parts.append(f"качество тренда ≥ {p.get('min_trend_q', 0)} из 100")
     if p.get("require_mtf"):
-        parts.append("3+ из 4 ТФ согласны")
-    if not p.get("require_mtf"):
-        parts.append(f"RSI {p.get('rsi_oversold', 30)}/{p.get('rsi_overbought', 70)}")
+        parts.append("≥ 3 из 4 таймфреймов согласны (D1+H4+H1+M15)")
+    else:
+        parts.append(f"RSI < {p.get('rsi_oversold', 30)} (перепродан) или > {p.get('rsi_overbought', 70)} (перекуплен)")
     return ", ".join(parts)
 
 
@@ -413,19 +433,28 @@ def describe_indicators_ru(ind: dict) -> str:
     """Plain-Russian dump of the latest indicator state for a pair."""
     if not ind:
         return ""
-    rsi_v = ind.get("rsi")  # not always populated; we mostly have ADX/MTF/Aroon
     bits: list[str] = []
-    bits.append(f"сигнал: <b>{ind.get('side', '—')}</b> уверенность {ind.get('confidence', 0):.0f}%")
-    bits.append(f"ADX={ind.get('adx', 0):.0f}")
+    bits.append(f"сигнал <b>{ind.get('side', '—')}</b> с уверенностью {ind.get('confidence', 0):.0f}%")
+    adx = ind.get("adx", 0)
+    adx_strength = (
+        "слабый" if adx < 20 else
+        "умеренный" if adx < 30 else
+        "сильный" if adx < 40 else "очень сильный"
+    )
+    bits.append(f"ADX = {adx:.0f} ({adx_strength} тренд)")
     aro = ind.get("aroon_osc", 0)
-    bits.append(f"Aroon осц.={aro:+.0f}")
+    aro_dir = "за рост" if aro > 30 else "за падение" if aro < -30 else "нет тренда"
+    bits.append(f"Aroon = {aro:+.0f} ({aro_dir})")
     mom = ind.get("momentum", 0)
-    bits.append(f"моментум={mom:+.2f}%")
+    mom_dir = "восходящий" if mom > 0.05 else "нисходящий" if mom < -0.05 else "плоский"
+    bits.append(f"моментум = {mom:+.2f}% ({mom_dir})")
     bull_n = int(ind.get("bull_count", 0))
     bear_n = int(ind.get("bear_count", 0))
-    bits.append(f"мульти-ТФ {bull_n}/4 за рост, {bear_n}/4 за падение")
-    bits.append(f"HA доля бычьих свечей={ind.get('ha_bull_ratio', 0):.0%}")
-    bits.append(f"ожидаемый ход 5ч ≈ {ind.get('expected_move_pp', 0):.0f} пп")
+    bits.append(f"таймфреймы: {bull_n} из 4 за рост, {bear_n} из 4 за падение")
+    ha = ind.get("ha_bull_ratio", 0)
+    ha_dir = "большинство бычьих" if ha > 0.66 else "большинство медвежьих" if ha < 0.34 else "поровну"
+    bits.append(f"свечи Heiken Ashi: {ha:.0%} зелёных ({ha_dir})")
+    bits.append(f"ожидаемый ход цены за 5 часов ≈ {ind.get('expected_move_pp', 0):.0f} пунктов")
     return "; ".join(bits)
 
 
@@ -596,24 +625,58 @@ def format_report(payload: dict) -> str:
     out: list[str] = []
     out.append(f"<b>🎯 Цикл {payload['cycle_utc']}</b>")
     out.append(
-        f"<i>Цель: найти стратегию с винрейтом ≥{int(WR_TARGET)}% "
-        f"минимум на {MIN_TOP_PAIRS} парах из 28 на бэктесте 365 дней (H1)</i>\n"
+        f"<i>Главная проверка — за последние 5 часов на всех 28 парах. "
+        f"Дополнительно — бэктест 365 дней.</i>\n"
     )
 
-    # ── 1. Walk-forward verdict from the previous cycle. ─────────────
-    wf = payload.get("walk_forward") or []
-    if wf:
+    # ── 1. PRIMARY: 5h validation across all pairs. ──────────────────
+    apv = payload.get("all_pairs_validation") or []
+    if apv:
+        hits = sum(1 for x in apv if x["verdict"] == "hit")
+        misses = sum(1 for x in apv if x["verdict"] == "miss")
+        neutral = len(apv) - hits - misses
+        if hits + misses > 0:
+            wr5h = 100.0 * hits / (hits + misses)
+        else:
+            wr5h = 0.0
+        out.append(f"<b>🔥 БЭКТЕСТ ЗА ПОСЛЕДНИЕ 5 ЧАСОВ (главная проверка):</b>")
+        out.append(
+            f"  Прогноз сбылся на <b>{hits}</b> парах из {hits + misses} "
+            f"со значимым движением → WR за 5 часов = <b>{wr5h:.1f}%</b>"
+        )
+        out.append(
+            f"  попаданий: <b>{hits}</b>  ·  промахов: <b>{misses}</b>  ·  "
+            f"нет движения: {neutral}"
+        )
+        # Show top 8 pairs by realized move magnitude.
+        apv_sorted = sorted(apv, key=lambda x: -abs(x.get("moved_pp", 0)))
+        for x in apv_sorted[:8]:
+            mark = "✅" if x["verdict"] == "hit" else ("❌" if x["verdict"] == "miss" else "▫️")
+            out.append(
+                f"  {mark} <b>{x['pair']}</b> прогноз {x['predicted_dir']} → "
+                f"реально {x['moved_pp']:+.1f} пп"
+            )
+        out.append("")
+    elif payload.get("walk_forward"):
+        # First-cycle fallback: only top-3 walk-forward available.
+        wf = payload["walk_forward"]
         hits = sum(1 for x in wf if x["verdict"] == "hit")
         misses = sum(1 for x in wf if x["verdict"] == "miss")
-        out.append(f"<b>📊 Что сбылось из прошлого прогноза (5ч назад):</b>")
-        out.append(f"  попаданий: <b>{hits}</b> · промахов: <b>{misses}</b> · нейтрально: {len(wf) - hits - misses}")
+        out.append(f"<b>🔥 БЭКТЕСТ ЗА ПОСЛЕДНИЕ 5 ЧАСОВ (главная проверка):</b>")
+        out.append(f"  попаданий: <b>{hits}</b> · промахов: <b>{misses}</b> · нет движения: {len(wf) - hits - misses}")
         for x in wf[:5]:
             mark = "✅" if x["verdict"] == "hit" else ("❌" if x["verdict"] == "miss" else "▫️")
             out.append(
-                f"  {mark} <b>{x['pair']}</b> {x['predicted_dir']} → реально "
-                f"{x['moved_pp']:+.1f} пп (WR на бэктесте было {x.get('prev_wr')}%)"
+                f"  {mark} <b>{x['pair']}</b> прогноз {x['predicted_dir']} → "
+                f"реально {x['moved_pp']:+.1f} пп"
             )
         out.append("")
+    else:
+        out.append(
+            "<b>🔥 БЭКТЕСТ ЗА ПОСЛЕДНИЕ 5 ЧАСОВ:</b>"
+            "\n  Появится начиная со <b>следующего</b> цикла "
+            "(нужны прогнозы из прошлого цикла).\n"
+        )
 
     # ── 2. Top-3 strict picks. ───────────────────────────────────────
     top3 = payload.get("top3", [])
@@ -621,31 +684,36 @@ def format_report(payload: dict) -> str:
     sweep_attempts = payload.get("sweep_attempts", 1)
     if on_target_n >= MIN_TOP_PAIRS:
         out.append(
-            f"<b>🏆 Топ-{len(top3)} (WR ≥ {int(WR_TARGET)}% на бэктесте за 365 дней):</b>"
+            f"<b>🏆 Топ-{len(top3)} стратегий (WR ≥ {int(WR_TARGET)}% на бэктесте 365 дней):</b>"
         )
     else:
         out.append(
             f"<b>⚠️ Цель не достигнута: пар с WR≥{int(WR_TARGET)}% — {on_target_n} "
-            f"(нужно ≥{MIN_TOP_PAIRS}). Расширил сетку {sweep_attempts}× — лучшее что нашёл:</b>"
+            f"(нужно ≥{MIN_TOP_PAIRS}). Расширил параметры {sweep_attempts}× — "
+            f"лучшее что нашёл:</b>"
         )
     for i, r in enumerate(top3, 1):
         d = r.get("direction", 0)
         if d == 1:
-            side_ru = "ПОКУПКА (вход активен)"
+            side_ru = "<b>ПОКУПКА</b> (стратегия даёт сигнал на вход)"
         elif d == -1:
-            side_ru = "ПРОДАЖА (вход активен)"
+            side_ru = "<b>ПРОДАЖА</b> (стратегия даёт сигнал на вход)"
         else:
             raw = (r.get("indicators_now") or {}).get("side", "—")
-            side_ru = f"стратегия ждёт условий (текущий уклон: {raw})"
+            side_ru = (
+                f"стратегия пока ждёт условий "
+                f"(текущий уклон рынка: <b>{raw}</b>)"
+            )
+        tpd = r.get("trades_per_day", 0)
         out.append(
             f"\n<b>{i}. {r['pair']}</b>  {side_ru}"
-            f"\n   WR <b>{r['wr']}%</b>  ·  сделок {r['trades']}  ·  "
-            f"{r.get('trades_per_day', 0):.1f}/день  ·  PnL {r['pnl']:+.1f}"
+            f"\n   Винрейт <b>{r['wr']}%</b>  ·  всего сделок {r['trades']}  ·  "
+            f"{humanize_trades_per_day(tpd)}  ·  прибыль {r['pnl']:+.1f} пунктов"
         )
-        out.append(f"  • Стратегия: {describe_strategy_ru(r.get('params', {}))}")
+        out.append(f"  • <b>Стратегия:</b> {describe_strategy_ru(r.get('params', {}))}")
         if r.get("indicators_now"):
-            out.append(f"  • Индикаторы сейчас: {describe_indicators_ru(r['indicators_now'])}")
-        out.append(f"  • Цена 5ч назад → сейчас: прошла {r.get('last_5h_pp', 0):+.1f} пп")
+            out.append(f"  • <b>Индикаторы сейчас:</b> {describe_indicators_ru(r['indicators_now'])}")
+        out.append(f"  • <b>Цена за последние 5 часов:</b> прошла {r.get('last_5h_pp', 0):+.1f} пунктов")
 
     # ── 3. Diff vs previous cycle. ───────────────────────────────────
     diff = payload.get("diff", {})
@@ -683,27 +751,73 @@ def format_report(payload: dict) -> str:
                 f"{a['wr_mean']}% (z={a['z']})"
             )
 
-    # ── 6. Top-10 leaderboard. ───────────────────────────────────────
-    out.append(f"\n<b>📋 Лучшие 10 пар по WR (бэктест 365 дней):</b>")
+    # ── 6. 24h aging. ────────────────────────────────────────────────
+    aging = payload.get("aging_24h") or []
+    if aging:
+        out.append(f"\n<b>🧠 Память: что изменилось за последние 24 часа:</b>")
+        improving = [a for a in aging if a["wr_delta"] > 0][:3]
+        degrading = [a for a in aging if a["wr_delta"] < 0][:3]
+        if improving:
+            out.append(f"  📈 Стало лучше:")
+            for a in improving:
+                pc = " (стиль изменился)" if a["params_changed"] else ""
+                out.append(
+                    f"    • {a['pair']}: WR {a['wr_24h_ago']}% → "
+                    f"<b>{a['wr_now']}%</b>  ({a['wr_delta']:+.1f} п.п.{pc})"
+                )
+        if degrading:
+            out.append(f"  📉 Стало хуже:")
+            for a in degrading:
+                pc = " (стиль изменился)" if a["params_changed"] else ""
+                out.append(
+                    f"    • {a['pair']}: WR {a['wr_24h_ago']}% → "
+                    f"<b>{a['wr_now']}%</b>  ({a['wr_delta']:+.1f} п.п.{pc})"
+                )
+        stable_top = [
+            a for a in aging
+            if not a["params_changed"] and a["wr_now"] >= WR_TARGET
+            and a["wr_24h_ago"] >= WR_TARGET
+        ]
+        if stable_top:
+            names = ", ".join(a["pair"] for a in stable_top[:5])
+            out.append(f"  💎 Стабильно держат WR≥{int(WR_TARGET)}%: <b>{names}</b>")
+
+    # ── 7. Top-10 leaderboard. ───────────────────────────────────────
+    out.append(f"\n<b>📋 Лучшие 10 пар по винрейту (бэктест 365 дней):</b>")
     sorted_pp = sorted(
         [r for r in payload["per_pair"] if r.get("trades", 0) >= MIN_TRADES_FOR_VALID],
         key=lambda r: -r.get("wr", 0),
     )[:10]
     for r in sorted_pp:
+        tpd = r.get("trades_per_day", 0)
         out.append(
-            f"  {r['pair']}: WR <b>{r['wr']}%</b> · сделок {r['trades']} · "
-            f"{r.get('trades_per_day', 0):.1f}/день · PnL {r['pnl']:+.1f}"
+            f"  {r['pair']}: <b>{r['wr']}%</b> · {r['trades']} сделок · "
+            f"{humanize_trades_per_day(tpd)} · прибыль {r['pnl']:+.1f} п."
         )
 
     # ── 7. Glossary. ─────────────────────────────────────────────────
     out.append("")
     out.append(
-        "<i>📖 Глоссарий: пп = 1 пипс (1/10000 цены, для JPY 1/100); "
-        "WR = доля выигранных сделок на бэктесте; H1/M15 = таймфрейм 1ч/15мин; "
-        "горизонт = на сколько баров вперёд проверяем результат сделки.</i>"
+        "<i>📖 <b>Глоссарий:</b>\n"
+        "  • <b>пункт (пп / п.п.)</b> — 1 пипс (1/10000 цены; для JPY 1/100)\n"
+        "  • <b>винрейт / WR</b> — доля выигранных сделок (например 70% = "
+        "7 побед из 10 сделок)\n"
+        "  • <b>таймфрейм</b> — длина одной свечи: M15 = 15 минут, "
+        "H1 = 1 час, H4 = 4 часа, D1 = день\n"
+        "  • <b>ADX</b> — сила тренда от 0 до ~60 (≥25 = тренд есть, "
+        "≥40 = очень сильный)\n"
+        "  • <b>RSI</b> — перекупленность/перепроданность от 0 до 100 "
+        "(>70 перекуплен, &lt;30 перепродан)\n"
+        "  • <b>Aroon</b> — индикатор силы и направления тренда от -100 до +100\n"
+        "  • <b>моментум</b> — % изменения цены за последние 12 баров\n"
+        "  • <b>Heiken Ashi</b> — сглаженные свечи; высокая доля зелёных "
+        "= устойчивый рост\n"
+        "  • <b>мульти-ТФ</b> — сколько таймфреймов согласны на BUY/SELL\n"
+        "  • <b>горизонт</b> — на сколько М15-баров вперёд считается "
+        "результат сделки</i>"
     )
     out.append(
-        "<i>Авто-генерация GitHub Actions, следующий цикл через 5 часов (UTC+5).</i>"
+        "<i>Авто-генерация GitHub Actions · следующий цикл через 5 часов (UTC+5).</i>"
     )
     return "\n".join(out)
 
@@ -725,6 +839,58 @@ def compute_indicator_attribution(per_pair: list[dict]) -> list[tuple[str, float
             families["horizon-long"]  += r.get("wr", 0) - 50.0
     total = sum(max(v, 0) for v in families.values()) or 1
     return [(k, 100 * max(v, 0) / total) for k, v in sorted(families.items(), key=lambda kv: -kv[1])]
+
+
+# ── 24-HOUR STRATEGY AGING  (compare current strategy vs 24h ago) ──────
+def compute_24h_aging(current_per_pair: list[dict]) -> list[dict]:
+    """For each pair, look up the cycle file from ~24 hours ago (5
+    cycles back) and report whether the chosen strategy is still the
+    same / its WR has improved or degraded.
+
+    Returns a list of dicts (most-changed first) with::
+
+        pair, wr_now, wr_24h_ago, wr_delta, params_changed, age_cycles
+    """
+    out: list[dict] = []
+    files = sorted(
+        f for f in os.listdir(STATE_DIR)
+        if f.startswith("cycle_") and f.endswith(".json")
+        and f != "cycle_latest.json"
+    )
+    if len(files) < 5:
+        return out
+    target_idx = max(0, len(files) - 5)
+    target_path = os.path.join(STATE_DIR, files[target_idx])
+    try:
+        prev = json.load(open(target_path))
+    except Exception:
+        return out
+
+    prev_by_pair = {r["pair"]: r for r in prev.get("per_pair", [])}
+    age_cycles = len(files) - target_idx
+
+    for r in current_per_pair:
+        prev_r = prev_by_pair.get(r["pair"])
+        if not prev_r:
+            continue
+        wr_now = r.get("wr", 0)
+        wr_old = prev_r.get("wr", 0)
+        params_now = r.get("params", {}) or {}
+        params_old = prev_r.get("params", {}) or {}
+        same_style = bool(params_now.get("require_mtf")) == bool(params_old.get("require_mtf"))
+        same_horizon = params_now.get("horizon_bars") == params_old.get("horizon_bars")
+        params_changed = not (same_style and same_horizon)
+        out.append(dict(
+            pair=r["pair"],
+            wr_now=wr_now,
+            wr_24h_ago=wr_old,
+            wr_delta=round(wr_now - wr_old, 2),
+            params_changed=params_changed,
+            age_cycles=age_cycles,
+        ))
+
+    out.sort(key=lambda x: -abs(x["wr_delta"]))
+    return out
 
 
 # ── ADAPTIVE SWEEP  (escalates the grid until ≥ MIN_TOP_PAIRS hit WR_TARGET) ─
@@ -780,9 +946,21 @@ def main() -> None:
 
     indicator_attr = compute_indicator_attribution(per_pair)
 
-    # Walk-forward verdict on the previous cycle's top-3.
+    # PRIMARY: 5h validation across ALL 28 pairs — for each pair, did the
+    # strategy chosen 5h ago point in the direction that the price actually
+    # took during the elapsed 5h window?
     previous = load_previous_cycle()
-    walk_forward = walk_forward_check((previous or {}).get("top3", []))
+    prev_per_pair = (previous or {}).get("per_pair", [])
+    prev_top3 = {r["pair"] for r in (previous or {}).get("top3", [])}
+    all_pairs_validation = walk_forward_check(
+        [r for r in prev_per_pair if r.get("direction", 0) != 0]
+    )
+    # Subset of all_pairs_validation that was in the previous top-3.
+    walk_forward = [x for x in all_pairs_validation if x["pair"] in prev_top3]
+
+    # 24-hour strategy aging — compare current chosen strategy vs the
+    # strategy chosen for the same pair 24h ago (≈ 5 cycles back).
+    aging = compute_24h_aging(per_pair)
 
     diff = diff_with_previous(dict(top3=top3, per_pair=per_pair), previous)
 
@@ -812,6 +990,8 @@ def main() -> None:
         anomalies=anomalies,
         indicator_attribution=indicator_attr,
         walk_forward=walk_forward,
+        all_pairs_validation=all_pairs_validation,
+        aging_24h=aging,
         on_target_count=len(on_target),
         sweep_attempts=sweep_attempts,
     )
