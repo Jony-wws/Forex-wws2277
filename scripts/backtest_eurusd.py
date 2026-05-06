@@ -54,6 +54,7 @@ PREMIUM_MIN_HA_BULL_EXTREME = 0.83
 PREMIUM_MIN_HA_BODY = 0.55
 PREMIUM_MIN_MOMENTUM = 0.20
 PREMIUM_MIN_MOVE_PIPS_NONJPY = 60.0
+PREMIUM_MIN_MOVE_PIPS_JPY = 100.0
 
 
 # ── INDICATORS ─────────────────────────────────────────────────────────
@@ -156,10 +157,10 @@ def heiken_ashi(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
 
 
 # ── DATA ───────────────────────────────────────────────────────────────
-def fetch(period: str, interval: str) -> pd.DataFrame:
+def fetch(period: str, interval: str, symbol: str = PAIR) -> pd.DataFrame:
     import yfinance as yf
     df = yf.download(
-        PAIR,
+        symbol,
         period=period,
         interval=interval,
         progress=False,
@@ -167,11 +168,10 @@ def fetch(period: str, interval: str) -> pd.DataFrame:
         threads=False,
     )
     if df.empty:
-        raise RuntimeError(f"yfinance returned empty {period}/{interval} for {PAIR}")
+        raise RuntimeError(f"yfinance returned empty {period}/{interval} for {symbol}")
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
     df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
-    # Normalise every timeframe to UTC so cross-TF reindexing works.
     if df.index.tz is None:
         df.index = df.index.tz_localize("UTC")
     else:
@@ -208,11 +208,23 @@ class BarSignal:
     is_premium: bool
 
 
-def classify_dataframe(m15: pd.DataFrame, h1: pd.DataFrame, h4: pd.DataFrame, d1: pd.DataFrame) -> pd.DataFrame:
+def classify_dataframe(
+    m15: pd.DataFrame,
+    h1: pd.DataFrame,
+    h4: pd.DataFrame,
+    d1: pd.DataFrame,
+    pip_mult: float = 10000.0,
+    min_move_pips: float = PREMIUM_MIN_MOVE_PIPS_NONJPY,
+) -> pd.DataFrame:
     """Compute the full system output for every M15 bar.
 
     The decision indicators run on H1 (matching app/analyzer.py), but the
-    multi-TF check uses D1+H4+H1+M15. Heiken Ashi is computed on M15."""
+    multi-TF check uses D1+H4+H1+M15. Heiken Ashi is computed on M15.
+
+    `pip_mult` is the multiplier to convert price moves into pips:
+      * 10000 for non-JPY pairs (1 pip = 0.0001)
+      * 100   for JPY pairs     (1 pip = 0.01)
+    `min_move_pips` is the premium-tier minimum expected 5h ATR move."""
     # Per-TF EMAs for alignment.
     for df in (d1, h4, h1, m15):
         df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
@@ -313,7 +325,7 @@ def classify_dataframe(m15: pd.DataFrame, h1: pd.DataFrame, h4: pd.DataFrame, d1
     q_mom   = scale(mom_.abs(), 0.05, 0.30)
     trend_quality = (q_score + q_adx + q_aroon + q_ha + q_mtf + q_atr + q_mom) / 7.0
 
-    expected_move_pips_5h = atr_ * 5.0 * 10000.0  # EUR/USD pip = 0.0001
+    expected_move_pips_5h = atr_ * 5.0 * pip_mult
 
     # ── Classification ───────────────────────────────────────────────
     side = pd.Series(None, index=m15.index, dtype=object)
@@ -331,7 +343,7 @@ def classify_dataframe(m15: pd.DataFrame, h1: pd.DataFrame, h4: pd.DataFrame, d1
         & (aro_.abs() >= PREMIUM_MIN_AROON_OSC)
         & (ha_body_strength_6 >= PREMIUM_MIN_HA_BODY)
         & (mom_.abs() >= PREMIUM_MIN_MOMENTUM)
-        & (expected_move_pips_5h >= PREMIUM_MIN_MOVE_PIPS_NONJPY)
+        & (expected_move_pips_5h >= min_move_pips)
         & multi_tf_aligned
     )
     is_prem_buy = is_strict_buy & is_prem_common & (ha_bull_ratio_6 >= PREMIUM_MIN_HA_BULL_EXTREME)

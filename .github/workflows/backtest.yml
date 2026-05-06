@@ -1,14 +1,19 @@
-name: EUR/USD M15 backtest
+name: Forex backtest (28 pairs + EUR/USD trend + EUR/USD MR)
 
-# Runs the Python backtest on every push and on demand. Posts the resulting
-# WR / trade-count report as a comment on the commit so we can iterate
-# without having to look at logs by hand.
+# Runs three Python backtests on every push that touches the system, and
+# every morning at 07:00 UTC. All three reports are posted as a single
+# combined comment on any open PR for the pushed branch.
+#
+# 1. 28-pair full-system backtest (premium / strict / daily TOP-3)
+# 2. EUR/USD M15 trend-system (★ ПРЕМИУМ / СТРОГИЙ, 5h binary)
+# 3. EUR/USD M15 mean-reversion (BB+RSI extreme bounce, 1-2h binary)
 
 on:
   push:
     paths:
       - "scripts/backtest_eurusd.py"
       - "scripts/backtest_eurusd_mr.py"
+      - "scripts/backtest_28pairs.py"
       - "tradingview/**.pine"
       - "app/analyzer.py"
       - "app/indicators.py"
@@ -27,7 +32,8 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 28-pair download is the slow step; allow plenty of headroom.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +46,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance pandas numpy
 
+      - name: Run 28-pair full-system backtest (premium / strict / daily TOP-3)
+        run: python scripts/backtest_28pairs.py
+
       - name: Run trend-system backtest (★ ПРЕМИУМ / СТРОГИЙ, 5h binary)
         run: python scripts/backtest_eurusd.py
 
@@ -49,29 +58,38 @@ jobs:
       - name: Upload reports artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eurusd-backtest-reports
-          path: reports/*.md
+          name: forex-backtest-reports
+          path: |
+            reports/*.md
+            reports/*.json
           if-no-files-found: error
 
-      - name: Append both reports to job summary
+      - name: Append all reports to job summary
         run: |
-          echo "## Trend system" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 28-pair full-system backtest" >> "$GITHUB_STEP_SUMMARY"
+          cat reports/28pairs_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## EUR/USD trend-system backtest" >> "$GITHUB_STEP_SUMMARY"
           cat reports/eurusd_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## Mean-reversion strategy" >> "$GITHUB_STEP_SUMMARY"
+          echo "## EUR/USD mean-reversion strategy" >> "$GITHUB_STEP_SUMMARY"
           cat reports/eurusd_mr_backtest_latest.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Comment both reports on PR (when run on a PR push)
+      - name: Comment all reports on PR (when run on a push)
         if: github.event_name == 'push'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
+            const all = fs.readFileSync('reports/28pairs_backtest_latest.md', 'utf8');
             const trend = fs.readFileSync('reports/eurusd_backtest_latest.md', 'utf8');
             const mr    = fs.readFileSync('reports/eurusd_mr_backtest_latest.md', 'utf8');
-            const body  = '## Trend system\n\n' + trend + '\n\n---\n\n## Mean-reversion strategy\n\n' + mr +
-                          '\n\n_Posted automatically by the backtest workflow._';
+            const body  =
+              '# 🎯 28-pair full-system backtest\n\n' + all +
+              '\n\n---\n\n# EUR/USD trend-system\n\n' + trend +
+              '\n\n---\n\n# EUR/USD mean-reversion\n\n' + mr +
+              '\n\n_Posted automatically by `.github/workflows/backtest.yml`._';
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo:  context.repo.repo,
