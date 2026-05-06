@@ -354,6 +354,14 @@ def walk_forward_check(prev_top3: list[dict], min_pp: float = 1.0) -> list[dict]
     for r in prev_top3 or []:
         pair = r.get("pair")
         prev_dir = r.get("direction", 0)
+        # Fall back to the latest-bar indicator lean when there was no
+        # active entry signal — it still encodes the strategy's view.
+        if prev_dir == 0:
+            side = ((r.get("indicators_now") or {}).get("side") or "").upper()
+            if side == "BUY":
+                prev_dir = 1
+            elif side == "SELL":
+                prev_dir = -1
         prev_close = r.get("last_close")
         prev_ts = r.get("last_bar_ts")
         if not pair or prev_dir == 0 or prev_close is None:
@@ -952,9 +960,7 @@ def main() -> None:
     previous = load_previous_cycle()
     prev_per_pair = (previous or {}).get("per_pair", [])
     prev_top3 = {r["pair"] for r in (previous or {}).get("top3", [])}
-    all_pairs_validation = walk_forward_check(
-        [r for r in prev_per_pair if r.get("direction", 0) != 0]
-    )
+    all_pairs_validation = walk_forward_check(prev_per_pair)
     # Subset of all_pairs_validation that was in the previous top-3.
     walk_forward = [x for x in all_pairs_validation if x["pair"] in prev_top3]
 
