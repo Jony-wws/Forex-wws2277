@@ -1,15 +1,22 @@
 // © Jony-wws / Forex-wws2277 — mirrored from app/analyzer.py + app/cycle.py
-// Backtestable strategy: same multi-TF signal as the indicator,
-// wired into TradingView Strategy Tester for honest win-rate stats.
+// FOREX-28 v2 — binary-options strategy (no TP / no SL)
+// For TradingView Strategy Tester. Mirrors the indicator file's logic exactly
+// so backtest stats match what the indicator's on-chart panel shows.
 //
-// Trading rule (asymmetric R:R, mirrors cycle.py):
-//   On a fresh BUY signal (conf >= gate)  → enter long.
-//     Exit when: TP +tpPct% (win) | SL −slPct% (loss) | Horizon hours elapsed (close at market).
-//   Same for SELL (mirrored).  No pyramiding.
-//   Defaults tuned for «strong moves»: gate=90, TP=0.30%, SL=0.15% → R:R 2:1.
+// Trade model:
+//   - Enter long  on freshBuy  (conf >= gateConf, valid pair, no DD-halt).
+//   - Enter short on freshSell.
+//   - Hold until expiry  (expiryH hours)  →  close at market.  No TP / SL.
+//   - "Reverse" exit: if the opposite signal fires with conf >= revGate
+//     before expiry → close current position at market and open the opposite.
+//   - The win/loss is determined by the closing price's direction vs. entry
+//     (binary).  Strategy Tester reports Win Rate, Profit Factor etc. on this
+//     definition because each trade is a discrete payoff event.
+//
+// Universal: works on any chart TF, internally pulls D1+H4+H1+M15.
 //@version=5
-strategy(title              = "FOREX-28 Strategy — strong moves, asymmetric R:R",
-         shorttitle         = "FX-28-S",
+strategy(title              = "FOREX-28 v2 — binary-options strategy",
+         shorttitle         = "FX-28-S v2",
          overlay            = true,
          pyramiding         = 0,
          initial_capital    = 10000,
@@ -21,13 +28,14 @@ strategy(title              = "FOREX-28 Strategy — strong moves, asymmetric R:
          process_orders_on_close = true)
 
 // ── INPUTS ─────────────────────────────────────────────────────────────
-gateConf = input.int  (90,   "Уверенность для входа, %",     minval=50, maxval=95)
-horizonH = input.int  (12,   "Горизонт сделки, часов",       minval=1,  maxval=72)
-tpPct    = input.float(0.30, "TP, % (целевое движение)",     minval=0.01, maxval=5.0, step=0.01)
-slPct    = input.float(0.15, "SL, % (стоп-лосс)",            minval=0.01, maxval=5.0, step=0.01)
-useLong  = input.bool (true, "Торговать BUY")
-useShort = input.bool (true, "Торговать SELL")
-showLbl  = input.bool (true, "Показывать метки на графике")
+gateConf      = input.int  (80,   "Уверенность для входа, %",                 minval=50, maxval=95, group="Сигнал")
+expiryH       = input.float(5.0,  "Горизонт сделки (binary expiry), часов",   minval=0.25, maxval=24, step=0.25, group="Сигнал")
+allowReverse  = input.bool (true, "Разрешить разворот",                       group="Сигнал")
+revGate       = input.int  (80,   "Уверенность для разворота, %",             minval=50, maxval=95, group="Сигнал")
+useLong       = input.bool (true, "Торговать BUY",                            group="Сигнал")
+useShort      = input.bool (true, "Торговать SELL",                           group="Сигнал")
+showLbl       = input.bool (true, "Показывать метки на графике",              group="Отображение")
+showHorizonLine = input.bool(true,"Линия горизонта",                         group="Отображение")
 
 // ── PER-TF AGGREGATORS ─────────────────────────────────────────────────
 f_h1_pack() =>
@@ -41,21 +49,34 @@ f_h1_pack() =>
     sk = ta.stoch(close, high, low, 14)
     sd = ta.sma(sk, 3)
     [dp, dm, ax] = ta.dmi(14, 14)
-    wr = ta.wpr(14)
+    wr  = ta.wpr(14)
     mom = (close / close[10] - 1) * 100
-    [close, e20, e50, rsi, h, hp, bbpct, sk, sd, dp, dm, ax, wr, mom]
+    tk  = (ta.highest(high,  9) + ta.lowest(low,  9)) / 2
+    kj  = (ta.highest(high, 26) + ta.lowest(low, 26)) / 2
+    sa  = (tk + kj) / 2
+    sb  = (ta.highest(high, 52) + ta.lowest(low, 52)) / 2
+    aboveC = close > math.max(sa, sb)
+    belowC = close < math.min(sa, sb)
+    vw  = ta.vwap
+    vw_ok = not na(vw)
+    bullEng = close > open and close[1] < open[1] and close > open[1] and open <= close[1]
+    bearEng = close < open and close[1] > open[1] and close < open[1] and open >= close[1]
+    body    = math.abs(close - open)
+    upWick  = high - math.max(close, open)
+    dnWick  = math.min(close, open) - low
+    hammer  = body > 0 and dnWick > 2 * body and upWick < body
+    shootng = body > 0 and upWick > 2 * body and dnWick < body
+    paScore = (bullEng or hammer ? 2 : 0) - (bearEng or shootng ? 2 : 0)
+    [close, e20, e50, rsi, h, hp, bbpct, sk, sd, dp, dm, ax, wr, mom,
+     aboveC, belowC, tk, kj, vw, vw_ok, paScore]
 
-f_m15_pack() =>
-    [close, ta.ema(close, 20), ta.ema(close, 50)]
-
-f_h4_pack() =>
-    [close, ta.ema(close, 50), ta.ema(close, 200)]
-
-f_d1_pack() =>
-    [close, ta.ema(close, 50), ta.ema(close, 200)]
+f_m15_pack() => [close, ta.ema(close, 20), ta.ema(close, 50)]
+f_h4_pack()  => [close, ta.ema(close, 50), ta.ema(close, 200)]
+f_d1_pack()  => [close, ta.ema(close, 50), ta.ema(close, 200)]
 
 [h1_close, h1_ema20, h1_ema50, h1_rsi, h1_hist, h1_hist_prev,
- h1_bbpct, h1_sk, h1_sd, h1_dp, h1_dm, h1_adx, h1_wr, h1_mom] =
+ h1_bbpct, h1_sk, h1_sd, h1_dp, h1_dm, h1_adx, h1_wr, h1_mom,
+ h1_above, h1_below, h1_tk, h1_kj, h1_vwap, h1_vwap_ok, h1_pa] =
      request.security(syminfo.tickerid, "60",  f_h1_pack(),  barmerge.gaps_off, barmerge.lookahead_off)
 [m15_close, m15_ema20, m15_ema50] =
      request.security(syminfo.tickerid, "15",  f_m15_pack(), barmerge.gaps_off, barmerge.lookahead_off)
@@ -64,13 +85,13 @@ f_d1_pack() =>
 [d1_close, d1_ema50, d1_ema200] =
      request.security(syminfo.tickerid, "D",   f_d1_pack(),  barmerge.gaps_off, barmerge.lookahead_off)
 
-// ── SCORE / MAX ────────────────────────────────────────────────────────
+// ── 15 voting blocks ───────────────────────────────────────────────────
 var float score_v = 0.
 var float maxp_v  = 0.
 score_v := 0.
 maxp_v  := 0.
 
-// A0. D1 trend  (weight 3)
+// A0 D1
 if d1_close > d1_ema50 and d1_ema50 > d1_ema200
     score_v := score_v + 3
 else if d1_close < d1_ema50 and d1_ema50 < d1_ema200
@@ -81,7 +102,7 @@ else if d1_close < d1_ema50
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// A. H4 trend  (weight 3)
+// A H4
 if h4_close > h4_ema50 and h4_ema50 > h4_ema200
     score_v := score_v + 3
 else if h4_close < h4_ema50 and h4_ema50 < h4_ema200
@@ -92,21 +113,21 @@ else if h4_close < h4_ema50
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// B. H1 confirmation  (weight 2)
+// B H1
 if h1_close > h1_ema20 and h1_ema20 > h1_ema50
     score_v := score_v + 2
 else if h1_close < h1_ema20 and h1_ema20 < h1_ema50
     score_v := score_v - 2
 maxp_v := maxp_v + 2
 
-// C. M15 entry  (weight 1)
+// C M15
 if m15_close > m15_ema20
     score_v := score_v + 1
 else
     score_v := score_v - 1
 maxp_v := maxp_v + 1
 
-// D. RSI on H1  (weight 3)
+// D RSI
 if h1_rsi > 55 and h1_rsi < 70
     score_v := score_v + 2
 else if h1_rsi > 30 and h1_rsi < 45
@@ -117,7 +138,7 @@ else if h1_rsi <= 30
     score_v := score_v + 3
 maxp_v := maxp_v + 3
 
-// E. MACD on H1  (weight 3)
+// E MACD
 if h1_hist > 0 and h1_hist_prev <= 0
     score_v := score_v + 3
 else if h1_hist < 0 and h1_hist_prev >= 0
@@ -132,7 +153,7 @@ else if h1_hist < 0
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// F. Bollinger %B on H1  (weight 2)
+// F BB %B
 if h1_bbpct > 0.95
     score_v := score_v - 2
 else if h1_bbpct < 0.05
@@ -143,7 +164,7 @@ else if h1_bbpct < 0.35
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// G. Stochastic on H1  (weight 2)
+// G Stoch
 if h1_sk < 20 and h1_sd < 20
     score_v := score_v + 2
 else if h1_sk > 80 and h1_sd > 80
@@ -154,7 +175,7 @@ else if h1_sk < h1_sd and h1_sk > 20
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// H. ADX on H1  (weight 3)
+// H ADX
 if h1_adx < 15
     score_v := score_v > 0 ? score_v - math.abs(score_v) * 0.5 : score_v + math.abs(score_v) * 0.5
 else if h1_adx > 30
@@ -169,14 +190,25 @@ else if h1_adx > 20
         score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// I. Williams %R on H1  (weight 1)
+// I Williams
 if h1_wr > -20
     score_v := score_v - 1
 else if h1_wr < -80
     score_v := score_v + 1
 maxp_v := maxp_v + 1
 
-// K. Momentum on H1 (10-bar %)  (weight 2)
+// J Ichimoku
+if h1_above and h1_tk > h1_kj
+    score_v := score_v + 3
+else if h1_below and h1_tk < h1_kj
+    score_v := score_v - 3
+else if h1_above
+    score_v := score_v + 1
+else if h1_below
+    score_v := score_v - 1
+maxp_v := maxp_v + 3
+
+// K Momentum
 if h1_mom > 0.15
     score_v := score_v + 2
 else if h1_mom < -0.15
@@ -187,7 +219,15 @@ else if h1_mom < -0.05
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// M. Multi-TF agreement (D1+H4+H1+M15)  (weight 3)
+// L VWAP
+if h1_vwap_ok
+    if h1_close > h1_vwap * 1.001
+        score_v := score_v + 1
+    else if h1_close < h1_vwap * 0.999
+        score_v := score_v - 1
+    maxp_v := maxp_v + 1
+
+// M Multi-TF
 bull4 = (d1_close > d1_ema50 ? 1 : 0) + (h4_close > h4_ema50 ? 1 : 0) + (h1_close > h1_ema20 ? 1 : 0) + (m15_close > m15_ema20 ? 1 : 0)
 if bull4 == 4
     score_v := score_v + 3
@@ -199,7 +239,13 @@ else if bull4 <= 1
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// O. M15 EMA20/50 cross  (weight 1)
+// N Price Action
+if h1_pa != 0
+    capped = math.max(-3, math.min(3, h1_pa))
+    score_v := score_v + capped
+maxp_v := maxp_v + 3
+
+// O M15 EMA cross
 if m15_ema20 > m15_ema50
     score_v := score_v + 1
 else
@@ -209,12 +255,12 @@ maxp_v := maxp_v + 1
 // ── CONFIDENCE / SIGNAL ────────────────────────────────────────────────
 ratio = maxp_v > 0 ? math.min(1.0, math.abs(score_v) / maxp_v) : 0.0
 confidence_pct = math.round(math.max(50, math.min(95, 50 + 45 * (1 - math.exp(-3.66 * ratio)))))
-direction = score_v > 0 ? "BUY" : score_v < 0 ? "SELL" : "—"
-isStrong  = confidence_pct >= gateConf and direction != "—"
+direction = score_v > 0 ? 1 : score_v < 0 ? -1 : 0
+isStrong = confidence_pct >= gateConf and direction != 0
 
-var string prevDir = "—"
-freshBuy  = isStrong and direction == "BUY"  and prevDir != "BUY"
-freshSell = isStrong and direction == "SELL" and prevDir != "SELL"
+var int prevDir = 0
+freshBuy  = isStrong and direction ==  1 and prevDir !=  1
+freshSell = isStrong and direction == -1 and prevDir != -1
 if isStrong
     prevDir := direction
 
@@ -224,30 +270,24 @@ if useLong  and freshBuy  and strategy.position_size == 0
 if useShort and freshSell and strategy.position_size == 0
     strategy.entry("S", strategy.short, comment="SELL " + str.tostring(confidence_pct) + "%")
 
-// ── EXIT: TP / SL / TIME-STOP ──────────────────────────────────────────
-var float entryP = na
-var int   entryT = na
+// Reversal entry: close current and open opposite if conf >= revGate
+if allowReverse and strategy.position_size > 0 and freshSell and confidence_pct >= revGate
+    strategy.close("L", comment="↻rev SELL")
+    if useShort
+        strategy.entry("S", strategy.short, comment="SELL " + str.tostring(confidence_pct) + "% (rev)")
+if allowReverse and strategy.position_size < 0 and freshBuy and confidence_pct >= revGate
+    strategy.close("S", comment="↻rev BUY")
+    if useLong
+        strategy.entry("L", strategy.long, comment="BUY " + str.tostring(confidence_pct) + "% (rev)")
 
-if strategy.position_size != 0 and na(entryP)
-    entryP := strategy.position_avg_price
+// ── EXIT: TIME-STOP ONLY (binary expiry; NO TP/SL) ─────────────────────
+var int entryT = na
+if strategy.position_size != 0 and na(entryT)
     entryT := time
-
-if strategy.position_size > 0
-    tp = entryP * (1 + tpPct / 100)
-    sl = entryP * (1 - slPct / 100)
-    strategy.exit("Lx", "L", limit=tp, stop=sl)
-
-if strategy.position_size < 0
-    tp = entryP * (1 - tpPct / 100)
-    sl = entryP * (1 + slPct / 100)
-    strategy.exit("Sx", "S", limit=tp, stop=sl)
-
-horizonMs = horizonH * 60 * 60 * 1000
-if strategy.position_size != 0 and not na(entryT) and (time - entryT) >= horizonMs
-    strategy.close_all(comment="time-stop")
-
+expiryMs = int(expiryH * 60.0 * 60.0 * 1000.0)
+if strategy.position_size != 0 and not na(entryT) and (time - entryT) >= expiryMs
+    strategy.close_all(comment="expiry")
 if strategy.position_size == 0
-    entryP := na
     entryT := na
 
 // ── VISUAL LABELS ──────────────────────────────────────────────────────
@@ -255,8 +295,13 @@ plotshape(showLbl and freshBuy,  title="BUY",
           style=shape.labelup,   location=location.belowbar,
           color=color.new(color.green, 0), textcolor=color.white,
           text="BUY", size=size.small)
-
 plotshape(showLbl and freshSell, title="SELL",
           style=shape.labeldown, location=location.abovebar,
           color=color.new(color.red, 0),   textcolor=color.white,
           text="SELL", size=size.small)
+
+if showHorizonLine and (freshBuy or freshSell)
+    expBar = time + expiryMs
+    line.new(x1=time, y1=close, x2=expBar, y2=close,
+             xloc=xloc.bar_time, color=color.new(freshBuy ? color.green : color.red, 50),
+             style=line.style_dashed, width=2)

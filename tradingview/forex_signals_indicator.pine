@@ -1,20 +1,48 @@
 // © Jony-wws / Forex-wws2277 — mirrored from app/analyzer.py
-// Multi-timeframe BUY/SELL signal indicator for forex.
-// M15 + H1 + H4 + D1 voting; signal fires only when confidence >= 80 %.
-// Apply on ANY chart timeframe — script always pulls D1/H4/H1/M15 itself.
+// FOREX-28 v2 — universal binary-options indicator
+// Designed for the Android TradingView app (no PC needed): live BUY/SELL labels
+// PLUS an on-chart live backtest table that updates in real time.
+//
+// Trading model: BINARY OPTION — no TP / no SL.
+//   - On a fresh BUY signal → "open" virtual position
+//   - After `expiryH` hours → evaluate: WIN if price moved in predicted dir,
+//     LOSS otherwise. Symmetric for SELL.
+//   - Reversal: if a strong opposite signal appears before expiry → close old
+//     at current price (evaluate now), open new in opposite direction, draw a
+//     ❌-reverse marker on the chart.
+//   - Per-pair allowlist: indicator only fires on pairs whose historical WR
+//     ≥ minPairWR%. Other pairs are "muted" (you'll see "PAIR MUTED" banner).
+//   - Daily DD halt: if today's drawdown ≥ dailyDDLimit% — indicator stops
+//     firing new signals until next UTC day.
+//
+// Universal across timeframes M15 / M30 / H1 / H4 — pulls the same htf data
+// (D1+H4+H1+M15) regardless of chart TF.
+
 //@version=5
-indicator(title     = "FOREX-28 Signals — Multi-TF (D1+H4+H1+M15)",
-          shorttitle= "FX-28",
-          overlay   = true,
-          max_labels_count = 500)
+indicator(title           = "FOREX-28 v2 — universal binary-options",
+          shorttitle      = "FX-28 v2",
+          overlay         = true,
+          max_labels_count = 500,
+          max_lines_count  = 100)
 
 // ── INPUTS ─────────────────────────────────────────────────────────────
-gateConf      = input.int(90,  "Минимальная уверенность для сигнала, %", minval=50, maxval=95)
-showInfoTable = input.bool(true,"Показать таблицу с уверенностью")
-showSignals   = input.bool(true,"Показывать метки BUY / SELL")
+gateConf      = input.int  (80,   "Минимальная уверенность для сигнала, %",  minval=50, maxval=95, group="Сигнал")
+expiryH       = input.float(5.0,  "Горизонт сделки, часов (binary expiry)",  minval=0.25, maxval=24, step=0.25, group="Сигнал")
+allowReverse  = input.bool (true, "Разрешить разворот (закрыть и открыть в противоположную сторону)", group="Сигнал")
+revGate       = input.int  (80,   "Уверенность для разворота, %",            minval=50, maxval=95, group="Сигнал")
 
-// ── PER-TF AGGREGATOR FUNCTIONS  (each runs in security() context) ─────
-// All H1 indicators in one call — keeps us well under the 40-security limit.
+minPairWR     = input.int  (70,   "Минимальный WR пары для активации, %",    minval=0,  maxval=95, group="Фильтры качества")
+useAllowlist  = input.bool (true, "Использовать allowlist (включать сигнал только на проверенных парах)", group="Фильтры качества")
+muteOnDD      = input.bool (true, "Останавливать сигналы при просадке за день", group="Фильтры качества")
+dailyDDLimit  = input.float(50.0, "Дневной DD-лимит, %",                     minval=10.0, maxval=99.0, step=1.0, group="Фильтры качества")
+
+showSignals   = input.bool (true, "Показывать метки BUY / SELL / REVERSE", group="Отображение")
+showInfoTable = input.bool (true, "Показать таблицу сигнала + бэктест",    group="Отображение")
+showHorizonLine = input.bool(true,"Линия горизонта сделки на чарте",       group="Отображение")
+infoTblPos    = input.string("top_right", "Позиция таблицы", options=["top_right","top_left","bottom_right","bottom_left","middle_right","middle_left"], group="Отображение")
+
+// ── PER-TF AGGREGATORS ────────────────────────────────────────────────
+// Pull D1+H4+H1+M15 in 4 security calls regardless of chart TF.
 f_h1_pack() =>
     e20  = ta.ema(close, 20)
     e50  = ta.ema(close, 50)
@@ -26,47 +54,57 @@ f_h1_pack() =>
     sk = ta.stoch(close, high, low, 14)
     sd = ta.sma(sk, 3)
     [dp, dm, ax] = ta.dmi(14, 14)
-    wr = ta.wpr(14)
+    wr  = ta.wpr(14)
     mom = (close / close[10] - 1) * 100
-    [close, e20, e50, rsi, h, hp, bbpct, sk, sd, dp, dm, ax, wr, mom]
+    // Ichimoku
+    tk  = (ta.highest(high,  9) + ta.lowest(low,  9)) / 2
+    kj  = (ta.highest(high, 26) + ta.lowest(low, 26)) / 2
+    sa  = (tk + kj) / 2
+    sb  = (ta.highest(high, 52) + ta.lowest(low, 52)) / 2
+    aboveC = close > math.max(sa, sb)
+    belowC = close < math.min(sa, sb)
+    // VWAP — works only when volume present (else na, we skip the block)
+    vw  = ta.vwap
+    vw_ok = not na(vw)
+    // Price Action: simple engulfing + hammer/shooting-star detection on H1
+    bullEng = close > open and close[1] < open[1] and close > open[1] and open <= close[1]
+    bearEng = close < open and close[1] > open[1] and close < open[1] and open >= close[1]
+    body    = math.abs(close - open)
+    upWick  = high - math.max(close, open)
+    dnWick  = math.min(close, open) - low
+    hammer  = body > 0 and dnWick > 2 * body and upWick < body
+    shootng = body > 0 and upWick > 2 * body and dnWick < body
+    paScore = (bullEng or hammer ? 2 : 0) - (bearEng or shootng ? 2 : 0)
+    [close, e20, e50, rsi, h, hp, bbpct, sk, sd, dp, dm, ax, wr, mom,
+     aboveC, belowC, tk, kj, vw, vw_ok, paScore]
 
 f_m15_pack() =>
-    e20 = ta.ema(close, 20)
-    e50 = ta.ema(close, 50)
-    [close, e20, e50]
+    [close, ta.ema(close, 20), ta.ema(close, 50)]
 
 f_h4_pack() =>
-    e50  = ta.ema(close, 50)
-    e200 = ta.ema(close, 200)
-    [close, e50, e200]
+    [close, ta.ema(close, 50), ta.ema(close, 200)]
 
 f_d1_pack() =>
-    e50  = ta.ema(close, 50)
-    e200 = ta.ema(close, 200)
-    [close, e50, e200]
+    [close, ta.ema(close, 50), ta.ema(close, 200)]
 
-// ── PULL HTF DATA (4 security calls total) ─────────────────────────────
 [h1_close, h1_ema20, h1_ema50, h1_rsi, h1_hist, h1_hist_prev,
- h1_bbpct, h1_sk, h1_sd, h1_dp, h1_dm, h1_adx, h1_wr, h1_mom] =
-     request.security(syminfo.tickerid, "60", f_h1_pack(), barmerge.gaps_off, barmerge.lookahead_off)
-
+ h1_bbpct, h1_sk, h1_sd, h1_dp, h1_dm, h1_adx, h1_wr, h1_mom,
+ h1_above, h1_below, h1_tk, h1_kj, h1_vwap, h1_vwap_ok, h1_pa] =
+     request.security(syminfo.tickerid, "60",  f_h1_pack(),  barmerge.gaps_off, barmerge.lookahead_off)
 [m15_close, m15_ema20, m15_ema50] =
-     request.security(syminfo.tickerid, "15", f_m15_pack(), barmerge.gaps_off, barmerge.lookahead_off)
-
+     request.security(syminfo.tickerid, "15",  f_m15_pack(), barmerge.gaps_off, barmerge.lookahead_off)
 [h4_close, h4_ema50, h4_ema200] =
-     request.security(syminfo.tickerid, "240", f_h4_pack(), barmerge.gaps_off, barmerge.lookahead_off)
-
+     request.security(syminfo.tickerid, "240", f_h4_pack(),  barmerge.gaps_off, barmerge.lookahead_off)
 [d1_close, d1_ema50, d1_ema200] =
-     request.security(syminfo.tickerid, "D", f_d1_pack(), barmerge.gaps_off, barmerge.lookahead_off)
+     request.security(syminfo.tickerid, "D",   f_d1_pack(),  barmerge.gaps_off, barmerge.lookahead_off)
 
-// ── SCORE / MAX POSSIBLE ───────────────────────────────────────────────
+// ── 15 voting blocks (mirrors app/analyzer.py) ──────────────────────────
 var float score_v = 0.
 var float maxp_v  = 0.
-
 score_v := 0.
 maxp_v  := 0.
 
-// A0. D1 trend  (weight 3)
+// A0. D1 trend (±3)
 if d1_close > d1_ema50 and d1_ema50 > d1_ema200
     score_v := score_v + 3
 else if d1_close < d1_ema50 and d1_ema50 < d1_ema200
@@ -77,7 +115,7 @@ else if d1_close < d1_ema50
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// A. H4 trend  (weight 3)
+// A. H4 trend (±3)
 if h4_close > h4_ema50 and h4_ema50 > h4_ema200
     score_v := score_v + 3
 else if h4_close < h4_ema50 and h4_ema50 < h4_ema200
@@ -88,21 +126,21 @@ else if h4_close < h4_ema50
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// B. H1 confirmation  (weight 2)
+// B. H1 confirmation (±2)
 if h1_close > h1_ema20 and h1_ema20 > h1_ema50
     score_v := score_v + 2
 else if h1_close < h1_ema20 and h1_ema20 < h1_ema50
     score_v := score_v - 2
 maxp_v := maxp_v + 2
 
-// C. M15 entry  (weight 1)
+// C. M15 entry (±1)
 if m15_close > m15_ema20
     score_v := score_v + 1
 else
     score_v := score_v - 1
 maxp_v := maxp_v + 1
 
-// D. RSI on H1  (weight 3)
+// D. RSI (±3)
 if h1_rsi > 55 and h1_rsi < 70
     score_v := score_v + 2
 else if h1_rsi > 30 and h1_rsi < 45
@@ -113,7 +151,7 @@ else if h1_rsi <= 30
     score_v := score_v + 3
 maxp_v := maxp_v + 3
 
-// E. MACD on H1  (weight 3)
+// E. MACD (±3)
 if h1_hist > 0 and h1_hist_prev <= 0
     score_v := score_v + 3
 else if h1_hist < 0 and h1_hist_prev >= 0
@@ -128,7 +166,7 @@ else if h1_hist < 0
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// F. Bollinger %B on H1  (weight 2)
+// F. Bollinger %B (±2)
 if h1_bbpct > 0.95
     score_v := score_v - 2
 else if h1_bbpct < 0.05
@@ -139,7 +177,7 @@ else if h1_bbpct < 0.35
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// G. Stochastic on H1  (weight 2)
+// G. Stochastic (±2)
 if h1_sk < 20 and h1_sd < 20
     score_v := score_v + 2
 else if h1_sk > 80 and h1_sd > 80
@@ -150,7 +188,7 @@ else if h1_sk < h1_sd and h1_sk > 20
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// H. ADX on H1  (weight 3)
+// H. ADX (±3)
 if h1_adx < 15
     score_v := score_v > 0 ? score_v - math.abs(score_v) * 0.5 : score_v + math.abs(score_v) * 0.5
 else if h1_adx > 30
@@ -165,14 +203,25 @@ else if h1_adx > 20
         score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// I. Williams %R on H1  (weight 1)
+// I. Williams %R (±1)
 if h1_wr > -20
     score_v := score_v - 1
 else if h1_wr < -80
     score_v := score_v + 1
 maxp_v := maxp_v + 1
 
-// K. Momentum on H1 (10-bar %)  (weight 2)
+// J. Ichimoku (±3)
+if h1_above and h1_tk > h1_kj
+    score_v := score_v + 3
+else if h1_below and h1_tk < h1_kj
+    score_v := score_v - 3
+else if h1_above
+    score_v := score_v + 1
+else if h1_below
+    score_v := score_v - 1
+maxp_v := maxp_v + 3
+
+// K. Momentum (±2)
 if h1_mom > 0.15
     score_v := score_v + 2
 else if h1_mom < -0.15
@@ -183,7 +232,15 @@ else if h1_mom < -0.05
     score_v := score_v - 1
 maxp_v := maxp_v + 2
 
-// M. Multi-TF agreement (D1+H4+H1+M15)  (weight 3)
+// L. VWAP (±1) — only counts when volume present (forex on Oanda etc has no vol)
+if h1_vwap_ok
+    if h1_close > h1_vwap * 1.001
+        score_v := score_v + 1
+    else if h1_close < h1_vwap * 0.999
+        score_v := score_v - 1
+    maxp_v := maxp_v + 1
+
+// M. Multi-TF agreement (±3)
 bull4 = (d1_close > d1_ema50 ? 1 : 0) + (h4_close > h4_ema50 ? 1 : 0) + (h1_close > h1_ema20 ? 1 : 0) + (m15_close > m15_ema20 ? 1 : 0)
 if bull4 == 4
     score_v := score_v + 3
@@ -195,60 +252,260 @@ else if bull4 <= 1
     score_v := score_v - 1
 maxp_v := maxp_v + 3
 
-// O. M15 EMA20/50 cross  (weight 1)
+// N. Price Action (±2..±3)
+if h1_pa != 0
+    capped = math.max(-3, math.min(3, h1_pa))
+    score_v := score_v + capped
+maxp_v := maxp_v + 3
+
+// O. M15 EMA20/50 cross (±1)
 if m15_ema20 > m15_ema50
     score_v := score_v + 1
 else
     score_v := score_v - 1
 maxp_v := maxp_v + 1
 
-// ── CONFIDENCE ─────────────────────────────────────────────────────────
+// ── CONFIDENCE / SIGNAL ─────────────────────────────────────────────────
 ratio = maxp_v > 0 ? math.min(1.0, math.abs(score_v) / maxp_v) : 0.0
 confidence_pct = math.round(math.max(50, math.min(95, 50 + 45 * (1 - math.exp(-3.66 * ratio)))))
-direction = score_v > 0 ? "BUY" : score_v < 0 ? "SELL" : "—"
-isStrong  = confidence_pct >= gateConf and direction != "—"
+direction = score_v > 0 ? 1 : score_v < 0 ? -1 : 0    // +1=BUY, -1=SELL
 
-// Track previous direction to plot ONE label per fresh signal, not per bar
-var string prevDir = "—"
-freshBuy  = isStrong and direction == "BUY"  and prevDir != "BUY"
-freshSell = isStrong and direction == "SELL" and prevDir != "SELL"
-if isStrong
-    prevDir := direction
+// ── PER-PAIR ALLOWLIST ─────────────────────────────────────────────────
+// Comma-separated list of TradingView tickerids that have historical WR >= 70%.
+// Run the strategy file in Strategy Tester per pair, copy the symbols that pass.
+allowlist_inp = input.string("FX:EURUSD,FX:GBPUSD,FX:USDJPY,FX:AUDUSD,FX:USDCAD,FX:NZDUSD,FX:USDCHF,OANDA:EURUSD,OANDA:GBPUSD,OANDA:USDJPY,OANDA:AUDUSD,OANDA:USDCAD,OANDA:NZDUSD,OANDA:USDCHF,FX_IDC:EURUSD", "Allowlist (comma-separated symbols, hist WR >= threshold)", group="Quality filters")
 
-// ── PLOT SIGNALS ───────────────────────────────────────────────────────
-plotshape(showSignals and freshBuy,  title="BUY",
+f_in_allowlist(s) =>
+    found = false
+    list  = str.split(allowlist_inp, ",")
+    if array.size(list) > 0
+        for i = 0 to array.size(list) - 1
+            if str.contains(s, str.trim(array.get(list, i)))
+                found := true
+                break
+    found
+
+pair_id      = syminfo.tickerid
+pair_allowed = not useAllowlist or f_in_allowlist(pair_id)
+
+// ── DAILY DD HALT (computed live from in-script trade tracker, see below) ──
+var float dayStartEquity = 100.0
+var float curEquity      = 100.0
+var int   curDay         = na
+utcDayIdx = math.floor(time / 86400000)
+isNewDay = na(curDay) or curDay != utcDayIdx
+if isNewDay
+    dayStartEquity := curEquity
+    curDay         := utcDayIdx
+dayDD = dayStartEquity > 0 ? math.max(0.0, (dayStartEquity - curEquity) / dayStartEquity * 100.0) : 0.0
+ddHalted = muteOnDD and dayDD >= dailyDDLimit
+
+// ── FRESH SIGNAL DETECTION ─────────────────────────────────────────────
+isStrong = confidence_pct >= gateConf and direction != 0
+canFire  = pair_allowed and not ddHalted
+
+var int   prevDir         = 0
+var float prevSignalConf  = 0.0
+
+// fresh = signal direction changed since previous strong signal
+freshBuy  = canFire and isStrong and direction ==  1 and prevDir !=  1
+freshSell = canFire and isStrong and direction == -1 and prevDir != -1
+isReverse = (freshBuy and prevDir == -1) or (freshSell and prevDir ==  1)
+
+if isStrong and canFire
+    prevDir         := direction
+    prevSignalConf  := confidence_pct
+
+// ── BINARY-OPTION TRACKER (live, in-script, no strategy.* needed) ──────
+// Each open trade: entry price, entry bar time, direction (+1/-1), entry conf.
+// On every bar we close any trade whose age >= expiry, and tally win/loss.
+var array<float> tEntry  = array.new<float>(0)
+var array<int>   tStart  = array.new<int>(0)
+var array<int>   tDir    = array.new<int>(0)
+var array<int>   tConf   = array.new<int>(0)
+
+var int totSig = 0
+var int totWin = 0
+var int totLoss = 0
+var int dayWin  = 0
+var int dayLoss = 0
+var int dayTrades = 0
+var float netPnL  = 0.0
+
+if isNewDay
+    dayWin     := 0
+    dayLoss    := 0
+    dayTrades  := 0
+
+expiryMs = int(expiryH * 60.0 * 60.0 * 1000.0)
+
+// 1) close any expired or reversed trades
+i = array.size(tEntry) - 1
+while i >= 0
+    eP   = array.get(tEntry, i)
+    eT   = array.get(tStart, i)
+    eDir = array.get(tDir,   i)
+    expired = (time - eT) >= expiryMs
+    reversed = false
+    // reversal close: fresh opposite signal of high conf
+    if allowReverse
+        if eDir ==  1 and freshSell and confidence_pct >= revGate
+            reversed := true
+        if eDir == -1 and freshBuy  and confidence_pct >= revGate
+            reversed := true
+    if expired or reversed
+        // evaluate
+        win = false
+        if eDir ==  1
+            win := close > eP
+        else
+            win := close < eP
+        // payout model: +0.8 on win, -1.0 on loss (typical 80% binary)
+        if win
+            totWin := totWin + 1
+            dayWin := dayWin + 1
+            netPnL := netPnL + 0.80
+            curEquity := curEquity + 0.80
+        else
+            totLoss := totLoss + 1
+            dayLoss := dayLoss + 1
+            netPnL := netPnL - 1.0
+            curEquity := curEquity - 1.0
+        dayTrades := dayTrades + 1
+        // remove from arrays
+        array.remove(tEntry, i)
+        array.remove(tStart, i)
+        array.remove(tDir,   i)
+        array.remove(tConf,  i)
+    i := i - 1
+
+// 2) open a new trade if fresh signal
+opened_now = false
+if (freshBuy or freshSell) and canFire
+    array.push(tEntry, close)
+    array.push(tStart, time)
+    array.push(tDir,   freshBuy ? 1 : -1)
+    array.push(tConf,  confidence_pct)
+    totSig := totSig + 1
+    opened_now := true
+
+// ── PLOT BUY / SELL / REVERSE LABELS ────────────────────────────────────
+freshBuyVisible  = showSignals and freshBuy
+freshSellVisible = showSignals and freshSell
+
+plotshape(freshBuyVisible and not isReverse,  title="BUY",
           style=shape.labelup,   location=location.belowbar,
           color=color.new(color.green, 0), textcolor=color.white,
           text="BUY", size=size.small)
-
-plotshape(showSignals and freshSell, title="SELL",
+plotshape(freshSellVisible and not isReverse, title="SELL",
           style=shape.labeldown, location=location.abovebar,
           color=color.new(color.red, 0),   textcolor=color.white,
           text="SELL", size=size.small)
+plotshape(showSignals and freshBuy  and isReverse, title="REVERSE→BUY",
+          style=shape.labelup,   location=location.belowbar,
+          color=color.new(color.lime, 0), textcolor=color.black,
+          text="↻BUY", size=size.normal)
+plotshape(showSignals and freshSell and isReverse, title="REVERSE→SELL",
+          style=shape.labeldown, location=location.abovebar,
+          color=color.new(color.fuchsia, 0), textcolor=color.white,
+          text="↻SELL", size=size.normal)
 
-// ── INFO TABLE (top-right, last bar) ───────────────────────────────────
-var table tbl = table.new(position.top_right, 2, 6,
+// horizon-line on entry: visualises max trade duration
+if showHorizonLine and (freshBuy or freshSell) and canFire
+    expBar = time + expiryMs
+    line.new(x1=time, y1=close, x2=expBar, y2=close,
+             xloc=xloc.bar_time, color=color.new(freshBuy ? color.green : color.red, 50),
+             style=line.style_dashed, width=2)
+
+// ── INFO + LIVE BACKTEST TABLE ─────────────────────────────────────────
+f_pos(s) =>
+    s == "top_left"      ? position.top_left      :
+     s == "top_right"     ? position.top_right     :
+     s == "bottom_left"   ? position.bottom_left   :
+     s == "bottom_right"  ? position.bottom_right  :
+     s == "middle_left"   ? position.middle_left   :
+     s == "middle_right"  ? position.middle_right  :
+     position.top_right
+
+var table tbl = table.new(f_pos(infoTblPos), 2, 14,
                           border_color=color.new(color.gray, 50), border_width=1)
 
 if barstate.islast and showInfoTable
-    sigBg = isStrong and direction == "BUY"  ? color.new(color.green, 20) : isStrong and direction == "SELL" ? color.new(color.red, 20)   : color.new(color.gray, 30)
-    bgDk  = color.new(color.black, 70)
-    table.cell(tbl, 0, 0, "FOREX-28",       text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.small)
-    table.cell(tbl, 1, 0, syminfo.ticker,    text_color=color.white, bgcolor=color.new(color.blue, 30), text_size=size.small)
-    table.cell(tbl, 0, 1, "Сигнал",          text_color=color.silver, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 1, 1, isStrong ? direction : "ОЖИДАНИЕ", text_color=color.white, bgcolor=sigBg, text_size=size.small)
-    table.cell(tbl, 0, 2, "Уверенность",     text_color=color.silver, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 1, 2, str.tostring(confidence_pct) + "%",          text_color=color.white, bgcolor=sigBg, text_size=size.small)
-    table.cell(tbl, 0, 3, "Score / Max",     text_color=color.silver, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 1, 3, str.tostring(math.round(score_v)) + " / " + str.tostring(math.round(maxp_v)), text_color=color.white, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 0, 4, "Порог входа",     text_color=color.silver, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 1, 4, "≥ " + str.tostring(gateConf) + "%",          text_color=color.white, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 0, 5, "Цена",            text_color=color.silver, bgcolor=bgDk, text_size=size.small)
-    table.cell(tbl, 1, 5, str.tostring(close, format.mintick),         text_color=color.white, bgcolor=bgDk, text_size=size.small)
+    sigBg = isStrong and direction ==  1 ? color.new(color.green, 20) :
+             isStrong and direction == -1 ? color.new(color.red,   20) :
+             color.new(color.gray, 30)
+    bgDk   = color.new(color.black, 70)
+    bgHead = color.new(color.blue,  20)
 
-// ── ALERTS ─────────────────────────────────────────────────────────────
-// Pine `alertcondition` requires a *const* message string, so we keep the
-// alert text static.  The actual confidence/gate value at signal time is
-// available in the chart's info table and via the {{ticker}} placeholder.
-alertcondition(freshBuy,  title="FX-28 BUY",  message="BUY {{ticker}} — FOREX-28 signal (conf >= gateConf)")
-alertcondition(freshSell, title="FX-28 SELL", message="SELL {{ticker}} — FOREX-28 signal (conf >= gateConf)")
+    totalDone = totWin + totLoss
+    wrPct  = totalDone > 0 ? math.round(totWin * 100.0 / totalDone) : 0
+    breakEven80 = 56  // payout 80% → break-even WR is ~56%
+    wrColor = wrPct >= 70 ? color.new(color.green, 0) : wrPct >= breakEven80 ? color.new(color.orange, 0) : color.new(color.red, 0)
+
+    pf = totLoss > 0 ? math.round(totWin * 0.80 / (totLoss * 1.0) * 100) / 100 : (totWin > 0 ? 99.0 : 0.0)
+
+    statusTxt = ddHalted ? "🛑 DD HALT" : not pair_allowed ? "🔇 PAIR MUTED" : isStrong ? (direction ==  1 ? "BUY" : "SELL") : "ОЖИДАНИЕ"
+    statusBg  = ddHalted ? color.new(color.red, 0) : not pair_allowed ? color.new(color.gray, 0) : sigBg
+
+    // Header
+    table.cell(tbl, 0, 0, "FX-28 v2",            text_color=color.white, bgcolor=bgHead, text_size=size.small)
+    table.cell(tbl, 1, 0, syminfo.ticker + " " + timeframe.period, text_color=color.white, bgcolor=bgHead, text_size=size.small)
+    // Signal row
+    table.cell(tbl, 0, 1, "Сигнал",               text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 1, statusTxt,              text_color=color.white,  bgcolor=statusBg, text_size=size.small)
+    // Confidence
+    table.cell(tbl, 0, 2, "Уверенность",          text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(confidence_pct) + "%", text_color=color.white, bgcolor=sigBg, text_size=size.small)
+    // Score / Max
+    table.cell(tbl, 0, 3, "Score / Max",          text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 3, str.tostring(math.round(score_v)) + " / " + str.tostring(math.round(maxp_v)),
+               text_color=color.white, bgcolor=bgDk, text_size=size.small)
+    // Live backtest header
+    table.cell(tbl, 0, 4, "── БЭКТЕСТ (live) ──", text_color=color.yellow, bgcolor=bgHead, text_size=size.small)
+    table.cell(tbl, 1, 4, "",                     text_color=color.white,  bgcolor=bgHead, text_size=size.small)
+    // Win rate
+    table.cell(tbl, 0, 5, "Win Rate",             text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 5, str.tostring(wrPct) + "% (" + str.tostring(totWin) + "/" + str.tostring(totalDone) + ")",
+               text_color=color.white, bgcolor=wrColor, text_size=size.small)
+    // Profit factor
+    table.cell(tbl, 0, 6, "Profit Factor (80%)",  text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    pfColor = pf >= 1.5 ? color.new(color.green, 0) : pf >= 1.0 ? color.new(color.orange, 0) : color.new(color.red, 0)
+    table.cell(tbl, 1, 6, str.tostring(pf),       text_color=color.white, bgcolor=pfColor, text_size=size.small)
+    // Total signals
+    table.cell(tbl, 0, 7, "Сигналов",             text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 7, str.tostring(totSig) + " (откр. " + str.tostring(array.size(tEntry)) + ")",
+               text_color=color.white, bgcolor=bgDk, text_size=size.small)
+    // Net P&L (in payout units)
+    table.cell(tbl, 0, 8, "Net P&L (юнитов)",     text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    pnlColor = netPnL > 0 ? color.new(color.green, 0) : netPnL < 0 ? color.new(color.red, 0) : bgDk
+    table.cell(tbl, 1, 8, str.tostring(math.round(netPnL * 100) / 100), text_color=color.white, bgcolor=pnlColor, text_size=size.small)
+    // Equity & day DD
+    table.cell(tbl, 0, 9, "Equity %",             text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    eqDelta = math.round((curEquity - 100) * 100) / 100
+    eqColor = eqDelta > 0 ? color.new(color.green, 0) : eqDelta < 0 ? color.new(color.red, 0) : bgDk
+    table.cell(tbl, 1, 9, str.tostring(math.round(curEquity * 100) / 100) + " (" + (eqDelta >= 0 ? "+" : "") + str.tostring(eqDelta) + ")",
+               text_color=color.white, bgcolor=eqColor, text_size=size.small)
+    // Day stats
+    table.cell(tbl, 0, 10,"Сегодня",              text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    dWR = dayTrades > 0 ? math.round(dayWin * 100.0 / dayTrades) : 0
+    table.cell(tbl, 1, 10, "WR " + str.tostring(dWR) + "% — " + str.tostring(dayWin) + "W/" + str.tostring(dayLoss) + "L",
+               text_color=color.white, bgcolor=bgDk, text_size=size.small)
+    // Day DD
+    table.cell(tbl, 0, 11,"Day DD",               text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    ddColor = dayDD >= dailyDDLimit ? color.new(color.red, 0) : dayDD >= dailyDDLimit * 0.5 ? color.new(color.orange, 0) : color.new(color.green, 0)
+    table.cell(tbl, 1, 11, str.tostring(math.round(dayDD * 10) / 10) + "% / " + str.tostring(dailyDDLimit) + "%",
+               text_color=color.white, bgcolor=ddColor, text_size=size.small)
+    // Horizon
+    table.cell(tbl, 0, 12,"Горизонт",             text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    table.cell(tbl, 1, 12, str.tostring(expiryH) + " ч",  text_color=color.white, bgcolor=bgDk, text_size=size.small)
+    // Allowlist status
+    table.cell(tbl, 0, 13,"Пара",                 text_color=color.silver, bgcolor=bgDk,   text_size=size.small)
+    plBg = pair_allowed ? color.new(color.green, 0) : color.new(color.gray, 0)
+    table.cell(tbl, 1, 13, pair_allowed ? "✅ активна" : "🔇 muted (не в allowlist)",
+               text_color=color.white, bgcolor=plBg, text_size=size.small)
+
+// ── ALERTS (Pine v5 requires const message strings) ────────────────────
+alertcondition(freshBuy  and not isReverse, title="FX-28 v2 BUY",     message="BUY  {{ticker}} — FX-28 v2 (binary)")
+alertcondition(freshSell and not isReverse, title="FX-28 v2 SELL",    message="SELL {{ticker}} — FX-28 v2 (binary)")
+alertcondition(freshBuy  and isReverse,     title="FX-28 v2 ↻BUY",    message="REVERSE→BUY  {{ticker}} — FX-28 v2")
+alertcondition(freshSell and isReverse,     title="FX-28 v2 ↻SELL",   message="REVERSE→SELL {{ticker}} — FX-28 v2")
