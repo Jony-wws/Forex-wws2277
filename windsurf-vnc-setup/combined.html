@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover'>
+<title>Windsurf</title>
+<style>
+  *,*:before,*:after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background:#000; color:#eee;
+               font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+  #screen { flex: 1 1 auto; min-height: 0; background:#000; position:relative; }
+  #screen canvas { display: block; }
+  #panel { flex: 0 0 auto; background:#1e1e1e; border-top:1px solid #333; padding:8px; }
+  #t { width:100%; box-sizing:border-box; font-size:16px; padding:8px;
+       border-radius:6px; border:1px solid #444; background:#2b2b2b; color:#fff;
+       resize: vertical; min-height: 56px; max-height: 200px; }
+  .row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  button { flex: 1 1 0; padding:10px 6px; font-size:14px; border:0; border-radius:6px;
+           background:#0a84ff; color:#fff; font-weight:600; }
+  button.s { background:#3a3a3a; }
+  button.k { padding:8px 4px; font-size:13px; background:#3a3a3a; }
+  .keys { display:grid; grid-template-columns: repeat(6, 1fr); gap:4px; margin-top:6px; }
+  #status { font-size:12px; color:#9ad; min-height:14px; margin-top:4px; }
+  #toggle { position:absolute; top:6px; right:6px; z-index:10; background:rgba(0,0,0,.6);
+            color:#fff; border:1px solid #555; border-radius:4px; padding:6px 10px;
+            font-size:12px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id='screen'>
+  <button id='toggle' onclick='togglePanel()'>Hide panel</button>
+</div>
+<div id='panel'>
+  <textarea id='t' placeholder='Пиши сюда — текст пойдёт прямо в Windsurf' autocapitalize='off' autocomplete='off' autocorrect='off' spellcheck='false'></textarea>
+  <div class='row'>
+    <button onclick='sendText(true)'>Отправить (Enter)</button>
+    <button class='s' onclick='sendText(false)'>Только напечатать</button>
+  </div>
+  <div class='keys'>
+    <button class='k' onclick='sendKey("Return")'>Enter</button>
+    <button class='k' onclick='sendKey("Tab")'>Tab</button>
+    <button class='k' onclick='sendKey("Escape")'>Esc</button>
+    <button class='k' onclick='sendKey("BackSpace")'>Bksp</button>
+    <button class='k' onclick='sendKey("Up")'>↑</button>
+    <button class='k' onclick='sendKey("Down")'>↓</button>
+    <button class='k' onclick='sendKey("Left")'>←</button>
+    <button class='k' onclick='sendKey("Right")'>→</button>
+    <button class='k' onclick='sendKey("ctrl+l")'>Ctrl+L</button>
+    <button class='k' onclick='sendKey("ctrl+a")'>Ctrl+A</button>
+    <button class='k' onclick='sendKey("ctrl+c")'>Ctrl+C</button>
+    <button class='k' onclick='sendKey("ctrl+v")'>Ctrl+V</button>
+  </div>
+  <div id='status'>Connecting...</div>
+</div>
+
+<script type='module'>
+import RFB from './core/rfb.js';
+
+// Build absolute URL without embedded credentials (Chrome rejects fetch
+// to URLs with user:pass@). location.host strips out userinfo.
+const TYPE_URL = window.location.protocol + '//' + window.location.host;
+const PASSWORD = 'devin';
+let rfb = null;
+const status = (m, c) => { const e = document.getElementById('status'); e.textContent = m; e.style.color = c || '#9ad'; };
+
+function connect() {
+  const proto = (window.location.protocol === 'https:') ? 'wss' : 'ws';
+  const url = proto + '://' + window.location.host + '/websockify';
+  status('Connecting to ' + url + ' ...');
+  try {
+    rfb = new RFB(document.getElementById('screen'), url, {
+      credentials: { password: PASSWORD }
+    });
+    rfb.scaleViewport = true;
+    rfb.resizeSession = false;
+    rfb.viewOnly = false;
+    rfb.background = '#000';
+    rfb.addEventListener('connect', () => status('Connected', '#9d9'));
+    rfb.addEventListener('disconnect', (e) => {
+      status('Disconnected: ' + (e.detail && e.detail.reason ? e.detail.reason : 'unknown') + ' (reload page to reconnect)', '#f99');
+    });
+    rfb.addEventListener('credentialsrequired', () => {
+      rfb.sendCredentials({ password: PASSWORD });
+    });
+    rfb.addEventListener('securityfailure', (e) => {
+      status('Security failure: ' + (e.detail && e.detail.reason ? e.detail.reason : 'unknown'), '#f99');
+    });
+  } catch (e) {
+    status('Error: ' + e.message, '#f99');
+  }
+}
+
+window.sendText = async function(enter) {
+  const t = document.getElementById('t');
+  const text = t.value;
+  if (!text) { status('Empty', '#fc8'); return; }
+  status('Sending ' + text.length + ' chars...');
+  try {
+    const r = await fetch(TYPE_URL + '/type', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, enter: !!enter, focus_chat: true }),
+      credentials: 'include',
+      mode: 'cors',
+    });
+    const j = await r.json();
+    if (j.ok) {
+      status('Sent ' + text.length + ' chars' + (enter ? ' + Enter' : ''), '#9d9');
+      t.value = '';
+    } else {
+      status('Error: ' + j.error, '#f99');
+    }
+  } catch (e) {
+    status('Network error: ' + e.message, '#f99');
+  }
+};
+
+window.sendKey = async function(k) {
+  status('Sending key: ' + k);
+  try {
+    const r = await fetch(TYPE_URL + '/key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: k }),
+      credentials: 'include',
+      mode: 'cors',
+    });
+    const j = await r.json();
+    status(j.ok ? ('Sent: ' + k) : ('Error: ' + j.error), j.ok ? '#9d9' : '#f99');
+  } catch (e) {
+    status('Network error: ' + e.message, '#f99');
+  }
+};
+
+window.togglePanel = function() {
+  const p = document.getElementById('panel');
+  const b = document.getElementById('toggle');
+  if (p.style.display === 'none') {
+    p.style.display = '';
+    b.textContent = 'Hide panel';
+  } else {
+    p.style.display = 'none';
+    b.textContent = 'Show panel';
+  }
+};
+
+connect();
+</script>
+</body>
+</html>
