@@ -20,6 +20,17 @@ on:
     # is the sweet spot for forex-day-trading dashboards — Yahoo
     # Finance quotes barely move inside a single minute anyway.
     - cron: "*/15 * * * *"
+  # Self-trigger on any push that changes the pipeline — guarantees a
+  # fresh data snapshot gets published within minutes of a deploy, even
+  # before the first cron tick. (It's also the only way to seed the
+  # `data` branch for the first time after merging this workflow.)
+  push:
+    branches: [main]
+    paths:
+      - "scripts/build_static_data.py"
+      - "app/**"
+      - "requirements.txt"
+      - ".github/workflows/refresh_data.yml"
   workflow_dispatch:
     inputs:
       skip_bars:
