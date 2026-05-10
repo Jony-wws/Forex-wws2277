@@ -1,0 +1,79 @@
+name: Deploy GitHub Pages
+
+# Publishes the React v2 SPA (web/) to GitHub Pages.
+# URL after first successful run: https://jony-wws.github.io/Forex-wws2277/
+#
+# The built bundle is configured (via VITE_STATIC_DATA=1) to fetch live
+# data from the `data` branch instead of the removed /api backend, so
+# the whole stack is serverless: Actions cron fills the data, Pages
+# serves the UI, jsDelivr/raw.githubusercontent acts as the CDN.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/gh_pages.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  # Allow a newer deploy to cancel an in-flight one so the published
+  # bundle always matches the latest `main`.
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build SPA (static-data mode)
+        env:
+          # Tells the SPA (see src/lib/api.ts) to stop hitting /api/*
+          # and instead read JSON from the data branch via jsDelivr.
+          VITE_STATIC_DATA: "1"
+          VITE_DATA_OWNER: ${{ github.repository_owner }}
+          VITE_DATA_REPO: ${{ github.event.repository.name }}
+          # GitHub Pages serves project sites from
+          # /<repo-name>/, so the Vite base has to match.
+          VITE_BASE_PATH: "/${{ github.event.repository.name }}/"
+        run: npm run build
+
+      - name: Upload artefact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: static/dashboard
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,133 @@
+name: Refresh static data
+
+# Runs the analyser + yfinance pipeline every 15 minutes on a fresh
+# ubuntu-latest runner and commits the JSON output to the orphan
+# `data` branch.
+#
+# The SPA on GitHub Pages reads those JSON files directly from raw.
+# githubusercontent.com/.../data so no server is involved — just a
+# static CDN + a cron that keeps the data fresh.
+#
+# IMPORTANT: we commit to a *dedicated* branch (not main) so that:
+#   1. the main branch history stays clean;
+#   2. Fly.io / other deploys don't retrigger on data-only commits;
+#   3. The diff in this branch is tiny (JSON only), so "no changes"
+#      runs are skipped cheaply.
+
+on:
+  schedule:
+    # GitHub Actions' minimum cron granularity is 5 minutes. 15 mins
+    # is the sweet spot for forex-day-trading dashboards — Yahoo
+    # Finance quotes barely move inside a single minute anyway.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      skip_bars:
+        description: "Skip regenerating candle files (faster run)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  # Only one refresh at a time — otherwise two runs could race on the
+  # data-branch push and force retries.
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main (for source code + state)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # We need state/ from main so the 5h-cycle winrate history
+          # accumulates across runs.
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build static data snapshot
+        env:
+          # Harden yfinance against intermittent Yahoo 429/5xx — it
+          # already retries internally, but giving it a tighter budget
+          # keeps the job under the 20-min timeout even on bad days.
+          YFINANCE_TIMEOUT: "20"
+        run: |
+          if [ "${{ github.event.inputs.skip_bars }}" = "true" ]; then
+            python scripts/build_static_data.py --no-bars
+          else
+            python scripts/build_static_data.py
+          fi
+
+      - name: Publish to the `data` branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Stash freshly built data so we don't lose it during branch
+          # gymnastics.
+          mkdir -p /tmp/fresh-data
+          cp -r data/. /tmp/fresh-data/
+
+          git config user.name  "forex-data-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch the orphan `data` branch if it already exists;
+          # otherwise create one from scratch.
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch origin data --depth=1
+            git checkout -B data origin/data
+          else
+            echo "::notice::Creating orphan 'data' branch for the first time"
+            git checkout --orphan data
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          # Wipe any leftovers from a previous state and copy in the
+          # fresh snapshot.  Kept tiny to keep raw.githubusercontent
+          # lookups fast.
+          rm -rf data
+          mkdir -p data
+          cp -r /tmp/fresh-data/. data/
+
+          # Humans opening the branch on GitHub should see something.
+          cat > README.md <<'EOF'
+          # `data` branch
+
+          This branch holds JSON snapshots produced every 15 minutes by
+          `.github/workflows/refresh_data.yml`.  The GitHub Pages SPA
+          (built from `main` via `gh_pages.yml`) reads these files at
+          runtime via jsDelivr CDN.
+
+          **Do not edit by hand.**  Changes will be overwritten by the
+          next scheduled run.
+          EOF
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes in the data snapshot — nothing to push."
+            exit 0
+          fi
+
+          git commit -m "data: refresh $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin data
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "See [data branch](https://github.com/${{ github.repository }}/tree/data/data) for the latest snapshot." >> "$GITHUB_STEP_SUMMARY"

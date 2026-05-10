@@ -2,24 +2,33 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// Build artefacts are emitted into ../static/dashboard so FastAPI can
-// serve them from /v2 via StaticFiles, next to the existing / and /tg
-// dashboards.  base is set to /v2/ so all asset URLs in the built
-// index.html resolve correctly when mounted on that sub-path.
+// Vite `base` (= basename for asset URLs) + the React-Router basename
+// that main.tsx reads both come from the same env var so we only have
+// one knob to flip for each deploy target:
+//
+//   • FastAPI /v2 mount  → VITE_BASE_PATH unset → "/v2/"
+//   • GitHub Pages build → VITE_BASE_PATH="/Forex-wws2277/"
+//
+// Setting these at build time means the emitted index.html has the
+// correct <script src="…"> paths baked in for whichever host will
+// serve it.
+const basePath = process.env.VITE_BASE_PATH || "/v2/";
+
 export default defineConfig({
   plugins: [react()],
-  base: "/v2/",
+  base: basePath,
   build: {
     outDir: path.resolve(__dirname, "../static/dashboard"),
     emptyOutDir: true,
     sourcemap: false,
     target: "es2020",
   },
+  // Propagate the base path to runtime code via import.meta.env.
+  define: {
+    "import.meta.env.VITE_BASE_PATH": JSON.stringify(basePath),
+  },
   server: {
     port: 5173,
-    // During local dev the Vite server proxies /api/* to the local
-    // FastAPI dev server (uvicorn app.main:app --port 8080) so the
-    // dashboard shows live Yahoo Finance data end-to-end.
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8080",

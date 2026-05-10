@@ -43,13 +43,24 @@ export const PAIR_NAMES_RU: Record<string, string> = {
 
 export const MIN_CONFIDENCE = 80;
 
-// How often the UI refetches each endpoint.  Kept intentionally loose on
-// mobile to avoid wasted polling when the tab is backgrounded — the
-// backend scanner runs every 10s server-side anyway.
-export const POLL_INTERVAL_MS = {
-  signals: 5_000,
-  cycle: 15_000,
-  orderbook: 15_000,
-  bars: 30_000,
-  health: 30_000,
-} as const;
+// How often the UI refetches each endpoint. In static mode (GitHub
+// Pages) the data only changes every 15 minutes, so we back off the
+// poll interval dramatically to avoid hammering jsDelivr for nothing.
+const STATIC_MODE =
+  (import.meta.env.VITE_STATIC_DATA as string | undefined) === "1";
+
+export const POLL_INTERVAL_MS = STATIC_MODE
+  ? {
+      signals: 60_000,
+      cycle: 60_000,
+      orderbook: 120_000,
+      bars: 300_000,
+      health: 120_000,
+    }
+  : ({
+      signals: 5_000,
+      cycle: 15_000,
+      orderbook: 15_000,
+      bars: 30_000,
+      health: 30_000,
+    } as const);

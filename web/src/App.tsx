@@ -41,14 +41,10 @@ export default function App() {
       </main>
 
       <footer className="border-t border-border py-4 text-center text-xs text-muted">
-        Данные: Yahoo Finance · Обновление каждые 10с ·{" "}
-        <a
-          href="/"
-          className="text-accent hover:underline"
-          title="Старый дашборд"
-        >
-          Классический UI
-        </a>
+        Данные: Yahoo Finance ·{" "}
+        {import.meta.env.VITE_STATIC_DATA === "1"
+          ? "обновление каждые 15 минут (GitHub Actions cron)"
+          : "обновление каждые 10с"}
       </footer>
     </div>
   );

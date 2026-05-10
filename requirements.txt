@@ -1,0 +1,10 @@
+# Minimal runtime dependencies for the scripts/build_static_data.py
+# cron job running on ubuntu-latest via .github/workflows/refresh_data.yml.
+#
+# Version ranges match the Dockerfile so we exercise the same stack as
+# the (now-deprecated) Fly.io deploy.  FastAPI / uvicorn / slowapi are
+# intentionally omitted — the cron only needs the analyser + yfinance
+# wrappers, not the HTTP server, so we keep the install fast.
+yfinance>=0.2.40
+pandas>=2.2.0
+numpy>=1.26.0
