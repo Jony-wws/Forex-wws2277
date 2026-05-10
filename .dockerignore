@@ -39,6 +39,17 @@ scripts/
 tests/
 tradingview/
 
+# Frontend artefacts: Vite build output is produced inside the image by
+# the `frontend` Docker stage, not copied from the host.  Keep the
+# `web/` sources (needed by the builder stage) but exclude node_modules
+# and any local dev build output so we never accidentally ship stale
+# bundles from a developer's laptop.
+web/node_modules/
+web/dist/
+web/.vite/
+web/*.tsbuildinfo
+static/dashboard/
+
 # Misc.
 *.log
 *.swp

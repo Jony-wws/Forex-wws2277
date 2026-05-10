@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #0a0e17;
+  color: #e2e8f0;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar so the dark UI doesn't get a bright default scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2a3a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3a50;
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-border rounded-xl;
+  }
+  .card-hover {
+    @apply transition-colors hover:bg-cardAlt;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold;
+  }
+  .chip-buy {
+    @apply chip bg-buy/10 text-buy border border-buy/30;
+  }
+  .chip-sell {
+    @apply chip bg-sell/10 text-sell border border-sell/30;
+  }
+  .chip-neutral {
+    @apply chip bg-muted/10 text-muted border border-muted/30;
+  }
+  .chip-premium {
+    @apply chip bg-accent2/15 text-accent2 border border-accent2/40;
+  }
+  .chip-strong {
+    @apply chip bg-accent/15 text-accent border border-accent/40;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg
+           text-sm font-medium bg-card border border-border text-text
+           hover:bg-cardAlt transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-accent/15 border-accent/40 text-accent hover:bg-accent/25;
+  }
+  .skeleton {
+    @apply animate-pulse bg-cardAlt rounded-md;
+  }
+}
