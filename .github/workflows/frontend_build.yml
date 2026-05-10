@@ -1,0 +1,55 @@
+name: Frontend build
+
+# Type-checks and builds the React v2 dashboard on every PR that touches
+# /web so we know the bundle produces before Fly.io tries to build it.
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/frontend_build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/frontend_build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install deps
+        # `npm ci` requires a lockfile; fall back to `npm install` for the
+        # initial PR where no lockfile has been committed yet.
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Report bundle size
+        run: du -sh ../static/dashboard || true

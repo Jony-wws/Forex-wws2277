@@ -8,16 +8,16 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from .config import PAIRS, PAIR_NAMES_RU, TZ_UTC5, MIN_CONFIDENCE, SCAN_INTERVAL_SEC
-from .prices import get_current_price, get_price_change
+from .prices import fetch_bars, get_current_price, get_price_change
 from .analyzer import analyze_pair
 from .orderbook import get_orderbook
 from . import cycle as cycle_mod
@@ -29,9 +29,26 @@ logging.basicConfig(
 )
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+# Built React SPA (vite build → static/dashboard/). The directory is
+# created lazily at container build time by the CI frontend build step
+# (see .github/workflows/deploy_fly.yml and Dockerfile). When the folder
+# is absent — e.g. a local Python-only checkout without Node — we skip
+# mounting /v2 entirely so the classic / and /tg dashboards still work.
+DASHBOARD_DIR = STATIC_DIR / "dashboard"
 STATE_DIR = Path(__file__).resolve().parent.parent / "state"
 ORDERBOOKS_SUMMARY_FILE = STATE_DIR / "orderbooks_summary.json"
 ORDERBOOKS_SUMMARY_TTL = 60  # seconds
+
+# Allow-list of candlestick intervals exposed via /api/bars. Each entry
+# maps an interval key to the Yahoo Finance `period` string we pass to
+# fetch_bars() — picked so every timeframe returns ~150–500 bars, which
+# is a sweet spot for lightweight-charts on a phone screen.
+BAR_INTERVALS: dict[str, str] = {
+    "15m": "5d",
+    "1h": "1mo",
+    "4h": "3mo",
+    "1d": "1y",
+}
 
 _signals: dict = {"pairs": {}, "updated_at": None, "scan_count": 0}
 _orderbooks: dict = {}
@@ -322,3 +339,119 @@ async def health(request: Request):
         "updated_at": ua,
         "time_utc5": datetime.now(TZ_UTC5).strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+# ---------------------------------------------------------------------------
+# /api/bars/{pair} — candlestick data for the v2 React dashboard.
+#
+# We intentionally return the minimal OHLCV shape that
+# lightweight-charts expects (unix-seconds `time`, numeric OHLC +
+# volume), so the frontend can feed the array straight into
+# `series.setData(...)` without any per-bar transform.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/bars/{pair}")
+@limiter.limit("60/minute")
+async def get_bars(
+    request: Request,
+    pair: str,
+    interval: str = Query("1h", pattern="^(15m|1h|4h|1d)$"),
+):
+    pair = pair.upper()
+    if pair not in PAIRS:
+        raise HTTPException(status_code=404, detail=f"Unknown pair {pair}")
+
+    period = BAR_INTERVALS.get(interval)
+    if period is None:
+        raise HTTPException(status_code=400, detail="Unsupported interval")
+
+    df = fetch_bars(pair, interval=interval, period=period)
+    if df is None or df.empty:
+        return {"pair": pair, "interval": interval, "bars": []}
+
+    bars: list[dict] = []
+    for ts, row in df.iterrows():
+        # Guard against stray NaN rows — yfinance occasionally emits
+        # partial bars that pandas keeps in the frame with NaN close.
+        try:
+            close = float(row["Close"])
+        except (TypeError, ValueError):
+            continue
+        if close != close:  # NaN check
+            continue
+        bars.append({
+            "time": int(ts.timestamp()),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": close,
+            "volume": float(row.get("Volume", 0) or 0),
+        })
+
+    return {"pair": pair, "interval": interval, "bars": bars}
+
+
+# ---------------------------------------------------------------------------
+# /v2 — modern React SPA (Vite + TailwindCSS). Built artefacts live under
+# static/dashboard/ and are produced by CI before the Fly.io deploy.
+# When the build folder is missing (local dev without a frontend build)
+# we return a helpful 404 explaining how to build it rather than an
+# opaque StaticFiles error.
+# ---------------------------------------------------------------------------
+
+_DASHBOARD_INDEX = DASHBOARD_DIR / "index.html"
+
+if _DASHBOARD_INDEX.is_file():
+    # Mount hashed Vite assets (JS/CSS bundles) under /v2/assets.
+    assets_dir = DASHBOARD_DIR / "assets"
+    if assets_dir.is_dir():
+        app.mount(
+            "/v2/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="v2_assets",
+        )
+
+    @app.get("/v2", include_in_schema=False)
+    @app.get("/v2/", include_in_schema=False)
+    async def v2_root():
+        return FileResponse(_DASHBOARD_INDEX)
+
+    # SPA fallback: any unmatched /v2/<client-side-route> path (e.g.
+    # /v2/pair/EURUSD, /v2/cycle) serves index.html so react-router can
+    # handle the route on the client.  Note FastAPI will still match
+    # /v2/assets/... first because that mount is declared above, and
+    # /api/* routes are declared earlier, so we do not shadow them.
+    @app.get("/v2/{path:path}", include_in_schema=False)
+    async def v2_spa(path: str):
+        # Serve static files that exist in the build dir verbatim
+        # (favicon.ico, sitemap, etc.). Anything else falls through to
+        # index.html for client-side routing.
+        candidate = DASHBOARD_DIR / path
+        if candidate.is_file() and candidate.resolve().is_relative_to(
+            DASHBOARD_DIR.resolve()
+        ):
+            return FileResponse(candidate)
+        return FileResponse(_DASHBOARD_INDEX)
+else:
+    log.warning(
+        "Dashboard build not found at %s — /v2 routes disabled. "
+        "Run `npm ci && npm run build` in /web to generate it.",
+        DASHBOARD_DIR,
+    )
+
+    @app.get("/v2", include_in_schema=False)
+    @app.get("/v2/", include_in_schema=False)
+    @app.get("/v2/{path:path}", include_in_schema=False)
+    async def v2_missing(path: str = ""):
+        return HTMLResponse(
+            "<!doctype html><html><body style='font-family:sans-serif;"
+            "background:#0a0e17;color:#e2e8f0;padding:2rem'>"
+            "<h1>Dashboard not built</h1>"
+            "<p>The v2 React dashboard hasn't been built yet.</p>"
+            "<pre>cd web && npm ci && npm run build</pre>"
+            "<p>Then restart the server. "
+            "Meanwhile the classic dashboard is available at "
+            "<a href='/' style='color:#4fc3f7'>/</a>.</p>"
+            "</body></html>",
+            status_code=503,
+        )
