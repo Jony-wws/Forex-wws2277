@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0a0e17" />
+<title>FOREX · 28 пар · живые сигналы</title>
+
+<!--
+  FOREX dashboard — fully static, zero-install.
+  - Reads JSON snapshots from the `data` branch of this repo via jsDelivr CDN.
+  - Those snapshots are regenerated every 15 minutes by GitHub Actions
+    (.github/workflows/refresh_data.yml) on a real ubuntu-latest runner
+    with real internet access — the data is genuine Yahoo Finance, not
+    simulated.
+  - Vanilla JS on purpose so the page works directly from githack/jsdelivr
+    with no build step and no framework runtime beyond lightweight-charts.
+-->
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d1321'/%3E%3Cpath d='M6 20 L12 14 L16 18 L26 8' stroke='%234fc3f7' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" defer></script>
+
+<style>
+:root {
+  --bg: #0a0e17;
+  --card: #141b2d;
+  --card-alt: #1a2235;
+  --border: #1e2a3a;
+  --text: #e2e8f0;
+  --muted: #8892a4;
+  --buy: #00e676;
+  --sell: #ff5252;
+  --accent: #4fc3f7;
+  --accent2: #7c4dff;
+  --warn: #ffa726;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+a { color: var(--accent); text-decoration: none; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,14,23,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.header-inner {
+  max-width: 1100px; margin: 0 auto;
+  padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: var(--bg); font-weight: 900; font-size: 16px;
+  display: grid; place-items: center;
+}
+.brand-name { font-weight: 700; font-size: 15px; }
+.brand-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.4px; }
+.brand-name .v { color: var(--accent); }
+
+.live-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+}
+.live-dot.live { background: var(--buy); animation: pulse 2s ease-in-out infinite; }
+.live-dot.stale { background: var(--warn); }
+.live-dot.offline { background: var(--sell); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.tabs {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 14px;
+  display: flex; gap: 2px;
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 10px 16px;
+  border: none; background: none; cursor: pointer;
+  font-weight: 600; font-size: 13px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+main {
+  max-width: 1100px; margin: 0 auto;
+  padding: 14px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.card-hover { transition: background 0.15s; }
+.card-hover:hover, .card-hover:active { background: var(--card-alt); }
+
+.stats-bar {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.stat {
+  display: inline-flex; align-items: baseline; gap: 6px;
+}
+.stat-label { color: var(--muted); font-size: 12px; }
+.stat-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-value.buy { color: var(--buy); }
+.stat-value.sell { color: var(--sell); }
+.stat-value.strong { color: var(--accent2); }
+.stats-right { margin-left: auto; color: var(--muted); font-size: 11px; }
+.refresh-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.refresh-btn:active { background: var(--card-alt); }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 9px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.chip:hover { color: var(--text); }
+.chip.active { background: rgba(79,195,247,0.18); border-color: rgba(79,195,247,0.5); color: var(--accent); }
+.chip-count { opacity: 0.7; font-variant-numeric: tabular-nums; }
+.sort-select {
+  margin-left: auto;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.grid-pairs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 10px;
+}
+.pair-card {
+  padding: 12px;
+  cursor: pointer;
+  display: block;
+  color: var(--text);
+}
+.pair-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 2px;
+}
+.pair-symbol {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-weight: 700; font-size: 14px;
+  letter-spacing: 0.5px;
+}
+.pair-name { font-size: 11px; color: var(--muted); margin-bottom: 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pair-price-row {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 8px;
+}
+.pair-price {
+  font-family: "SF Mono", monospace;
+  font-size: 18px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pair-change {
+  text-align: right;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.pair-change-pips { font-size: 12px; font-weight: 700; }
+.pair-change-pct { font-size: 11px; }
+.color-up { color: var(--buy); }
+.color-down { color: var(--sell); }
+.color-flat { color: var(--text); }
+
+.pair-meta {
+  margin-top: 8px;
+  display: flex; flex-wrap: wrap; gap: 2px 10px;
+  font-size: 10px; color: var(--muted);
+}
+.pair-meta strong { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.tag-accent { color: var(--accent); font-weight: 700; }
+.tag-accent2 { color: var(--accent2); font-weight: 700; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px;
+  border-radius: 7px;
+  font-size: 10px; font-weight: 700;
+  border: 1px solid;
+}
+.badge-buy { background: rgba(0,230,118,0.1); color: var(--buy); border-color: rgba(0,230,118,0.3); }
+.badge-sell { background: rgba(255,82,82,0.1); color: var(--sell); border-color: rgba(255,82,82,0.3); }
+.badge-neutral { background: rgba(84,110,122,0.1); color: var(--muted); border-color: rgba(84,110,122,0.3); }
+.badge-premium { background: rgba(124,77,255,0.15); color: var(--accent2); border-color: rgba(124,77,255,0.4); }
+.badge-strong { background: rgba(79,195,247,0.15); color: var(--accent); border-color: rgba(79,195,247,0.4); }
+
+.cycle-hero {
+  padding: 16px; margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  align-items: center; gap: 12px;
+}
+.cycle-big {
+  font-family: "SF Mono", monospace;
+  font-size: 34px; font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.cycle-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.cycle-strong-count {
+  font-size: 34px; font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.wr-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-bottom: 12px;
+}
+.wr-card { padding: 12px; }
+.wr-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.wr-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wr-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.cycle-card {
+  padding: 12px;
+  margin-bottom: 10px;
+  display: block;
+  color: var(--text);
+}
+.cycle-card-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  margin-bottom: 4px; flex-wrap: wrap;
+}
+.cycle-card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cycle-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.cycle-metric-label { color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.cycle-metric-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.eval-banner {
+  margin-top: 8px; padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  border: 1px solid;
+}
+.eval-win { background: rgba(0,230,118,0.1); color: var(--buy); border-color: rgba(0,230,118,0.3); }
+.eval-loss { background: rgba(255,82,82,0.1); color: var(--sell); border-color: rgba(255,82,82,0.3); }
+
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.detail-header { padding: 16px; margin-bottom: 12px; }
+.detail-price {
+  display: flex; align-items: baseline; gap: 14px;
+  margin-top: 6px; flex-wrap: wrap;
+}
+.detail-price-big {
+  font-family: "SF Mono", monospace;
+  font-size: 30px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tf-group {
+  display: flex; gap: 4px;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.tf-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.tf-btn.active { background: rgba(79,195,247,0.18); border-color: rgba(79,195,247,0.5); color: var(--accent); }
+
+.chart-box {
+  width: 100%; height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.two-col {
+  display: grid; grid-template-columns: 1fr; gap: 12px;
+}
+@media (min-width: 900px) {
+  .two-col { grid-template-columns: 1fr 1fr; }
+}
+
+.depth-row {
+  position: relative;
+  display: flex; justify-content: space-between;
+  padding: 3px 6px;
+  font-family: "SF Mono", monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.depth-bar {
+  position: absolute; inset: 0 0 0 auto;
+  border-radius: 3px;
+}
+.depth-bar.ask { background: rgba(255,82,82,0.15); }
+.depth-bar.bid { background: rgba(0,230,118,0.15); }
+.depth-price { position: relative; z-index: 1; }
+.depth-vol { position: relative; z-index: 1; color: var(--muted); }
+.depth-mid {
+  display: flex; justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--card-alt);
+  border-radius: 6px;
+  margin: 6px 0;
+  font-family: "SF Mono", monospace;
+  font-size: 12px;
+}
+.indicators-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px;
+  font-size: 13px;
+}
+@media (min-width: 600px) {
+  .indicators-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
+.ind-label { color: var(--muted); font-size: 11px; }
+.ind-value { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+
+.vote-list { list-style: none; font-size: 12px; }
+.vote-item {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+  padding: 5px 8px;
+  background: rgba(26,34,53,0.5);
+  border: 1px solid rgba(30,42,58,0.5);
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+.vote-name { font-weight: 700; }
+.vote-reason { color: var(--muted); margin-left: 4px; font-size: 11px; }
+.vote-val {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--card) 0%, var(--card-alt) 50%, var(--card) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-card {
+  height: 108px; border-radius: 12px; border: 1px solid var(--border);
+}
+
+.loading-hero {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--muted);
+}
+.loading-hero h3 { color: var(--text); margin-bottom: 10px; font-weight: 700; }
+.spinner {
+  display: inline-block;
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-banner {
+  padding: 14px;
+  border: 1px solid rgba(255,82,82,0.4);
+  background: rgba(255,82,82,0.06);
+  border-radius: 10px;
+  color: var(--sell);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.notice {
+  padding: 12px;
+  border: 1px solid rgba(255,167,38,0.4);
+  background: rgba(255,167,38,0.06);
+  border-radius: 10px;
+  color: var(--warn);
+  font-size: 12px;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+footer {
+  text-align: center;
+  padding: 20px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  margin-top: 30px;
+}
+
+@media (max-width: 600px) {
+  .grid-pairs { grid-template-columns: 1fr; }
+  .wr-grid { grid-template-columns: 1fr; }
+  .cycle-big { font-size: 28px; }
+  .cycle-strong-count { font-size: 28px; }
+  .detail-price-big { font-size: 24px; }
+  .stats-bar { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <a class="brand" href="#/" id="brand-link">
+      <div class="logo">₣</div>
+      <div>
+        <div class="brand-name">FOREX <span class="v">live</span></div>
+        <div class="brand-sub">28 пар · Yahoo Finance</div>
+      </div>
+    </a>
+    <div class="live-badge" id="live-badge" title="Статус данных">
+      <span class="live-dot" id="live-dot"></span>
+      <span id="live-text">…</span>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-route="dashboard">Сигналы</button>
+    <button class="tab-btn" data-route="cycle">Цикл 5ч</button>
+  </nav>
+</header>
+
+<main id="app">
+  <div class="loading-hero">
+    <div class="spinner"></div>
+    <h3>Загружаем живые данные…</h3>
+    <p>С Yahoo Finance через GitHub Actions · первый запуск может занять до 2 минут</p>
+  </div>
+</main>
+
+<footer>
+  Данные: Yahoo Finance · обновляются каждые 15 мин · хостинг: GitHub + jsDelivr CDN<br>
+  <a href="https://github.com/Jony-wws/Forex-wws2277" target="_blank" rel="noopener">Исходный код →</a>
+</footer>
+
+<script>
+/* =========================================================================
+ * CONFIG
+ * ========================================================================= */
+const REPO_OWNER = "Jony-wws";
+const REPO_NAME = "Forex-wws2277";
+const DATA_BRANCH = "data";
+
+// jsDelivr with minute-level cache busting + raw.githubusercontent fallback.
+// jsDelivr's CDN updates within ~10 minutes of a new commit; the
+// fallback hits GitHub directly for fresher reads when the CDN is lagging.
+function urls(path) {
+  const bust = Math.floor(Date.now() / 60000); // new URL every minute
+  return [
+    `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@${DATA_BRANCH}/data/${path}?t=${bust}`,
+    `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${DATA_BRANCH}/data/${path}`,
+  ];
+}
+
+const POLL_MS = 60000;  // 60s — data itself refreshes every 15min on the server side
+const PAIRS_ALL = [
+  "EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD",
+  "EURGBP","EURJPY","EURCHF","EURAUD","EURCAD","EURNZD",
+  "GBPJPY","GBPCHF","GBPAUD","GBPCAD","GBPNZD",
+  "AUDJPY","CADJPY","CHFJPY","NZDJPY",
+  "AUDCAD","AUDCHF","AUDNZD",
+  "CADCHF","NZDCAD","NZDCHF"
+];
+const INTERVALS = [
+  { key: "15m", label: "15М" },
+  { key: "1h", label: "1Ч" },
+  { key: "4h", label: "4Ч" },
+  { key: "1d", label: "1Д" },
+];
+
+/* =========================================================================
+ * STATE
+ * ========================================================================= */
+const state = {
+  signals: null,
+  cycle: null,
+  orderbooks: null,
+  health: null,
+  bars: {},             // `${pair}|${interval}` → BarsResponse
+  lastFetchAt: null,
+  firstLoadError: null,
+  filter: "all",
+  sort: "default",
+  currentPair: null,
+  currentInterval: "1h",
+};
+
+/* =========================================================================
+ * ROUTING — hash-based, trivial.
+ *   #/             → dashboard
+ *   #/cycle        → 5h cycle
+ *   #/pair/EURUSD  → pair detail
+ * ========================================================================= */
+function currentRoute() {
+  const hash = location.hash.slice(1) || "/";
+  const parts = hash.split("/").filter(Boolean);
+  if (parts.length === 0) return { name: "dashboard" };
+  if (parts[0] === "cycle") return { name: "cycle" };
+  if (parts[0] === "pair" && parts[1]) return { name: "pair", pair: parts[1].toUpperCase() };
+  return { name: "dashboard" };
+}
+window.addEventListener("hashchange", () => {
+  window.scrollTo(0, 0);
+  render();
+});
+
+/* =========================================================================
+ * FETCH — try jsDelivr first, fall back to raw. Never throw on a partial
+ *         failure — we show whatever we have plus a friendly warning.
+ * ========================================================================= */
+async function fetchJSON(path) {
+  const candidates = urls(path);
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) { lastErr = err; }
+  }
+  throw lastErr || new Error(`Failed: ${path}`);
+}
+
+async function refresh() {
+  try {
+    const [signals, cycle, orderbooks, health] = await Promise.all([
+      fetchJSON("signals.json").catch(e => ({ _err: e })),
+      fetchJSON("cycle.json").catch(e => ({ _err: e })),
+      fetchJSON("orderbooks.json").catch(e => ({ _err: e })),
+      fetchJSON("health.json").catch(e => ({ _err: e })),
+    ]);
+
+    if (!signals._err) state.signals = signals;
+    if (!cycle._err) state.cycle = cycle;
+    if (!orderbooks._err) state.orderbooks = orderbooks;
+    if (!health._err) state.health = health;
+
+    const anyOk = [signals, cycle, orderbooks, health].some(x => !x._err);
+    if (anyOk) {
+      state.lastFetchAt = Date.now();
+      state.firstLoadError = null;
+    } else if (!state.signals) {
+      state.firstLoadError = "" + signals._err;
+    }
+  } catch (err) {
+    if (!state.signals) state.firstLoadError = "" + err;
+  }
+  updateHealthBadge();
+  render();
+}
+
+async function fetchBars(pair, interval) {
+  const key = `${pair}|${interval}`;
+  // Do not re-fetch if younger than the general poll cycle.
+  const cached = state.bars[key];
+  if (cached && Date.now() - cached._at < POLL_MS) return cached;
+  try {
+    const data = await fetchJSON(`bars/${pair}-${interval}.json`);
+    state.bars[key] = Object.assign(data, { _at: Date.now() });
+    return state.bars[key];
+  } catch (err) {
+    state.bars[key] = { _at: Date.now(), bars: [], _err: "" + err };
+    return state.bars[key];
+  }
+}
+
+/* =========================================================================
+ * FORMATTING
+ * ========================================================================= */
+const fmt = {
+  price(pair, p) {
+    if (p == null || isNaN(p)) return "—";
+    return pair.includes("JPY") ? p.toFixed(3) : p.toFixed(5);
+  },
+  pips(v) {
+    if (v == null || isNaN(v)) return "—";
+    return (v > 0 ? "+" : "") + v.toFixed(1);
+  },
+  pct(v, d) {
+    if (v == null || isNaN(v)) return "—";
+    const digits = d == null ? 2 : d;
+    return (v > 0 ? "+" : "") + v.toFixed(digits) + "%";
+  },
+  num(v, d) {
+    if (v == null || isNaN(v)) return "—";
+    return Number(v).toFixed(d == null ? 1 : d);
+  },
+  countdown(sec) {
+    const s = Math.max(0, Math.floor(sec || 0));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    return [h, m, ss].map(n => String(n).padStart(2, "0")).join(":");
+  },
+};
+
+/* =========================================================================
+ * SMALL RENDER HELPERS
+ * ========================================================================= */
+function el(tag, attrs, children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    for (const k in attrs) {
+      const v = attrs[k];
+      if (v == null) continue;
+      if (k === "class") node.className = v;
+      else if (k === "onclick") node.addEventListener("click", v);
+      else if (k === "onchange") node.addEventListener("change", v);
+      else if (k === "html") node.innerHTML = v;
+      else node.setAttribute(k, v);
+    }
+  }
+  if (children) {
+    (Array.isArray(children) ? children : [children]).forEach(c => {
+      if (c == null || c === false) return;
+      if (typeof c === "string" || typeof c === "number") node.append(String(c));
+      else node.append(c);
+    });
+  }
+  return node;
+}
+
+function sideBadge(side, confidence) {
+  if (side === "BUY") return el("span", { class: "badge badge-buy" },
+    "▲ BUY" + (confidence != null ? ` ${confidence}%` : ""));
+  if (side === "SELL") return el("span", { class: "badge badge-sell" },
+    "▼ SELL" + (confidence != null ? ` ${confidence}%` : ""));
+  return el("span", { class: "badge badge-neutral" }, "—");
+}
+
+function tierBadge(tier) {
+  if (tier === "PREMIUM") return el("span", { class: "badge badge-premium", title: "Премиум выбор" }, "PREMIUM");
+  if (tier === "STRONG") return el("span", { class: "badge badge-strong", title: "Сильный тренд" }, "STRONG");
+  return el("span", { class: "badge badge-neutral" }, "NORMAL");
+}
+
+function changeColorClass(v) {
+  return v > 0 ? "color-up" : v < 0 ? "color-down" : "color-flat";
+}
+
+/* =========================================================================
+ * HEALTH BADGE — shows in the header
+ * ========================================================================= */
+function updateHealthBadge() {
+  const dot = document.getElementById("live-dot");
+  const text = document.getElementById("live-text");
+  const badge = document.getElementById("live-badge");
+
+  if (state.firstLoadError && !state.signals) {
+    dot.className = "live-dot offline";
+    text.textContent = "OFF";
+    badge.title = "Не удалось загрузить данные";
+    return;
+  }
+  if (!state.signals) {
+    dot.className = "live-dot";
+    text.textContent = "…";
+    return;
+  }
+
+  const updated = state.health?.updated_at_utc5 || state.signals?.updated_at;
+  // Data is "fresh" if the server-side update is <= 30 min old.
+  let fresh = true;
+  if (state.health?.updated_at_utc) {
+    const ageMs = Date.now() - Date.parse(state.health.updated_at_utc);
+    fresh = ageMs < 30 * 60 * 1000;
+  }
+  dot.className = fresh ? "live-dot live" : "live-dot stale";
+  text.textContent = fresh ? "LIVE" : "STALE";
+  badge.title = `Обновлено: ${updated || "—"} · ${state.signals.scan_count ?? 0} пар · кэш 1 мин`;
+}
+
+/* =========================================================================
+ * DASHBOARD VIEW
+ * ========================================================================= */
+function viewDashboard() {
+  const pairs = state.signals?.pairs || {};
+  const rows = PAIRS_ALL.map(p => pairs[p]).filter(Boolean);
+  const counts = {
+    total: rows.length,
+    buy: rows.filter(r => r.signal === "BUY").length,
+    sell: rows.filter(r => r.signal === "SELL").length,
+    strong: rows.filter(r => r.is_strong_trend).length,
+  };
+
+  // Filter
+  let filtered = rows.slice();
+  if (state.filter === "signals") filtered = filtered.filter(r => r.signal !== null);
+  else if (state.filter === "buy") filtered = filtered.filter(r => r.signal === "BUY");
+  else if (state.filter === "sell") filtered = filtered.filter(r => r.signal === "SELL");
+  else if (state.filter === "strong") filtered = filtered.filter(r => r.is_strong_trend);
+
+  // Sort
+  if (state.sort === "confidence") filtered.sort((a, b) => b.confidence - a.confidence);
+  else if (state.sort === "change") filtered.sort((a, b) =>
+    Math.abs(b.change_24h_pct || 0) - Math.abs(a.change_24h_pct || 0));
+  else if (state.sort === "adx") filtered.sort((a, b) => (b.adx_h1 || 0) - (a.adx_h1 || 0));
+
+  const root = el("div");
+
+  // Error / empty-state banners
+  if (state.firstLoadError && !state.signals) {
+    root.append(el("div", { class: "error-banner" },
+      `Ошибка загрузки данных: ${state.firstLoadError}. Возможно, первый сбор ещё не завершился — попробуйте через 2–3 минуты.`));
+  }
+  if (state.signals && rows.length === 0) {
+    root.append(el("div", { class: "notice" },
+      "⏳ Данные прилетают… Первый сбор может занять до 2 минут после запуска. Страница обновится автоматически."));
+  }
+
+  // Stats
+  const refreshBtn = el("button", {
+    class: "refresh-btn", title: "Обновить",
+    onclick: () => refresh(),
+  }, "↻");
+  root.append(el("div", { class: "card stats-bar" }, [
+    el("span", { class: "stat" }, [
+      el("span", { class: "stat-label" }, "Всего"),
+      el("span", { class: "stat-value" }, `${counts.total}/28`),
+    ]),
+    el("span", { class: "stat" }, [
+      el("span", { class: "stat-label" }, "BUY"),
+      el("span", { class: "stat-value buy" }, String(counts.buy)),
+    ]),
+    el("span", { class: "stat" }, [
+      el("span", { class: "stat-label" }, "SELL"),
+      el("span", { class: "stat-value sell" }, String(counts.sell)),
+    ]),
+    el("span", { class: "stat" }, [
+      el("span", { class: "stat-label" }, "STRONG"),
+      el("span", { class: "stat-value strong" }, String(counts.strong)),
+    ]),
+    el("span", { class: "stats-right" }, [
+      state.signals?.updated_at ? `Данные: ${state.signals.updated_at}` : "Ожидание…",
+      refreshBtn,
+    ]),
+  ]));
+
+  // Filters + sort
+  const chips = [
+    { key: "all", label: "Все", count: counts.total },
+    { key: "signals", label: "Сигналы", count: counts.buy + counts.sell },
+    { key: "buy", label: "BUY", count: counts.buy },
+    { key: "sell", label: "SELL", count: counts.sell },
+    { key: "strong", label: "STRONG", count: counts.strong },
+  ];
+  const filterBar = el("div", { class: "filters" },
+    chips.map(c => el("button", {
+      class: "chip" + (state.filter === c.key ? " active" : ""),
+      onclick: () => { state.filter = c.key; render(); },
+    }, [c.label, " ", el("span", { class: "chip-count" }, String(c.count))]))
+  );
+  const select = el("select", {
+    class: "sort-select",
+    onchange: (e) => { state.sort = e.target.value; render(); },
+  }, [
+    el("option", { value: "default" }, "По умолчанию"),
+    el("option", { value: "confidence" }, "По уверенности"),
+    el("option", { value: "change" }, "По движению"),
+    el("option", { value: "adx" }, "По ADX"),
+  ]);
+  select.value = state.sort;
+  filterBar.append(select);
+  root.append(filterBar);
+
+  // Grid
+  if (rows.length === 0 && !state.firstLoadError) {
+    const grid = el("div", { class: "grid-pairs" },
+      Array.from({ length: 9 }, () => el("div", { class: "skeleton skeleton-card" }))
+    );
+    root.append(grid);
+  } else if (filtered.length === 0) {
+    root.append(el("div", { class: "card", style: "padding:24px;text-align:center;color:var(--muted);" },
+      "Ничего не найдено по текущему фильтру."));
+  } else {
+    root.append(el("div", { class: "grid-pairs" }, filtered.map(pairCard)));
+  }
+
+  return root;
+}
+
+function pairCard(e) {
+  const changeClass = changeColorClass(e.change_24h_pct);
+  return el("a", {
+    class: "card card-hover pair-card",
+    href: `#/pair/${e.pair}`,
+  }, [
+    el("div", { class: "pair-head" }, [
+      el("div", { class: "pair-symbol" }, e.pair),
+      sideBadge(e.signal, e.confidence),
+    ]),
+    el("div", { class: "pair-name" }, e.name_ru),
+    el("div", { class: "pair-price-row" }, [
+      el("div", { class: "pair-price" }, e.price_display),
+      el("div", { class: "pair-change " + changeClass }, [
+        el("div", { class: "pair-change-pips" }, fmt.pips(e.change_24h_pips) + " пп"),
+        el("div", { class: "pair-change-pct" }, fmt.pct(e.change_24h_pct)),
+      ]),
+    ]),
+    el("div", { class: "pair-meta" }, [
+      el("span", null, ["ADX ", el("strong", null, fmt.num(e.adx_h1, 0))]),
+      el("span", null, ["Persist ", el("strong", null, `${e.trend_persistence_bars || 0}/5`)]),
+      e.multi_tf_aligned ? el("span", { class: "tag-accent" }, "4 ТФ ✓") : null,
+      e.is_strong_trend ? el("span", { class: "tag-accent2" }, "STRONG") : null,
+    ]),
+  ]);
+}
+
+/* =========================================================================
+ * CYCLE VIEW
+ * ========================================================================= */
+function viewCycle() {
+  const root = el("div");
+
+  if (!state.cycle) {
+    return el("div", { class: "notice" }, "Данные цикла ещё не собраны.");
+  }
+
+  const cy = state.cycle;
+  const current = cy.current_cycle;
+  const secondsLeft = computeCountdown(cy);
+
+  root.append(el("div", { class: "card cycle-hero" }, [
+    el("div", null, [
+      el("div", { class: "cycle-label" }, "Следующий цикл через"),
+      el("div", { class: "cycle-big", id: "cycle-countdown" }, fmt.countdown(secondsLeft)),
+      current?.cycle_start_utc ? el("div", { style: "font-size:11px;color:var(--muted);margin-top:4px;" },
+        `Текущий стартовал: ${current.cycle_start_utc}`) : null,
+    ]),
+    el("div", { style: "text-align:right;" }, [
+      el("div", { class: "cycle-label" }, "STRONG пиков"),
+      el("div", {
+        class: "cycle-strong-count",
+        style: `color: ${(current?.strong_count || 0) >= 3 ? "var(--buy)" : "var(--warn)"}`,
+      }, String(current?.strong_count || 0)),
+    ]),
+  ]));
+
+  // Winrate
+  root.append(el("div", { class: "wr-grid" }, [
+    winrateCard("Winrate 5ч", cy.winrate_5h),
+    winrateCard("Winrate 24ч", cy.winrate_24h),
+  ]));
+  root.append(el("div", { style: "font-size:11px;color:var(--muted);margin-bottom:14px;" },
+    `История: ${cy.history_cycles || 0} циклов · порог WIN ≥ ${fmt.num(cy.win_threshold_pct, 2)}%`));
+
+  if (current?.weak_market) {
+    root.append(el("div", { class: "notice" },
+      "⚠️ Слабый рынок: не все слоты прошли жёсткий фильтр. Добраны лучшие (NORMAL) для минимума 3 пиков."));
+  }
+
+  root.append(el("h2", {
+    style: "font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;"
+  }, "Топ прогнозы на 5 часов"));
+
+  if (!current || !current.selected || current.selected.length === 0) {
+    root.append(el("div", { class: "card", style: "padding:24px;text-align:center;color:var(--muted);" },
+      "Первый цикл ещё не сформирован."));
+  } else {
+    current.selected.forEach(f => root.append(cycleCard(f)));
+  }
+
+  if (current) {
+    root.append(el("div", { style: "margin-top:10px;font-size:11px;color:var(--muted);" },
+      `Следующая ротация: ${current.next_cycle_utc}`));
+  }
+
+  return root;
+}
+
+function computeCountdown(cy) {
+  // Server side wrote seconds_to_next_cycle at build time. Augment with
+  // client clock against next_cycle_utc so the timer stays accurate
+  // between 15-min refreshes.
+  const iso = cy.current_cycle?.next_cycle_utc || cy.next_cycle_utc;
+  if (!iso) return cy.seconds_to_next_cycle || 0;
+  const parsed = Date.parse(iso.replace(" UTC", "Z").replace(" ", "T"));
+  if (isNaN(parsed)) return cy.seconds_to_next_cycle || 0;
+  return Math.max(0, Math.round((parsed - Date.now()) / 1000));
+}
+
+function winrateCard(title, wr) {
+  const pct = (wr && wr.winrate_pct) || 0;
+  const tone = pct >= 70 ? "color-up" : pct >= 50 ? "tag-accent" : "color-down";
+  return el("div", { class: "card wr-card" }, [
+    el("div", { class: "wr-title" }, title),
+    el("div", { class: `wr-value ${tone}` }, pct.toFixed(1) + "%"),
+    el("div", { class: "wr-sub" },
+      `${wr?.wins || 0} побед / ${wr?.losses || 0} проигрышей · ${wr?.decisions || 0} решений`),
+  ]);
+}
+
+function cycleCard(f) {
+  const evaluated = f.evaluated_5h;
+  const win = f.result_5h === "win";
+  const loss = f.result_5h === "loss";
+  return el("a", {
+    class: "card card-hover cycle-card",
+    href: `#/pair/${f.pair}`,
+  }, [
+    el("div", { class: "cycle-card-head" }, [
+      el("div", { class: "cycle-card-title" }, [
+        el("span", { style: "font-family:monospace;font-weight:700;" }, f.pair),
+        tierBadge(f.tier),
+        f.high_wr ? el("span", {
+          class: "badge badge-premium", title: "Historical winrate ≥ 70%",
+        }, "WR 70+") : null,
+      ]),
+      sideBadge(f.side, f.confidence),
+    ]),
+    el("div", { style: "font-size:11px;color:var(--muted);" }, f.name_ru),
+    el("div", { class: "cycle-metrics" }, [
+      metric("Вход", f.entry_price != null ? fmt.price(f.pair, f.entry_price) : "—"),
+      metric("ADX H1", fmt.num(f.adx_h1, 0)),
+      metric("ADX H4", fmt.num(f.adx_h4, 0)),
+      metric("Persist", `${f.trend_persistence_bars || 0}/5`),
+    ]),
+    evaluated ? el("div", {
+      class: "eval-banner " + (win ? "eval-win" : loss ? "eval-loss" : ""),
+    }, [
+      el("strong", null, win ? "✓ WIN" : loss ? "✗ LOSS" : "EVAL"),
+      " · движение " + fmt.pct(f.move_pct_5h, 3) + " за 5ч",
+      f.exit_price_5h != null ? el("span", { style: "opacity:0.7;margin-left:6px;" },
+        `→ ${fmt.price(f.pair, f.exit_price_5h)}`) : null,
+    ]) : el("div", { style: "margin-top:6px;font-size:11px;color:var(--muted);" },
+      "Ожидание результата по истечении 5ч…"),
+  ]);
+}
+
+function metric(label, value) {
+  return el("div", null, [
+    el("div", { class: "cycle-metric-label" }, label),
+    el("div", { class: "cycle-metric-value" }, value),
+  ]);
+}
+
+/* =========================================================================
+ * PAIR DETAIL VIEW (with candle chart + orderbook + indicators)
+ * ========================================================================= */
+function viewPair(pair) {
+  const root = el("div");
+
+  root.append(el("a", { class: "back-btn", href: "#/" }, "← Назад ко всем парам"));
+
+  const entry = state.signals?.pairs?.[pair];
+  const ob = state.orderbooks?.[pair];
+  const digits = pair.includes("JPY") ? 3 : 5;
+
+  // Header
+  if (entry) {
+    const changeCls = changeColorClass(entry.change_24h_pct);
+    root.append(el("div", { class: "card detail-header" }, [
+      el("div", { style: "display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;" }, [
+        el("div", null, [
+          el("div", { style: "font-family:monospace;font-weight:700;font-size:22px;letter-spacing:0.5px;" }, pair),
+          el("div", { style: "font-size:12px;color:var(--muted);margin-top:2px;" }, entry.name_ru),
+          el("div", { class: "detail-price" }, [
+            el("span", { class: "detail-price-big" }, entry.price_display),
+            el("span", { class: `${changeCls}`, style: "font-size:13px;font-weight:700;" },
+              `${fmt.pips(entry.change_24h_pips)} пп (${fmt.pct(entry.change_24h_pct)})`),
+          ]),
+        ]),
+        el("div", { style: "text-align:right;" }, [
+          sideBadge(entry.signal, entry.confidence),
+          el("div", { style: "font-size:11px;color:var(--muted);margin-top:4px;" }, entry.strength || "—"),
+        ]),
+      ]),
+      entry.forecast_5h || entry.forecast_24h ? el("div", {
+        style: "margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px;",
+      }, [
+        entry.forecast_5h ? el("div", null, [
+          el("span", { style: "color:var(--muted);" }, "5ч: "),
+          el("span", {
+            class: entry.forecast_5h.direction === "Рост" ? "color-up" : "color-down",
+            style: "font-weight:700;",
+          }, entry.forecast_5h.direction + " · " + entry.forecast_5h.strength),
+        ]) : null,
+        entry.forecast_24h ? el("div", null, [
+          el("span", { style: "color:var(--muted);" }, "24ч: "),
+          el("span", {
+            class: entry.forecast_24h.direction === "Рост" ? "color-up" : "color-down",
+            style: "font-weight:700;",
+          }, entry.forecast_24h.direction + " · " + entry.forecast_24h.strength),
+        ]) : null,
+      ]) : null,
+    ]));
+  }
+
+  // Chart section
+  const chartBox = el("div", { class: "chart-box", id: "chart-box" });
+  root.append(el("div", { class: "card", style: "padding:12px;margin-bottom:12px;" }, [
+    el("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:6px;flex-wrap:wrap;" }, [
+      el("div", { style: "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;" },
+        "Свечной график"),
+      el("div", { class: "tf-group" }, INTERVALS.map(iv => el("button", {
+        class: "tf-btn" + (state.currentInterval === iv.key ? " active" : ""),
+        onclick: () => {
+          state.currentInterval = iv.key;
+          mountChart(pair, iv.key);
+          render();
+        },
+      }, iv.label))),
+    ]),
+    chartBox,
+  ]));
+
+  // Two-col: orderbook + indicators
+  root.append(el("div", { class: "two-col" }, [
+    ob ? orderbookPanel(ob, digits) : el("div", { class: "card", style: "padding:14px;color:var(--muted);font-size:12px;" },
+      "Стакан будет доступен после первого сбора."),
+    entry ? indicatorsPanel(entry) : el("div", { class: "card", style: "padding:14px;color:var(--muted);font-size:12px;" },
+      "Индикаторы появятся вместе с сигналом."),
+  ]));
+
+  // Mount the chart async after root is in DOM.
+  queueMicrotask(() => mountChart(pair, state.currentInterval));
+
+  return root;
+}
+
+async function mountChart(pair, interval) {
+  if (!window.LightweightCharts) return;
+  const container = document.getElementById("chart-box");
+  if (!container) return;
+  container.innerHTML = ""; // clear previous chart
+
+  const bars = await fetchBars(pair, interval);
+  if (!bars || !bars.bars || bars.bars.length === 0) {
+    container.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center;">Нет свечных данных для ${interval}.</div>`;
+    return;
+  }
+
+  const digits = pair.includes("JPY") ? 3 : 5;
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 320,
+    layout: { background: { color: "#141b2d" }, textColor: "#8892a4", fontSize: 11 },
+    grid: { vertLines: { color: "#1e2a3a" }, horzLines: { color: "#1e2a3a" } },
+    rightPriceScale: { borderColor: "#1e2a3a" },
+    timeScale: { borderColor: "#1e2a3a", timeVisible: true, secondsVisible: false },
+    handleScale: { mouseWheel: false },
+  });
+  const series = chart.addCandlestickSeries({
+    upColor: "#00e676", downColor: "#ff5252",
+    borderUpColor: "#00e676", borderDownColor: "#ff5252",
+    wickUpColor: "#00e676", wickDownColor: "#ff5252",
+    priceFormat: { type: "price", precision: digits, minMove: Math.pow(10, -digits) },
+  });
+  series.setData(bars.bars.map(b => ({
+    time: b.time, open: b.open, high: b.high, low: b.low, close: b.close,
+  })));
+  chart.timeScale().fitContent();
+
+  // Keep the chart responsive to orientation changes.
+  const ro = new ResizeObserver(entries => {
+    const r = entries[0]?.contentRect;
+    if (r) chart.applyOptions({ width: r.width });
+  });
+  ro.observe(container);
+}
+
+function orderbookPanel(ob, digits) {
+  const asks = (ob.depth || []).filter(d => d.side === "ask").sort((a, b) => b.price - a.price);
+  const bids = (ob.depth || []).filter(d => d.side === "bid").sort((a, b) => b.price - a.price);
+  const maxPct = Math.max(1, ...(ob.depth || []).map(d => d.volume_pct || 0));
+  const mkRow = (d) => {
+    const width = Math.max(2, (d.volume_pct / maxPct) * 100);
+    return el("div", { class: "depth-row" }, [
+      el("span", {
+        class: "depth-bar " + d.side,
+        style: `width:${width}%`,
+      }),
+      el("span", {
+        class: "depth-price",
+        style: `color: ${d.side === "ask" ? "var(--sell)" : "var(--buy)"}`,
+      }, d.price.toFixed(digits)),
+      el("span", { class: "depth-vol" },
+        `${d.volume_pct.toFixed(1)}% · ${d.distance_pips.toFixed(1)}пп`),
+    ]);
+  };
+  return el("div", { class: "card", style: "padding:12px;" }, [
+    el("div", { style: "display:flex;justify-content:space-between;margin-bottom:8px;font-size:11px;color:var(--muted);" }, [
+      el("span", null, "СТАКАН (АППРОКС.)"),
+      el("span", null, `спред ${fmt.num(ob.spread_pips, 1)} пп`),
+    ]),
+    el("div", null, asks.map(mkRow)),
+    el("div", { class: "depth-mid" }, [
+      el("span", { style: "color:var(--sell);" }, `ASK ${ob.ask?.toFixed(digits) || "—"}`),
+      el("span", { style: "color:var(--muted);" }, `MID ${ob.mid?.toFixed(digits) || "—"}`),
+      el("span", { style: "color:var(--buy);" }, `BID ${ob.bid?.toFixed(digits) || "—"}`),
+    ]),
+    el("div", null, bids.map(mkRow)),
+    (ob.supports?.length || ob.resistances?.length) ? el("div", {
+      style: "margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;",
+    }, [
+      el("div", null, [
+        el("div", { style: "color:var(--muted);font-size:10px;text-transform:uppercase;" }, "Сопротивления"),
+        ...(ob.resistances?.length
+          ? ob.resistances.map(r => el("div", { style: "font-family:monospace;color:var(--sell);" }, r.toFixed(digits)))
+          : [el("div", { style: "color:var(--muted);" }, "—")]),
+      ]),
+      el("div", null, [
+        el("div", { style: "color:var(--muted);font-size:10px;text-transform:uppercase;" }, "Поддержки"),
+        ...(ob.supports?.length
+          ? ob.supports.map(s => el("div", { style: "font-family:monospace;color:var(--buy);" }, s.toFixed(digits)))
+          : [el("div", { style: "color:var(--muted);" }, "—")]),
+      ]),
+    ]) : null,
+  ]);
+}
+
+function indicatorsPanel(e) {
+  const ind = e.indicators || {};
+  const rows = [
+    ["RSI H1", fmt.num(ind.RSI, 1)],
+    ["MACD Hist", fmt.num(ind.MACD, 4)],
+    ["Stoch K", fmt.num(ind.Stochastic_K, 1)],
+    ["ADX H1", fmt.num(e.adx_h1, 1)],
+    ["ADX H4", fmt.num(e.adx_h4, 1)],
+    ["Williams %R", fmt.num(ind.Williams_R, 1)],
+    ["Bollinger %B", fmt.num(ind["Bollinger_%B"], 2)],
+    ["Momentum", fmt.num(ind.Momentum, 3)],
+    ["EMA20", fmt.num(ind.EMA20, 5)],
+    ["EMA50", fmt.num(ind.EMA50, 5)],
+    ["Persist 5ч", `${e.trend_persistence_bars || 0}/5 (${fmt.num(e.trend_persistence_5h, 0)}%)`],
+    ["Score", `${e.score || 0}/${e.max_score || 0}`],
+  ];
+  return el("div", { class: "card", style: "padding:12px;" }, [
+    el("div", { style: "font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;letter-spacing:0.6px;" },
+      "Индикаторы"),
+    el("div", { class: "indicators-grid" }, rows.flatMap(([l, v]) => [
+      el("div", { class: "ind-label" }, l),
+      el("div", { class: "ind-value" }, v),
+    ])),
+    (e.details && e.details.length) ? el("div", { style: "margin-top:12px;" }, [
+      el("div", { style: "font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;letter-spacing:0.6px;" },
+        `Голосование (${e.details.length} блоков)`),
+      el("ul", { class: "vote-list" }, e.details.map(d => el("li", { class: "vote-item" }, [
+        el("div", null, [
+          el("span", { class: "vote-name" }, d.name),
+          el("span", { class: "vote-reason" }, " — " + d.reason),
+        ]),
+        el("span", {
+          class: "vote-val",
+          style: `color: ${d.value > 0 ? "var(--buy)" : d.value < 0 ? "var(--sell)" : "var(--muted)"}`,
+        }, (d.value > 0 ? "+" : "") + d.value),
+      ]))),
+    ]) : null,
+  ]);
+}
+
+/* =========================================================================
+ * RENDER
+ * ========================================================================= */
+function render() {
+  const app = document.getElementById("app");
+  const route = currentRoute();
+
+  // Update tab highlight
+  document.querySelectorAll("#tabs .tab-btn").forEach(b => {
+    b.classList.toggle("active",
+      (route.name === "dashboard" && b.dataset.route === "dashboard") ||
+      (route.name === "cycle" && b.dataset.route === "cycle"));
+  });
+
+  let view;
+  if (route.name === "pair") {
+    view = viewPair(route.pair);
+  } else if (route.name === "cycle") {
+    view = viewCycle();
+  } else {
+    view = viewDashboard();
+  }
+
+  app.innerHTML = "";
+  app.append(view);
+}
+
+/* =========================================================================
+ * BOOT
+ * ========================================================================= */
+document.querySelectorAll("#tabs .tab-btn").forEach(b => {
+  b.addEventListener("click", () => {
+    location.hash = b.dataset.route === "cycle" ? "#/cycle" : "#/";
+  });
+});
+document.getElementById("brand-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  location.hash = "#/";
+});
+
+// Update the cycle countdown every second so it feels live between data
+// refreshes. We only touch the single countdown element, never re-render
+// the whole tree.
+setInterval(() => {
+  const el = document.getElementById("cycle-countdown");
+  if (el && state.cycle) el.textContent = fmt.countdown(computeCountdown(state.cycle));
+}, 1000);
+
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
