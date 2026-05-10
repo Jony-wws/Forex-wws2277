@@ -465,6 +465,132 @@ footer {
   .detail-price-big { font-size: 24px; }
   .stats-bar { font-size: 12px; }
 }
+
+/* ===== SNIPER styles ===== */
+.sniper-hero {
+  padding: 18px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(79,195,247,0.08), rgba(124,77,255,0.06));
+}
+.sniper-title {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.sniper-verdict {
+  font-family: "SF Mono", monospace;
+  font-size: 22px; font-weight: 800; margin-top: 4px;
+}
+.sniper-verdict.fire { color: var(--buy); }
+.sniper-verdict.notrade { color: var(--warn); }
+.sniper-pair-line {
+  display: flex; align-items: baseline; gap: 12px;
+  flex-wrap: wrap; margin-top: 6px;
+}
+.sniper-pair-name {
+  font-family: "SF Mono", monospace;
+  font-size: 28px; font-weight: 800; letter-spacing: 0.5px;
+}
+.sniper-side-big {
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+.sniper-side-big.buy { background: rgba(0,230,118,0.2); color: var(--buy); border: 1px solid rgba(0,230,118,0.5); }
+.sniper-side-big.sell { background: rgba(255,82,82,0.2); color: var(--sell); border: 1px solid rgba(255,82,82,0.5); }
+.sniper-side-big.none { background: rgba(255,167,38,0.15); color: var(--warn); border: 1px solid rgba(255,167,38,0.4); }
+.sniper-countdown-row {
+  display: flex; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid var(--border);
+}
+.sniper-countdown-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.sniper-countdown-big {
+  font-family: "SF Mono", monospace;
+  font-size: 32px; font-weight: 700; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.sniper-info-line {
+  font-size: 12px; color: var(--muted); margin-top: 6px;
+}
+.sniper-info-line b { color: var(--text); }
+
+.sniper-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.sniper-table th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--card-alt);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+.sniper-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(30,42,58,0.5);
+  vertical-align: top;
+}
+.sniper-table td.metric { color: var(--muted); width: 40%; }
+.sniper-table td.value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sniper-table td.note { color: var(--muted); font-size: 11px; }
+.sniper-table tr:last-child td { border-bottom: none; }
+
+.sniper-section {
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.sniper-section-title {
+  font-size: 12px; color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sniper-section-title::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.bt-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.bt-stat-card {
+  padding: 10px;
+  background: var(--card-alt);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.bt-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.bt-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bt-wr-green { color: var(--buy); }
+.bt-wr-yellow { color: var(--warn); }
+.bt-wr-red { color: var(--sell); }
 </style>
 </head>
 <body>
@@ -486,6 +612,7 @@ footer {
   <nav class="tabs" id="tabs">
     <button class="tab-btn active" data-route="dashboard">Сигналы</button>
     <button class="tab-btn" data-route="cycle">Цикл 5ч</button>
+    <button class="tab-btn" data-route="sniper">🎯 SNIPER</button>
   </nav>
 </header>
 
@@ -545,6 +672,7 @@ const state = {
   cycle: null,
   orderbooks: null,
   health: null,
+  sniper: null,
   bars: {},             // `${pair}|${interval}` → BarsResponse
   lastFetchAt: null,
   firstLoadError: null,
@@ -565,6 +693,7 @@ function currentRoute() {
   const parts = hash.split("/").filter(Boolean);
   if (parts.length === 0) return { name: "dashboard" };
   if (parts[0] === "cycle") return { name: "cycle" };
+  if (parts[0] === "sniper") return { name: "sniper" };
   if (parts[0] === "pair" && parts[1]) return { name: "pair", pair: parts[1].toUpperCase() };
   return { name: "dashboard" };
 }
@@ -592,17 +721,19 @@ async function fetchJSON(path) {
 
 async function refresh() {
   try {
-    const [signals, cycle, orderbooks, health] = await Promise.all([
+    const [signals, cycle, orderbooks, health, sniperSig] = await Promise.all([
       fetchJSON("signals.json").catch(e => ({ _err: e })),
       fetchJSON("cycle.json").catch(e => ({ _err: e })),
       fetchJSON("orderbooks.json").catch(e => ({ _err: e })),
       fetchJSON("health.json").catch(e => ({ _err: e })),
+      fetchJSON("sniper.json").catch(e => ({ _err: e })),
     ]);
 
     if (!signals._err) state.signals = signals;
     if (!cycle._err) state.cycle = cycle;
     if (!orderbooks._err) state.orderbooks = orderbooks;
     if (!health._err) state.health = health;
+    if (!sniperSig._err) state.sniper = sniperSig;
 
     const anyOk = [signals, cycle, orderbooks, health].some(x => !x._err);
     if (anyOk) {
@@ -1221,6 +1352,201 @@ function indicatorsPanel(e) {
 /* =========================================================================
  * RENDER
  * ========================================================================= */
+/* =========================================================================
+ * SNIPER VIEW — top-1 5h binary-options pick with A/B/C tables + backtest
+ * ========================================================================= */
+function viewSniper() {
+  const s = state.sniper;
+  const root = el("div");
+
+  if (!s) {
+    return el("div", { class: "notice" },
+      "Снайпер ещё не собран. Первый прогноз появится после следующего прогона cron (каждые 15 минут).");
+  }
+
+  const verdict = s.verdict || "NO-TRADE";
+  const isFire = verdict === "FIRE";
+  const sideCls = s.side === "BUY" ? "buy" : s.side === "SELL" ? "sell" : "none";
+  const sideTxt = s.side === "BUY" ? "▲ BUY" : s.side === "SELL" ? "▼ SELL" : "— NO-TRADE";
+  const secondsLeft = typeof s.seconds_to_next_slot === "number"
+    ? s.seconds_to_next_slot : 0;
+
+  // HERO
+  root.append(el("div", { class: "sniper-hero" }, [
+    el("div", { class: "sniper-title" }, "🎯 SNIPER V1.0 · ТОП-1 ЗА 5 ЧАСОВ"),
+    el("div", {
+      class: "sniper-verdict " + (isFire ? "fire" : "notrade"),
+    }, isFire ? "✓ FIRE — сигнал готов" : "⊘ NO-TRADE"),
+    el("div", { class: "sniper-pair-line" }, [
+      el("span", { class: "sniper-pair-name" }, s.pair || "—"),
+      el("span", { class: "sniper-side-big " + sideCls }, sideTxt),
+      el("span", { style: "font-size:12px;color:var(--muted);" }, s.name_ru || ""),
+    ]),
+    isFire ? el("div", { class: "sniper-info-line" }, [
+      el("span", null, "Точка входа: "),
+      el("b", null, s.entry_price ? Number(s.entry_price).toFixed(5) : "—"),
+      el("span", null, " · Уверенность: "),
+      el("b", null, (s.confidence || 0) + "%"),
+      el("span", null, " · " + (s.strength || "")),
+    ]) : el("div", { class: "sniper-info-line" },
+      "Лучший кандидат не прошёл строгие фильтры. Сделка отменена."),
+    el("div", { class: "sniper-countdown-row" }, [
+      el("div", null, [
+        el("div", { class: "sniper-countdown-label" },
+          isFire ? "До экспирации" : "До следующего сигнала"),
+        el("div", {
+          class: "sniper-countdown-big",
+          id: "sniper-countdown",
+        }, fmt.countdown(secondsLeft)),
+      ]),
+      el("div", { style: "text-align:right;" }, [
+        el("div", { class: "sniper-countdown-label" }, "Окно 5ч"),
+        el("div", { style: "font-size:12px;color:var(--muted);font-family:monospace;margin-top:4px;" },
+          (s.slot_start_utc || "—") + "  →"),
+        el("div", { style: "font-size:12px;color:var(--muted);font-family:monospace;" },
+          s.slot_end_utc || "—"),
+      ]),
+    ]),
+  ]));
+
+  // Table B — Trade params (most important, shown first)
+  root.append(el("div", { class: "card sniper-section" }, [
+    el("div", { class: "sniper-section-title" }, "Таблица Б — Параметры сделки"),
+    renderSniperTable(s.tables?.B || []),
+  ]));
+
+  // Table A — Technical slice
+  root.append(el("div", { class: "card sniper-section" }, [
+    el("div", { class: "sniper-section-title" }, "Таблица А — Технический срез"),
+    renderSniperTable(s.tables?.A || []),
+  ]));
+
+  // Table C — Risk map (traps)
+  root.append(el("div", { class: "card sniper-section" }, [
+    el("div", { class: "sniper-section-title" }, "Таблица В — Карта рисков (Anti-Trap)"),
+    renderSniperTable(s.tables?.C || []),
+  ]));
+
+  // Backtest stats
+  if (s.backtest) {
+    root.append(renderBacktestSection(s.backtest));
+  } else {
+    root.append(el("div", { class: "card sniper-section", style: "font-size:12px;color:var(--muted);" }, [
+      el("div", { class: "sniper-section-title" }, "Бэктест 5 лет"),
+      el("div", null, "Первый бэктест запустится автоматически в течение суток (workflow auto_tune). Он пройдёт по ~3500 5-часовым окнам на 28 парах и покажет исторический винрейт стратегии."),
+    ]));
+  }
+
+  return root;
+}
+
+function renderSniperTable(rows) {
+  if (!rows || rows.length === 0) {
+    return el("div", { style: "color:var(--muted);font-size:12px;padding:10px 0;" },
+      "Нет данных.");
+  }
+  const table = el("table", { class: "sniper-table" }, [
+    el("thead", null, el("tr", null, [
+      el("th", null, "Метрика"),
+      el("th", null, "Значение"),
+      el("th", null, "Примечание"),
+    ])),
+    el("tbody", null, rows.map(r => el("tr", null, [
+      el("td", { class: "metric" }, r.metric || ""),
+      el("td", { class: "value" }, r.value || ""),
+      el("td", { class: "note" }, r.note || ""),
+    ]))),
+  ]);
+  return table;
+}
+
+function renderBacktestSection(bt) {
+  const wr = bt.winrate_pct || 0;
+  const wrClass = wr >= 65 ? "bt-wr-green" : wr >= 50 ? "bt-wr-yellow" : "bt-wr-red";
+
+  // Top pairs by winrate (only those with >= 10 picks for statistical significance)
+  const pairStats = bt.per_pair || {};
+  const topPairs = Object.entries(pairStats)
+    .filter(([_, s]) => (s.picks || 0) >= 10)
+    .sort((a, b) => (b[1].winrate || 0) - (a[1].winrate || 0))
+    .slice(0, 10);
+
+  // Session breakdown
+  const sessStats = bt.per_session || {};
+  const sessRows = ["Asia", "London", "Overlap", "NY"].map(k => {
+    const st = sessStats[k] || { picks: 0, wins: 0, losses: 0, winrate: 0 };
+    return { session: k, ...st };
+  });
+
+  const children = [
+    el("div", { class: "sniper-section-title" },
+      `Бэктест ${bt.years || "—"} лет · 28 пар · 5-часовые окна`),
+    el("div", { class: "bt-stats" }, [
+      el("div", { class: "bt-stat-card" }, [
+        el("div", { class: "bt-stat-label" }, "Винрейт"),
+        el("div", { class: "bt-stat-value " + wrClass }, wr.toFixed(1) + "%"),
+      ]),
+      el("div", { class: "bt-stat-card" }, [
+        el("div", { class: "bt-stat-label" }, "Сделок"),
+        el("div", { class: "bt-stat-value" }, String(bt.total_picks || 0)),
+      ]),
+      el("div", { class: "bt-stat-card" }, [
+        el("div", { class: "bt-stat-label" }, "W / L"),
+        el("div", { class: "bt-stat-value" },
+          `${bt.total_wins || 0} / ${bt.total_losses || 0}`),
+      ]),
+      el("div", { class: "bt-stat-card" }, [
+        el("div", { class: "bt-stat-label" }, "Слотов проанализ."),
+        el("div", { class: "bt-stat-value" }, String(bt.total_slots || 0)),
+      ]),
+    ]),
+  ];
+
+  if (topPairs.length > 0) {
+    children.push(el("div", { style: "margin-top:12px;" }, [
+      el("div", { style: "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;" },
+        "Топ пар по винрейту"),
+      el("table", { class: "sniper-table" }, [
+        el("thead", null, el("tr", null, [
+          el("th", null, "Пара"),
+          el("th", null, "Сделок"),
+          el("th", null, "Винрейт"),
+        ])),
+        el("tbody", null, topPairs.map(([pair, st]) => el("tr", null, [
+          el("td", { class: "value", style: "font-family:monospace;" }, pair),
+          el("td", { class: "note" }, String(st.picks)),
+          el("td", {
+            class: "value " + (st.winrate >= 65 ? "bt-wr-green" : st.winrate >= 50 ? "bt-wr-yellow" : "bt-wr-red"),
+          }, st.winrate + "%"),
+        ]))),
+      ]),
+    ]));
+  }
+
+  if (sessRows.some(s => s.picks > 0)) {
+    children.push(el("div", { style: "margin-top:12px;" }, [
+      el("div", { style: "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;" },
+        "Сессии"),
+      el("table", { class: "sniper-table" }, [
+        el("thead", null, el("tr", null, [
+          el("th", null, "Сессия"),
+          el("th", null, "Сделок"),
+          el("th", null, "Винрейт"),
+        ])),
+        el("tbody", null, sessRows.map(r => el("tr", null, [
+          el("td", { class: "value" }, r.session),
+          el("td", { class: "note" }, String(r.picks)),
+          el("td", {
+            class: "value " + ((r.winrate || 0) >= 65 ? "bt-wr-green" : (r.winrate || 0) >= 50 ? "bt-wr-yellow" : "bt-wr-red"),
+          }, (r.winrate || 0) + "%"),
+        ]))),
+      ]),
+    ]));
+  }
+
+  return el("div", { class: "card sniper-section" }, children);
+}
+
 function render() {
   const app = document.getElementById("app");
   const route = currentRoute();
@@ -1229,7 +1555,8 @@ function render() {
   document.querySelectorAll("#tabs .tab-btn").forEach(b => {
     b.classList.toggle("active",
       (route.name === "dashboard" && b.dataset.route === "dashboard") ||
-      (route.name === "cycle" && b.dataset.route === "cycle"));
+      (route.name === "cycle" && b.dataset.route === "cycle") ||
+      (route.name === "sniper" && b.dataset.route === "sniper"));
   });
 
   let view;
@@ -1237,6 +1564,8 @@ function render() {
     view = viewPair(route.pair);
   } else if (route.name === "cycle") {
     view = viewCycle();
+  } else if (route.name === "sniper") {
+    view = viewSniper();
   } else {
     view = viewDashboard();
   }
@@ -1250,7 +1579,10 @@ function render() {
  * ========================================================================= */
 document.querySelectorAll("#tabs .tab-btn").forEach(b => {
   b.addEventListener("click", () => {
-    location.hash = b.dataset.route === "cycle" ? "#/cycle" : "#/";
+    const r = b.dataset.route;
+    location.hash = r === "cycle" ? "#/cycle"
+      : r === "sniper" ? "#/sniper"
+      : "#/";
   });
 });
 document.getElementById("brand-link").addEventListener("click", (e) => {
@@ -1262,8 +1594,18 @@ document.getElementById("brand-link").addEventListener("click", (e) => {
 // refreshes. We only touch the single countdown element, never re-render
 // the whole tree.
 setInterval(() => {
-  const el = document.getElementById("cycle-countdown");
-  if (el && state.cycle) el.textContent = fmt.countdown(computeCountdown(state.cycle));
+  const cEl = document.getElementById("cycle-countdown");
+  if (cEl && state.cycle) cEl.textContent = fmt.countdown(computeCountdown(state.cycle));
+  const sEl = document.getElementById("sniper-countdown");
+  if (sEl && state.sniper) {
+    // Recompute against slot_end_utc for drift-free accuracy.
+    const iso = state.sniper.slot_end_utc || "";
+    const parsed = Date.parse(iso.replace(" UTC", "Z").replace(" ", "T"));
+    if (!isNaN(parsed)) {
+      const secs = Math.max(0, Math.round((parsed - Date.now()) / 1000));
+      sEl.textContent = fmt.countdown(secs);
+    }
+  }
 }, 1000);
 
 refresh();
