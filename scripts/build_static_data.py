@@ -44,6 +44,7 @@ from app.config import MIN_CONFIDENCE, PAIRS, PAIR_NAMES_RU, TZ_UTC5  # noqa: E4
 from app.orderbook import get_orderbook  # noqa: E402
 from app.prices import fetch_bars, get_current_price, get_price_change  # noqa: E402
 from app import cycle as cycle_mod  # noqa: E402
+from app import sniper as sniper_mod  # noqa: E402
 
 log = logging.getLogger("build_static_data")
 logging.basicConfig(
@@ -231,6 +232,42 @@ def build(*, include_bars: bool) -> dict:
     _write_json(DATA_DIR / "signals.json", signals_payload)
     _write_json(DATA_DIR / "cycle.json", cycle_snapshot)
     _write_json(DATA_DIR / "orderbooks.json", orderbooks)
+
+    # ------------------------------------------------------------------
+    # SNIPER V1.0 — top-1 5h binary-options pick.
+    # We reuse `built_pairs` so we don't re-download bars: sniper reads
+    # from the same in-process cache that populated `_build_pair_entry`.
+    # Learning state is loaded from state/sniper_learning.json so the
+    # trap-penalty feedback accumulates across runs.
+    # ------------------------------------------------------------------
+    try:
+        sniper_signal = sniper_mod.pick_top1()
+        sniper_payload = sniper_mod.signal_to_dict(sniper_signal)
+        sniper_payload["seconds_to_next_slot"] = sniper_mod.seconds_to_next_slot()
+        # Load the latest backtest so the frontend can show the historical
+        # winrate next to the live pick.  The file is written out-of-band
+        # by .github/workflows/auto_tune.yml (SNIPER backtest step) and
+        # is therefore *optional*.
+        backtest_path = ROOT / "reports" / "sniper_backtest.json"
+        if backtest_path.is_file():
+            try:
+                sniper_payload["backtest"] = json.loads(
+                    backtest_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                log.warning("could not attach backtest: %s", exc)
+        _write_json(DATA_DIR / "sniper.json", sniper_payload)
+    except Exception as exc:
+        log.exception("sniper pick failed: %s", exc)
+        _write_json(DATA_DIR / "sniper.json", {
+            "slot_start_utc": "", "slot_end_utc": "",
+            "verdict": "NO-TRADE",
+            "pair": "—", "name_ru": "—", "side": "—",
+            "entry_price": 0.0, "confidence": 0, "atr_h1": 0.0,
+            "strength": "",
+            "traps_detected": [f"sniper error: {exc}"],
+            "tables": {"A": [], "B": [], "C": []},
+            "seconds_to_next_slot": 0,
+        })
 
     bar_files = 0
     if include_bars:
