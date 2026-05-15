@@ -1,0 +1,144 @@
+name: Minute refresh (1-min data pulse)
+
+# The user explicitly asked for the dashboard to refresh **every 1
+# minute** through GitHub Actions.  GitHub's cron scheduler has a 5-minute
+# minimum granularity, so we approximate "every minute" by running once
+# every 5 minutes and looping internally 5 times with a 60-second sleep
+# between iterations.  Each iteration runs the AI brain in "quick" mode
+# (top1.json only) and pushes to the `data` branch.
+#
+# This complements the heavier crons:
+#   - ai_brain.yml      — full 28-pair breakdown every 5h (brain_full.json)
+#   - refresh_data.yml  — yfinance signals + cycle every 5 min
+#
+# Concurrency: the publish step has its own retry loop so it never loses
+# a forecast to a race with refresh_data.yml on the same `data` branch.
+
+on:
+  schedule:
+    # GitHub's tightest cron granularity.  Inside the job we loop 5×60s
+    # so the effective publish cadence is once per minute.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ai_brain.py"
+      - "app/brain.py"
+      - ".github/workflows/minute_refresh.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  # We deliberately let two minute-refresh runs queue rather than cancel
+  # each other — every minute of data is valuable, even if the previous
+  # 5-min slot's job overruns slightly.
+  group: minute-refresh
+  cancel-in-progress: false
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    # Five 60-second iterations + ~30s of overhead per iteration.  Hard
+    # cap at 9 min so we never collide with the next */5 tick.
+    timeout-minutes: 9
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Pulse loop (5 × 60s)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tighter yfinance budget so a stuck call can't blow the
+          # 9-min job timeout.
+          YFINANCE_TIMEOUT: "15"
+        run: |
+          set -euo pipefail
+          git config user.name  "forex-data-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          push_top1() {
+            mkdir -p /tmp/minute-out
+            cp data/top1.json /tmp/minute-out/top1.json
+
+            if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+              git fetch origin data --depth=1
+              git checkout -B data origin/data
+            else
+              git checkout --orphan data
+              git rm -rf . >/dev/null 2>&1 || true
+            fi
+
+            mkdir -p data
+            cp /tmp/minute-out/top1.json data/top1.json
+
+            git add data/top1.json
+            if git diff --cached --quiet; then
+              echo "::notice::No top1.json delta this minute — skipping commit."
+              git checkout main
+              return 0
+            fi
+
+            git commit -m "brain: minute pulse $(date -u +%Y-%m-%dT%H:%MZ)"
+            # Up to 3 retries with rebase-style refetch so we never lose
+            # a minute to a refresh_data.yml race.
+            for attempt in 1 2 3; do
+              if git push origin data; then
+                git checkout main
+                return 0
+              fi
+              echo "push attempt $attempt failed, rebasing on origin/data…"
+              git fetch origin data --depth=1
+              git reset --soft FETCH_HEAD
+              git add data/top1.json
+              git commit -m "brain: minute pulse $(date -u +%Y-%m-%dT%H:%MZ) (retry $attempt)"
+              sleep 5
+            done
+            echo "::warning::Push failed after 3 retries — giving up this minute."
+            git checkout main
+            return 1
+          }
+
+          for i in 1 2 3 4 5; do
+            iteration_start=$(date -u +%s)
+            echo "── Minute pulse $i/5 — $(date -u +%H:%M:%SZ) ──"
+
+            # Quick mode = top1.json only.  No per-pair breakdown so the
+            # data branch diff stays small and the push is fast.
+            python scripts/ai_brain.py --quick || {
+              echo "::warning::ai_brain.py quick failed on iter $i — skipping push."
+              true
+            }
+
+            if [ -f data/top1.json ]; then
+              push_top1 || true
+            else
+              echo "::warning::data/top1.json missing on iter $i."
+            fi
+
+            # Sleep the remainder of the 60-second slot.  Skip on the
+            # final iteration so we don't waste compute.
+            if [ "$i" != "5" ]; then
+              elapsed=$(( $(date -u +%s) - iteration_start ))
+              remaining=$(( 60 - elapsed ))
+              if [ "$remaining" -gt 0 ]; then
+                echo "Sleeping ${remaining}s before next pulse…"
+                sleep "$remaining"
+              fi
+            fi
+          done
