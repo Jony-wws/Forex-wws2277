@@ -179,13 +179,26 @@
   function renderHero(top1Payload) {
     const top = top1Payload && top1Payload.top1;
     if (!top) {
-      $("topPair").textContent = "—";
-      $("topName").textContent = "AI пока не находит качественного сетапа.";
+      // Even when no pair has cleared the strict 80 % publication
+      // gate, we surface the *leading candidate* (top1Payload.leading_candidate)
+      // so the user can see which pair the brain is watching and why
+      // it stayed silent.  The TradingView chart is mounted for the
+      // leading pair when present, otherwise it falls back to the
+      // most-traded major (EURUSD) so the chart is never blank.
+      const lead = top1Payload && top1Payload.leading_candidate;
+      $("topPair").textContent = lead && lead.pair ? lead.pair : "—";
+      const reason = top1Payload && top1Payload.favorite_check && top1Payload.favorite_check.reason;
+      if (lead && lead.confidence != null) {
+        $("topName").textContent =
+          `Лидер ожидания: ${escapeHtml(lead.name_ru || lead.pair)} · уверенность ${lead.confidence}% (нужно ≥80%).`;
+      } else {
+        $("topName").textContent = "AI пока не находит качественного сетапа.";
+      }
       $("topSide").className = "side-tag wait";
       $("topSide").textContent = "ОЖИДАНИЕ";
-      $("topTier").textContent = "Все 28 пар отфильтрованы по veto-правилам";
-      $("confFill").style.width = "0%";
-      $("confText").textContent = "—";
+      $("topTier").textContent = reason || "Все 28 пар отфильтрованы по veto-правилам";
+      $("confFill").style.width = `${(lead && lead.confidence) || 0}%`;
+      $("confText").textContent = lead && lead.confidence != null ? `${lead.confidence}% (порог 80%)` : "—";
       ["mEntry","mAtr","mProjClose","mLiveStatus"].forEach(id => {
         const el = $(id);
         if (el) {
@@ -203,6 +216,9 @@
           и ждёт следующего цикла. <br/><br/>
           <span class="empty-em">Это нормально — не каждый цикл даёт качество.</span>
         </div>`;
+      // Always mount a chart so the user has live context even in
+      // the waiting state — leading candidate first, EURUSD fallback.
+      mountHeroChart((lead && lead.pair) || "EURUSD");
       return;
     }
 
