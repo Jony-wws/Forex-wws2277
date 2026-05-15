@@ -292,3 +292,45 @@ def test_select_top1_clear_favorite_passes(monkeypatch):
     assert out["favorite_check"]["ok"] is True
     assert out["top1"] is not None
     assert out["top1"]["confidence"] >= 80
+
+
+def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
+    """Strict-80% gate: a 79 % leader with a huge lead must be suppressed.
+
+    Under the old gate (``has_clear_lead OR has_floor``) a 79 % leader
+    with a 79-point lead over a zero-confidence runner-up would have
+    been published.  With the strict floor it must not — confidence
+    below 80 means no publish, regardless of the gap.
+    """
+    from app import brain as brain_mod
+
+    fake_eval = [
+        {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 79, "composite_score": 0.79, "layers": {}},
+    ]
+    # Stub external inputs (identical pattern to the other two tests).
+    monkeypatch.setattr(brain_mod, "fetch_macro_snapshot", lambda: {})
+    monkeypatch.setattr(brain_mod, "currency_strength_from_macro", lambda *_a, **_k: {})
+    monkeypatch.setattr(brain_mod, "_sentiment_score", lambda *_a, **_k: {"score": 0, "reason": ""})
+    monkeypatch.setattr(brain_mod, "political_risk_scores", lambda: {})
+    monkeypatch.setattr(brain_mod, "next_high_impact_events", lambda: {})
+    monkeypatch.setattr(brain_mod, "cot_currency_zscores", lambda: {})
+    monkeypatch.setattr(
+        brain_mod,
+        "big_player_scores",
+        lambda *_a, **_k: {"currency_scores": {}, "components": {"cot": {}, "orderbook": {}, "macro": {}}},
+    )
+
+    iter_evals = iter(fake_eval)
+
+    def fake_eval_fn(pair, *args, **kwargs):
+        try:
+            return next(iter_evals)
+        except StopIteration:
+            return {"pair": pair, "side": None, "veto": "out", "confidence": 0, "composite_score": 0, "layers": {}}
+
+    monkeypatch.setattr(brain_mod, "evaluate_pair", fake_eval_fn)
+
+    out = brain_mod.select_top1()
+    assert out["top1"] is None, "79 % leader must be suppressed by the strict 80 % floor"
+    assert out["favorite_check"]["ok"] is False
+    assert "порог" in out["favorite_check"]["reason"].lower()
