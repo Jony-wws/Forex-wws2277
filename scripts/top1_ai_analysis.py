@@ -68,21 +68,31 @@ SYSTEM_PROMPT = """\
 ВАЖНО: Это БИНАРНЫЕ ОПЦИОНЫ — нет Take Profit, нет Stop Loss, только время экспирации (5 часов).
 Твоя задача — проанализировать все данные и дать прогноз BUY/SELL на 5 часов.
 
-Требования к анализу:
-1. Начни с чёткого прогноза: ПОКУПКА или ПРОДАЖА с уверенностью
-2. Объясни ПОЧЕМУ выбрана именно эта пара (анализ 7 слоёв)
-3. Опиши техническую картину (мульти-TF, ADX, persistence, индикаторы,
-   SMC: FVG / Order Blocks, Wyckoff, Volume Profile — POC/VAH/VAL)
-4. Объясни макро-контекст: DXY, US10Y, VIX, Gold, Brent и матрицу силы
-   валют (USD/EUR/GBP/JPY/CHF/AUD/NZD/CAD) — какая валюта сейчас сильнее
-5. Оцени риски (новости в бл. часах, геополитика, волатильность, спред)
-6. Дай прогноз на 5 часов: куда пойдёт цена и почему
-7. Пиши на русском языке, НЕ как шаблон, а как настоящий аналитик
-8. Используй профессиональную терминологию, но понятно
-9. Будь честным — если сигнал слабый, скажи об этом и упомяни
-   альтернативу из Топ-3..5, если она выглядит сильнее
+КРИТИЧЕСКОЕ ПРАВИЛО — блок "# РЕШЕНИЕ СИСТЕМЫ ПО ВХОДУ В СДЕЛКУ":
+- Если Decision = GO — дай уверенный разбор и рекомендуй ОТКРЫТЬ сделку СЕЙЧАС
+  с экспирацией в переданное время (entry_at + 5ч). Объясни куда пойдёт цена и почему.
+- Если Decision = WAIT — НЕ уговаривай пользователя торговать. Честно объясни
+  почему фильтр не пройден (gate_ok, tier, conf vs floor, MTF, ADX, news),
+  что нужно мониторить до следующего цикла, и есть ли в Топ-5 кто-то сильнее.
+  Если в Топ-5 ничего стоящего нет — так и скажи: цикл слабый, ждём.
 
-Формат: структурированный анализ с эмодзи, 1500-2000 символов.
+Требования к анализу:
+1. Начни с решения (GO → покупка/продажа с уверенностью, WAIT → «НЕ входим, потому что …»)
+2. Опиши техническую картину (мульти-TF, ADX, persistence, ADR %,
+   SMC: FVG / Order Blocks / Liquidity sweep, Wyckoff, Volume Profile — POC/VAH/VAL)
+3. Прокомментируй order-flow: кумулятивную дельту, пулы BSL/SSL,
+   VWAP-отклонение, имбаланс стакана — совпадает ли с направлением или против.
+4. Объясни макро-контекст (DXY/US10Y/VIX/Gold/Brent), матрицу силы 8 валют,
+   корреляцию пары с DXY и флаг Risk-On/Risk-Off.
+5. Smart Money — COT institutional positioning (лучше SSI, потому что это
+   реальные позиции крупных игроков на CME).
+6. Оцени риски (новости, геополитика, волатильность, спред).
+7. Дай прогноз на 5 часов: куда пойдёт цена и почему.
+8. Пиши на русском, НЕ шаблонно, как живой аналитик; проф. терминология.
+9. Будь честным. Если сигнал слабый — скажи и предложи альтернативу из Топ-5
+   (если есть). Никогда не придумывай данные вне того, что передано в промпте.
+
+Формат: структурированный анализ с эмодзи, 1500-2200 символов.
 """
 
 
@@ -228,6 +238,145 @@ def _utc_plus_5(dt_iso: str | None) -> str:
             .strftime("%Y-%m-%d %H:%M UTC+5"))
 
 
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _fmt_dt_plus_5(dt: datetime | None) -> str:
+    """Format a tz-aware datetime as 'YYYY-MM-DD HH:MM UTC+5'."""
+    if dt is None:
+        return "—"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone(timedelta(hours=5))).strftime("%Y-%m-%d %H:%M UTC+5")
+
+
+# 5h cycle boundaries in UTC (corresponds to 00, 05, 10, 15, 20 UTC+5).
+_STRICT_5H_UTC_HOURS = (0, 5, 10, 15, 19)
+
+
+def _next_5h_boundary(now: datetime) -> datetime:
+    """Return the next strict 5h cycle boundary (in UTC) strictly after `now`."""
+    now_utc = now.astimezone(timezone.utc)
+    cands: list[datetime] = []
+    for h in _STRICT_5H_UTC_HOURS:
+        for off in (0, 1):
+            c = now_utc.replace(hour=h, minute=0, second=0, microsecond=0) \
+                + timedelta(days=off)
+            if c > now_utc:
+                cands.append(c)
+    return min(cands)
+
+
+def _compute_entry_window(payload: dict) -> dict:
+    """Decide whether to open a new 5h binary option right now (GO) or WAIT.
+
+    Rules:
+    - GO  : favorite_check.ok = True AND tier ∈ {premium,strong,normal}
+            AND confidence ≥ floor AND side ∈ {BUY,SELL}.
+            entry = now, expiry = now + 5h.
+    - WAIT: otherwise. entry = next strict 5h cycle boundary (rolling),
+            expiry = entry + 5h.  We don't urge the user to trade.
+
+    'now' comes from payload['generated_at_utc'] so all rendering
+    functions agree on a single timestamp.
+    """
+    gen_iso = payload.get("generated_at_utc")
+    now = _now_utc()
+    if gen_iso:
+        try:
+            parsed = datetime.fromisoformat(gen_iso.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            now = parsed
+        except ValueError:
+            pass
+
+    fav = payload.get("favorite_check") or {}
+    top1 = payload.get("top1") or payload.get("leading_candidate") or {}
+    tier_raw = (top1.get("tier") or "").lower()
+    side_raw = (top1.get("side") or "").upper()
+
+    try:
+        conf = float(top1.get("confidence") or 0)
+    except (TypeError, ValueError):
+        conf = 0.0
+    conf_pct = conf * 100.0 if conf <= 1.0 else conf
+
+    try:
+        floor = float(fav.get("confidence_floor") or 80)
+    except (TypeError, ValueError):
+        floor = 80.0
+
+    gate_ok = bool(fav.get("ok"))
+    tier_ok = tier_raw in ("premium", "strong", "normal")
+    conf_ok = conf_pct >= floor
+    side_ok = side_raw in ("BUY", "SELL")
+
+    decision = "GO" if (gate_ok and tier_ok and conf_ok and side_ok) else "WAIT"
+
+    reasons: list[str] = []
+    if not gate_ok:
+        reasons.append(f"favorite_check.ok=False ({fav.get('reason') or 'нет причины'})")
+    if not tier_ok:
+        reasons.append(f"tier={tier_raw or '—'} (нужен PREMIUM/STRONG/NORMAL)")
+    if not conf_ok:
+        reasons.append(f"confidence={conf_pct:.1f}% ниже floor {floor:.0f}%")
+    if not side_ok:
+        reasons.append(f"side={side_raw or '—'} (направление не определено)")
+
+    if decision == "GO":
+        entry_at = now
+        expiry_at = now + timedelta(hours=5)
+    else:
+        entry_at = _next_5h_boundary(now)
+        expiry_at = entry_at + timedelta(hours=5)
+
+    return {
+        "decision": decision,
+        "now_utc": now,
+        "entry_at_utc": entry_at,
+        "expiry_at_utc": expiry_at,
+        "minutes_to_entry": max(0, int((entry_at - now).total_seconds() // 60)),
+        "minutes_to_expiry": max(0, int((expiry_at - now).total_seconds() // 60)),
+        "gate_ok": gate_ok,
+        "tier_ok": tier_ok,
+        "conf_ok": conf_ok,
+        "side_ok": side_ok,
+        "tier": tier_raw or "—",
+        "conf_pct": conf_pct,
+        "floor": floor,
+        "reasons": reasons,
+    }
+
+
+def _banner(window: dict) -> str:
+    """Big GO/WAIT banner line for the top of every Telegram message."""
+    if window["decision"] == "GO":
+        return ("✅ <b>ВХОД РЕКОМЕНДОВАН</b> · открой бинарный опцион СЕЙЧАС "
+                f"(conf {window['conf_pct']:.0f}%, floor {window['floor']:.0f}%)")
+    reasons = "; ".join(window["reasons"]) if window["reasons"] else "фильтр не пройден"
+    return ("⛔ <b>ВХОД НЕ РЕКОМЕНДОВАН</b> · мониторинг текущего 5h-цикла\n"
+            f"   причины: {reasons}")
+
+
+def _timing_lines(window: dict) -> list[str]:
+    """Timestamp + rolling 5h trade window lines."""
+    gen = window["now_utc"]
+    if window["decision"] == "GO":
+        return [
+            f"📅 Сгенерировано: {_fmt_dt_plus_5(gen)}",
+            f"🎯 Открыть: <b>сейчас</b> ({_fmt_dt_plus_5(window['entry_at_utc'])})",
+            f"⏳ Закрытие через 5 ч: <b>{_fmt_dt_plus_5(window['expiry_at_utc'])}</b>",
+        ]
+    return [
+        f"📅 Сгенерировано: {_fmt_dt_plus_5(gen)}",
+        f"⏸ Не входим. Следующая попытка: "
+        f"<b>{_fmt_dt_plus_5(window['entry_at_utc'])}</b> "
+        f"(через {window['minutes_to_entry']} мин)",
+    ]
+
+
 def _arrow(delta: float | None) -> str:
     if delta is None:
         return "→"
@@ -312,19 +461,270 @@ def _pair_oneliner(cand: dict, idx: int) -> str:
     return "\n".join(parts)
 
 
+def _orderflow_scanner_block(payload: dict, pair: str | None) -> list[str]:
+    """🎯 ORDER FLOW · Top-1 — VSA + SMC снимок для выбранной пары.
+
+    Поля: кумулятивная дельта (синтетическая), пулы ликвидности BSL/SSL,
+    FVG H1 + H4, POC/VAH/VAL (H1), VWAP-отклонение в ATR-единицах,
+    Liquidity Sweep, свежий Order Block, имбаланс стакана (bid/ask depth).
+    """
+    out = ["🎯 <b>ORDER FLOW · Top-1</b>" + (f" · {pair}" if pair else "")]
+    if not pair:
+        out.append("  (нет Top-1 — пропускаем)")
+        return out
+
+    top1 = payload.get("top1") or payload.get("leading_candidate") or {}
+    layers = top1.get("layers") or {}
+    extras = (layers.get("technical") or {}).get("extras") or {}
+    smc = extras.get("smc") or {}
+    vp = extras.get("vp") or {}
+    atr_h1 = (top1.get("levels") or {}).get("atr_h1")
+
+    # Fresh H1 bars for BSL/SSL + VWAP dev + synthetic delta.
+    bsl = ssl_lvl = None
+    vwap_dev_atr = None
+    cum_delta_pct = None
+    fvg_h1 = None
+    try:
+        from app.prices import fetch_bars
+        from app.indicators import vwap as vwap_series
+        from app.smc import detect_fvgs
+        bars_h1 = fetch_bars(pair, "1h", "1mo")
+        if bars_h1 is not None and not bars_h1.empty and len(bars_h1) >= 20:
+            tail = bars_h1.tail(20)
+            bsl = float(tail["High"].max())
+            ssl_lvl = float(tail["Low"].min())
+            last_close = float(bars_h1["Close"].iloc[-1])
+            try:
+                vw = vwap_series(bars_h1)
+                vw_last = float(vw.iloc[-1])
+                if atr_h1 and float(atr_h1) > 0:
+                    vwap_dev_atr = (last_close - vw_last) / float(atr_h1)
+            except Exception:
+                pass
+
+            n = min(50, len(bars_h1))
+            tail50 = bars_h1.tail(n)
+            opens = tail50["Open"].to_numpy()
+            closes = tail50["Close"].to_numpy()
+            highs = tail50["High"].to_numpy()
+            lows = tail50["Low"].to_numpy()
+            sign = (closes >= opens).astype(int) * 2 - 1  # +1 bull / -1 bear
+            if "Volume" in tail50.columns:
+                vol = tail50["Volume"].to_numpy()
+                vol_total = float(abs(vol).sum())
+                if vol_total > 0:
+                    cum_delta_pct = float((sign * vol).sum()) / vol_total * 100.0
+            if cum_delta_pct is None:
+                # Fall back: body / range weighted mean (forex Yahoo volume = 0).
+                bodies = closes - opens
+                ranges = (highs - lows) + 1e-12
+                cum_delta_pct = float((bodies / ranges).mean()) * 100.0
+
+            gh1 = detect_fvgs(bars_h1, max_gaps=3)
+            if gh1:
+                fvg_h1 = {"top": gh1[0].top, "bottom": gh1[0].bottom,
+                          "side": gh1[0].side}
+    except Exception as e:
+        print(f"[top1_ai] orderflow H1 fetch failed: {e}", file=sys.stderr)
+
+    fvgs_h4 = smc.get("fvgs") or []
+    fvg_h4 = fvgs_h4[0] if fvgs_h4 else None
+
+    # Order Book Imbalance + spread (approximation from app.orderbook).
+    ob_imb_pct = None
+    bid = ask = spread_pips = None
+    try:
+        from app.orderbook import get_orderbook
+        ob = get_orderbook(pair) or {}
+        bid = ob.get("bid")
+        ask = ob.get("ask")
+        spread_pips = ob.get("spread_pips")
+        depth = ob.get("depth") or []
+        bid_vol = sum(float(d.get("volume", 0) or 0)
+                      for d in depth if d.get("side") == "bid")
+        ask_vol = sum(float(d.get("volume", 0) or 0)
+                      for d in depth if d.get("side") == "ask")
+        if (bid_vol + ask_vol) > 0:
+            ob_imb_pct = (bid_vol - ask_vol) / (bid_vol + ask_vol) * 100.0
+    except Exception as e:
+        print(f"[top1_ai] orderbook fetch failed: {e}", file=sys.stderr)
+
+    sweep = smc.get("sweep") or {}
+    sweep_str = sweep.get("event") or "none"
+    sweep_lvl = sweep.get("level")
+    obs = smc.get("order_blocks") or []
+    fresh_ob = obs[0] if obs else None
+
+    def fvg_str(g):
+        if not g:
+            return "—"
+        side_ru = "бычий" if g["side"] == "bull" else "медвежий"
+        return f"{side_ru} {_fmt_price(g['bottom'])}…{_fmt_price(g['top'])}"
+
+    out.append(f"  • Кум. дельта (~50×H1, synth): "
+               f"{('%+.1f%%' % cum_delta_pct) if cum_delta_pct is not None else 'n/a'}")
+    out.append(f"  • Пулы ликвидности: BSL≈{_fmt_price(bsl) if bsl is not None else '—'} "
+               f"· SSL≈{_fmt_price(ssl_lvl) if ssl_lvl is not None else '—'}")
+    out.append(f"  • FVG H1: {fvg_str(fvg_h1)} · FVG H4: {fvg_str(fvg_h4)}")
+    poc = vp.get("poc"); vah = vp.get("vah"); val = vp.get("val")
+    out.append(f"  • Volume Profile H1: POC {_fmt_price(poc) if poc is not None else '—'} "
+               f"· VAH {_fmt_price(vah) if vah is not None else '—'} "
+               f"· VAL {_fmt_price(val) if val is not None else '—'}")
+    out.append(f"  • VWAP отклонение: "
+               f"{('%+.2f ATR' % vwap_dev_atr) if vwap_dev_atr is not None else 'n/a'}")
+    sweep_line = f"  • Liquidity sweep: {sweep_str}"
+    if sweep_lvl is not None:
+        sweep_line += f" @ {_fmt_price(sweep_lvl)}"
+    if fresh_ob:
+        ob_side_ru = "бычий" if fresh_ob.get("side") == "bull" else "медвежий"
+        sweep_line += (f" · свежий OB {ob_side_ru} "
+                       f"{_fmt_price(fresh_ob.get('low'))}…{_fmt_price(fresh_ob.get('high'))}")
+    out.append(sweep_line)
+    out.append(f"  • Стакан: bid={_fmt_price(bid) if bid else '—'} "
+               f"· ask={_fmt_price(ask) if ask else '—'} "
+               f"· спред={spread_pips if spread_pips else '—'} пипс "
+               f"· имбаланс={('%+.0f%%' % ob_imb_pct) if ob_imb_pct is not None else 'n/a'}")
+    return out
+
+
+def _intermarket_block(payload: dict, pair: str | None) -> list[str]:
+    """🌐 INTERMARKET — корреляция пары с DXY (H1, 50 баров) + Risk-On/Off."""
+    out = ["🌐 <b>INTERMARKET</b> (корреляция + риск-флаг)"]
+
+    macro_raw = (payload.get("macro") or {}).get("tickers") or {}
+    vix_d = macro_raw.get("VIX")
+    us10y_d = macro_raw.get("US10Y")
+    gold_d = macro_raw.get("GOLD")
+
+    risk_off = (isinstance(vix_d, (int, float)) and vix_d > 0.5
+                and isinstance(us10y_d, (int, float)) and us10y_d > 0.1)
+    risk_on = (isinstance(vix_d, (int, float)) and vix_d < -0.5
+               and isinstance(gold_d, (int, float)) and gold_d < 0)
+
+    if risk_off:
+        risk_lbl = "RISK-OFF (VIX↑ + US10Y↑) — осторожно с шортом JPY/CHF"
+    elif risk_on:
+        risk_lbl = "RISK-ON (VIX↓ + Gold↓) — рисковые валюты в фаворе"
+    else:
+        risk_lbl = "нейтрально"
+
+    corr_dxy = None
+    if pair:
+        try:
+            import yfinance as yf
+            from app.prices import fetch_bars
+            pair_h1 = fetch_bars(pair, "1h", "1mo")
+            # DXY is not a forex pair, fetch it directly via Yahoo's index symbol.
+            dxy_h1 = yf.Ticker("DX-Y.NYB").history(period="1mo", interval="1h",
+                                                    auto_adjust=False)
+            if (pair_h1 is not None and dxy_h1 is not None
+                    and not pair_h1.empty and not dxy_h1.empty):
+                p_ret = pair_h1["Close"].pct_change().dropna()
+                d_ret = dxy_h1["Close"].pct_change().dropna()
+                # Re-localize both indexes to UTC-naive for join.
+                if getattr(p_ret.index, "tz", None) is not None:
+                    p_ret.index = p_ret.index.tz_convert("UTC").tz_localize(None)
+                if getattr(d_ret.index, "tz", None) is not None:
+                    d_ret.index = d_ret.index.tz_convert("UTC").tz_localize(None)
+                joined = p_ret.to_frame("p").join(d_ret.to_frame("d"), how="inner").tail(50)
+                if len(joined) >= 20:
+                    corr_dxy = float(joined["p"].corr(joined["d"]))
+        except Exception as e:
+            print(f"[top1_ai] DXY corr failed: {e}", file=sys.stderr)
+
+    out.append(f"  • Корреляция {pair or '—'} ↔ DXY (50×H1): "
+               f"{('%+.2f' % corr_dxy) if corr_dxy is not None else 'n/a'}")
+    out.append(f"  • Режим рынка: {risk_lbl}")
+    return out
+
+
+def _execution_block(payload: dict, pair: str | None) -> list[str]:
+    """⚙️ EXECUTION — ADX-порог 25, MTF strict, ADR%."""
+    out = ["⚙️ <b>EXECUTION CHECK</b> (исполнимость входа)"]
+    top1 = payload.get("top1") or payload.get("leading_candidate") or {}
+    layers = top1.get("layers") or {}
+    ta = layers.get("technical") or {}
+    adx = ta.get("adx_h1")
+    mtf = ta.get("multi_tf_aligned")
+    persistence = ta.get("persistence_5h")
+
+    try:
+        adx_val = float(adx) if adx is not None else None
+    except (TypeError, ValueError):
+        adx_val = None
+    adx_pass = adx_val is not None and adx_val >= 25
+    adx_str = (f"{adx_val:.1f}" if adx_val is not None else "—")
+    adx_lbl = "≥25 ✓" if adx_pass else "<25 ✗ (слабый тренд)"
+    out.append(f"  • ADX H1: {adx_str} ({adx_lbl})")
+
+    mtf_lbl = "D1+H4+H1+M15 ✓" if mtf else "не совпадают ✗"
+    out.append(f"  • Multi-TF alignment: {mtf_lbl} · persistence 5h: "
+               f"{_fmt_pct(persistence)}")
+
+    # ADR % — used range today vs 14-day ADR.
+    adr_pct = None
+    if pair:
+        try:
+            from app.prices import fetch_bars
+            bars_d1 = fetch_bars(pair, "1d", "1mo")
+            if bars_d1 is not None and len(bars_d1) >= 15:
+                ranges_14 = (bars_d1["High"] - bars_d1["Low"]).tail(15).head(14)
+                adr14 = float(ranges_14.mean())
+                today = bars_d1.iloc[-1]
+                today_range = float(today["High"] - today["Low"])
+                if adr14 > 0:
+                    adr_pct = today_range / adr14 * 100.0
+        except Exception as e:
+            print(f"[top1_ai] ADR calc failed: {e}", file=sys.stderr)
+    out.append(f"  • ADR % (пройдено сегодня / 14-day ADR): "
+               f"{('%.0f%%' % adr_pct) if adr_pct is not None else 'n/a'}")
+    return out
+
+
+def _sentiment_block(payload: dict) -> list[str]:
+    """🧠 SENTIMENT — SSI=n/a + COT positioning из big_players/cot."""
+    out = ["🧠 <b>SENTIMENT</b> (позиционирование)"]
+    out.append("  • SSI (розничный buy/sell %): n/a (источник недоступен на Yahoo)")
+    bp_snap = payload.get("big_players") or {}
+    cur_scores = bp_snap.get("currency_scores") or {}
+    cot_scores = bp_snap.get("cot_scores") or bp_snap.get("cot") or {}
+    if cur_scores:
+        rows = sorted(cur_scores.items(), key=lambda kv: -float(kv[1] or 0))[:8]
+        compact = " · ".join(f"{k} {float(v or 0):+.2f}" for k, v in rows)
+        out.append(f"  • Smart Money (composite): {compact}")
+    elif cot_scores:
+        rows = sorted(cot_scores.items(), key=lambda kv: -float(kv[1] or 0))[:8]
+        compact = " · ".join(f"{k} z={float(v or 0):+.2f}" for k, v in rows)
+        out.append(f"  • COT z-score (52-week): {compact}")
+    else:
+        out.append("  • COT/Smart Money: n/a")
+    return out
+
+
 def build_scanner_message(payload: dict) -> str:
     """Build the first Telegram message: scanner of all 28 pairs.
 
-    Includes global macro, currency strength matrix, and the top 3..5
-    candidates with short technicals each.
+    Layout (top → bottom):
+      banner (GO/WAIT)
+      generated_at + entry/expiry timing
+      🌐 Macro snapshot (DXY/US10Y/VIX/Gold/Brent)
+      💪 Currency strength matrix (8 currencies)
+      📊 Top-5 candidates (oneliners)
+      🎯 Order flow · Top-1 (VSA + SMC + VP + OB)
+      🌐 Intermarket (DXY corr + Risk-On/Off)
+      ⚙️ Execution check (ADX, MTF, ADR%)
+      🧠 Sentiment (SSI=n/a, COT institutional)
     """
     top5 = payload.get("top5") or []
     top1 = payload.get("top1") or payload.get("leading_candidate") or {}
-    next_cycle = payload.get("next_cycle_utc") or payload.get("cycle_close_utc")
+    pair = top1.get("pair")
+    window = _compute_entry_window(payload)
 
     lines: list[str] = []
     lines.append("📡 <b>СКАНЕР 28 ПАР · 5h binary-option</b>")
-    lines.append(f"Закрытие цикла: {_utc_plus_5(next_cycle)}")
+    lines.append(_banner(window))
+    lines.extend(_timing_lines(window))
     lines.append("")
     lines.extend(_macro_block(payload))
     lines.append("")
@@ -336,6 +736,14 @@ def build_scanner_message(payload: dict) -> str:
         lines.append(_pair_oneliner(cand, i))
     if not take:
         lines.append("  (нет кандидатов — все 28 отфильтрованы veto / favorite_check)")
+    lines.append("")
+    lines.extend(_orderflow_scanner_block(payload, pair))
+    lines.append("")
+    lines.extend(_intermarket_block(payload, pair))
+    lines.append("")
+    lines.extend(_execution_block(payload, pair))
+    lines.append("")
+    lines.extend(_sentiment_block(payload))
     lines.append("")
     lines.append("⤵️ Ниже — подробный AI-разбор Top-1 и 3 графика M15/H1/H4.")
 
@@ -432,12 +840,32 @@ def build_prompt(payload: dict) -> str:
 
     next_cycle = payload.get("next_cycle_utc") or payload.get("cycle_close_utc")
     minutes_to_expiry = payload.get("minutes_to_expiry")
+    window = _compute_entry_window(payload)
 
     macro_raw = (payload.get("macro") or {}).get("tickers") or {}
     top5 = payload.get("top5") or []
 
     lines: list[str] = []
-    # Global context first — макро + сила валют + Top-5, чтобы LLM их учитывал.
+    # CRITICAL: this is the system's GO/WAIT decision the LLM MUST respect.
+    lines.append("# РЕШЕНИЕ СИСТЕМЫ ПО ВХОДУ В СДЕЛКУ")
+    lines.append(f"- Decision: {window['decision']}")
+    lines.append(f"- Сгенерировано: {_fmt_dt_plus_5(window['now_utc'])}")
+    if window["decision"] == "GO":
+        lines.append(f"- Открыть СЕЙЧАС: {_fmt_dt_plus_5(window['entry_at_utc'])}")
+        lines.append(f"- Закрытие через 5 ч: {_fmt_dt_plus_5(window['expiry_at_utc'])}")
+        lines.append("- ИНСТРУКЦИЯ: Дай уверенный разбор и рекомендуй ОТКРЫТЬ "
+                     "сделку СЕЙЧАС. Скажи куда пойдёт цена за 5 часов и почему.")
+    else:
+        reasons = "; ".join(window["reasons"]) if window["reasons"] else "фильтр не пройден"
+        lines.append(f"- Причины НЕ-входа: {reasons}")
+        lines.append(f"- Следующая попытка не раньше: "
+                     f"{_fmt_dt_plus_5(window['entry_at_utc'])}")
+        lines.append("- ИНСТРУКЦИЯ: НЕ уговаривай пользователя торговать. "
+                     "Честно объясни почему сейчас пропускаем, что нужно "
+                     "мониторить, и есть ли в Топ-5 кто-то сильнее. "
+                     "Если в Топ-5 ничего стоящего нет — так и скажи: цикл слабый, ждём.")
+    lines.append("")
+    # Global context — макро + сила валют + Top-5, чтобы LLM их учитывал.
     lines.append("# ГЛОБАЛЬНЫЙ МАКРОФОН (Δ за 5 баров H1, +% = рост)")
     for label in ("DXY", "US10Y", "VIX", "GOLD", "BRENT"):
         v = macro_raw.get(label)
@@ -784,18 +1212,18 @@ def build_telegram_text(payload: dict, analysis: str, model_label: str) -> str:
     side = top1.get("side")
     conf = top1.get("confidence")
     tier = _tier_label(top1.get("tier"))
-    next_cycle = payload.get("next_cycle_utc") or payload.get("cycle_close_utc")
-    minutes_to_expiry = payload.get("minutes_to_expiry")
     fav = payload.get("favorite_check") or {}
+    window = _compute_entry_window(payload)
 
+    timing_block = "\n".join(_timing_lines(window))
     header = (
+        f"{_banner(window)}\n"
         f"🤖 <b>ТОП-1 AI-АНАЛИЗ</b> (бинарный опцион, 5 ч)\n"
+        f"{timing_block}\n"
         f"Пара: <b>{pair}</b> ({name_ru})\n"
         f"Сигнал: <b>{_side_ru(side)}</b> · "
         f"Уверенность: <b>{_fmt_pct(conf)}</b> · "
         f"Tier: <b>{tier}</b>\n"
-        f"Экспирация: {_utc_plus_5(next_cycle)} "
-        f"(осталось ~{int(round(minutes_to_expiry or 0))} мин)\n"
         f"Gate ok: {fav.get('ok')} · floor: {fav.get('confidence_floor')}%\n"
         f"\n"
     )
