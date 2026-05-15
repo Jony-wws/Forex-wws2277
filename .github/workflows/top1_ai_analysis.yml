@@ -1,0 +1,92 @@
+name: TOP-1 AI analysis (binary option, 5h)
+
+# Раз в 5 часов, сразу после ai_brain (cron "0 19,0,5,10,15"):
+# - тянет ТОП-1 пару из app.brain.select_top1()
+# - просит LLM (Cloudflare Workers AI Llama 3.3 70B → fallback
+#   GitHub Models gpt-4o-mini) написать "экспертный" разбор уровня
+#   GPT-5.5 с учётом 7 слоёв (TA, confluence, macro, big-players,
+#   fundamental, news, sentiment, political)
+# - делает 3 скриншота TradingView (M15 / H1 / H4) с индикаторами
+#   RSI / MACD / Bollinger / Stochastic через Playwright + tv.js widget
+# - шлёт всё в Telegram: текст через sendMessage, потом 3 фото
+#   альбомом через sendMediaGroup
+#
+# Триггер ``push`` гарантирует, что первый отчёт прилетит в Telegram
+# СРАЗУ после мержа PR, не дожидаясь следующей пятичасовой границы.
+
+on:
+  schedule:
+    # Через 5 минут после ai_brain (cron "0 19,0,5,10,15 * * *").
+    - cron: "5 19,0,5,10,15 * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "scripts/top1_ai_analysis.py"
+      - ".github/workflows/top1_ai_analysis.yml"
+
+permissions:
+  contents: read
+  # GitHub Models fallback uses GITHUB_TOKEN.
+  models: read
+
+concurrency:
+  group: top1-ai-analysis
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install playwright
+
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run TOP-1 AI analysis
+        env:
+          # Primary LLM: Cloudflare Workers AI (free Llama 3.3 70B).
+          # Optional — falls back to GitHub Models when absent.
+          CF_AI_ACCOUNT_ID: ${{ secrets.CF_AI_ACCOUNT_ID }}
+          CF_AI_API_TOKEN:  ${{ secrets.CF_AI_API_TOKEN }}
+          CF_AI_MODEL:      "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+          # Fallback: GitHub Models (gpt-4o-mini, free via auto-injected GITHUB_TOKEN).
+          GITHUB_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODEL:     openai/gpt-4o-mini
+          # Telegram (текст + альбом из 3 фото).
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          YFINANCE_TIMEOUT: "20"
+        run: |
+          python scripts/top1_ai_analysis.py
+
+      - name: Append latest report to job summary
+        if: always()
+        run: |
+          if [ -f reports/top1_ai_analysis_latest.md ]; then
+            cat reports/top1_ai_analysis_latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload screenshots as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: top1-ai-screenshots
+          path: screenshots/top1_ai/*.png
+          if-no-files-found: ignore
+          retention-days: 7
