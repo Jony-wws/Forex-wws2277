@@ -46,6 +46,8 @@ export type PairEntry = {
   score: number;
   max_score: number;
   multi_tf_aligned: boolean;
+  multi_tf_strict?: boolean;
+  multi_tf_count?: number;
   adx_h1: number;
   adx_h4: number;
   trend_persistence_5h: number;
@@ -81,6 +83,8 @@ export type CycleForecast = {
   trend_persistence_5h: number;
   trend_persistence_bars: number;
   multi_tf_aligned: boolean;
+  multi_tf_strict?: boolean;
+  multi_tf_count?: number;
   high_wr: boolean;
   entry_price: number;
   forecast_5h: ForecastDirection | null;

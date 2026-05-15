@@ -54,7 +54,9 @@ export default function PairCard({ entry }: { entry: PairEntry }) {
         <Meta label="ADX" value={fmtNumber(entry.adx_h1, 0)} />
         <Meta label="Persist" value={`${entry.trend_persistence_bars}/5`} />
         {entry.multi_tf_aligned && (
-          <span className="text-accent font-semibold">4 ТФ ✓</span>
+          <span className="text-accent font-semibold">
+            {entry.multi_tf_strict ? "4 ТФ ✓" : `${entry.multi_tf_count ?? 3} ТФ ✓`}
+          </span>
         )}
         {entry.is_strong_trend && (
           <span className="text-accent2 font-semibold">STRONG</span>
