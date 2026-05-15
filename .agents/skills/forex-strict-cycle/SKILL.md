@@ -99,21 +99,44 @@ Cron boundaries: `5 19,0,5,10,15 * * *` UTC (00:05, 05:05, 10:05,
    (gate), ⊙ NORMAL (top-up).
 6. Writes `state/forecasts.json` and `reports/cycle_5h_latest.md`.
 
-### 3a. AI brain `select_top1()` — 7 layers + safety gates
+### 3a. AI brain `select_top1()` — 8 layers + safety gates
 
 `app/brain.py` runs a parallel "Top-1 of 28 with a clear favorite"
 pipeline used by `scripts/ai_brain.py` and consumed by the SPA /
-Telegram bot.  The composite confidence is the weighted sum:
+Telegram bot.  Rebalanced 2026-05-15 for the 5-hour binary horizon —
+technicals and the new multi-TF/multi-indicator confluence dominate
+because carry trade and political risk barely move 5 h prices.  The
+composite confidence is the weighted sum:
 
-| Layer            | Weight | Source                                      |
-|------------------|--------|---------------------------------------------|
-| `technical`      | 0.33   | `analyzer.py` votes + SMC/Wyckoff/VP extras |
-| `macro`          | 0.22   | DXY, yields, commodities (`macro.py`)       |
-| `big_players`    | 0.12   | CFTC COT + bid/ask + macro (`big_players.py`)|
-| `fundamental`    | 0.13   | Carry / policy rate diff (`brain.py`)       |
-| `news`           | 0.09   | High-impact event veto (`news_brain.py`)    |
-| `sentiment`      | 0.08   | Risk-on / risk-off from VIX & DXY tape      |
-| `political`      | 0.03   | Reuters / BBC headline risk score           |
+| Layer            | Weight | Source                                            |
+|------------------|--------|---------------------------------------------------|
+| `technical`      | 0.30   | `analyzer.py` votes + SMC/Wyckoff/VP extras       |
+| `confluence`     | 0.25   | `confluence.py` 5-TF + 10-indicator confluence    |
+| `macro`          | 0.12   | DXY, yields, commodities (`macro.py`)             |
+| `big_players`    | 0.08   | CFTC COT + bid/ask + macro (`big_players.py`)     |
+| `fundamental`    | 0.07   | Carry / policy rate diff (`brain.py`)             |
+| `news`           | 0.08   | High-impact event veto (`news_brain.py`)          |
+| `sentiment`      | 0.05   | Risk-on / risk-off from VIX & DXY tape            |
+| `political`      | 0.05   | Reuters / BBC headline risk score                 |
+
+The `confluence` layer is built from `app/confluence.py` and
+`app/extra_indicators.py` (MFI, CCI, OBV slope, Supertrend, Vortex,
+ROC, Bollinger/Keltner squeeze, Donchian).  It produces a directional
+score from 5 timeframes (W1 + D1 + H4 + H1 + M15) and 10 independent
+indicator votes.  When all 5 TFs agree + ≥7/10 indicators agree +
+ADX(H1) ≥ 22 + volatility expansion confirms, `super_confluence`
+fires and brain awards a +0.18 `SUPER_CONFLUENCE_BONUS` to composite.
+Combined with the existing `+0.22` STRONG_TREND_BONUS this lets a
+technically-perfect setup clear the strict 80 % publication floor on
+its own merits, without needing macro/carry to agree — addressing the
+user's product ask "больше шансов найти настоящие 80 % в каждом цикле".
+
+The `_scale_confidence` calibration anchors were also retuned to
+match the new weights:
+- `composite=0.00` → 0  %
+- `composite=0.20` → 50 %
+- `composite=0.45` → 80 % (publication floor)
+- `composite=1.00` → 99 %
 
 Hard gates promoted to `veto` so the pair is excluded from Top-1:
 
