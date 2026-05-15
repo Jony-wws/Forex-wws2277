@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-15T12:20:50.910390+00:00",
+  "generated_at_utc": "2026-05-15T12:20:52.252569+00:00",
   "next_cycle_utc": "2026-05-15T15:00:00+00:00",
   "cycle_close_utc": "2026-05-15T15:00:00+00:00",
-  "minutes_to_expiry": 159.15,
+  "minutes_to_expiry": 159.13,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -305,51 +305,51 @@
           "drift_per_bar": -0.00044,
           "drift_per_minute": -7.4e-06,
           "horizon_bars": 5,
-          "horizon_minutes": 159.15,
+          "horizon_minutes": 159.13,
           "safety_margin": 0.0004
         }
       },
       "edge_check": {
-        "passes": false,
-        "calibrated_confidence": 73.5,
+        "passes": true,
+        "calibrated_confidence": 75.7,
         "brain_confidence": 91,
-        "reason": "Edge не подтверждён: 5d Wilson lower 47.4% < 51% (статистически не отличается от случайности).",
+        "reason": "Edge подтверждён: Wilson 95% lower=52.7% на окне 5d (n=75), EV=+1.45п. на сделку, calibrated=75.7%.",
         "windows": {
           "5d": {
-            "point_pct": 54.4,
-            "lower_pct": 47.36,
-            "upper_pct": 61.28,
-            "wins": 105,
-            "n": 193
+            "point_pct": 64.0,
+            "lower_pct": 52.7,
+            "upper_pct": 73.94,
+            "wins": 48,
+            "n": 75
           },
           "30d": {
-            "point_pct": 50.07,
-            "lower_pct": 47.41,
-            "upper_pct": 52.74,
-            "wins": 676,
-            "n": 1350
+            "point_pct": 55.06,
+            "lower_pct": 51.33,
+            "upper_pct": 58.73,
+            "wins": 381,
+            "n": 692
           },
           "lifetime": {
-            "point_pct": 50.79,
-            "lower_pct": 49.14,
-            "upper_pct": 52.43,
-            "wins": 1808,
-            "n": 3560
+            "point_pct": 50.97,
+            "lower_pct": 48.76,
+            "upper_pct": 53.18,
+            "wins": 996,
+            "n": 1954
           }
         },
         "best_wilson": {
-          "point_pct": 54.4,
-          "lower_pct": 47.36,
-          "upper_pct": 61.28,
-          "wins": 105,
-          "n": 193
+          "point_pct": 64.0,
+          "lower_pct": 52.7,
+          "upper_pct": 73.94,
+          "wins": 48,
+          "n": 75
         },
         "primary_window": "5d",
         "primary_floor_pct": 51.0,
         "mode": "standard",
-        "expected_value_pp": 0.241,
-        "wilson_lower_pct": 47.36,
-        "lifetime_significant": false,
+        "expected_value_pp": 1.448,
+        "wilson_lower_pct": 52.7,
+        "lifetime_significant": true,
         "regime_ok": true,
         "lifetime_ok": true,
         "ev_positive": true,
@@ -364,55 +364,55 @@
       "rr_target": 1.66
     },
     "edge": {
-      "passes": false,
-      "calibrated_confidence": 73.5,
+      "passes": true,
+      "calibrated_confidence": 75.7,
       "brain_confidence": 91,
-      "reason": "Edge не подтверждён: 5d Wilson lower 47.4% < 51% (статистически не отличается от случайности).",
+      "reason": "Edge подтверждён: Wilson 95% lower=52.7% на окне 5d (n=75), EV=+1.45п. на сделку, calibrated=75.7%.",
       "windows": {
         "5d": {
-          "point_pct": 54.4,
-          "lower_pct": 47.36,
-          "upper_pct": 61.28,
-          "wins": 105,
-          "n": 193
+          "point_pct": 64.0,
+          "lower_pct": 52.7,
+          "upper_pct": 73.94,
+          "wins": 48,
+          "n": 75
         },
         "30d": {
-          "point_pct": 50.07,
-          "lower_pct": 47.41,
-          "upper_pct": 52.74,
-          "wins": 676,
-          "n": 1350
+          "point_pct": 55.06,
+          "lower_pct": 51.33,
+          "upper_pct": 58.73,
+          "wins": 381,
+          "n": 692
         },
         "lifetime": {
-          "point_pct": 50.79,
-          "lower_pct": 49.14,
-          "upper_pct": 52.43,
-          "wins": 1808,
-          "n": 3560
+          "point_pct": 50.97,
+          "lower_pct": 48.76,
+          "upper_pct": 53.18,
+          "wins": 996,
+          "n": 1954
         }
       },
       "best_wilson": {
-        "point_pct": 54.4,
-        "lower_pct": 47.36,
-        "upper_pct": 61.28,
-        "wins": 105,
-        "n": 193
+        "point_pct": 64.0,
+        "lower_pct": 52.7,
+        "upper_pct": 73.94,
+        "wins": 48,
+        "n": 75
       },
       "primary_window": "5d",
       "primary_floor_pct": 51.0,
       "mode": "standard",
-      "expected_value_pp": 0.241,
-      "wilson_lower_pct": 47.36,
-      "lifetime_significant": false,
+      "expected_value_pp": 1.448,
+      "wilson_lower_pct": 52.7,
+      "lifetime_significant": true,
       "regime_ok": true,
       "lifetime_ok": true,
       "ev_positive": true,
       "calibrated_ok": true
     },
-    "tier": "strong",
+    "tier": "premium",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 159.15,
+      "horizon_minutes": 159.13,
       "entry": 0.58432,
       "projected_close": 0.58314,
       "drift_per_hour": -0.00044,
@@ -725,51 +725,51 @@
             "drift_per_bar": -0.00044,
             "drift_per_minute": -7.4e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 159.15,
+            "horizon_minutes": 159.13,
             "safety_margin": 0.0004
           }
         },
         "edge_check": {
-          "passes": false,
-          "calibrated_confidence": 73.5,
+          "passes": true,
+          "calibrated_confidence": 75.7,
           "brain_confidence": 91,
-          "reason": "Edge не подтверждён: 5d Wilson lower 47.4% < 51% (статистически не отличается от случайности).",
+          "reason": "Edge подтверждён: Wilson 95% lower=52.7% на окне 5d (n=75), EV=+1.45п. на сделку, calibrated=75.7%.",
           "windows": {
             "5d": {
-              "point_pct": 54.4,
-              "lower_pct": 47.36,
-              "upper_pct": 61.28,
-              "wins": 105,
-              "n": 193
+              "point_pct": 64.0,
+              "lower_pct": 52.7,
+              "upper_pct": 73.94,
+              "wins": 48,
+              "n": 75
             },
             "30d": {
-              "point_pct": 50.07,
-              "lower_pct": 47.41,
-              "upper_pct": 52.74,
-              "wins": 676,
-              "n": 1350
+              "point_pct": 55.06,
+              "lower_pct": 51.33,
+              "upper_pct": 58.73,
+              "wins": 381,
+              "n": 692
             },
             "lifetime": {
-              "point_pct": 50.79,
-              "lower_pct": 49.14,
-              "upper_pct": 52.43,
-              "wins": 1808,
-              "n": 3560
+              "point_pct": 50.97,
+              "lower_pct": 48.76,
+              "upper_pct": 53.18,
+              "wins": 996,
+              "n": 1954
             }
           },
           "best_wilson": {
-            "point_pct": 54.4,
-            "lower_pct": 47.36,
-            "upper_pct": 61.28,
-            "wins": 105,
-            "n": 193
+            "point_pct": 64.0,
+            "lower_pct": 52.7,
+            "upper_pct": 73.94,
+            "wins": 48,
+            "n": 75
           },
           "primary_window": "5d",
           "primary_floor_pct": 51.0,
           "mode": "standard",
-          "expected_value_pp": 0.241,
-          "wilson_lower_pct": 47.36,
-          "lifetime_significant": false,
+          "expected_value_pp": 1.448,
+          "wilson_lower_pct": 52.7,
+          "lifetime_significant": true,
           "regime_ok": true,
           "lifetime_ok": true,
           "ev_positive": true,
@@ -787,7 +787,7 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 159.15,
+    "horizon_minutes": 159.13,
     "entry": 0.58432,
     "projected_close": 0.58314,
     "drift_per_hour": -0.00044,
@@ -875,52 +875,52 @@
     }
   },
   "favorite_check": {
-    "ok": false,
-    "tier": "strong",
-    "reason": "⚡ STRONG: brain 91% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 47.4% < 51% (статистически не отличается от случайности).",
+    "ok": true,
+    "tier": "premium",
+    "reason": "★ PREMIUM: brain 91% ≥ 80% и мат. преимущество подтверждено (calibrated 75.7%, Wilson95 lower 52.7%, EV +1.45п.)",
     "lead_required": 5,
     "confidence_floor": 80,
     "edge_check": {
-      "passes": false,
-      "calibrated_confidence": 73.5,
+      "passes": true,
+      "calibrated_confidence": 75.7,
       "brain_confidence": 91,
-      "reason": "Edge не подтверждён: 5d Wilson lower 47.4% < 51% (статистически не отличается от случайности).",
+      "reason": "Edge подтверждён: Wilson 95% lower=52.7% на окне 5d (n=75), EV=+1.45п. на сделку, calibrated=75.7%.",
       "windows": {
         "5d": {
-          "point_pct": 54.4,
-          "lower_pct": 47.36,
-          "upper_pct": 61.28,
-          "wins": 105,
-          "n": 193
+          "point_pct": 64.0,
+          "lower_pct": 52.7,
+          "upper_pct": 73.94,
+          "wins": 48,
+          "n": 75
         },
         "30d": {
-          "point_pct": 50.07,
-          "lower_pct": 47.41,
-          "upper_pct": 52.74,
-          "wins": 676,
-          "n": 1350
+          "point_pct": 55.06,
+          "lower_pct": 51.33,
+          "upper_pct": 58.73,
+          "wins": 381,
+          "n": 692
         },
         "lifetime": {
-          "point_pct": 50.79,
-          "lower_pct": 49.14,
-          "upper_pct": 52.43,
-          "wins": 1808,
-          "n": 3560
+          "point_pct": 50.97,
+          "lower_pct": 48.76,
+          "upper_pct": 53.18,
+          "wins": 996,
+          "n": 1954
         }
       },
       "best_wilson": {
-        "point_pct": 54.4,
-        "lower_pct": 47.36,
-        "upper_pct": 61.28,
-        "wins": 105,
-        "n": 193
+        "point_pct": 64.0,
+        "lower_pct": 52.7,
+        "upper_pct": 73.94,
+        "wins": 48,
+        "n": 75
       },
       "primary_window": "5d",
       "primary_floor_pct": 51.0,
       "mode": "standard",
-      "expected_value_pp": 0.241,
-      "wilson_lower_pct": 47.36,
-      "lifetime_significant": false,
+      "expected_value_pp": 1.448,
+      "wilson_lower_pct": 52.7,
+      "lifetime_significant": true,
       "regime_ok": true,
       "lifetime_ok": true,
       "ev_positive": true,
