@@ -89,21 +89,27 @@ def _hist(*, wins, trades, wr_5d, n5, wr_30d, n30, avg_win=10.0, avg_loss=10.0):
 
 
 def test_compute_edge_passes_for_strong_pair():
-    """A pair with 67 % lifetime WR over 450 trades clears every gate."""
+    """A pair with consistently strong WR across windows clears every gate.
+
+    Primary window is now 5d (most-recent regime), so the 5d sample must
+    also clear the 51 % Wilson lower bound — matches real-world cases
+    where a profitable strategy is profitable *right now*, not just on a
+    multi-year average that mixes pre- and post-regime data.
+    """
     history = _hist(
         wins=319,
         trades=450,
-        wr_5d=57.14, n5=56,
-        wr_30d=67.04, n30=179,
+        wr_5d=70.0, n5=80,         # 5d Wilson lower ≈ 59 % — clears 51 %
+        wr_30d=67.04, n30=179,     # 30d Wilson lower ≈ 60 % — clears regime
         avg_win=14.8, avg_loss=15.8,
     )
     verdict = compute_edge("AUDNZD", 85.0, history=history)
     assert verdict["passes"] is True
+    # Primary is 5d, lower ~59 %; calibrated = 0.6*85 + 0.4*59 = 51 + 23.6 = 74.6
+    assert verdict["primary_window"] == "5d"
     assert verdict["wilson_lower_pct"] >= LIFETIME_LOWER_FLOOR * 100
     assert verdict["expected_value_pp"] > 0
-    assert verdict["calibrated_confidence"] > 70
-    # Calibrated blends 60 % brain (=85) + 40 % wilson_lower (~66.5) ≈ 77.6
-    assert 75 < verdict["calibrated_confidence"] < 80
+    assert 70 < verdict["calibrated_confidence"] < 80
 
 
 def test_compute_edge_blocks_coin_flip_pair():
@@ -133,6 +139,48 @@ def test_compute_edge_blocks_regime_change():
     # Lifetime stat is fine, but the 30-day regime guard fires.
     assert verdict["regime_ok"] is False
     assert "режима" in verdict["reason"]
+
+
+def test_compute_edge_regime_recovery_with_coin_flip_lifetime():
+    """Recent regime is profitable even though the multi-year lifetime
+    is coin-flip — the new most-recent-window gate should publish.
+
+    Models today's EURUSD: 5d Wilson lower 52 % (recent profitable
+    regime), 30d Wilson lower 46 % (recovering), lifetime Wilson lower
+    48 % (mixed pre-/post-regime data).  The old lifetime-only gate
+    blocked this; the new most-recent gate publishes it because the
+    primary window (5d) clears 51 %, the regime guard (30d ≥ 45 %)
+    holds, and the lifetime crash guard (≥ 45 %) holds.
+    """
+    history = _hist(
+        wins=1148,                # 50.24 % lifetime point
+        trades=2285,
+        wr_5d=59.0, n5=195,       # Wilson lower ≈ 52 % — clears 51 %
+        wr_30d=49.07, n30=803,    # Wilson lower ≈ 45.7 % — clears 45 %
+        avg_win=10.0, avg_loss=10.0,
+    )
+    verdict = compute_edge("EURUSD", 85.0, history=history)
+    assert verdict["passes"] is True, verdict["reason"]
+    assert verdict["primary_window"] == "5d"
+    assert verdict["regime_ok"] is True
+    assert verdict["lifetime_ok"] is True
+    assert verdict["wilson_lower_pct"] >= LIFETIME_LOWER_FLOOR * 100
+
+
+def test_compute_edge_blocks_structural_weak_pair():
+    """Recent 5d is hot but the multi-year lifetime is below the crash
+    floor (≤ 45 %).  The lifetime crash guard fires and we don't trade.
+    """
+    history = _hist(
+        wins=400,                 # 40 % lifetime — structurally broken
+        trades=1000,
+        wr_5d=70.0, n5=80,        # 5d hot
+        wr_30d=55.0, n30=200,     # 30d ok
+    )
+    verdict = compute_edge("ZARJPY", 85.0, history=history)
+    assert verdict["passes"] is False
+    assert verdict["lifetime_ok"] is False
+    assert "структурно" in verdict["reason"]
 
 
 def test_compute_edge_returns_no_history_gracefully():
