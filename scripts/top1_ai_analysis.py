@@ -62,7 +62,8 @@ OUT_REPORT = REPORTS / "top1_ai_analysis_latest.md"
 
 SYSTEM_PROMPT = """\
 Ты — эксперт по бинарным опционам уровня GPT-5.5 с глубоким пониманием форекс-рынка.
-Тебе дают полную информацию о ТОП-1 валютной паре из 28, выбранной AI-системой.
+Тебе дают полную информацию о ТОП-1 валютной паре из 28, выбранной AI-системой,
+плюс глобальный макрофон, матрицу силы 8 валют и Топ-3..5 параллельных кандидатов.
 
 ВАЖНО: Это БИНАРНЫЕ ОПЦИОНЫ — нет Take Profit, нет Stop Loss, только время экспирации (5 часов).
 Твоя задача — проанализировать все данные и дать прогноз BUY/SELL на 5 часов.
@@ -70,13 +71,16 @@ SYSTEM_PROMPT = """\
 Требования к анализу:
 1. Начни с чёткого прогноза: ПОКУПКА или ПРОДАЖА с уверенностью
 2. Объясни ПОЧЕМУ выбрана именно эта пара (анализ 7 слоёв)
-3. Опиши техническую картину (мульти-TF, ADX, persistence, индикаторы)
-4. Объясни макро-контекст (DXY, ставки, сырье)
-5. Оцени риски (новости, геополитика, волатильность)
+3. Опиши техническую картину (мульти-TF, ADX, persistence, индикаторы,
+   SMC: FVG / Order Blocks, Wyckoff, Volume Profile — POC/VAH/VAL)
+4. Объясни макро-контекст: DXY, US10Y, VIX, Gold, Brent и матрицу силы
+   валют (USD/EUR/GBP/JPY/CHF/AUD/NZD/CAD) — какая валюта сейчас сильнее
+5. Оцени риски (новости в бл. часах, геополитика, волатильность, спред)
 6. Дай прогноз на 5 часов: куда пойдёт цена и почему
 7. Пиши на русском языке, НЕ как шаблон, а как настоящий аналитик
 8. Используй профессиональную терминологию, но понятно
-9. Будь честным — если сигнал слабый, скажи об этом
+9. Будь честным — если сигнал слабый, скажи об этом и упомяни
+   альтернативу из Топ-3..5, если она выглядит сильнее
 
 Формат: структурированный анализ с эмодзи, 1500-2000 символов.
 """
@@ -224,6 +228,169 @@ def _utc_plus_5(dt_iso: str | None) -> str:
             .strftime("%Y-%m-%d %H:%M UTC+5"))
 
 
+def _arrow(delta: float | None) -> str:
+    if delta is None:
+        return "→"
+    try:
+        d = float(delta)
+    except (TypeError, ValueError):
+        return "→"
+    if d > 0.15:
+        return "↑"
+    if d > 0.03:
+        return "↗"
+    if d < -0.15:
+        return "↓"
+    if d < -0.03:
+        return "↘"
+    return "→"
+
+
+CURRENCY_BUCKET = ("USD", "EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD")
+
+
+def _macro_block(payload: dict) -> list[str]:
+    """Format the global macro snapshot (DXY/US10Y/VIX/Gold/Brent)."""
+    macro_raw = (payload.get("macro") or {}).get("tickers") or {}
+    if not macro_raw and "macro_raw" in payload:
+        macro_raw = payload.get("macro_raw") or {}
+
+    def row(label: str, key: str, suffix: str = "") -> str:
+        v = macro_raw.get(key)
+        if v is None:
+            return f"  • {label}: n/a"
+        return f"  • {label}: Δ5b {float(v):+.2f}%{suffix} {_arrow(v)}"
+
+    lines = ["🌐 <b>ГЛОБАЛЬНЫЙ МАКРОФОН</b> (Δ за 5 баров H1)"]
+    lines.append(row("DXY (индекс доллара)", "DXY"))
+    lines.append(row("US10Y (10Y treasury)", "US10Y"))
+    lines.append(row("VIX (страх)", "VIX"))
+    lines.append(row("Золото (XAU/USD)", "GOLD"))
+    lines.append(row("Нефть (Brent)", "BRENT"))
+    return lines
+
+
+def _currency_strength_block(payload: dict) -> list[str]:
+    """Format the 8-currency strength matrix sorted from strong → weak."""
+    strength = (payload.get("macro") or {}).get("currency_strength") or {}
+    if not strength:
+        return ["💪 <b>МАТРИЦА СИЛЫ ВАЛЮТ</b>: n/a"]
+    rows = [(c, float(strength.get(c, 0.0) or 0.0)) for c in CURRENCY_BUCKET]
+    rows.sort(key=lambda kv: -kv[1])
+    lines = ["💪 <b>МАТРИЦА СИЛЫ ВАЛЮТ</b> (сильная → слабая)"]
+    for i, (c, sc) in enumerate(rows, 1):
+        lines.append(f"  {i}. {c}: {sc:+.2f} {_arrow(sc)}")
+    return lines
+
+
+def _pair_oneliner(cand: dict, idx: int) -> str:
+    """One-line summary for a Top-N candidate in the scanner message."""
+    pair = cand.get("pair", "?")
+    side = cand.get("side") or "—"
+    conf = cand.get("confidence")
+    tier = _tier_label(cand.get("tier"))
+    layers = cand.get("layers") or {}
+    ta = layers.get("technical") or {}
+    adx = ta.get("adx_h1")
+    persistence = ta.get("persistence_5h")
+    mtf = ta.get("multi_tf_aligned")
+    safety = (layers.get("safety_5h") or {}).get("projection") or {}
+    news = layers.get("news") or {}
+    next_evt = news.get("next_event") or {}
+    minutes = next_evt.get("minutes") if isinstance(next_evt, dict) else None
+    atr = (cand.get("levels") or {}).get("atr_h1") or safety.get("atr")
+    parts = [
+        f"<b>{idx}. {pair}</b> · {side} · {_fmt_pct(conf)} · {tier}",
+        f"   ADX H1={adx if adx is not None else '—'} · "
+        f"persistence={_fmt_pct(persistence)} · "
+        f"MTF aligned={'да' if mtf else 'нет'}",
+    ]
+    safety_status = "✓" if safety.get("passes") else "✗"
+    atr_str = f"ATR(H1)={_fmt_price(atr)}" if atr is not None else "ATR=—"
+    parts.append(f"   {atr_str} · safety {safety_status} · "
+                 f"новости {'через ' + str(int(minutes)) + ' мин' if isinstance(minutes, (int, float)) else 'нет'}")
+    return "\n".join(parts)
+
+
+def build_scanner_message(payload: dict) -> str:
+    """Build the first Telegram message: scanner of all 28 pairs.
+
+    Includes global macro, currency strength matrix, and the top 3..5
+    candidates with short technicals each.
+    """
+    top5 = payload.get("top5") or []
+    top1 = payload.get("top1") or payload.get("leading_candidate") or {}
+    next_cycle = payload.get("next_cycle_utc") or payload.get("cycle_close_utc")
+
+    lines: list[str] = []
+    lines.append("📡 <b>СКАНЕР 28 ПАР · 5h binary-option</b>")
+    lines.append(f"Закрытие цикла: {_utc_plus_5(next_cycle)}")
+    lines.append("")
+    lines.extend(_macro_block(payload))
+    lines.append("")
+    lines.extend(_currency_strength_block(payload))
+    lines.append("")
+    lines.append("📊 <b>ТОП-5 СИГНАЛОВ</b> (по композитному score brain)")
+    take = top5[:5] if top5 else ([top1] if top1 else [])
+    for i, cand in enumerate(take, 1):
+        lines.append(_pair_oneliner(cand, i))
+    if not take:
+        lines.append("  (нет кандидатов — все 28 отфильтрованы veto / favorite_check)")
+    lines.append("")
+    lines.append("⤵️ Ниже — подробный AI-разбор Top-1 и 3 графика M15/H1/H4.")
+
+    text = "\n".join(lines)
+    if len(text) > 4000:
+        text = text[:3990] + "\n…"
+    return text
+
+
+def _top1_orderflow_block(top1: dict) -> list[str]:
+    """Extract order-flow / liquidity bits for the Top-1 pair from extras."""
+    layers = top1.get("layers") or {}
+    ta_extras = (layers.get("technical") or {}).get("extras") or {}
+    smc = ta_extras.get("smc") or {}
+    vp = ta_extras.get("vp") or {}
+    wy = ta_extras.get("wyckoff") or {}
+
+    lines: list[str] = []
+    lines.append("## Поток ордеров / SMC / Volume Profile")
+    if smc:
+        structure = smc.get("structure") or {}
+        sweep = smc.get("sweep") or {}
+        fvgs = smc.get("fvgs") or []
+        obs = smc.get("order_blocks") or []
+        lines.append(f"- Структура H4: {structure.get('event')} (score={structure.get('score')})")
+        lines.append(f"- Liquidity sweep: {sweep.get('event')} (level={sweep.get('level')})")
+        if obs:
+            ob = obs[0]
+            lines.append(f"- Свежий Order Block: {ob.get('side')} "
+                         f"[{_fmt_price(ob.get('low'))} … {_fmt_price(ob.get('high'))}]")
+        if fvgs:
+            g = fvgs[0]
+            lines.append(f"- Свежий FVG (имбаланс): {g.get('side')} "
+                         f"[{_fmt_price(g.get('bottom'))} … {_fmt_price(g.get('top'))}]")
+        reasons = smc.get("reasons") or []
+        if reasons:
+            lines.append("- SMC reasons: " + "; ".join(str(r) for r in reasons[:6]))
+    else:
+        lines.append("- SMC: нет данных")
+    if vp:
+        lines.append(f"- Volume Profile (H1, 100 баров): "
+                     f"POC={_fmt_price(vp.get('poc'))} · "
+                     f"VAH={_fmt_price(vp.get('vah'))} · "
+                     f"VAL={_fmt_price(vp.get('val'))} "
+                     f"(score={vp.get('score')}, {vp.get('reason') or ''})")
+    else:
+        lines.append("- Volume Profile: нет данных")
+    if wy:
+        lines.append(f"- Wyckoff phase: {wy.get('phase') or wy.get('reason')} "
+                     f"(score={wy.get('score')})")
+    else:
+        lines.append("- Wyckoff: нет данных")
+    return lines
+
+
 def build_prompt(payload: dict) -> str:
     top1 = payload.get("top1") or payload.get("leading_candidate") or {}
     if not top1:
@@ -266,7 +433,41 @@ def build_prompt(payload: dict) -> str:
     next_cycle = payload.get("next_cycle_utc") or payload.get("cycle_close_utc")
     minutes_to_expiry = payload.get("minutes_to_expiry")
 
+    macro_raw = (payload.get("macro") or {}).get("tickers") or {}
+    top5 = payload.get("top5") or []
+
     lines: list[str] = []
+    # Global context first — макро + сила валют + Top-5, чтобы LLM их учитывал.
+    lines.append("# ГЛОБАЛЬНЫЙ МАКРОФОН (Δ за 5 баров H1, +% = рост)")
+    for label in ("DXY", "US10Y", "VIX", "GOLD", "BRENT"):
+        v = macro_raw.get(label)
+        lines.append(f"- {label}: {('%+.3f%%' % float(v)) if v is not None else 'n/a'}")
+    lines.append("")
+    lines.append("# МАТРИЦА СИЛЫ ВАЛЮТ (8 валют, сильная → слабая)")
+    if macro_strength_lines:
+        lines.append("- " + " · ".join(macro_strength_lines))
+    else:
+        lines.append("- нет данных")
+    lines.append("")
+    lines.append("# ТОП-5 ПАРАЛЛЕЛЬНЫХ КАНДИДАТОВ (для сравнения с Top-1)")
+    if top5:
+        for i, cand in enumerate(top5[:5], 1):
+            c_layers = cand.get("layers") or {}
+            c_ta = c_layers.get("technical") or {}
+            c_safety = (c_layers.get("safety_5h") or {}).get("projection") or {}
+            lines.append(
+                f"- {i}. {cand.get('pair')} · {cand.get('side')} · "
+                f"{_fmt_pct(cand.get('confidence'))} · "
+                f"tier={_tier_label(cand.get('tier'))} · "
+                f"ADX H1={c_ta.get('adx_h1')} · "
+                f"persistence={_fmt_pct(c_ta.get('persistence_5h'))} · "
+                f"MTF={bool(c_ta.get('multi_tf_aligned'))} · "
+                f"safety_passes={bool(c_safety.get('passes'))}"
+            )
+    else:
+        lines.append("- top5 пуст")
+    lines.append("")
+
     lines.append(f"# ТОП-1 пара: {pair} ({name_ru})")
     lines.append(f"- Направление AI: {_side_ru(side)}")
     lines.append(f"- Уверенность модели: {_fmt_pct(conf)}")
@@ -276,6 +477,8 @@ def build_prompt(payload: dict) -> str:
     lines.append(f"- Окно бинарного опциона: 5 часов "
                  f"(до закрытия цикла {_utc_plus_5(next_cycle)}, "
                  f"осталось {minutes_to_expiry} мин.)")
+    lines.append("")
+    lines.extend(_top1_orderflow_block(top1))
     lines.append("")
     lines.append("## Слой 1 · Technical (multi-TF + индикаторы)")
     lines.append(f"- Direction analyzer: {ta.get('side') or '—'}")
@@ -631,11 +834,13 @@ def main() -> int:
     pair = top1.get("pair", "EURUSD")
     screenshots = capture_tradingview(pair)
 
+    scanner_text = build_scanner_message(payload)
     tg_text = build_telegram_text(payload, analysis, model_label)
 
     OUT_REPORT.write_text(
         f"# ТОП-1 AI-анализ — {payload.get('generated_at_utc', '')}\n\n"
-        f"## Сводка\n\n```\n{tg_text}\n```\n\n"
+        f"## Сканер 28 пар\n\n```\n{scanner_text}\n```\n\n"
+        f"## Подробный AI-анализ Top-1\n\n```\n{tg_text}\n```\n\n"
         f"## Полный prompt (для отладки)\n\n```\n{prompt}\n```\n\n"
         f"## Сырое тело LLM\n\n{analysis}\n",
         encoding="utf-8",
@@ -648,8 +853,10 @@ def main() -> int:
               "Telegram skipped")
         return 0
 
+    ok_scan = telegram_send_message(bot, chat, scanner_text)
+    print(f"[top1_ai] sendMessage scanner ok={ok_scan}")
     ok_text = telegram_send_message(bot, chat, tg_text)
-    print(f"[top1_ai] sendMessage ok={ok_text}")
+    print(f"[top1_ai] sendMessage analysis ok={ok_text}")
 
     if screenshots:
         captions = [
