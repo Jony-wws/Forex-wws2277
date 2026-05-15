@@ -30,7 +30,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .analyzer import analyze_pair
+from .big_players import (
+    big_player_scores,
+    pair_big_player_score,
+)
 from .config import PAIRS, PAIR_NAMES_RU, SESSIONS, detect_session
+from .cot import cot_currency_zscores
 from .indicators import atr as atr_series  # noqa: F401  (re-export via compute_all)
 from .macro import (
     CURRENCIES,
@@ -40,6 +45,12 @@ from .macro import (
 )
 from .news_brain import next_high_impact_events, political_risk_scores
 from .prices import fetch_bars, get_current_price
+from .safety import (
+    five_hour_projection,
+    m5_momentum_aligned,
+    reversal_risk_h1,
+    weekly_bias,
+)
 from .smc import smc_score
 from .volume_profile import volume_profile
 from .wyckoff import wyckoff_phase
@@ -48,17 +59,29 @@ from .wyckoff import wyckoff_phase
 log = logging.getLogger("brain")
 
 
+# Layer weights — must sum to 1.0.  ``big_players`` carries 12 % and
+# the other layers were each trimmed by 1-3 % to make room.  The user
+# explicitly asked for a system that goes "inside the market" and
+# knows where the institutional money sits, so we give that layer a
+# meaningful but non-dominant slice of the score.
 WEIGHTS = {
-    "technical": 0.35,
-    "macro": 0.25,
-    "fundamental": 0.15,
-    "news": 0.10,
-    "sentiment": 0.10,
-    "political": 0.05,
+    "technical": 0.33,
+    "macro": 0.22,
+    "big_players": 0.12,
+    "fundamental": 0.13,
+    "news": 0.09,
+    "sentiment": 0.08,
+    "political": 0.03,
 }
 
 NEWS_VETO_MINUTES = 120
 MIN_ADX_H1 = 20
+
+# Top-1 must lead Top-2 by at least this many confidence points, *or*
+# have a confidence ≥ ``CLEAR_FAVORITE_FLOOR``.  Otherwise the cycle
+# refuses to publish a Top-1 because there is no "явный фаворит".
+CLEAR_FAVORITE_LEAD = 5
+CLEAR_FAVORITE_FLOOR = 80
 
 
 # Carry: which currency in each pair is "high-yielder" by historical
@@ -177,6 +200,76 @@ def _veto_check(
     return None
 
 
+def _senior_alignment_check(pair: str, side: Optional[str]) -> dict:
+    """Extra MTF guard the user asked for: W1 bias + M5 momentum.
+
+    The analyser already aligns D1+H4+H1+M15.  This helper adds
+
+    * ``weekly_aligned`` — W1 bias must not be against ``side``
+    * ``m5_aligned``      — last 6 M5 closes must not move against ``side``
+
+    Returns a dict with both flags plus a human-readable reason.
+    Always returns *some* dict so the brain can include the layer in
+    its breakdown even when ``side`` is None.
+    """
+    if side not in ("BUY", "SELL"):
+        return {
+            "weekly_aligned": None,
+            "weekly_bias": None,
+            "m5_aligned": None,
+            "reason": "Стороны нет — проверка пропущена",
+        }
+    bars_w1 = fetch_bars(pair, "1wk", "2y")
+    bars_m5 = fetch_bars(pair, "5m", "5d")
+    w_bias = weekly_bias(bars_w1)
+    w_ok = (w_bias is None) or (w_bias == side)
+    m5_ok = m5_momentum_aligned(bars_m5, side)
+    reasons: list[str] = []
+    if w_bias is None:
+        reasons.append("W1 нейтральна")
+    else:
+        reasons.append(f"W1 bias = {w_bias} ({'согласован' if w_ok else 'против'})")
+    reasons.append(f"M5 momentum {'согласован' if m5_ok else 'против'}")
+    return {
+        "weekly_aligned": bool(w_ok),
+        "weekly_bias": w_bias,
+        "m5_aligned": bool(m5_ok),
+        "reason": ", ".join(reasons),
+    }
+
+
+def _safety_layer(pair: str, side: Optional[str]) -> dict:
+    """Reversal-risk check + 5-hour projection (last-moment safety).
+
+    The user explicitly asked for the system to know the trade will be
+    in profit at expiry — not just at entry.  We answer with two
+    quantitative checks on H1 bars:
+
+    * ``reversal``     — last few bars show a reversal pattern
+    * ``projection``   — projected close in 5 H1 bars stays in profit
+
+    Either one failing sets ``passes=False`` so ``_veto_check_full``
+    can flip the pair to vetoed before it competes for Top-1.
+    """
+    if side not in ("BUY", "SELL"):
+        return {
+            "passes": True,
+            "reversal": {"reversal": False, "reason": "Сторона не определена"},
+            "projection": {
+                "passes": True,
+                "reason": "Сторона не определена",
+            },
+        }
+    bars_h1 = fetch_bars(pair, "1h", "1mo")
+    rev = reversal_risk_h1(bars_h1, side)
+    proj = five_hour_projection(bars_h1, side)
+    return {
+        "passes": (not rev["reversal"]) and proj["passes"],
+        "reversal": rev,
+        "projection": proj,
+    }
+
+
 def _technical_extras(pair: str) -> dict:
     """SMC + Wyckoff + Volume Profile composite (one timeframe each)."""
     bars_h1 = fetch_bars(pair, "1h", "1mo")
@@ -263,8 +356,9 @@ def evaluate_pair(
     sentiment: dict,
     political: dict[str, int],
     news_minutes: dict[str, int],
+    big_player_currency_scores: Optional[dict[str, float]] = None,
 ) -> dict:
-    """Score one pair across all six layers and return a transparent record."""
+    """Score one pair across all seven layers and return a transparent record."""
     ta = analyze_pair(pair)
     veto = _veto_check(pair, ta, news_minutes)
 
@@ -296,6 +390,9 @@ def evaluate_pair(
     political_layer = _political_pair_penalty(pair, political)
     pol_norm = _norm(political_layer["score"], 3.0)
 
+    big_player = pair_big_player_score(pair, big_player_currency_scores or {})
+    big_player_norm = _norm(big_player["score"], 3.0)
+
     # Direction comes from the technical analyzer; the other layers
     # *modulate confidence* in that direction.  We bake a sign agreement
     # check into the macro layer — if technical says BUY but macro
@@ -304,9 +401,26 @@ def evaluate_pair(
         "BUY" if tech_norm > 0 else "SELL" if tech_norm < 0 else None
     )
 
+    senior = _senior_alignment_check(pair, side)
+    safety = _safety_layer(pair, side)
+
+    # Promote senior MTF / safety failures into the veto field so the
+    # rest of the pipeline (filtering candidates, picking Top-1) sees a
+    # uniformly-vetoed pair regardless of which guard fired.
+    if veto is None and side is not None:
+        if senior["weekly_aligned"] is False:
+            veto = f"W1 bias {senior['weekly_bias']} против {side} — старший тренд не поддерживает"
+        elif senior["m5_aligned"] is False:
+            veto = "M5 momentum против — краткосрочный импульс мешает"
+        elif safety["reversal"]["reversal"]:
+            veto = safety["reversal"]["reason"]
+        elif not safety["projection"]["passes"]:
+            veto = f"5h-проекция: последний момент не в плюсе — {safety['projection']['reason']}"
+
     composite_raw = (
         WEIGHTS["technical"] * abs(tech_norm)
         + WEIGHTS["macro"] * (macro_norm if side == "BUY" else -macro_norm) * (1 if tech_norm >= 0 else -1)
+        + WEIGHTS["big_players"] * (big_player_norm if side == "BUY" else -big_player_norm) * (1 if tech_norm >= 0 else -1)
         + WEIGHTS["fundamental"] * (fund_norm if side == "BUY" else -fund_norm) * (1 if tech_norm >= 0 else -1)
         + WEIGHTS["sentiment"] * sent_norm * (1 if tech_norm >= 0 else -1)
         + WEIGHTS["political"] * pol_norm
@@ -336,10 +450,13 @@ def evaluate_pair(
                 "normalised": round(tech_norm, 3),
             },
             "macro": {**macro, "normalised": round(macro_norm, 3)},
+            "big_players": {**big_player, "normalised": round(big_player_norm, 3)},
             "fundamental": {**fundamental, "normalised": round(fund_norm, 3)},
             "news": news,
             "sentiment": {**sentiment_layer, "normalised": round(sent_norm, 3)},
             "political": {**political_layer, "normalised": round(pol_norm, 3)},
+            "senior_alignment": senior,
+            "safety_5h": safety,
         },
         "levels": (_atr_stop_take(pair, side) if side and veto is None else {}),
     }
@@ -356,6 +473,13 @@ def select_top1(now: datetime | None = None) -> dict:
     political = political_risk_scores()
     news_minutes = next_high_impact_events()
 
+    # Smart Money / big-player composite — COT + bid-ask + macro flow.
+    # Failures inside this layer never block the cycle; on error the
+    # currency scores are zero and the brain treats the layer as silent.
+    cot_scores = cot_currency_zscores()
+    bp_snapshot = big_player_scores(cot_scores=cot_scores, macro_currency=currency_scores)
+    big_player_currency = bp_snapshot["currency_scores"]
+
     all_evals: list[dict] = []
     for pair in PAIRS:
         try:
@@ -366,6 +490,7 @@ def select_top1(now: datetime | None = None) -> dict:
                 sentiment,
                 political,
                 news_minutes,
+                big_player_currency_scores=big_player_currency,
             )
         except Exception as e:
             log.exception(f"evaluate_pair failed {pair}: {e}")
@@ -375,7 +500,30 @@ def select_top1(now: datetime | None = None) -> dict:
     candidates = [e for e in all_evals if e["veto"] is None and e["side"]]
     candidates.sort(key=lambda e: e["confidence"], reverse=True)
 
-    top1 = candidates[0] if candidates else None
+    # Clear-favorite gate — the user explicitly asked the system to pick
+    # ONE pair "where there is a clear favorite".  We publish a Top-1
+    # only when the top candidate is unambiguously ahead.
+    top1 = None
+    favorite_reason: Optional[str] = None
+    if candidates:
+        winner = candidates[0]
+        runner_up = candidates[1] if len(candidates) > 1 else None
+        lead = winner["confidence"] - (runner_up["confidence"] if runner_up else 0)
+        has_clear_lead = lead >= CLEAR_FAVORITE_LEAD
+        has_floor = winner["confidence"] >= CLEAR_FAVORITE_FLOOR
+        if has_clear_lead or has_floor:
+            top1 = winner
+            favorite_reason = (
+                f"Явный фаворит: уверенность {winner['confidence']}% "
+                f"(отрыв от Top-2 = {lead} п.)"
+            )
+        else:
+            favorite_reason = (
+                f"Нет явного фаворита: Top-1 {winner['confidence']}% / "
+                f"Top-2 {runner_up['confidence'] if runner_up else 0}% — "
+                f"отрыв {lead} < {CLEAR_FAVORITE_LEAD}"
+            )
+
     return {
         "generated_at_utc": now.isoformat(),
         "next_cycle_utc": _next_cycle_iso(now),
@@ -386,6 +534,13 @@ def select_top1(now: datetime | None = None) -> dict:
         "sentiment": sentiment,
         "political_risk": political,
         "news_minutes": news_minutes,
+        "big_players": bp_snapshot,
+        "favorite_check": {
+            "ok": top1 is not None,
+            "reason": favorite_reason,
+            "lead_required": CLEAR_FAVORITE_LEAD,
+            "confidence_floor": CLEAR_FAVORITE_FLOOR,
+        },
         "top1": top1,
         "top5": candidates[:5],
         "all_evals": all_evals,

@@ -53,7 +53,9 @@ def main() -> int:
     payload = select_top1()
 
     # `top1` is the user-facing canonical card — kept tiny so the SPA
-    # loads it instantly on slow mobile networks.
+    # loads it instantly on slow mobile networks.  We also expose the
+    # big-player / clear-favorite layers so the UI can display "почему
+    # фаворит" and "куда стоит smart money" without re-fetching.
     top1_payload = {
         "generated_at_utc": payload["generated_at_utc"],
         "next_cycle_utc": payload["next_cycle_utc"],
@@ -62,6 +64,8 @@ def main() -> int:
         "macro_currency_strength": payload["macro"]["currency_strength"],
         "sentiment": payload["sentiment"],
         "political_risk": payload["political_risk"],
+        "big_players": payload.get("big_players"),
+        "favorite_check": payload.get("favorite_check"),
     }
     _write(top1_payload, DATA_DIR / "top1.json")
 
