@@ -576,9 +576,56 @@
     await Promise.all([reloadTop1(), reloadSignals()]);
   }
 
+  // ─── Theme toggle (light / dark) ─────────────────────────────────────
+  //
+  // User asked for a button to switch between the dark default and a
+  // light theme.  The CSS does all the heavy lifting via the
+  // ``body.light-theme`` class — we just toggle that class and persist
+  // the choice in ``localStorage`` so it survives reloads.
+  function applyTheme(theme) {
+    const isLight = theme === "light";
+    document.body.classList.toggle("light-theme", isLight);
+    const icon = document.getElementById("themeIcon");
+    const label = document.getElementById("themeLabel");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (icon)  icon.textContent  = isLight ? "\u2600" : "\u263d";       // ☀ / ☽
+    if (label) label.textContent = isLight ? "Светлая" : "Темная";
+    if (meta)  meta.setAttribute("content", isLight ? "#faf5f3" : "#1a0a0c");
+  }
+
+  function initThemeToggle() {
+    const saved = localStorage.getItem("forex-theme");
+    applyTheme(saved === "light" ? "light" : "dark");
+    const btn = document.getElementById("themeToggle");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const next = document.body.classList.contains("light-theme")
+        ? "dark"
+        : "light";
+      localStorage.setItem("forex-theme", next);
+      applyTheme(next);
+    });
+  }
+
+  // ─── Visibility-driven refetch ───────────────────────────────────────
+  //
+  // When the user puts the tab in the background, the 60-second refresh
+  // loop keeps running but nothing is rendered.  When they come back,
+  // we immediately repull top1 + signals so the screen shows the most
+  // recent data without waiting for the next tick.
+  function initVisibilityRefetch() {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        reloadAll();
+      }
+    });
+  }
+
   // ─── Boot ────────────────────────────────────────────────────────────
   function boot() {
     setLive("offline", "Подключение…");
+    initThemeToggle();
+    initVisibilityRefetch();
     reloadAll();
     setInterval(reloadTop1, REFRESH_MS);
     setInterval(reloadSignals, SIGNALS_REFRESH_MS);

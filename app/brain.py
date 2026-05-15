@@ -51,6 +51,11 @@ from .safety import (
     reversal_risk_h1,
     weekly_bias,
 )
+from .edge_check import (
+    LIFETIME_LOWER_FLOOR,
+    REGIME_LOWER_FLOOR,
+    compute_edge,
+)
 from .smc import smc_score
 from .volume_profile import volume_profile
 from .wyckoff import wyckoff_phase
@@ -501,30 +506,73 @@ def select_top1(now: datetime | None = None) -> dict:
     candidates = [e for e in all_evals if e["veto"] is None and e["side"]]
     candidates.sort(key=lambda e: e["confidence"], reverse=True)
 
-    # Clear-favorite gate — strict 80 % floor.  Top-1 is published only
-    # when the leader's confidence is at least ``CLEAR_FAVORITE_FLOOR``
-    # (80 %).  The lead over Top-2 is reported but does not trigger
-    # publication on its own.
+    # Publication gate is TWO-PART, both must hold:
+    #
+    # 1. Strict 80 % floor on brain confidence ("now" signal quality).
+    #    Same as before — the seven-layer composite score must agree
+    #    that the current setup is high quality.
+    #
+    # 2. Edge_check ("distance" / mathematical edge).  The candidate's
+    #    historical win-rate, with the Wilson 95 % lower bound, must be
+    #    a statistically-significant edge over coin-flip and have
+    #    positive expected value at that lower bound.  See
+    #    ``app/edge_check.py`` for the math.
+    #
+    # We walk candidates in descending brain-confidence order: the first
+    # pair to clear *both* gates becomes Top-1.  This is exactly the
+    # user's product spec: "give me one currency every 5 hours where
+    # 80 % is a real mathematical edge over distance, not just now".
     top1 = None
     favorite_reason: Optional[str] = None
+    edge_verdict: Optional[dict] = None
+    has_floor = False
     if candidates:
-        winner = candidates[0]
         runner_up = candidates[1] if len(candidates) > 1 else None
+        for c in candidates:
+            if c["confidence"] < CLEAR_FAVORITE_FLOOR:
+                # Sorted descending by confidence, so no later candidate
+                # can clear the floor either.
+                break
+            verdict = compute_edge(c["pair"], c["confidence"])
+            if verdict["passes"]:
+                top1 = dict(c)
+                top1["edge"] = verdict
+                top1.setdefault("layers", {})["edge_check"] = verdict
+                edge_verdict = verdict
+                has_floor = True
+                break
+
+        winner = candidates[0]
         lead = winner["confidence"] - (runner_up["confidence"] if runner_up else 0)
-        has_floor = winner["confidence"] >= CLEAR_FAVORITE_FLOOR
-        if has_floor:
-            top1 = winner
+        if top1 is not None:
             favorite_reason = (
-                f"Явный фаворит: уверенность {winner['confidence']}% "
-                f"≥ {CLEAR_FAVORITE_FLOOR}% (отрыв от Top-2 = {lead} п.)"
+                f"Явный фаворит: brain {top1['confidence']}% "
+                f"≥ {CLEAR_FAVORITE_FLOOR}% и мат. преимущество подтверждено "
+                f"(calibrated {edge_verdict['calibrated_confidence']}%, "
+                f"Wilson95 lower {edge_verdict.get('wilson_lower_pct', 0):.1f}%, "
+                f"EV {edge_verdict.get('expected_value_pp', 0):+.2f}п.)"
             )
-        else:
+        elif winner["confidence"] < CLEAR_FAVORITE_FLOOR:
             favorite_reason = (
                 f"Нет явного фаворита: Top-1 {winner['confidence']}% "
                 f"< порог {CLEAR_FAVORITE_FLOOR}% "
                 f"(Top-2 {runner_up['confidence'] if runner_up else 0}%, "
                 f"отрыв {lead} п.)"
             )
+        else:
+            # At least one candidate cleared the 80 % brain floor but
+            # none passed edge-check — brain says strong, history says
+            # not yet proven.  Wait for the next cycle.
+            best_blocked = candidates[0]
+            blocked_verdict = compute_edge(
+                best_blocked["pair"], best_blocked["confidence"]
+            )
+            favorite_reason = (
+                f"Brain ≥ 80 % есть ({best_blocked['pair']} "
+                f"{best_blocked['confidence']}%), но мат. преимущество на "
+                f"дистанции не подтверждено: {blocked_verdict['reason']}"
+            )
+            edge_verdict = blocked_verdict
 
     return {
         "generated_at_utc": now.isoformat(),
@@ -542,6 +590,9 @@ def select_top1(now: datetime | None = None) -> dict:
             "reason": favorite_reason,
             "lead_required": CLEAR_FAVORITE_LEAD,
             "confidence_floor": CLEAR_FAVORITE_FLOOR,
+            "edge_check": edge_verdict,
+            "wilson_lifetime_floor_pct": int(LIFETIME_LOWER_FLOOR * 100),
+            "wilson_regime_floor_pct": int(REGIME_LOWER_FLOOR * 100),
         },
         "top1": top1,
         "top5": candidates[:5],

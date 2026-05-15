@@ -217,15 +217,8 @@ def test_brain_clear_favorite_constants_sane():
     assert 70 <= CLEAR_FAVORITE_FLOOR <= 95
 
 
-def test_select_top1_clear_favorite_gate(monkeypatch):
-    """Force two near-tied candidates and verify Top-1 is suppressed."""
-    from app import brain as brain_mod
-
-    fake_eval = [
-        {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 72, "composite_score": 0.72, "layers": {}},
-        {"pair": "GBPUSD", "side": "BUY", "veto": None, "confidence": 71, "composite_score": 0.71, "layers": {}},
-    ]
-    # Stub external inputs.
+def _stub_brain_inputs(monkeypatch, brain_mod):
+    """Common stubs for external data sources used by ``select_top1``."""
     monkeypatch.setattr(brain_mod, "fetch_macro_snapshot", lambda: {})
     monkeypatch.setattr(brain_mod, "currency_strength_from_macro", lambda *_a, **_k: {})
     monkeypatch.setattr(brain_mod, "_sentiment_score", lambda *_a, **_k: {"score": 0, "reason": ""})
@@ -237,6 +230,60 @@ def test_select_top1_clear_favorite_gate(monkeypatch):
         "big_player_scores",
         lambda *_a, **_k: {"currency_scores": {}, "components": {"cot": {}, "orderbook": {}, "macro": {}}},
     )
+
+
+def _stub_edge_pass(brain_mod, monkeypatch):
+    """Make edge_check always pass so brain-level gates are tested alone."""
+    monkeypatch.setattr(
+        brain_mod,
+        "compute_edge",
+        lambda pair, brain_conf, **_k: {
+            "passes": True,
+            "calibrated_confidence": brain_conf,
+            "brain_confidence": brain_conf,
+            "reason": "stub: edge passed",
+            "windows": {},
+            "best_wilson": None,
+            "expected_value_pp": 1.0,
+            "wilson_lower_pct": 60.0,
+            "lifetime_significant": True,
+            "regime_ok": True,
+            "ev_positive": True,
+        },
+    )
+
+
+def _stub_edge_fail(brain_mod, monkeypatch):
+    """Make edge_check always fail."""
+    monkeypatch.setattr(
+        brain_mod,
+        "compute_edge",
+        lambda pair, brain_conf, **_k: {
+            "passes": False,
+            "calibrated_confidence": 50.0,
+            "brain_confidence": brain_conf,
+            "reason": "stub: edge not proven",
+            "windows": {},
+            "best_wilson": None,
+            "expected_value_pp": -0.5,
+            "wilson_lower_pct": 45.0,
+            "lifetime_significant": False,
+            "regime_ok": True,
+            "ev_positive": False,
+        },
+    )
+
+
+def test_select_top1_clear_favorite_gate(monkeypatch):
+    """Force two near-tied candidates and verify Top-1 is suppressed."""
+    from app import brain as brain_mod
+
+    fake_eval = [
+        {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 72, "composite_score": 0.72, "layers": {}},
+        {"pair": "GBPUSD", "side": "BUY", "veto": None, "confidence": 71, "composite_score": 0.71, "layers": {}},
+    ]
+    _stub_brain_inputs(monkeypatch, brain_mod)
+    _stub_edge_pass(brain_mod, monkeypatch)
 
     # Replace evaluate_pair with a deterministic stub that returns one of
     # the prepared fake_eval entries (cycling through the list).
@@ -259,24 +306,15 @@ def test_select_top1_clear_favorite_gate(monkeypatch):
 
 
 def test_select_top1_clear_favorite_passes(monkeypatch):
-    """High-confidence leader must publish Top-1 even if lead is tiny."""
+    """High-confidence leader must publish Top-1 when both gates clear."""
     from app import brain as brain_mod
 
     fake_eval = [
         {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 88, "composite_score": 0.88, "layers": {}},
         {"pair": "GBPUSD", "side": "BUY", "veto": None, "confidence": 86, "composite_score": 0.86, "layers": {}},
     ]
-    monkeypatch.setattr(brain_mod, "fetch_macro_snapshot", lambda: {})
-    monkeypatch.setattr(brain_mod, "currency_strength_from_macro", lambda *_a, **_k: {})
-    monkeypatch.setattr(brain_mod, "_sentiment_score", lambda *_a, **_k: {"score": 0, "reason": ""})
-    monkeypatch.setattr(brain_mod, "political_risk_scores", lambda: {})
-    monkeypatch.setattr(brain_mod, "next_high_impact_events", lambda: {})
-    monkeypatch.setattr(brain_mod, "cot_currency_zscores", lambda: {})
-    monkeypatch.setattr(
-        brain_mod,
-        "big_player_scores",
-        lambda *_a, **_k: {"currency_scores": {}, "components": {"cot": {}, "orderbook": {}, "macro": {}}},
-    )
+    _stub_brain_inputs(monkeypatch, brain_mod)
+    _stub_edge_pass(brain_mod, monkeypatch)
 
     iter_evals = iter(fake_eval + fake_eval * 14)
 
@@ -292,6 +330,35 @@ def test_select_top1_clear_favorite_passes(monkeypatch):
     assert out["favorite_check"]["ok"] is True
     assert out["top1"] is not None
     assert out["top1"]["confidence"] >= 80
+    # Edge metadata is attached to top1 for the UI.
+    assert out["top1"]["edge"]["passes"] is True
+
+
+def test_select_top1_edge_check_blocks_when_brain_passes(monkeypatch):
+    """Even with brain ≥ 80 % the edge_check failure must suppress Top-1."""
+    from app import brain as brain_mod
+
+    fake_eval = [
+        {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 88, "composite_score": 0.88, "layers": {}},
+    ]
+    _stub_brain_inputs(monkeypatch, brain_mod)
+    _stub_edge_fail(brain_mod, monkeypatch)
+
+    iter_evals = iter(fake_eval * 28)
+
+    def fake_eval_fn(pair, *args, **kwargs):
+        try:
+            return next(iter_evals)
+        except StopIteration:
+            return {"pair": pair, "side": None, "veto": "out", "confidence": 0, "composite_score": 0, "layers": {}}
+
+    monkeypatch.setattr(brain_mod, "evaluate_pair", fake_eval_fn)
+
+    out = brain_mod.select_top1()
+    assert out["top1"] is None
+    assert out["favorite_check"]["ok"] is False
+    assert "мат. преимущество" in out["favorite_check"]["reason"]
+    assert out["favorite_check"]["edge_check"]["passes"] is False
 
 
 def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
@@ -307,19 +374,9 @@ def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
     fake_eval = [
         {"pair": "EURUSD", "side": "BUY", "veto": None, "confidence": 79, "composite_score": 0.79, "layers": {}},
     ]
-    # Stub external inputs (identical pattern to the other two tests).
-    monkeypatch.setattr(brain_mod, "fetch_macro_snapshot", lambda: {})
-    monkeypatch.setattr(brain_mod, "currency_strength_from_macro", lambda *_a, **_k: {})
-    monkeypatch.setattr(brain_mod, "_sentiment_score", lambda *_a, **_k: {"score": 0, "reason": ""})
-    monkeypatch.setattr(brain_mod, "political_risk_scores", lambda: {})
-    monkeypatch.setattr(brain_mod, "next_high_impact_events", lambda: {})
-    monkeypatch.setattr(brain_mod, "cot_currency_zscores", lambda: {})
-    monkeypatch.setattr(
-        brain_mod,
-        "big_player_scores",
-        lambda *_a, **_k: {"currency_scores": {}, "components": {"cot": {}, "orderbook": {}, "macro": {}}},
-    )
+    _stub_brain_inputs(monkeypatch, brain_mod)
 
+    _stub_edge_pass(brain_mod, monkeypatch)
     iter_evals = iter(fake_eval)
 
     def fake_eval_fn(pair, *args, **kwargs):
