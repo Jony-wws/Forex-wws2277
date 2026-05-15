@@ -275,7 +275,14 @@ def _stub_edge_fail(brain_mod, monkeypatch):
 
 
 def test_select_top1_clear_favorite_gate(monkeypatch):
-    """Force two near-tied candidates and verify Top-1 is suppressed."""
+    """Below-floor leader: top1 is still published (always-publish policy)
+    but tagged ``tier="normal"`` and ``favorite_check.ok`` stays False.
+
+    Per the user-explicit "every 5 h one top-1 from 28" policy (2026-
+    05-15) we never hide top-1; we tag it.  The strict PREMIUM gate
+    (brain ≥ 80 AND edge passes) is reported via ``favorite_check.ok``
+    and ``top1.tier`` — never by suppressing the pick.
+    """
     from app import brain as brain_mod
 
     fake_eval = [
@@ -298,11 +305,14 @@ def test_select_top1_clear_favorite_gate(monkeypatch):
     monkeypatch.setattr(brain_mod, "evaluate_pair", fake_eval_fn)
 
     out = brain_mod.select_top1()
-    # Top-1 must be suppressed because the leader's confidence (72%) is
-    # below CLEAR_FAVORITE_FLOOR (80) and the lead is only 1 < 5.
+    # PREMIUM gate is the strict 80 % brain + edge_check.  72 % leader
+    # does not satisfy it.
     assert out["favorite_check"]["ok"] is False
-    assert out["top1"] is None
-    assert "нет явного фаворита" in out["favorite_check"]["reason"].lower()
+    # But top-1 is still published with a NORMAL tier.
+    assert out["top1"] is not None
+    assert out["top1"]["tier"] == "normal"
+    assert out["top1"]["confidence"] == 72  # honest brain output
+    assert "normal" in out["favorite_check"]["reason"].lower()
 
 
 def test_select_top1_clear_favorite_passes(monkeypatch):
@@ -335,7 +345,10 @@ def test_select_top1_clear_favorite_passes(monkeypatch):
 
 
 def test_select_top1_edge_check_blocks_when_brain_passes(monkeypatch):
-    """Even with brain ≥ 80 % the edge_check failure must suppress Top-1."""
+    """Brain ≥ 80 % with failed edge_check: top-1 is published with
+    ``tier="strong"`` (⚡) but ``favorite_check.ok`` stays False because
+    the strict PREMIUM gate requires edge_check to pass as well.
+    """
     from app import brain as brain_mod
 
     fake_eval = [
@@ -355,19 +368,20 @@ def test_select_top1_edge_check_blocks_when_brain_passes(monkeypatch):
     monkeypatch.setattr(brain_mod, "evaluate_pair", fake_eval_fn)
 
     out = brain_mod.select_top1()
-    assert out["top1"] is None
+    # top-1 still surfaces with STRONG tag (brain ≥ 80, edge failed).
+    assert out["top1"] is not None
+    assert out["top1"]["tier"] == "strong"
+    assert out["top1"]["confidence"] >= 80
     assert out["favorite_check"]["ok"] is False
     assert "мат. преимущество" in out["favorite_check"]["reason"]
     assert out["favorite_check"]["edge_check"]["passes"] is False
 
 
-def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
-    """Strict-80% gate: a 79 % leader with a huge lead must be suppressed.
-
-    Under the old gate (``has_clear_lead OR has_floor``) a 79 % leader
-    with a 79-point lead over a zero-confidence runner-up would have
-    been published.  With the strict floor it must not — confidence
-    below 80 means no publish, regardless of the gap.
+def test_select_top1_strict_floor_below_publishes_as_normal(monkeypatch):
+    """Strict-80 % gate: a 79 % leader with a huge lead is NOT a PREMIUM
+    signal — ``favorite_check.ok`` must stay False — but under the
+    always-publish policy the leader is still surfaced as ``top1`` with
+    ``tier="normal"`` so the dashboard never goes blank.
     """
     from app import brain as brain_mod
 
@@ -388,8 +402,12 @@ def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
     monkeypatch.setattr(brain_mod, "evaluate_pair", fake_eval_fn)
 
     out = brain_mod.select_top1()
-    assert out["top1"] is None, "79 % leader must be suppressed by the strict 80 % floor"
+    # Strict PREMIUM gate is NOT cleared (brain < 80).
     assert out["favorite_check"]["ok"] is False
+    # But top-1 is published with NORMAL tier so dashboard isn't blank.
+    assert out["top1"] is not None
+    assert out["top1"]["tier"] == "normal"
+    assert out["top1"]["confidence"] == 79  # honest brain output
     assert "порог" in out["favorite_check"]["reason"].lower()
 
 

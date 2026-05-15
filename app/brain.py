@@ -91,10 +91,24 @@ WEIGHTS = {
 NEWS_VETO_MINUTES = 120
 MIN_ADX_H1 = 20
 
-# Strict 80 % floor — Top-1 is published ONLY when the leader's
-# confidence is >= ``CLEAR_FAVORITE_FLOOR``.  The lead over Top-2 is
-# reported for telemetry but is NOT part of the publish decision.
-# This is what the user asked for explicitly: "жёсткий 80 %".
+# Strict 80 % floor — flagged as PREMIUM when leader's brain confidence
+# is >= ``CLEAR_FAVORITE_FLOOR`` and edge_check passes.  Used for tier
+# tagging, NOT for hiding top-1 from the dashboard.
+#
+# The publication semantics changed 2026-05-15 at user's explicit
+# request: "Найти способ что бы каждый 5 часов был из 28 валюту один
+# топ 1 валюте... без этого не надо".  We now ALWAYS publish the best
+# un-vetoed candidate of the 28 as ``top1`` and tag it with a tier:
+#
+#   * ★ PREMIUM — brain conf >=80 AND edge_check passes (gold-standard)
+#   * ⚡ STRONG  — brain conf >=80 but edge_check did not confirm
+#   * ⊙ NORMAL  — brain conf <80, best-of-28 below the strict floor
+#
+# Honesty contract: ``confidence`` is ALWAYS the real model output, never
+# inflated to fake an 80 %.  The tier badge tells the user which signals
+# the model itself considers high-conviction.  ОЖИДАНИЕ is reserved for
+# the (rare) case where every pair is hard-vetoed — typically a news
+# blackout or projection failure across the board.
 CLEAR_FAVORITE_LEAD = 5
 CLEAR_FAVORITE_FLOOR = 80
 
@@ -716,61 +730,89 @@ def select_top1(now: datetime | None = None) -> dict:
     #    positive expected value at that lower bound.  See
     #    ``app/edge_check.py`` for the math.
     #
-    # We walk candidates in descending brain-confidence order: the first
-    # pair to clear *both* gates becomes Top-1.  This is exactly the
-    # user's product spec: "give me one currency every 5 hours where
-    # 80 % is a real mathematical edge over distance, not just now".
+    # New publication semantics (2026-05-15):
+    #
+    #   * Walk candidates in descending brain-confidence order.
+    #   * The first pair to clear BOTH the strict 80 % floor AND
+    #     edge_check is tagged ``tier="premium"`` (★) — the gold-standard
+    #     signal the original product spec required.
+    #   * The first pair to clear ONLY the strict 80 % floor (edge_check
+    #     fails) is tagged ``tier="strong"`` (⚡).
+    #   * If no pair clears the 80 % floor, the highest-confidence
+    #     un-vetoed candidate is tagged ``tier="normal"`` (⊙).
+    #
+    # In every case we publish ``top1`` so the dashboard ALWAYS has a
+    # pair to render — the user asked explicitly for "no waiting"
+    # state, and the tier badge tells them how seriously to take the
+    # signal.  ``has_floor`` and ``favorite_check.ok`` remain the
+    # honest signal of "is this a real 80 % setup?" for telemetry and
+    # for downstream consumers (Telegram bot, backtest scorer).
     top1 = None
     favorite_reason: Optional[str] = None
     edge_verdict: Optional[dict] = None
     has_floor = False
+    premium_pick: Optional[dict] = None
+    strong_pick: Optional[dict] = None
+
     if candidates:
         runner_up = candidates[1] if len(candidates) > 1 else None
         for c in candidates:
             if c["confidence"] < CLEAR_FAVORITE_FLOOR:
-                # Sorted descending by confidence, so no later candidate
-                # can clear the floor either.
+                # Sorted descending — no later candidate can clear it.
                 break
             verdict = compute_edge(c["pair"], c["confidence"])
             if verdict["passes"]:
-                top1 = dict(c)
-                top1["edge"] = verdict
-                top1.setdefault("layers", {})["edge_check"] = verdict
+                premium_pick = dict(c)
+                premium_pick["edge"] = verdict
+                premium_pick.setdefault("layers", {})["edge_check"] = verdict
+                premium_pick["tier"] = "premium"
                 edge_verdict = verdict
                 has_floor = True
                 break
+            elif strong_pick is None:
+                strong_pick = dict(c)
+                strong_pick["edge"] = verdict
+                strong_pick.setdefault("layers", {})["edge_check"] = verdict
+                strong_pick["tier"] = "strong"
+                edge_verdict = verdict
 
         winner = candidates[0]
         lead = winner["confidence"] - (runner_up["confidence"] if runner_up else 0)
-        if top1 is not None:
+
+        if premium_pick is not None:
+            top1 = premium_pick
             favorite_reason = (
-                f"Явный фаворит: brain {top1['confidence']}% "
+                f"★ PREMIUM: brain {premium_pick['confidence']}% "
                 f"≥ {CLEAR_FAVORITE_FLOOR}% и мат. преимущество подтверждено "
                 f"(calibrated {edge_verdict['calibrated_confidence']}%, "
                 f"Wilson95 lower {edge_verdict.get('wilson_lower_pct', 0):.1f}%, "
                 f"EV {edge_verdict.get('expected_value_pp', 0):+.2f}п.)"
             )
-        elif winner["confidence"] < CLEAR_FAVORITE_FLOOR:
+        elif strong_pick is not None:
+            top1 = strong_pick
             favorite_reason = (
-                f"Нет явного фаворита: Top-1 {winner['confidence']}% "
-                f"< порог {CLEAR_FAVORITE_FLOOR}% "
+                f"⚡ STRONG: brain {strong_pick['confidence']}% "
+                f"≥ {CLEAR_FAVORITE_FLOOR}%, но мат. преимущество на "
+                f"дистанции пока не подтверждено: {edge_verdict['reason']}"
+            )
+        else:
+            # No pair cleared the strict 80 % floor — publish the best
+            # of 28 anyway, transparently tagged as ⊙ NORMAL so the
+            # user sees this is a below-threshold pick.
+            best = dict(winner)
+            verdict = compute_edge(best["pair"], best["confidence"])
+            best["edge"] = verdict
+            best.setdefault("layers", {})["edge_check"] = verdict
+            best["tier"] = "normal"
+            top1 = best
+            edge_verdict = verdict
+            favorite_reason = (
+                f"⊙ NORMAL: лидер {best['pair']} brain {best['confidence']}% "
+                f"< порог {CLEAR_FAVORITE_FLOOR}% — сигнал слабый, "
+                f"торговать только если согласен с уровнем уверенности "
                 f"(Top-2 {runner_up['confidence'] if runner_up else 0}%, "
                 f"отрыв {lead} п.)"
             )
-        else:
-            # At least one candidate cleared the 80 % brain floor but
-            # none passed edge-check — brain says strong, history says
-            # not yet proven.  Wait for the next cycle.
-            best_blocked = candidates[0]
-            blocked_verdict = compute_edge(
-                best_blocked["pair"], best_blocked["confidence"]
-            )
-            favorite_reason = (
-                f"Brain ≥ 80 % есть ({best_blocked['pair']} "
-                f"{best_blocked['confidence']}%), но мат. преимущество на "
-                f"дистанции не подтверждено: {blocked_verdict['reason']}"
-            )
-            edge_verdict = blocked_verdict
 
     # Build the binary-option live forecast block.  For the published
     # Top-1 (when it exists) we surface the per-minute drift, the
@@ -814,7 +856,13 @@ def select_top1(now: datetime | None = None) -> dict:
         "news_minutes": news_minutes,
         "big_players": bp_snapshot,
         "favorite_check": {
-            "ok": top1 is not None,
+            # ``ok`` is reserved for the strict premium gate: brain ≥ 80
+            # AND edge_check passed.  When the dashboard shows top1
+            # because every pair was below the floor (tier="normal"),
+            # ``ok`` remains False — that is the honest signal that the
+            # current cycle's top-1 is below threshold.
+            "ok": top1 is not None and top1.get("tier") == "premium",
+            "tier": top1.get("tier") if top1 else None,
             "reason": favorite_reason,
             "lead_required": CLEAR_FAVORITE_LEAD,
             "confidence_floor": CLEAR_FAVORITE_FLOOR,

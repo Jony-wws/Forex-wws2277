@@ -176,29 +176,34 @@
   }
 
   // ─── Top-1 hero card ─────────────────────────────────────────────────
+  //
+  // Always-publish policy (2026-05-15): the brain ALWAYS surfaces a
+  // top-1 picked from the 28 pairs (the highest-confidence un-vetoed
+  // candidate of the cycle).  The card renders the real brain
+  // confidence and a tier badge (★ PREMIUM / ⚡ STRONG / ⊙ NORMAL)
+  // so the user sees how seriously to take the signal.  ОЖИДАНИЕ is
+  // reserved for the corner-case where every pair is hard-vetoed.
   function renderHero(top1Payload) {
     const top = top1Payload && top1Payload.top1;
     if (!top) {
-      // Even when no pair has cleared the strict 80 % publication
-      // gate, we surface the *leading candidate* (top1Payload.leading_candidate)
-      // so the user can see which pair the brain is watching and why
-      // it stayed silent.  The TradingView chart is mounted for the
-      // leading pair when present, otherwise it falls back to the
-      // most-traded major (EURUSD) so the chart is never blank.
+      // No top-1 — every pair was hard-vetoed (news blackout,
+      // multi-TF disagreement, projection out of profit, etc.).  This
+      // is the *only* remaining waiting state.  Fall back to the
+      // leading-candidate snapshot so the chart is never blank.
       const lead = top1Payload && top1Payload.leading_candidate;
       $("topPair").textContent = lead && lead.pair ? lead.pair : "—";
       const reason = top1Payload && top1Payload.favorite_check && top1Payload.favorite_check.reason;
       if (lead && lead.confidence != null) {
         $("topName").textContent =
-          `Лидер ожидания: ${escapeHtml(lead.name_ru || lead.pair)} · уверенность ${lead.confidence}% (нужно ≥80%).`;
+          `Все 28 пар под вето · лидер: ${escapeHtml(lead.name_ru || lead.pair)} · уверенность ${lead.confidence}%`;
       } else {
-        $("topName").textContent = "AI пока не находит качественного сетапа.";
+        $("topName").textContent = "Все 28 пар под veto-фильтрами (новости/мульти-TF). Подождите следующий цикл.";
       }
       $("topSide").className = "side-tag wait";
-      $("topSide").textContent = "ОЖИДАНИЕ";
+      $("topSide").textContent = "VETO";
       $("topTier").textContent = reason || "Все 28 пар отфильтрованы по veto-правилам";
       $("confFill").style.width = `${(lead && lead.confidence) || 0}%`;
-      $("confText").textContent = lead && lead.confidence != null ? `${lead.confidence}% (порог 80%)` : "—";
+      $("confText").textContent = lead && lead.confidence != null ? `${lead.confidence}%` : "—";
       ["mEntry","mAtr","mProjClose","mLiveStatus"].forEach(id => {
         const el = $(id);
         if (el) {
@@ -210,14 +215,13 @@
       if (detail) detail.hidden = true;
       $("aiLayers").innerHTML = `
         <div class="empty">
-          Защита для реальной торговли: если ни одна пара не прошла все фильтры
-          (multi-TF, ADX ≥ 20, 5h-проекция в плюсе на момент экспирации,
-          Wilson95 lower ≥ 52%, brain ≥ 80%), AI не показывает сигнал
-          и ждёт следующего цикла. <br/><br/>
-          <span class="empty-em">Это нормально — не каждый цикл даёт качество.</span>
+          Все 28 валютных пар сейчас отфильтрованы жёсткими veto-правилами
+          (multi-TF разногласие, ADX&lt;20, 5h-проекция против сделки,
+          активные новости ±2h).  Это редкое событие — следующий 5-часовой
+          цикл, как правило, восстанавливает картину.
+          <br/><br/>
+          <span class="empty-em">Это защита: лучше ноль сделок, чем сделка против всех фильтров.</span>
         </div>`;
-      // Always mount a chart so the user has live context even in
-      // the waiting state — leading candidate first, EURUSD fallback.
       mountHeroChart((lead && lead.pair) || "EURUSD");
       return;
     }
@@ -234,19 +238,36 @@
       sideEl.textContent = "ПРОДАЖА (SELL)";
     } else {
       sideEl.className = "side-tag wait";
-      sideEl.textContent = "ОЖИДАНИЕ";
+      sideEl.textContent = "—";
     }
 
-    const tierBits = [];
+    // Tier badge: ★ PREMIUM (gold-standard 80 %+ with edge confirmed),
+    // ⚡ STRONG (brain ≥ 80 but edge unconfirmed), ⊙ NORMAL (best of 28
+    // when nothing cleared the 80 % floor).  Honest signal of quality.
+    const tier = top.tier || (top.confidence >= 80 ? "strong" : "normal");
+    let tierBadge = "";
+    if (tier === "premium") tierBadge = "★ PREMIUM";
+    else if (tier === "strong") tierBadge = "⚡ STRONG";
+    else tierBadge = "⊙ NORMAL";
+
+    const tierBits = [tierBadge];
     if (top.layers && top.layers.technical) {
       tierBits.push(`ADX H1 ${(top.layers.technical.adx_h1 || 0).toFixed(0)}`);
       tierBits.push(`персистентность ${(top.layers.technical.persistence_5h || 0).toFixed(0)}%`);
     }
-    $("topTier").textContent = tierBits.join(" · ") || "—";
+    $("topTier").textContent = tierBits.join(" · ");
 
     const conf = top.confidence || 0;
     $("confFill").style.width = `${conf}%`;
-    $("confText").textContent = `${conf}%`;
+    // Show real confidence + tier hint so the user can never be misled
+    // into thinking a NORMAL pick is at the PREMIUM bar.
+    if (tier === "premium") {
+      $("confText").textContent = `${conf}% (★ выше порога 80%)`;
+    } else if (tier === "strong") {
+      $("confText").textContent = `${conf}% (⚡ ≥80%, edge не подтверждён)`;
+    } else {
+      $("confText").textContent = `${conf}% (⊙ ниже порога 80%)`;
+    }
 
     // Binary-option metrics: entry / ATR / projected close at expiry /
     // status (В ПЛЮСЕ or НЕ В ПЛЮСЕ).  SL/TP are intentionally
