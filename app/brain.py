@@ -671,5 +671,47 @@ def select_top1(now: datetime | None = None) -> dict:
         "top1": top1,
         "top5": candidates[:5],
         "live_forecast": live_forecast,
+        # Always surface the *leading candidate* so the UI can show
+        # what the brain is currently watching even when no pair has
+        # cleared the strict 80 % publication gate.  This is read-only
+        # transparency — it does NOT relax the gate.  The frontend uses
+        # it to render the chart for the right pair and a "Лидер
+        # ожидания" hint, which is invaluable for real-money trading
+        # because the user can see *why* the system is silent.
+        "leading_candidate": _leading_candidate_snapshot(candidates, all_evals),
         "all_evals": all_evals,
+    }
+
+
+def _leading_candidate_snapshot(
+    candidates: list[dict], all_evals: list[dict]
+) -> Optional[dict]:
+    """Return a minimal snapshot of the leading pair the brain is
+    watching.
+
+    Priority order:
+    1. The highest-confidence un-vetoed candidate (`candidates[0]`).
+       That's the pair closest to becoming Top-1; the user will see it
+       on the chart and on the "Лидер ожидания" hint until either its
+       confidence crosses the 80 % floor or another pair overtakes it.
+    2. If every pair is vetoed, fall back to the strongest *evaluated*
+       pair (max ``composite_score``) so the chart still has something
+       meaningful to plot.
+    """
+    pick = candidates[0] if candidates else None
+    if pick is None and all_evals:
+        pick = max(
+            all_evals,
+            key=lambda e: (e.get("composite_score") or 0.0),
+            default=None,
+        )
+    if pick is None:
+        return None
+    return {
+        "pair": pick.get("pair"),
+        "name_ru": pick.get("name_ru"),
+        "side": pick.get("side"),
+        "confidence": pick.get("confidence"),
+        "veto": pick.get("veto"),
+        "composite_score": pick.get("composite_score"),
     }

@@ -68,6 +68,7 @@ def main() -> int:
         "top1": payload["top1"],
         "top5": payload["top5"],
         "live_forecast": payload.get("live_forecast"),
+        "leading_candidate": payload.get("leading_candidate"),
         "macro_currency_strength": payload["macro"]["currency_strength"],
         "sentiment": payload["sentiment"],
         "political_risk": payload["political_risk"],
