@@ -59,8 +59,15 @@ def main() -> int:
     top1_payload = {
         "generated_at_utc": payload["generated_at_utc"],
         "next_cycle_utc": payload["next_cycle_utc"],
+        "cycle_close_utc": payload.get("cycle_close_utc", payload["next_cycle_utc"]),
+        "minutes_to_expiry": payload.get("minutes_to_expiry"),
+        "binary_option_mode": payload.get("binary_option_mode", True),
+        "binary_option_horizon_minutes": payload.get(
+            "binary_option_horizon_minutes", 300
+        ),
         "top1": payload["top1"],
         "top5": payload["top5"],
+        "live_forecast": payload.get("live_forecast"),
         "macro_currency_strength": payload["macro"]["currency_strength"],
         "sentiment": payload["sentiment"],
         "political_risk": payload["political_risk"],

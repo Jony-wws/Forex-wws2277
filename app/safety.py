@@ -30,6 +30,7 @@ log = logging.getLogger("safety")
 
 REVERSAL_LOOKBACK_BARS = 3
 PROJECTION_HORIZON_BARS = 5     # 5 × H1 = 5 hours
+PROJECTION_HORIZON_MINUTES = PROJECTION_HORIZON_BARS * 60
 SAFETY_MARGIN_FRACTION_OF_ATR = 0.5
 
 
@@ -139,18 +140,38 @@ def five_hour_projection(
     bars_1h: pd.DataFrame,
     side: str,
     horizon: int = PROJECTION_HORIZON_BARS,
+    *,
+    horizon_minutes: Optional[float] = None,
 ) -> dict:
-    """Project the end-of-cycle price and check it's still in profit.
+    """Project the price at trade expiry and check it stays in profit.
 
-    Heuristic: linear drift = mean(close diff over last 10 bars), bounded
-    by ±0.5×ATR per bar.  Project ``horizon`` bars forward.  Then check
-    that the projected end price is on the right side of the entry by at
-    least ``SAFETY_MARGIN_FRACTION_OF_ATR × ATR(H1)`` so we have a real
-    profit margin at expiry — not just a coin flip.
+    The system trades **5h binary options** — no SL/TP, only the
+    direction at expiry matters.  Every minute we re-evaluate whether
+    the live forecast still ends in profit at the binding cycle close.
+
+    Heuristic: linear drift = mean(close diff over last 10 H1 bars),
+    bounded by ±0.5×ATR(H1) per bar.  Drift is converted to a
+    per-minute rate (drift / 60) and projected forward by
+    ``horizon_minutes``.  When ``horizon_minutes`` is omitted we fall
+    back to ``horizon`` H1 bars (= 5 h by default) so the helper stays
+    backwards-compatible.
+
+    The safety margin scales with √(horizon_hours / 5) — random-walk
+    standard deviation grows with √t, so a 10-minute horizon needs a
+    much smaller margin than the full 5-hour horizon to still mean
+    "comfortably in profit".  This is what lets the user ask the
+    system at any point in the cycle — including 10 minutes before
+    expiry — "will my trade still be in profit at close?" and get a
+    meaningful answer.
 
     Returns a dict with the projected price, raw drift, ATR, margin and
     a ``passes`` flag the brain treats as a veto when False.
     """
+    if horizon_minutes is None:
+        horizon_minutes_f = float(horizon) * 60.0
+    else:
+        horizon_minutes_f = max(0.0, float(horizon_minutes))
+
     if bars_1h is None or bars_1h.empty or side not in ("BUY", "SELL"):
         return {
             "passes": False,
@@ -160,6 +181,7 @@ def five_hour_projection(
             "atr": 0.0,
             "drift_per_bar": 0.0,
             "horizon_bars": horizon,
+            "horizon_minutes": round(horizon_minutes_f, 2),
             "safety_margin": 0.0,
         }
     if len(bars_1h) < 20:
@@ -171,6 +193,7 @@ def five_hour_projection(
             "atr": 0.0,
             "drift_per_bar": 0.0,
             "horizon_bars": horizon,
+            "horizon_minutes": round(horizon_minutes_f, 2),
             "safety_margin": 0.0,
         }
 
@@ -184,8 +207,17 @@ def five_hour_projection(
     max_drift = 0.5 * atr_val
     drift = max(-max_drift, min(max_drift, raw_drift)) if max_drift > 0 else raw_drift
 
-    projected = entry + drift * horizon
-    safety_margin = SAFETY_MARGIN_FRACTION_OF_ATR * atr_val
+    # Convert per-bar (per-hour) drift to per-minute, then project.
+    drift_per_minute = drift / 60.0
+    projected = entry + drift_per_minute * horizon_minutes_f
+
+    # Margin shrinks with the remaining horizon — random-walk std ∝ √t.
+    full_horizon_minutes = float(PROJECTION_HORIZON_MINUTES)
+    if full_horizon_minutes > 0:
+        scale = (horizon_minutes_f / full_horizon_minutes) ** 0.5
+    else:
+        scale = 1.0
+    safety_margin = SAFETY_MARGIN_FRACTION_OF_ATR * atr_val * scale
 
     if side == "BUY":
         in_profit = projected - entry >= safety_margin
@@ -194,19 +226,25 @@ def five_hour_projection(
         in_profit = entry - projected >= safety_margin
         progress = entry - projected
 
+    horizon_hours_display = horizon_minutes_f / 60.0
+    if horizon_hours_display >= 1.0:
+        horizon_label = f"{horizon_hours_display:.1f}ч"
+    else:
+        horizon_label = f"{horizon_minutes_f:.0f}мин"
+
     if in_profit:
         reason = (
-            f"5h-проекция в плюсе: drift={drift:+.5f}/бар, "
+            f"Проекция на {horizon_label} в плюсе: drift={drift:+.5f}/ч, "
             f"итог {progress:+.5f} ≥ запас {safety_margin:.5f}"
         )
     elif progress >= 0:
         reason = (
-            f"5h-проекция в нейтрале: drift={drift:+.5f}/бар, "
+            f"Проекция на {horizon_label} в нейтрале: drift={drift:+.5f}/ч, "
             f"итог {progress:+.5f} < запас {safety_margin:.5f}"
         )
     else:
         reason = (
-            f"5h-проекция МИНУС: drift={drift:+.5f}/бар, "
+            f"Проекция на {horizon_label} МИНУС: drift={drift:+.5f}/ч, "
             f"итог {progress:+.5f} против {side}"
         )
 
@@ -217,7 +255,9 @@ def five_hour_projection(
         "entry": round(entry, 5),
         "atr": round(atr_val, 5),
         "drift_per_bar": round(drift, 5),
+        "drift_per_minute": round(drift_per_minute, 7),
         "horizon_bars": horizon,
+        "horizon_minutes": round(horizon_minutes_f, 2),
         "safety_margin": round(safety_margin, 5),
     }
 
