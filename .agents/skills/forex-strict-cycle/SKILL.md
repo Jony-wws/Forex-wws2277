@@ -37,6 +37,15 @@ app/
 ├── orderbook.py      # Bid/Ask, depth, S/R
 ├── analyzer.py       # 15 voting blocks, multi-TF scoring + is_strong_trend
 ├── cycle.py          # Strict 5h cycle: PREMIUM / STRONG / NORMAL tiers
+├── brain.py          # 7-layer Top-1 AI brain (TA + macro + big-players + …)
+├── big_players.py    # Smart Money composite: COT + bid/ask + macro flow
+├── cot.py            # CFTC Commitment of Traders (public Socrata API)
+├── safety.py         # 5h projection, reversal-risk, W1 bias, M5 momentum
+├── smc.py            # Smart Money Concepts (Order Blocks, FVG, BOS/CHoCH)
+├── wyckoff.py        # Wyckoff phases on H4 / D1
+├── volume_profile.py # POC / VAH / VAL value-area scoring
+├── macro.py          # DXY / yields / commodities → currency strength
+├── news_brain.py     # High-impact event veto + political risk
 └── main.py           # FastAPI server + background scanner
 static/
 └── index.html        # Single-page UI, embedded data on first paint
@@ -89,6 +98,42 @@ Cron boundaries: `5 19,0,5,10,15 * * *` UTC (00:05, 05:05, 10:05,
 5. Tiers: ★ PREMIUM (gate + ADX H1 ≥ 28 + persistence = 100 %), ⚡ STRONG
    (gate), ⊙ NORMAL (top-up).
 6. Writes `state/forecasts.json` and `reports/cycle_5h_latest.md`.
+
+### 3a. AI brain `select_top1()` — 7 layers + safety gates
+
+`app/brain.py` runs a parallel "Top-1 of 28 with a clear favorite"
+pipeline used by `scripts/ai_brain.py` and consumed by the SPA /
+Telegram bot.  The composite confidence is the weighted sum:
+
+| Layer            | Weight | Source                                      |
+|------------------|--------|---------------------------------------------|
+| `technical`      | 0.33   | `analyzer.py` votes + SMC/Wyckoff/VP extras |
+| `macro`          | 0.22   | DXY, yields, commodities (`macro.py`)       |
+| `big_players`    | 0.12   | CFTC COT + bid/ask + macro (`big_players.py`)|
+| `fundamental`    | 0.13   | Carry / policy rate diff (`brain.py`)       |
+| `news`           | 0.09   | High-impact event veto (`news_brain.py`)    |
+| `sentiment`      | 0.08   | Risk-on / risk-off from VIX & DXY tape      |
+| `political`      | 0.03   | Reuters / BBC headline risk score           |
+
+Hard gates promoted to `veto` so the pair is excluded from Top-1:
+
+- **Multi-TF alignment** — D1 + H4 + H1 + M15 must agree (analyzer).
+- **W1 bias** — weekly EMA-20 bias must not be against the trade.
+- **M5 momentum** — last 6 M5 closes must not contradict the trade.
+- **Reversal risk H1** — last 3 H1 bars must not show engulfing /
+  shooting-star / hammer against the trade.
+- **5-hour projection** — projected close in 5 H1 bars must stay in
+  profit by at least 0.5 × ATR(H1).  This is the user-required
+  "последний момент не должен быть минус" guard.
+- **News veto** — no high-impact econ event within 120 min on either
+  side of the pair.
+- **Clear-favorite gate** — Top-1 must lead Top-2 by ≥ 5 confidence
+  points *or* have confidence ≥ 80.  Otherwise `top1=null` and the
+  cycle publishes the reason "Нет явного фаворита".
+
+`scripts/ai_brain.py` writes `data/top1.json` (also `brain_full.json`
+on the slow path) with `top1`, `top5`, `big_players`, `favorite_check`
+plus the layer-by-layer breakdown for transparency.
 
 **Critical invariants — never break:**
 - `MIN_PICKS = 3` — user explicitly requires ≥ 3 forecasts every 5 h.
