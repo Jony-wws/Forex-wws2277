@@ -77,9 +77,10 @@ WEIGHTS = {
 NEWS_VETO_MINUTES = 120
 MIN_ADX_H1 = 20
 
-# Top-1 must lead Top-2 by at least this many confidence points, *or*
-# have a confidence ≥ ``CLEAR_FAVORITE_FLOOR``.  Otherwise the cycle
-# refuses to publish a Top-1 because there is no "явный фаворит".
+# Strict 80 % floor — Top-1 is published ONLY when the leader's
+# confidence is >= ``CLEAR_FAVORITE_FLOOR``.  The lead over Top-2 is
+# reported for telemetry but is NOT part of the publish decision.
+# This is what the user asked for explicitly: "жёсткий 80 %".
 CLEAR_FAVORITE_LEAD = 5
 CLEAR_FAVORITE_FLOOR = 80
 
@@ -500,28 +501,29 @@ def select_top1(now: datetime | None = None) -> dict:
     candidates = [e for e in all_evals if e["veto"] is None and e["side"]]
     candidates.sort(key=lambda e: e["confidence"], reverse=True)
 
-    # Clear-favorite gate — the user explicitly asked the system to pick
-    # ONE pair "where there is a clear favorite".  We publish a Top-1
-    # only when the top candidate is unambiguously ahead.
+    # Clear-favorite gate — strict 80 % floor.  Top-1 is published only
+    # when the leader's confidence is at least ``CLEAR_FAVORITE_FLOOR``
+    # (80 %).  The lead over Top-2 is reported but does not trigger
+    # publication on its own.
     top1 = None
     favorite_reason: Optional[str] = None
     if candidates:
         winner = candidates[0]
         runner_up = candidates[1] if len(candidates) > 1 else None
         lead = winner["confidence"] - (runner_up["confidence"] if runner_up else 0)
-        has_clear_lead = lead >= CLEAR_FAVORITE_LEAD
         has_floor = winner["confidence"] >= CLEAR_FAVORITE_FLOOR
-        if has_clear_lead or has_floor:
+        if has_floor:
             top1 = winner
             favorite_reason = (
                 f"Явный фаворит: уверенность {winner['confidence']}% "
-                f"(отрыв от Top-2 = {lead} п.)"
+                f"≥ {CLEAR_FAVORITE_FLOOR}% (отрыв от Top-2 = {lead} п.)"
             )
         else:
             favorite_reason = (
-                f"Нет явного фаворита: Top-1 {winner['confidence']}% / "
-                f"Top-2 {runner_up['confidence'] if runner_up else 0}% — "
-                f"отрыв {lead} < {CLEAR_FAVORITE_LEAD}"
+                f"Нет явного фаворита: Top-1 {winner['confidence']}% "
+                f"< порог {CLEAR_FAVORITE_FLOOR}% "
+                f"(Top-2 {runner_up['confidence'] if runner_up else 0}%, "
+                f"отрыв {lead} п.)"
             )
 
     return {

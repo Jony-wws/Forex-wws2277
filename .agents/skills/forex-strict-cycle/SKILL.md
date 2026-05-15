@@ -127,9 +127,12 @@ Hard gates promoted to `veto` so the pair is excluded from Top-1:
   "последний момент не должен быть минус" guard.
 - **News veto** — no high-impact econ event within 120 min on either
   side of the pair.
-- **Clear-favorite gate** — Top-1 must lead Top-2 by ≥ 5 confidence
-  points *or* have confidence ≥ 80.  Otherwise `top1=null` and the
-  cycle publishes the reason "Нет явного фаворита".
+- **Clear-favorite gate (strict 80 %)** — Top-1 is published ONLY when
+  the leader's confidence is ≥ `CLEAR_FAVORITE_FLOOR` (= 80).  The
+  lead over Top-2 is still reported inside `favorite_check` for
+  telemetry but is NOT part of the decision.  Below 80 % the cycle
+  publishes `top1=null` with the reason
+  "Нет явного фаворита: Top-1 N% < порог 80%".
 
 `scripts/ai_brain.py` writes `data/top1.json` (also `brain_full.json`
 on the slow path) with `top1`, `top5`, `big_players`, `favorite_check`
