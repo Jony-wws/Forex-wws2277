@@ -4,12 +4,17 @@ Designed to run on GitHub Actions (``.github/workflows/ai_brain.yml``)
 every 5 minutes for fresh layer scores + every 5 hours for the canonical
 Top-1 forecast that the UI shows.
 
-Real-money safety:
-- Refuses to publish a forecast if the veto layer eliminates EVERY pair
-  (returns ``"top1": null`` so the site shows "ждём цикла" instead of
-  forcing a low-conviction trade).
-- Pins the ``next_cycle_utc`` boundary so the UI countdown stays in sync
-  with the GitHub-Actions cron schedule.
+Always-publish policy (2026-05-15):
+- The brain ALWAYS picks the best of 28 un-vetoed candidates as
+  ``top1`` and tags it with a tier (``premium`` / ``strong`` /
+  ``normal``).  ``favorite_check.ok`` and ``top1.tier`` carry the
+  honest "is this a real 80 % setup?" signal — never inflated.
+- ``top1`` can still be ``null`` in the corner case where every one
+  of the 28 pairs is hard-vetoed (e.g. news blackout across all majors
+  + multi-TF disagreement on all crosses).  The SPA renders a "VETO"
+  state for that, with the leading-candidate snapshot on the chart.
+- Pins the ``next_cycle_utc`` boundary so the UI countdown stays in
+  sync with the GitHub-Actions cron schedule.
 - Writes a *separate* ``brain_full.json`` with the per-pair breakdown
   so journals/audits can replay any decision later.
 """
@@ -84,13 +89,16 @@ def main() -> int:
     log.info(f"AI brain done in {(finished-started).total_seconds():.1f}s")
     if payload["top1"] is None:
         log.warning(
-            "No pair survived the veto filter — published top1=null on purpose."
+            "No pair survived the veto filter — published top1=null "
+            "(this is the rare VETO state; SPA renders the leading-candidate)."
         )
     else:
         t = payload["top1"]
+        tier = t.get("tier", "unknown")
         log.info(
-            f"Top-1: {t['pair']} {t['side']} conf={t['confidence']}% — "
-            f"reason via {len(t['layers']['technical']['details'])} TA votes"
+            f"Top-1 [{tier.upper()}]: {t['pair']} {t['side']} "
+            f"conf={t['confidence']}% — reason via "
+            f"{len(t['layers']['technical']['details'])} TA votes"
         )
     return 0
 
