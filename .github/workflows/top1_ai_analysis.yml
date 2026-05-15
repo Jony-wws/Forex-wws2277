@@ -1,6 +1,6 @@
 name: TOP-1 AI analysis (binary option, 5h)
 
-# Раз в 5 часов, сразу после ai_brain (cron "0 19,0,5,10,15"):
+# Каждый 1 час (cron "5 * * * *"):
 # - тянет ТОП-1 пару из app.brain.select_top1()
 # - просит LLM (Cloudflare Workers AI Llama 3.3 70B → fallback
 #   GitHub Models gpt-4o-mini) написать "экспертный" разбор уровня
@@ -16,8 +16,11 @@ name: TOP-1 AI analysis (binary option, 5h)
 
 on:
   schedule:
-    # Через 5 минут после ai_brain (cron "0 19,0,5,10,15 * * *").
-    - cron: "5 19,0,5,10,15 * * *"
+    # Каждый час в :05 UTC (24 раза в сутки). Сам 5-часовой бинарный
+    # цикл и время экспирации считаются в app/brain.py, а этот workflow
+    # просто обновляет ТОП-1 + сканер каждый час, чтобы пользователь
+    # видел свежую AI-картинку в Telegram между границами 5h-цикла.
+    - cron: "5 * * * *"
   workflow_dispatch: {}
   push:
     branches: [main]
