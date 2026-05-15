@@ -73,21 +73,34 @@ _WILSON_Z_95 = 1.95996398454005
 # (e.g. 5 trades / 80 % WR → Wilson 95 % lower bound ≈ 38 %).
 MIN_TRADES_PER_WINDOW = 40
 
-# Lifetime gate.  This is the largest-sample window; a pair must show a
-# statistically-significant edge here (Wilson 95 % lower bound > 51 %)
-# to qualify as having a real long-run advantage.  The 51 % bar is the
-# binary-option "edge over coin-flip" threshold — Wilson 95 % lower
-# ≥51 % means we are 95 % confident the true win rate is at least
-# 51 %, which is already profitable on 1:1 binary payouts.  Strict
-# enough to reject random-walk pairs, loose enough that genuine
-# 53-55 % strategies (typical for forex 5h binaries) clear it with
-# the ~1000 historical trades the simulator generates per pair.
+# Primary edge floor.  A trade-window's Wilson 95 % lower bound must
+# exceed this for the pair to qualify as having a statistically-
+# significant edge.  The 51 % bar is the binary-option
+# "edge over coin-flip" threshold — Wilson 95 % lower ≥ 51 % means we
+# are 95 % confident the true win rate is at least 51 %, which is
+# already profitable on a 1:1 binary payout.  Strict enough to reject
+# random-walk pairs, loose enough that genuine 53-55 % strategies
+# (typical for forex 5h binaries) clear it with the few-hundred trades
+# the 5d / 30d windows accumulate per pair.
+#
+# Historically this used to be a *lifetime-only* gate — but for 5 h
+# binary options the **current regime** matters far more than a 3-year
+# coin-flip average that mixes pre- and post-regime data.  We now use
+# the most-recent statistically meaningful window as the primary gate
+# and keep the lifetime as a *secondary crash guard* (a pair must not
+# have collapsed below the lifetime-floor over its entire history).
 LIFETIME_LOWER_FLOOR = 0.51
 
-# Regime-change guard: the 30-day window's Wilson 95 % lower bound must
-# also be at least 45 %.  A pair whose lifetime is great but whose last
-# 30 days has collapsed below 45 % WR (lower bound) is likely in a
-# regime change — don't trade it until the trend stabilises.
+# Regime / crash guard.  The 30-day Wilson 95 % lower bound — and the
+# lifetime Wilson 95 % lower bound — must each remain above this floor.
+# This catches two failure modes:
+# (1) Pairs whose recent (30d) performance has collapsed below 45 %
+#     while older history looks fine — likely a regime change.
+# (2) Pairs that have *always* been below 45 % lifetime — likely a
+#     structurally bad pair regardless of a hot 5d streak.
+# When the *primary* gate uses the 5d window, this crash guard ensures
+# we don't blindly trade a momentary winning streak on an otherwise-
+# broken pair.
 REGIME_LOWER_FLOOR = 0.45
 
 # Weights used to blend the brain's "now" confidence (current setup
@@ -249,47 +262,65 @@ def compute_edge(
             "expected_value_pp": None,
         }
 
-    # Primary gate: lifetime Wilson 95 % lower bound > LIFETIME_LOWER_FLOOR.
-    # This is the largest-sample window, so the CI is tightest — if the
-    # lower bound clears 52 % here we have *strong* evidence the pair's
-    # true win rate is above coin-flip.
-    lifetime_significant = lifetime.lower >= LIFETIME_LOWER_FLOOR
+    # Primary gate: the **most-recent statistically meaningful** Wilson
+    # window must clear ``LIFETIME_LOWER_FLOOR``.  For 5 h binary
+    # options, the current regime (last 5 days) carries more signal
+    # than a 3-year average that mixes pre- and post-regime data.  We
+    # prefer 5d → 30d → lifetime, picking the first window with enough
+    # trades to be statistically meaningful (n ≥ MIN_TRADES_PER_WINDOW).
+    primary_window_name = None
+    primary_window: Optional[WilsonInterval] = None
+    for name in ("5d", "30d", "lifetime"):
+        w = windows[name]
+        if w is not None:
+            primary_window_name = name
+            primary_window = w
+            break
 
-    # Secondary guard: 30-day Wilson lower bound > REGIME_LOWER_FLOOR.
-    # Catches regime changes that flipped a historically-profitable pair
-    # into a recent drawdown.  If the 30-day window has too few trades,
-    # we are lenient and skip this check (the lifetime gate still holds).
+    # ``lifetime is None`` is already handled above, so primary_window is
+    # guaranteed to be non-None here.
+    assert primary_window is not None and primary_window_name is not None
+
+    primary_significant = primary_window.lower >= LIFETIME_LOWER_FLOOR
+
+    # Secondary guard: the 30-day window's Wilson lower bound must clear
+    # REGIME_LOWER_FLOOR (skip if too few trades).  Catches recent
+    # collapses on a pair whose 5d streak looks great but whose 30d
+    # has fallen apart.
     regime = windows["30d"]
     regime_ok = (regime is None) or (regime.lower >= REGIME_LOWER_FLOOR)
 
+    # Crash guard: the lifetime Wilson lower bound must not have
+    # collapsed below REGIME_LOWER_FLOOR.  Protects against pairs that
+    # have a hot 5d streak but are structurally awful long-term.
+    lifetime_ok = lifetime.lower >= REGIME_LOWER_FLOOR
+
     avg_win = float(history.get("avg_win_pp", 0.0))
     avg_loss = float(history.get("avg_loss_pp", 0.0))
-    ev_at_lifetime = expected_value(lifetime.lower, avg_win, avg_loss)
-    ev_positive = ev_at_lifetime > 0.0
+    ev_at_primary = expected_value(primary_window.lower, avg_win, avg_loss)
+    ev_positive = ev_at_primary > 0.0
 
-    # Calibrated confidence — blend "now" (brain) and "distance" (history).
-    # We use the lifetime Wilson lower bound (most-significant statistic)
-    # converted to percent.  When lifetime_lower is 0.60 and brain is 82,
-    # calibrated = 0.6*82 + 0.4*60 = 49.2 + 24 = 73.2 % — below the 80 %
-    # gate, so even a strong "now" signal won't publish if the pair
-    # historically only scrapes 60 % WR lower-bound.
-    hist_pct = lifetime.lower * 100.0
+    # Calibrated confidence — blend "now" (brain) and "distance"
+    # (primary window Wilson lower).  Using the primary window means a
+    # pair currently in a winning regime gets the credit it deserves
+    # rather than being dragged down by a pre-regime lifetime average.
+    hist_pct = primary_window.lower * 100.0
     calibrated = _W_BRAIN_NOW * brain_confidence + _W_HIST_DIST * hist_pct
 
-    passes = lifetime_significant and regime_ok and ev_positive
+    passes = primary_significant and regime_ok and lifetime_ok and ev_positive
 
     if passes:
         reason = (
-            f"Edge подтверждён: Wilson 95% lower={lifetime.lower * 100:.1f}% "
-            f"на жизненном окне (n={lifetime.n}), "
-            f"EV={ev_at_lifetime:+.2f}п. на сделку, "
+            f"Edge подтверждён: Wilson 95% lower={primary_window.lower * 100:.1f}% "
+            f"на окне {primary_window_name} (n={primary_window.n}), "
+            f"EV={ev_at_primary:+.2f}п. на сделку, "
             f"calibrated={calibrated:.1f}%."
         )
     else:
         bits = []
-        if not lifetime_significant:
+        if not primary_significant:
             bits.append(
-                f"жизненный Wilson lower {lifetime.lower * 100:.1f}% < "
+                f"{primary_window_name} Wilson lower {primary_window.lower * 100:.1f}% < "
                 f"{LIFETIME_LOWER_FLOOR*100:.0f}% "
                 "(статистически не отличается от случайности)"
             )
@@ -299,9 +330,15 @@ def compute_edge(
                 f"{REGIME_LOWER_FLOOR*100:.0f}% "
                 "(похоже на смену режима — недавняя просадка)"
             )
+        if not lifetime_ok:
+            bits.append(
+                f"жизненный Wilson lower {lifetime.lower * 100:.1f}% < "
+                f"{REGIME_LOWER_FLOOR*100:.0f}% "
+                "(пара структурно слабая)"
+            )
         if not ev_positive:
             bits.append(
-                f"EV {ev_at_lifetime:+.2f}п. ≤ 0 (отрицательное матожидание "
+                f"EV {ev_at_primary:+.2f}п. ≤ 0 (отрицательное матожидание "
                 f"на нижней границе WR)"
             )
         reason = "Edge не подтверждён: " + "; ".join(bits) + "."
@@ -312,11 +349,13 @@ def compute_edge(
         "brain_confidence": brain_confidence,
         "reason": reason,
         "windows": windows_serialised,
-        "best_wilson": _serialise_wilson(lifetime),
-        "expected_value_pp": round(ev_at_lifetime, 3),
-        "wilson_lower_pct": round(lifetime.lower * 100, 2),
-        "lifetime_significant": lifetime_significant,
+        "best_wilson": _serialise_wilson(primary_window),
+        "primary_window": primary_window_name,
+        "expected_value_pp": round(ev_at_primary, 3),
+        "wilson_lower_pct": round(primary_window.lower * 100, 2),
+        "lifetime_significant": primary_significant,
         "regime_ok": regime_ok,
+        "lifetime_ok": lifetime_ok,
         "ev_positive": ev_positive,
     }
 
