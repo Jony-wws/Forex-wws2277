@@ -1,11 +1,19 @@
 name: Minute refresh (1-min data pulse)
 
 # The user explicitly asked for the dashboard to refresh **every 1
-# minute** through GitHub Actions.  GitHub's cron scheduler has a 5-minute
-# minimum granularity, so we approximate "every minute" by running once
-# every 5 minutes and looping internally 5 times with a 60-second sleep
-# between iterations.  Each iteration runs the AI brain in "quick" mode
-# (top1.json only) and pushes to the `data` branch.
+# minute** through GitHub Actions, with a hard upper bound of 5 minutes
+# between publishes.  GitHub's cron scheduler has a 5-minute minimum
+# granularity AND is notoriously unreliable — entire `*/5` slots can be
+# silently skipped, especially during organisation-wide high load or
+# right after a push.  We have seen real-world skips of 12-20 minutes
+# on this repo when relying on a 5-iteration loop.
+#
+# To stay inside the 5-minute publish ceiling we now use a **long-loop**
+# strategy: each scheduled run pulses for 30 × 60s = 30 minutes.  Even if
+# the next 5-6 cron slots are skipped (i.e. up to ~30 minutes of cron
+# silence), the previous job is still pulsing every minute.  A second
+# workflow (`minute_keepalive.yml`) provides an offset cron lane for
+# redundancy.
 #
 # This complements the heavier crons:
 #   - ai_brain.yml      — full 28-pair breakdown every 5h (brain_full.json)
@@ -13,12 +21,25 @@ name: Minute refresh (1-min data pulse)
 #
 # Concurrency: the publish step has its own retry loop so it never loses
 # a forecast to a race with refresh_data.yml on the same `data` branch.
+# We deliberately let parallel pulse jobs from staggered crons run
+# concurrently — a few extra commits per minute is acceptable; a 19-min
+# silence is not.
 
 on:
   schedule:
-    # GitHub's tightest cron granularity.  Inside the job we loop 5×60s
-    # so the effective publish cadence is once per minute.
+    # Double-cron strategy for sub-5-min publish cadence even when
+    # GitHub silently drops slots.  Two `*/5` lanes, offset by 2 minutes:
+    #
+    #   primary:    00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+    #   offset (+2):02, 07, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57
+    #
+    # Each cron firing kicks off a 30-iteration pulse loop (30 minutes
+    # of per-minute publishes), so worst-case publish gap drops from the
+    # observed ~20 min to under 5 min — even if 5 consecutive slots are
+    # skipped.  Multiple `schedule:` entries are allowed in a single
+    # workflow and are treated as independent triggers.
     - cron: "*/5 * * * *"
+    - cron: "2-57/5 * * * *"
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -46,18 +67,21 @@ permissions:
   contents: write
 
 concurrency:
-  # We deliberately let two minute-refresh runs queue rather than cancel
-  # each other — every minute of data is valuable, even if the previous
-  # 5-min slot's job overruns slightly.
-  group: minute-refresh
+  # Allow up to one queued job in addition to the running one.  We use a
+  # per-run-id group so multiple staggered crons can run truly in
+  # parallel — overlap is desirable here because it shrinks the worst-
+  # case gap when GitHub silently drops a cron slot.
+  group: minute-refresh-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
   pulse:
     runs-on: ubuntu-latest
-    # Five 60-second iterations + ~30s of overhead per iteration.  Hard
-    # cap at 9 min so we never collide with the next */5 tick.
-    timeout-minutes: 9
+    # 30 × 60s iterations of the long pulse loop + ~5 min of overhead
+    # budget.  Hard cap at 35 min so this run definitely finishes before
+    # GitHub recycles the runner, while still covering ~30 minutes of
+    # cron silence end-to-end.
+    timeout-minutes: 35
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -76,11 +100,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Pulse loop (5 × 60s)
+      - name: Pulse loop (30 × 60s)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Tighter yfinance budget so a stuck call can't blow the
-          # 9-min job timeout.
+          # 35-min job timeout.
           YFINANCE_TIMEOUT: "15"
         run: |
           set -euo pipefail
@@ -129,9 +153,15 @@ jobs:
             return 1
           }
 
-          for i in 1 2 3 4 5; do
+          # 30 × 60s iterations.  Even if GitHub silently skips 5
+          # consecutive */5 cron slots (i.e. 25 minutes of cron silence),
+          # this single run is still pulsing every minute end-to-end.
+          # Combined with minute_keepalive.yml's offset cron we get
+          # double-coverage of every minute boundary.
+          TOTAL_ITERS=30
+          for i in $(seq 1 "$TOTAL_ITERS"); do
             iteration_start=$(date -u +%s)
-            echo "── Minute pulse $i/5 — $(date -u +%H:%M:%SZ) ──"
+            echo "── Minute pulse $i/$TOTAL_ITERS — $(date -u +%H:%M:%SZ) ──"
 
             # Quick mode = top1.json only.  No per-pair breakdown so the
             # data branch diff stays small and the push is fast.
@@ -148,7 +178,7 @@ jobs:
 
             # Sleep the remainder of the 60-second slot.  Skip on the
             # final iteration so we don't waste compute.
-            if [ "$i" != "5" ]; then
+            if [ "$i" != "$TOTAL_ITERS" ]; then
               elapsed=$(( $(date -u +%s) - iteration_start ))
               remaining=$(( 60 - elapsed ))
               if [ "$remaining" -gt 0 ]; then
