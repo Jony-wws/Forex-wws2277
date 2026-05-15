@@ -444,3 +444,54 @@ def test_minutes_to_expiry_clamps_within_cycle():
     # Right at a boundary the next slot must be in the future
     nxt = _next_cycle_dt(now)
     assert nxt > now
+
+
+# --------------------------------------------------------------------------- #
+#  Composite confidence — sign-flip regression
+# --------------------------------------------------------------------------- #
+
+
+def test_confidence_scaling_anchors():
+    """Piecewise scaling must hit its calibrated anchors exactly."""
+    from app.brain import _scale_confidence
+
+    assert _scale_confidence(0.0) == 0
+    assert _scale_confidence(0.30) == 50
+    assert _scale_confidence(0.60) == 80
+    assert _scale_confidence(1.00) == 99
+    # Negative composite (net disagreement) → 0 %
+    assert _scale_confidence(-0.50) == 0
+    # Above 1.0 (with bonus) clamps at 99
+    assert _scale_confidence(1.20) == 99
+
+
+def test_confidence_sign_alignment_buy_vs_sell():
+    """A SELL setup where bearish-on-pair layers all agree must score
+    *higher* confidence than the same pair traded BUY against the same
+    layers.  The previous double-flipped formula made disagreement and
+    agreement equivalent for SELL signals — this test locks that down.
+    """
+    from app.brain import _scale_confidence, WEIGHTS, STRONG_TREND_BONUS
+
+    # Bearish-on-pair: tech_norm = -0.9 (SELL), macro_norm = -0.8,
+    # big_player_norm = -0.7, fund_norm = -0.5, sent_norm = -0.6
+    tech_norm, macro_norm, big_norm, fund_norm, sent_norm = (
+        -0.9, -0.8, -0.7, -0.5, -0.6,
+    )
+
+    def composite(side):
+        s = 1 if side == "BUY" else -1
+        return (
+            WEIGHTS["technical"] * abs(tech_norm)
+            + WEIGHTS["macro"] * macro_norm * s
+            + WEIGHTS["big_players"] * big_norm * s
+            + WEIGHTS["fundamental"] * fund_norm * s
+            + WEIGHTS["sentiment"] * sent_norm * s
+        )
+
+    sell_conf = _scale_confidence(composite("SELL"))
+    buy_conf = _scale_confidence(composite("BUY"))
+    assert sell_conf > buy_conf, (sell_conf, buy_conf)
+    # Strong-trend bonus must lift fully-aligned SELL to ≥ 80 %.
+    sell_with_bonus = _scale_confidence(composite("SELL") + STRONG_TREND_BONUS)
+    assert sell_with_bonus >= 80, sell_with_bonus

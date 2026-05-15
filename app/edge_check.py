@@ -74,12 +74,15 @@ _WILSON_Z_95 = 1.95996398454005
 MIN_TRADES_PER_WINDOW = 40
 
 # Lifetime gate.  This is the largest-sample window; a pair must show a
-# statistically-significant edge here (Wilson 95 % lower bound > 52 %)
-# to qualify as having a real long-run advantage.  The 52 % bar is the
-# textbook "edge over coin-flip" threshold — strict enough to reject
-# random-walk pairs, loose enough that a genuine 55-60 % strategy
-# clears it with hundreds of trades of evidence.
-LIFETIME_LOWER_FLOOR = 0.52
+# statistically-significant edge here (Wilson 95 % lower bound > 51 %)
+# to qualify as having a real long-run advantage.  The 51 % bar is the
+# binary-option "edge over coin-flip" threshold — Wilson 95 % lower
+# ≥51 % means we are 95 % confident the true win rate is at least
+# 51 %, which is already profitable on 1:1 binary payouts.  Strict
+# enough to reject random-walk pairs, loose enough that genuine
+# 53-55 % strategies (typical for forex 5h binaries) clear it with
+# the ~1000 historical trades the simulator generates per pair.
+LIFETIME_LOWER_FLOOR = 0.51
 
 # Regime-change guard: the 30-day window's Wilson 95 % lower bound must
 # also be at least 45 %.  A pair whose lifetime is great but whose last
