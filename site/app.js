@@ -19,12 +19,23 @@
   const REPO_OWNER = "Jony-wws";
   const REPO_NAME = "Forex-wws2277";
   const DATA_BRANCH = "data";
-  // jsDelivr serves the GitHub raw branch with HTTP caching that respects
-  // immutable URLs but invalidates within ~10s — perfect for a 5-min cron.
-  const BASE = `https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@${DATA_BRANCH}/data`;
+  // Use raw.githubusercontent.com — it serves the live branch tip with
+  // an Etag, never the multi-hour jsDelivr branch cache.  The user
+  // explicitly asked for a 1-minute refresh, which means we MUST read
+  // the freshest bytes the moment the GitHub Action pushes them.
+  // statically.io is a battle-tested mirror we fall back to if raw is
+  // throttled (rare, but not impossible from mobile Chrome).
+  const PRIMARY_BASE  = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${DATA_BRANCH}/data`;
+  const FALLBACK_BASE = `https://cdn.statically.io/gh/${REPO_OWNER}/${REPO_NAME}/${DATA_BRANCH}/data`;
   const REFRESH_MS = 60 * 1000;          // re-fetch top1.json every minute
-  const SIGNALS_REFRESH_MS = 90 * 1000;  // re-fetch signals.json
+  const SIGNALS_REFRESH_MS = 60 * 1000;  // re-fetch signals.json every minute
   const TZ_OFFSET = 5 * 3600 * 1000;     // UTC+5 (user is in Russia)
+  // 5h cycle boundaries in UTC (same grid as scripts/cycle_5h.py and
+  // app/brain.py::_next_cycle_iso).  Used as a client-side safety net:
+  // if the server-side `next_cycle_utc` falls into the past (stale CDN
+  // or unusually long cron lag), we recompute it locally so the
+  // countdown never freezes at 00:00:00.
+  const CYCLE_BOUNDARIES_UTC_HOURS = [0, 5, 10, 15, 19];
 
   // ─── State ───────────────────────────────────────────────────────────
   const state = {
@@ -69,10 +80,32 @@
     // Cache-bust by minute bucket so the browser always picks up the
     // newest cron output without disabling HTTP cache entirely.
     const bucket = Math.floor(Date.now() / 60000);
-    const url = `${BASE}/${path}?t=${bucket}`;
-    const resp = await fetch(url, { cache: "no-cache" });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${path}`);
-    return resp.json();
+    const tryOne = async (base) => {
+      const url = `${base}/${path}?t=${bucket}`;
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${path}`);
+      return resp.json();
+    };
+    try {
+      return await tryOne(PRIMARY_BASE);
+    } catch (e) {
+      // raw.githubusercontent rare-fails on flaky mobile networks; try
+      // statically.io as a hot spare so the dashboard keeps ticking.
+      return tryOne(FALLBACK_BASE);
+    }
+  }
+
+  function nextCycleIsoFromGrid(now) {
+    const base = now instanceof Date ? now : new Date();
+    const candidates = CYCLE_BOUNDARIES_UTC_HOURS.map(h => {
+      const d = new Date(Date.UTC(
+        base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), h, 0, 0, 0
+      ));
+      if (d.getTime() <= base.getTime()) d.setUTCDate(d.getUTCDate() + 1);
+      return d;
+    });
+    candidates.sort((a, b) => a.getTime() - b.getTime());
+    return candidates[0].toISOString();
   }
 
   // ─── Tab routing ─────────────────────────────────────────────────────
@@ -461,12 +494,19 @@
   // ─── Countdown timer ─────────────────────────────────────────────────
   function startCountdown(nextIso) {
     if (state.countdownTimer) clearInterval(state.countdownTimer);
-    if (!nextIso) {
-      $("countdown").textContent = "—";
-      $("nextCycleAt").textContent = "—";
-      return;
+    // If the data branch has not been refreshed yet (stale CDN, first
+    // boot, unusually long cron gap) the server-side ``next_cycle_utc``
+    // may be in the past.  In that case fall back to the canonical 5h
+    // grid so the timer never gets stuck at 00:00:00 — that bug is
+    // exactly what the user reported.
+    const now = new Date();
+    let target = nextIso ? new Date(nextIso).getTime() : NaN;
+    if (!Number.isFinite(target) || target <= now.getTime() + 5_000) {
+      const fallback = nextCycleIsoFromGrid(now);
+      target = new Date(fallback).getTime();
+      nextIso = fallback;
+      console.info("[countdown] server next_cycle_utc stale — using grid fallback", fallback);
     }
-    const target = new Date(nextIso).getTime();
     $("nextCycleAt").textContent = fmtTimeMSk(nextIso);
 
     const tick = () => {
@@ -478,9 +518,11 @@
         `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
       if (diff <= 0) {
         clearInterval(state.countdownTimer);
-        // After the cycle boundary the cron is still warming up; give
-        // the workflow ~90 s before we refetch.
-        setTimeout(reloadAll, 90000);
+        // The cycle boundary just passed — kick off a refetch and then
+        // immediately restart the countdown using the next grid slot,
+        // so the timer never lingers at zero waiting for the cron.
+        reloadAll();
+        startCountdown(nextCycleIsoFromGrid(new Date()));
       }
     };
     tick();
