@@ -16,10 +16,11 @@ name: Refresh static data
 
 on:
   schedule:
-    # GitHub Actions' minimum cron granularity is 5 minutes. 15 mins
-    # is the sweet spot for forex-day-trading dashboards — Yahoo
-    # Finance quotes barely move inside a single minute anyway.
-    - cron: "*/15 * * * *"
+    # User asked for fresh data every 5 minutes — that's the smallest
+    # cron granularity GitHub Actions allows.  Yahoo Finance quotes are
+    # delayed ~1–2 minutes anyway, so 5 minutes is the right balance
+    # between freshness and rate-limit friendliness.
+    - cron: "*/5 * * * *"
   # Self-trigger on any push that changes the pipeline — guarantees a
   # fresh data snapshot gets published within minutes of a deploy, even
   # before the first cron tick. (It's also the only way to seed the
@@ -109,11 +110,20 @@ jobs:
             git rm -rf . >/dev/null 2>&1 || true
           fi
 
-          # Wipe any leftovers from a previous state and copy in the
-          # fresh snapshot.  Kept tiny to keep raw.githubusercontent
-          # lookups fast.
-          rm -rf data
-          mkdir -p data
+          # Overlay the freshly built snapshot on top of whatever is
+          # on origin/data.  We deliberately *don't* `rm -rf data` here
+          # because the AI brain workflow (`ai_brain.yml`) keeps its
+          # own files (`top1.json`, `brain_full.json`) in the same
+          # directory and we must not clobber them between cron ticks.
+          # Stale per-pair bar files are pruned a few lines below
+          # instead so the branch still stays slim.
+          mkdir -p data data/bars
+          # 1. Remove only the files this workflow owns (signals/cycle/
+          #    orderbooks/health + bars/*) so old, removed pairs don't
+          #    linger on the branch.
+          rm -f data/signals.json data/cycle.json data/orderbooks.json data/health.json
+          rm -rf data/bars
+          # 2. Drop the fresh snapshot in.
           cp -r /tmp/fresh-data/. data/
 
           # Humans opening the branch on GitHub should see something.

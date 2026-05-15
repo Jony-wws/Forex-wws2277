@@ -27,6 +27,12 @@ env/
 state/
 venv/
 
+# Data branch JSON snapshots — produced by GitHub Actions cron jobs,
+# never live on main.  Keeping them out of main avoids the static
+# Pages deploy ballooning and accidental clobbers between cron ticks.
+data/
+
+
 
 # Frontend (React SPA in /web)
 web/node_modules/
