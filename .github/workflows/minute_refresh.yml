@@ -23,8 +23,23 @@ on:
   push:
     branches: [main]
     paths:
+      # Any change to the brain pipeline that influences select_top1()
+      # should immediately seed a fresh `data/top1.json` rather than
+      # wait ≤ 5 min for the cron to fire (GitHub's */5 cron is often
+      # delayed or skipped after recent pushes).  edge_check.py gates
+      # publishes — changes here can flip a pair from null to live, so
+      # it belongs in the trigger set.  smc.py / wyckoff.py / macro.py /
+      # news_brain.py / big_players.py all feed the seven brain layers
+      # directly; safety.py governs the 5h projection veto.
       - "scripts/ai_brain.py"
       - "app/brain.py"
+      - "app/edge_check.py"
+      - "app/safety.py"
+      - "app/smc.py"
+      - "app/wyckoff.py"
+      - "app/macro.py"
+      - "app/news_brain.py"
+      - "app/big_players.py"
       - ".github/workflows/minute_refresh.yml"
 
 permissions:
