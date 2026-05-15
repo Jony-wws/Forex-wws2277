@@ -1,0 +1,141 @@
+name: AI brain (Top-1 cycle)
+
+# Runs the multi-layer AI brain that selects the Top-1 currency pair.
+# - Full brain (28-pair breakdown) every 5 hours, aligned to UTC+5
+#   trading cycles (00:00, 05:00, 10:00, 15:00, 20:00 UTC+5).
+# - "Quick" refresh every 5 minutes (still real data, just skips the
+#   per-pair breakdown JSON to keep the data branch small).
+#
+# Output: data/top1.json + data/brain_full.json on the `data` branch.
+
+on:
+  schedule:
+    # 5-hour cycle boundaries (UTC).
+    - cron: "0 19,0,5,10,15 * * *"
+    # 5-minute quick refresh.  GitHub's minimum cron granularity.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode (full|quick)"
+        required: false
+        default: "full"
+  push:
+    branches: [main]
+    paths:
+      - "app/brain.py"
+      - "app/smc.py"
+      - "app/wyckoff.py"
+      - "app/volume_profile.py"
+      - "app/macro.py"
+      - "app/news_brain.py"
+      - "scripts/ai_brain.py"
+      - ".github/workflows/ai_brain.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ai-brain-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  brain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Decide run mode
+        id: mode
+        run: |
+          # 5-hour cron uses "full"; everything else (5-min cron, push,
+          # manual workflow_dispatch) defaults to quick mode unless
+          # explicitly overridden.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode || 'full' }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            CRON="${{ github.event.schedule }}"
+            if [ "$CRON" = "*/5 * * * *" ]; then
+              echo "mode=quick" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=full" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run AI brain (${{ steps.mode.outputs.mode }})
+        env:
+          YFINANCE_TIMEOUT: "20"
+        run: |
+          if [ "${{ steps.mode.outputs.mode }}" = "quick" ]; then
+            python scripts/ai_brain.py --quick
+          else
+            python scripts/ai_brain.py
+          fi
+
+      - name: Publish to the `data` branch (retry on conflict)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -f data/top1.json ]; then
+            echo "::error::data/top1.json missing — brain produced no output"
+            exit 1
+          fi
+
+          mkdir -p /tmp/ai-brain-out
+          cp data/top1.json /tmp/ai-brain-out/
+          [ -f data/brain_full.json ] && cp data/brain_full.json /tmp/ai-brain-out/
+
+          git config user.name  "forex-data-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          push() {
+            if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+              git fetch origin data --depth=1
+              git checkout -B data origin/data
+            else
+              git checkout --orphan data
+              git rm -rf . >/dev/null 2>&1 || true
+            fi
+
+            mkdir -p data
+            cp /tmp/ai-brain-out/top1.json data/top1.json
+            [ -f /tmp/ai-brain-out/brain_full.json ] \
+              && cp /tmp/ai-brain-out/brain_full.json data/brain_full.json
+
+            git add data/top1.json
+            [ -f data/brain_full.json ] && git add data/brain_full.json
+            if git diff --cached --quiet; then
+              echo "No top1.json delta — nothing to publish."
+              return 0
+            fi
+            git commit -m "brain: top1 refresh $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push origin data
+          }
+
+          # refresh_data.yml may push to the same branch on the same
+          # minute — retry up to 3× with a rebase-style refetch so we
+          # never lose a forecast to a race.
+          for attempt in 1 2 3; do
+            if push; then
+              break
+            else
+              echo "push attempt $attempt failed, retrying after 6s…"
+              sleep 6
+            fi
+          done
