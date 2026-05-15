@@ -264,6 +264,82 @@ a { color: var(--primary-2); text-decoration: none; }
 }
 .metric-value.buy { color: var(--buy); }
 .metric-value.sell { color: var(--sell); }
+.metric-value.in-profit { color: var(--buy); }
+.metric-value.out-of-profit { color: var(--sell); }
+
+/* ─── Binary-option clarifier note ──────────────────────────────── */
+.binary-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 4px 16px 12px;
+  padding: 10px 12px;
+  font-size: 12.5px; line-height: 1.45;
+  color: var(--soft);
+  background: rgba(255, 184, 77, 0.10);
+  border: 1px solid rgba(255, 184, 77, 0.30);
+  border-radius: 10px;
+}
+.binary-note strong { color: var(--text); }
+.binary-note__icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+
+/* ─── Live-forecast detail strip ────────────────────────────────── */
+.live-detail {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  padding: 10px 16px 14px;
+  font-size: 12px;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+.live-detail__label {
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+/* ─── Last-updated banner ───────────────────────────────────────── */
+.updated-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+  margin: 10px 12px 12px;
+  padding: 9px 14px;
+  background: linear-gradient(135deg, rgba(76,175,80,0.18), rgba(76,175,80,0.04));
+  border: 1px solid rgba(76,175,80,0.32);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.updated-banner__left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.updated-banner__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--buy);
+  box-shadow: 0 0 10px rgba(76,175,80,0.6);
+  animation: updatedPulse 2s ease-in-out infinite;
+}
+@keyframes updatedPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.updated-banner__title {
+  text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.updated-banner__time {
+  font-family: "SF Mono", monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.updated-banner__ago { color: var(--soft); font-size: 12px; }
+.updated-banner__hint { color: var(--muted); font-size: 11.5px; }
+.updated-banner.stale {
+  background: linear-gradient(135deg, rgba(255,184,77,0.18), rgba(255,184,77,0.04));
+  border-color: rgba(255,184,77,0.40);
+}
+.updated-banner.stale .updated-banner__dot { background: #ffb84d; box-shadow: 0 0 10px rgba(255,184,77,0.6); }
+.updated-banner.offline {
+  background: linear-gradient(135deg, rgba(229,57,53,0.20), rgba(229,57,53,0.04));
+  border-color: rgba(229,57,53,0.40);
+}
+.updated-banner.offline .updated-banner__dot { background: var(--sell); box-shadow: 0 0 10px rgba(229,57,53,0.6); }
 
 /* ─── Countdown ─────────────────────────────────────────────────── */
 .countdown {
@@ -473,6 +549,22 @@ a { color: var(--primary-2); text-decoration: none; }
     </button>
   </header>
 
+  <!-- ─── Last-updated banner ──────────────────────────────────────
+       Pinned right under the header so the user always sees the
+       data-freshness timestamp.  Updates every minute when the brain
+       publishes a new top1.json. -->
+  <div class="updated-banner" id="updatedBanner">
+    <div class="updated-banner__left">
+      <span class="updated-banner__dot"></span>
+      <span class="updated-banner__title">Обновлено</span>
+      <span class="updated-banner__time" id="updatedTime">—</span>
+      <span class="updated-banner__ago" id="updatedAgo"></span>
+    </div>
+    <div class="updated-banner__right">
+      <span class="updated-banner__hint">UTC+5 · анализ каждую минуту</span>
+    </div>
+  </div>
+
   <!-- ─── Tabs ────────────────────────────────────────────────────── -->
   <nav class="tabs" id="topTabs">
     <button class="tab-btn active" data-tab="home">Главная</button>
@@ -480,7 +572,6 @@ a { color: var(--primary-2); text-decoration: none; }
     <button class="tab-btn" data-tab="analysis">Анализ</button>
     <button class="tab-btn" data-tab="news">Новости</button>
     <button class="tab-btn" data-tab="strength">Сила</button>
-    <button class="tab-btn" data-tab="journal">Журнал</button>
   </nav>
 
   <!-- ─── Home (Top-1) ────────────────────────────────────────────── -->
@@ -503,6 +594,19 @@ a { color: var(--primary-2); text-decoration: none; }
         <span id="confText">—</span>
       </div>
 
+      <!-- Binary-option clarifier: SL/TP have no meaning for these
+           5h binary trades — only direction at the cycle close.  We
+           show this explicitly so the user can't confuse the metrics
+           below with a classic stop-loss / take-profit pair. -->
+      <div class="binary-note">
+        <span class="binary-note__icon">⏱</span>
+        <span>
+          <strong>Бинарный опцион · 5 ч ·</strong>
+          автозакрытие в конце цикла · SL/TP не применяются.
+          Важно только направление в момент экспирации.
+        </span>
+      </div>
+
       <div class="hero-metrics">
         <div class="metric">
           <div class="metric-label">Цена входа</div>
@@ -513,19 +617,32 @@ a { color: var(--primary-2); text-decoration: none; }
           <div class="metric-value" id="mAtr">—</div>
         </div>
         <div class="metric">
-          <div class="metric-label">Stop-Loss</div>
-          <div class="metric-value sell" id="mSl">—</div>
+          <div class="metric-label">Прогноз на экспирации</div>
+          <div class="metric-value" id="mProjClose">—</div>
         </div>
         <div class="metric">
-          <div class="metric-label">Take-Profit</div>
-          <div class="metric-value buy" id="mTp">—</div>
+          <div class="metric-label">Статус прогноза</div>
+          <div class="metric-value" id="mLiveStatus">—</div>
         </div>
+      </div>
+
+      <!-- Binary-option live forecast detail strip — one row of finer
+           numbers (drift per hour, safety margin, horizon in minutes)
+           for users who want to see *why* the status came out that
+           way.  Hidden gracefully when the brain has not yet picked a
+           Top-1 for the current minute. -->
+      <div class="live-detail" id="liveDetail" hidden>
+        <span><span class="live-detail__label">Горизонт:</span> <span id="liveHorizon">—</span> мин</span>
+        <span><span class="live-detail__label">Дрифт/ч:</span> <span id="liveDrift">—</span></span>
+        <span><span class="live-detail__label">Запас:</span> <span id="liveMargin">—</span></span>
       </div>
     </div>
 
+    <!-- Two parallel countdowns for clarity: the binding 5h binary
+         expiry, and the next forecast cycle (same boundary). -->
     <div class="card countdown">
       <div>
-        <div class="countdown-label">До следующего прогноза</div>
+        <div class="countdown-label">До закрытия сделки (экспирация 5 ч)</div>
         <div class="countdown-time" id="countdown">—:—:—</div>
       </div>
       <div style="text-align:right">
@@ -612,13 +729,6 @@ a { color: var(--primary-2); text-decoration: none; }
     </div>
   </section>
 
-  <!-- ─── Journal ─────────────────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-journal">
-    <div class="section-title">История прогнозов</div>
-    <div class="card" id="journalList">
-      <div class="empty">История появится после первого 5-часового цикла.</div>
-    </div>
-  </section>
 </div>
 
 <!-- ─── Bottom nav (Android Chrome friendly) ────────────────────── -->

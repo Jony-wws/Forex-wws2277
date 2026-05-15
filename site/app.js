@@ -47,6 +47,8 @@
     heroChartWidget: null,
     analysisChartWidget: null,
     lastTop1Fetch: 0,
+    lastGeneratedIso: null,
+    updatedAgoTimer: null,
   };
 
   // ─── Helpers ─────────────────────────────────────────────────────────
@@ -122,13 +124,55 @@
   $$(".tabs .tab-btn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $$(".bottom-nav .nav-item").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
 
-  // ─── Live status pill ────────────────────────────────────────────────
+  // ─── Live status pill + last-updated banner ────────────────────────
   function setLive(status, text) {
     const dot = $("liveDot");
     dot.classList.remove("stale", "offline");
     if (status === "stale") dot.classList.add("stale");
     else if (status === "offline") dot.classList.add("offline");
     $("liveText").textContent = text;
+    const banner = $("updatedBanner");
+    if (banner) {
+      banner.classList.remove("stale", "offline");
+      if (status === "stale") banner.classList.add("stale");
+      else if (status === "offline") banner.classList.add("offline");
+    }
+  }
+
+  // Render the prominent "Обновлено HH:MM:SS UTC+5" banner.  We store
+  // the latest generated_at_utc and refresh the human-readable
+  // "X seconds ago" suffix every second via ``tickUpdatedAgo`` so the
+  // user always sees how fresh the page is.
+  function setUpdatedBanner(iso) {
+    state.lastGeneratedIso = iso || null;
+    const time = $("updatedTime");
+    if (time) time.textContent = iso ? fmtTimeMSkSeconds(iso) : "—";
+    tickUpdatedAgo();
+  }
+
+  function fmtTimeMSkSeconds(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const local = new Date(d.getTime() + TZ_OFFSET);
+    return local.toISOString().slice(11, 19); // HH:MM:SS
+  }
+
+  function tickUpdatedAgo() {
+    const ago = $("updatedAgo");
+    if (!ago) return;
+    if (!state.lastGeneratedIso) { ago.textContent = ""; return; }
+    const sec = Math.max(0, Math.floor((Date.now() - new Date(state.lastGeneratedIso).getTime()) / 1000));
+    if (sec < 60) ago.textContent = `· ${sec} с назад`;
+    else if (sec < 3600) ago.textContent = `· ${Math.floor(sec / 60)} мин назад`;
+    else ago.textContent = `· ${Math.floor(sec / 3600)} ч назад`;
+  }
+
+  function formatSigned(v, digits) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    const s = n.toFixed(digits == null ? 5 : digits);
+    return n > 0 ? `+${s}` : s;
   }
 
   // ─── Top-1 hero card ─────────────────────────────────────────────────
@@ -142,12 +186,21 @@
       $("topTier").textContent = "Все 28 пар отфильтрованы по veto-правилам";
       $("confFill").style.width = "0%";
       $("confText").textContent = "—";
-      ["mEntry","mAtr","mSl","mTp"].forEach(id => $(id).textContent = "—");
+      ["mEntry","mAtr","mProjClose","mLiveStatus"].forEach(id => {
+        const el = $(id);
+        if (el) {
+          el.textContent = "—";
+          el.classList.remove("in-profit", "out-of-profit", "buy", "sell");
+        }
+      });
+      const detail = $("liveDetail");
+      if (detail) detail.hidden = true;
       $("aiLayers").innerHTML = `
         <div class="empty">
           Защита для реальной торговли: если ни одна пара не прошла все фильтры
-          (multi-TF, ADX ≥ 20, отсутствие новостей в ближайшие 2ч),
-          AI не показывает сигнал и ждёт следующего цикла. <br/><br/>
+          (multi-TF, ADX ≥ 20, 5h-проекция в плюсе на момент экспирации,
+          Wilson95 lower ≥ 52%, brain ≥ 80%), AI не показывает сигнал
+          и ждёт следующего цикла. <br/><br/>
           <span class="empty-em">Это нормально — не каждый цикл даёт качество.</span>
         </div>`;
       return;
@@ -179,11 +232,41 @@
     $("confFill").style.width = `${conf}%`;
     $("confText").textContent = `${conf}%`;
 
+    // Binary-option metrics: entry / ATR / projected close at expiry /
+    // status (В ПЛЮСЕ or НЕ В ПЛЮСЕ).  SL/TP are intentionally
+    // dropped because the system trades 5h binaries with no SL/TP —
+    // only direction at the cycle close matters.
     const lv = top.levels || {};
-    $("mEntry").textContent = lv.entry != null ? lv.entry : "—";
-    $("mAtr").textContent = lv.atr_h1 != null ? lv.atr_h1 : "—";
-    $("mSl").textContent = lv.stop_loss != null ? lv.stop_loss : "—";
-    $("mTp").textContent = lv.take_profit != null ? lv.take_profit : "—";
+    const live = top.live_forecast || (top1Payload && top1Payload.live_forecast) || {};
+    $("mEntry").textContent = (live.entry != null ? live.entry : (lv.entry != null ? lv.entry : "—"));
+    $("mAtr").textContent   = (live.atr_h1 != null ? live.atr_h1 : (lv.atr_h1 != null ? lv.atr_h1 : "—"));
+
+    const projClose = live.projected_close;
+    $("mProjClose").textContent = projClose != null ? projClose : "—";
+
+    const statusEl = $("mLiveStatus");
+    statusEl.classList.remove("in-profit", "out-of-profit", "buy", "sell");
+    if (live.stays_in_profit_at_expiry === true) {
+      statusEl.textContent = "В ПЛЮСЕ";
+      statusEl.classList.add("in-profit");
+    } else if (live.stays_in_profit_at_expiry === false) {
+      statusEl.textContent = "НЕ В ПЛЮСЕ";
+      statusEl.classList.add("out-of-profit");
+    } else {
+      statusEl.textContent = "—";
+    }
+
+    const detail = $("liveDetail");
+    if (detail) {
+      if (live && (live.horizon_minutes != null || live.drift_per_hour != null)) {
+        $("liveHorizon").textContent = live.horizon_minutes != null ? Math.round(live.horizon_minutes) : "—";
+        $("liveDrift").textContent   = live.drift_per_hour != null ? formatSigned(live.drift_per_hour, 5) : "—";
+        $("liveMargin").textContent  = live.safety_margin != null ? Number(live.safety_margin).toFixed(5) : "—";
+        detail.hidden = false;
+      } else {
+        detail.hidden = true;
+      }
+    }
 
     renderLayers($("aiLayers"), top.layers);
     mountHeroChart(top.pair);
@@ -472,26 +555,7 @@
     $("strengthList").innerHTML = rows;
   }
 
-  // ─── Journal tab ─────────────────────────────────────────────────────
-  function renderJournal(top1Payload) {
-    if (!top1Payload || !top1Payload.top5 || top1Payload.top5.length === 0) {
-      $("journalList").innerHTML = `<div class="empty">История появится после первого цикла.</div>`;
-      return;
-    }
-    const rows = top1Payload.top5.map((t, idx) => `
-      <div class="news-item">
-        <div class="news-source">#${idx + 1} · ${t.side || "—"}</div>
-        <div class="news-title">${t.pair} — ${escapeHtml(t.name_ru || "")} · ${t.confidence || 0}%</div>
-        <div class="news-tags">
-          <span class="news-tag">multi-TF ${t.layers && t.layers.technical && t.layers.technical.multi_tf_aligned ? "✓" : "×"}</span>
-          <span class="news-tag">ADX ${(t.layers && t.layers.technical && t.layers.technical.adx_h1 || 0).toFixed(0)}</span>
-          <span class="news-tag">persist ${(t.layers && t.layers.technical && t.layers.technical.persistence_5h || 0).toFixed(0)}%</span>
-        </div>
-      </div>`).join("");
-    $("journalList").innerHTML = rows;
-  }
-
-  // ─── Countdown timer ─────────────────────────────────────────────────
+    // ─── Countdown timer ─────────────────────────────────────────────────
   function startCountdown(nextIso) {
     if (state.countdownTimer) clearInterval(state.countdownTimer);
     // If the data branch has not been refreshed yet (stale CDN, first
@@ -537,8 +601,13 @@
       state.lastTop1Fetch = Date.now();
       renderHero(top1);
       renderStrength(top1);
-      renderJournal(top1);
-      startCountdown(top1.next_cycle_utc);
+      // Binary expiry countdown: prefer cycle_close_utc (the binding
+      // expiry boundary the brain just used to project) and fall back
+      // to next_cycle_utc for older payloads.
+      startCountdown(top1.cycle_close_utc || top1.next_cycle_utc);
+      // Update the prominent "Обновлено HH:MM:SS" banner under the
+      // header.  The pill in the header keeps the legacy phrasing.
+      setUpdatedBanner(top1.generated_at_utc);
       setLive("live", `Обновлено: ${fmtTimeMSk(top1.generated_at_utc)} (UTC+5)`);
     } catch (e) {
       console.warn("top1.json fetch failed", e);
@@ -629,6 +698,10 @@
     reloadAll();
     setInterval(reloadTop1, REFRESH_MS);
     setInterval(reloadSignals, SIGNALS_REFRESH_MS);
+    // Tick the "X seconds ago" suffix on the last-updated banner every
+    // second so the freshness indicator stays honest between minute
+    // refreshes.
+    state.updatedAgoTimer = setInterval(tickUpdatedAgo, 1000);
   }
 
   if (document.readyState === "loading") {

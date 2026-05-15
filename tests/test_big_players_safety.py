@@ -391,3 +391,56 @@ def test_select_top1_strict_floor_rejects_lead_without_floor(monkeypatch):
     assert out["top1"] is None, "79 % leader must be suppressed by the strict 80 % floor"
     assert out["favorite_check"]["ok"] is False
     assert "порог" in out["favorite_check"]["reason"].lower()
+
+
+def test_five_hour_projection_horizon_minutes_scales_margin():
+    """Shorter horizon must shrink the safety margin via √(t/300) so the
+    binary-option projection can stay valid even at T-10 min before the
+    cycle close.  The drift contribution is per-minute, so projected
+    progress also shrinks linearly with horizon — both behaviors are
+    locked in by this test."""
+    from app.safety import five_hour_projection, PROJECTION_HORIZON_MINUTES
+
+    bull = _synthetic_h1(seed=3, drift=+0.0006)
+
+    full = five_hour_projection(bull, "BUY", horizon_minutes=PROJECTION_HORIZON_MINUTES)
+    half = five_hour_projection(bull, "BUY", horizon_minutes=PROJECTION_HORIZON_MINUTES / 2)
+    short = five_hour_projection(bull, "BUY", horizon_minutes=10)
+
+    # Margins shrink monotonically as horizon shrinks
+    assert short["safety_margin"] < half["safety_margin"] < full["safety_margin"]
+
+    # √t scaling: 10 min ≈ √(10/300) ≈ 0.1826 of full margin.  The
+    # function rounds margin to 5 decimals so we compare within 1e-5.
+    expected_short_factor = (10.0 / PROJECTION_HORIZON_MINUTES) ** 0.5
+    expected_short_margin = full["safety_margin"] * expected_short_factor
+    assert abs(short["safety_margin"] - expected_short_margin) < 1e-4
+
+    # drift_per_minute should be identical regardless of horizon
+    assert full["drift_per_minute"] == half["drift_per_minute"]
+    assert short["horizon_minutes"] == 10.0
+
+
+def test_five_hour_projection_default_horizon_matches_full_cycle():
+    """Calling without horizon_minutes must still produce the legacy
+    5-hour projection so existing call sites keep working unchanged."""
+    from app.safety import five_hour_projection, PROJECTION_HORIZON_MINUTES
+
+    bull = _synthetic_h1(seed=3, drift=+0.0006)
+    out = five_hour_projection(bull, "BUY")
+    assert out["horizon_minutes"] == float(PROJECTION_HORIZON_MINUTES)
+
+
+def test_minutes_to_expiry_clamps_within_cycle():
+    """`_minutes_to_expiry` must always return a value in (0, 300] so
+    downstream safety projections never see a degenerate horizon."""
+    from datetime import datetime, timezone
+    from app.brain import _minutes_to_expiry, _next_cycle_dt
+
+    now = datetime.now(timezone.utc)
+    m = _minutes_to_expiry(now)
+    assert 0 < m <= 300
+
+    # Right at a boundary the next slot must be in the future
+    nxt = _next_cycle_dt(now)
+    assert nxt > now

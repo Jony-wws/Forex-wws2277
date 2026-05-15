@@ -46,6 +46,7 @@ from .macro import (
 from .news_brain import next_high_impact_events, political_risk_scores
 from .prices import fetch_bars, get_current_price
 from .safety import (
+    PROJECTION_HORIZON_MINUTES as PROJECTION_HORIZON_MINUTES_DEFAULT,
     five_hour_projection,
     m5_momentum_aligned,
     reversal_risk_h1,
@@ -244,18 +245,31 @@ def _senior_alignment_check(pair: str, side: Optional[str]) -> dict:
     }
 
 
-def _safety_layer(pair: str, side: Optional[str]) -> dict:
-    """Reversal-risk check + 5-hour projection (last-moment safety).
+def _safety_layer(
+    pair: str,
+    side: Optional[str],
+    *,
+    horizon_minutes: Optional[float] = None,
+) -> dict:
+    """Reversal-risk check + binding-cycle expiry projection.
 
-    The user explicitly asked for the system to know the trade will be
-    in profit at expiry — not just at entry.  We answer with two
-    quantitative checks on H1 bars:
+    The system trades **5h binary options** — there is no SL/TP, only
+    the direction at the cycle close matters.  This layer answers two
+    quantitative questions on H1 bars:
 
     * ``reversal``     — last few bars show a reversal pattern
-    * ``projection``   — projected close in 5 H1 bars stays in profit
+    * ``projection``   — projected price at the cycle close (in
+      ``horizon_minutes`` minutes) is still in profit by a margin that
+      scales with √t
 
     Either one failing sets ``passes=False`` so ``_veto_check_full``
     can flip the pair to vetoed before it competes for Top-1.
+
+    Passing ``horizon_minutes`` overrides the default 5-hour horizon —
+    the minute pulse pipes in the *real* time remaining to the next 5h
+    cycle boundary so that 10 minutes before expiry we ask "will the
+    trade still be in profit in 10 minutes?" rather than "… in another
+    5 hours?".
     """
     if side not in ("BUY", "SELL"):
         return {
@@ -268,7 +282,7 @@ def _safety_layer(pair: str, side: Optional[str]) -> dict:
         }
     bars_h1 = fetch_bars(pair, "1h", "1mo")
     rev = reversal_risk_h1(bars_h1, side)
-    proj = five_hour_projection(bars_h1, side)
+    proj = five_hour_projection(bars_h1, side, horizon_minutes=horizon_minutes)
     return {
         "passes": (not rev["reversal"]) and proj["passes"],
         "reversal": rev,
@@ -335,11 +349,12 @@ def _atr_stop_take(pair: str, side: str) -> dict:
     }
 
 
-def _next_cycle_iso(now: datetime | None = None) -> str:
-    """Return the next 5-hour cycle boundary in UTC, aligned to UTC+5 5h grid.
+def _next_cycle_dt(now: datetime | None = None) -> datetime:
+    """Return the next 5-hour cycle boundary as a UTC ``datetime``.
 
     Cycles fire at 00:00, 05:00, 10:00, 15:00, 20:00 UTC+5 — same as
-    cycle_5h.yml.  We return the *next* such boundary strictly after now.
+    cycle_5h.yml.  We return the *next* such boundary strictly after
+    ``now``.
     """
     if now is None:
         now = datetime.now(timezone.utc)
@@ -352,7 +367,25 @@ def _next_cycle_iso(now: datetime | None = None) -> str:
         if cand <= now:
             cand = cand.replace(day=cand.day + 1)
         candidates.append(cand)
-    return min(candidates).isoformat()
+    return min(candidates)
+
+
+def _next_cycle_iso(now: datetime | None = None) -> str:
+    """Convenience wrapper: ISO-8601 string for the next cycle boundary."""
+    return _next_cycle_dt(now).isoformat()
+
+
+def _minutes_to_expiry(now: datetime | None = None) -> float:
+    """Minutes remaining until the next 5h cycle close.
+
+    Clamped to ``[1, 300]`` so projections never see a zero or negative
+    horizon (which would blow up the per-minute drift maths) and never
+    exceed the canonical 5-hour binary-option window.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    delta = (_next_cycle_dt(now) - now).total_seconds() / 60.0
+    return max(1.0, min(float(PROJECTION_HORIZON_MINUTES_DEFAULT), delta))
 
 
 def evaluate_pair(
@@ -363,6 +396,8 @@ def evaluate_pair(
     political: dict[str, int],
     news_minutes: dict[str, int],
     big_player_currency_scores: Optional[dict[str, float]] = None,
+    *,
+    horizon_minutes: Optional[float] = None,
 ) -> dict:
     """Score one pair across all seven layers and return a transparent record."""
     ta = analyze_pair(pair)
@@ -408,7 +443,7 @@ def evaluate_pair(
     )
 
     senior = _senior_alignment_check(pair, side)
-    safety = _safety_layer(pair, side)
+    safety = _safety_layer(pair, side, horizon_minutes=horizon_minutes)
 
     # Promote senior MTF / safety failures into the veto field so the
     # rest of the pipeline (filtering candidates, picking Top-1) sees a
@@ -421,7 +456,7 @@ def evaluate_pair(
         elif safety["reversal"]["reversal"]:
             veto = safety["reversal"]["reason"]
         elif not safety["projection"]["passes"]:
-            veto = f"5h-проекция: последний момент не в плюсе — {safety['projection']['reason']}"
+            veto = f"Экспирация не в плюсе — {safety['projection']['reason']}"
 
     composite_raw = (
         WEIGHTS["technical"] * abs(tech_norm)
@@ -473,6 +508,14 @@ def select_top1(now: datetime | None = None) -> dict:
     if now is None:
         now = datetime.now(timezone.utc)
 
+    # Time remaining to the next 5h cycle boundary — piped into every
+    # pair's safety projection so the brain answers "will the trade be
+    # in profit *at the binding cycle close*" rather than "… in five
+    # full hours from now".  This is what makes the system honest at
+    # T-10 min: the projection horizon shrinks with the timer.
+    minutes_to_expiry = _minutes_to_expiry(now)
+    next_cycle_dt = _next_cycle_dt(now)
+
     macro_raw = fetch_macro_snapshot()
     currency_scores = currency_strength_from_macro(macro_raw)
     sentiment = _sentiment_score(macro_raw)
@@ -497,6 +540,7 @@ def select_top1(now: datetime | None = None) -> dict:
                 political,
                 news_minutes,
                 big_player_currency_scores=big_player_currency,
+                horizon_minutes=minutes_to_expiry,
             )
         except Exception as e:
             log.exception(f"evaluate_pair failed {pair}: {e}")
@@ -574,9 +618,39 @@ def select_top1(now: datetime | None = None) -> dict:
             )
             edge_verdict = blocked_verdict
 
+    # Build the binary-option live forecast block.  For the published
+    # Top-1 (when it exists) we surface the per-minute drift, the
+    # projected price *at the binding cycle close*, and a plain-language
+    # status (В ПЛЮСЕ / НЕ В ПЛЮСЕ).  This is what the UI shows
+    # the user every minute; the same block is reused by the Telegram
+    # narrative.
+    live_forecast: Optional[dict] = None
+    if top1 is not None:
+        safety = top1.get("layers", {}).get("safety_5h") or {}
+        proj = safety.get("projection") or {}
+        stays = bool(proj.get("passes"))
+        live_forecast = {
+            "binary_option_mode": True,
+            "horizon_minutes": proj.get("horizon_minutes", minutes_to_expiry),
+            "entry": proj.get("entry"),
+            "projected_close": proj.get("projected_close"),
+            "drift_per_hour": proj.get("drift_per_bar"),
+            "drift_per_minute": proj.get("drift_per_minute"),
+            "atr_h1": proj.get("atr"),
+            "safety_margin": proj.get("safety_margin"),
+            "stays_in_profit_at_expiry": stays,
+            "status_ru": "В ПЛЮСЕ" if stays else "НЕ В ПЛЮСЕ",
+            "reason": proj.get("reason"),
+        }
+        top1["live_forecast"] = live_forecast
+
     return {
         "generated_at_utc": now.isoformat(),
-        "next_cycle_utc": _next_cycle_iso(now),
+        "next_cycle_utc": next_cycle_dt.isoformat(),
+        "cycle_close_utc": next_cycle_dt.isoformat(),
+        "minutes_to_expiry": round(minutes_to_expiry, 2),
+        "binary_option_mode": True,
+        "binary_option_horizon_minutes": int(PROJECTION_HORIZON_MINUTES_DEFAULT),
         "macro": {
             "tickers": macro_raw,
             "currency_strength": currency_scores,
@@ -596,5 +670,6 @@ def select_top1(now: datetime | None = None) -> dict:
         },
         "top1": top1,
         "top5": candidates[:5],
+        "live_forecast": live_forecast,
         "all_evals": all_evals,
     }
