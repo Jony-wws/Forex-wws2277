@@ -36,6 +36,7 @@
 """
 from __future__ import annotations
 
+import html as _html
 import io
 import json
 import mimetypes
@@ -188,6 +189,16 @@ def generate_ai_analysis(prompt: str) -> tuple[str, str]:
 
 
 # ── Prompt builder ─────────────────────────────────────────────────────
+
+
+def _esc(s) -> str:
+    """HTML-escape a value for safe insertion into Telegram parse_mode=HTML.
+
+    Use this for any payload-sourced or LLM-generated text that is interpolated
+    into a Telegram message — otherwise characters like '<' or '>' will be
+    parsed as malformed HTML tags and Telegram will reject the message.
+    """
+    return _html.escape("" if s is None else str(s), quote=False)
 
 
 def _fmt_price(p) -> str:
@@ -357,7 +368,7 @@ def _banner(window: dict) -> str:
                 f"(conf {window['conf_pct']:.0f}%, floor {window['floor']:.0f}%)")
     reasons = "; ".join(window["reasons"]) if window["reasons"] else "фильтр не пройден"
     return ("⛔ <b>ВХОД НЕ РЕКОМЕНДОВАН</b> · мониторинг текущего 5h-цикла\n"
-            f"   причины: {reasons}")
+            f"   причины: {_esc(reasons)}")
 
 
 def _timing_lines(window: dict) -> list[str]:
@@ -655,7 +666,7 @@ def _execution_block(payload: dict, pair: str | None) -> list[str]:
         adx_val = None
     adx_pass = adx_val is not None and adx_val >= 25
     adx_str = (f"{adx_val:.1f}" if adx_val is not None else "—")
-    adx_lbl = "≥25 ✓" if adx_pass else "<25 ✗ (слабый тренд)"
+    adx_lbl = "≥25 ✓" if adx_pass else "&lt;25 ✗ (слабый тренд)"
     out.append(f"  • ADX H1: {adx_str} ({adx_lbl})")
 
     mtf_lbl = "D1+H4+H1+M15 ✓" if mtf else "не совпадают ✗"
@@ -1220,18 +1231,22 @@ def build_telegram_text(payload: dict, analysis: str, model_label: str) -> str:
         f"{_banner(window)}\n"
         f"🤖 <b>ТОП-1 AI-АНАЛИЗ</b> (бинарный опцион, 5 ч)\n"
         f"{timing_block}\n"
-        f"Пара: <b>{pair}</b> ({name_ru})\n"
-        f"Сигнал: <b>{_side_ru(side)}</b> · "
+        f"Пара: <b>{_esc(pair)}</b> ({_esc(name_ru)})\n"
+        f"Сигнал: <b>{_esc(_side_ru(side))}</b> · "
         f"Уверенность: <b>{_fmt_pct(conf)}</b> · "
-        f"Tier: <b>{tier}</b>\n"
-        f"Gate ok: {fav.get('ok')} · floor: {fav.get('confidence_floor')}%\n"
+        f"Tier: <b>{_esc(tier)}</b>\n"
+        f"Gate ok: {_esc(fav.get('ok'))} · floor: {_esc(fav.get('confidence_floor'))}%\n"
         f"\n"
     )
 
-    footer = f"\n\n— модель: {model_label}"
+    footer = f"\n\n— модель: {_esc(model_label)}"
     # Telegram limit is 4096 chars for sendMessage; reserve room for footer.
     budget = 4000 - len(header) - len(footer)
-    body = analysis.strip()
+    # The LLM body MUST be HTML-escaped — model output often contains literal
+    # '<25', '<' or '>' characters (mirroring ADX/RSI thresholds from the
+    # prompt), which Telegram parse_mode=HTML interprets as malformed tags
+    # and rejects with HTTP 400.
+    body = _esc(analysis.strip())
     if len(body) > budget:
         body = body[:budget - 1] + "…"
     return header + body + footer
