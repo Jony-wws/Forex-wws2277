@@ -452,12 +452,21 @@ def test_minutes_to_expiry_clamps_within_cycle():
 
 
 def test_confidence_scaling_anchors():
-    """Piecewise scaling must hit its calibrated anchors exactly."""
+    """Piecewise scaling must hit its calibrated anchors exactly.
+
+    Anchors recalibrated 2026-05-15 for the rebalanced binary-5h weights
+    (technical=0.30, confluence=0.25) and the new confluence layer:
+
+        composite=0.00 → 0   %
+        composite=0.20 → 50  %
+        composite=0.45 → 80  %   (publication floor)
+        composite=1.00 → 99  %
+    """
     from app.brain import _scale_confidence
 
     assert _scale_confidence(0.0) == 0
-    assert _scale_confidence(0.30) == 50
-    assert _scale_confidence(0.60) == 80
+    assert _scale_confidence(0.20) == 50
+    assert _scale_confidence(0.45) == 80
     assert _scale_confidence(1.00) == 99
     # Negative composite (net disagreement) → 0 %
     assert _scale_confidence(-0.50) == 0

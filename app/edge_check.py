@@ -91,6 +91,24 @@ MIN_TRADES_PER_WINDOW = 40
 # have collapsed below the lifetime-floor over its entire history).
 LIFETIME_LOWER_FLOOR = 0.51
 
+# Premium edge floor — used when ``compute_edge(..., mode="premium")``
+# is called.  Lifts the primary-window Wilson 95 % lower-bound bar
+# from 51 % to 55 %, which corresponds to a 55 % "true" win rate at
+# 95 % statistical confidence.  Combined with the brain's ≥ 80 % gate
+# and the new ``super_confluence`` setup detector this matches the
+# user's product ask — publish only when both "now" (≥80 % brain) and
+# "distance" (Wilson 95 % lower ≥55 %) clear strict thresholds.
+PREMIUM_LOWER_FLOOR = 0.55
+
+# Premium calibrated-confidence target.  The blended (brain + history)
+# calibrated confidence must clear this in premium mode.  The pure
+# brain floor is 80 % and the historical floor in premium mode is
+# 55 % — the 60/40 blend of those is 70 %, so we set the target at 70
+# to stay achievable while still being meaningfully stricter than the
+# default mode.  Raising this above the blend means the gate would
+# never fire even on textbook setups.
+PREMIUM_CALIBRATED_TARGET = 70.0
+
 # Regime / crash guard.  The 30-day Wilson 95 % lower bound — and the
 # lifetime Wilson 95 % lower bound — must each remain above this floor.
 # This catches two failure modes:
@@ -186,6 +204,7 @@ def compute_edge(
     *,
     state_path: Path | None = None,
     history: Optional[dict] = None,
+    mode: str = "standard",
 ) -> dict:
     """Run the full edge-check and return a structured verdict.
 
@@ -203,6 +222,14 @@ def compute_edge(
     history
         Override the loaded ``per_pair`` record.  Used by tests so they
         don't have to touch the filesystem.
+    mode
+        ``"standard"`` (default) keeps the historical 51 % Wilson 95 %
+        lower-bound floor.  ``"premium"`` raises it to 55 % AND requires
+        the calibrated (brain + history) confidence to clear
+        ``PREMIUM_CALIBRATED_TARGET``.  Premium mode is what the brain
+        uses when ``super_confluence`` fires so the publication gate
+        is genuinely "≥80 % ‘сейчас’ + ≥55 % ‘на дистанции’".  Calls
+        with an unknown mode fall back to ``"standard"``.
 
     Returns
     -------
@@ -281,7 +308,10 @@ def compute_edge(
     # guaranteed to be non-None here.
     assert primary_window is not None and primary_window_name is not None
 
-    primary_significant = primary_window.lower >= LIFETIME_LOWER_FLOOR
+    primary_floor = (
+        PREMIUM_LOWER_FLOOR if mode == "premium" else LIFETIME_LOWER_FLOOR
+    )
+    primary_significant = primary_window.lower >= primary_floor
 
     # Secondary guard: the 30-day window's Wilson lower bound must clear
     # REGIME_LOWER_FLOOR (skip if too few trades).  Catches recent
@@ -307,11 +337,21 @@ def compute_edge(
     hist_pct = primary_window.lower * 100.0
     calibrated = _W_BRAIN_NOW * brain_confidence + _W_HIST_DIST * hist_pct
 
-    passes = primary_significant and regime_ok and lifetime_ok and ev_positive
+    calibrated_ok = (
+        mode != "premium" or calibrated >= PREMIUM_CALIBRATED_TARGET
+    )
+    passes = (
+        primary_significant
+        and regime_ok
+        and lifetime_ok
+        and ev_positive
+        and calibrated_ok
+    )
 
     if passes:
+        suffix = "" if mode == "standard" else " [PREMIUM]"
         reason = (
-            f"Edge подтверждён: Wilson 95% lower={primary_window.lower * 100:.1f}% "
+            f"Edge подтверждён{suffix}: Wilson 95% lower={primary_window.lower * 100:.1f}% "
             f"на окне {primary_window_name} (n={primary_window.n}), "
             f"EV={ev_at_primary:+.2f}п. на сделку, "
             f"calibrated={calibrated:.1f}%."
@@ -321,7 +361,7 @@ def compute_edge(
         if not primary_significant:
             bits.append(
                 f"{primary_window_name} Wilson lower {primary_window.lower * 100:.1f}% < "
-                f"{LIFETIME_LOWER_FLOOR*100:.0f}% "
+                f"{primary_floor*100:.0f}% "
                 "(статистически не отличается от случайности)"
             )
         if not regime_ok and regime is not None:
@@ -341,6 +381,11 @@ def compute_edge(
                 f"EV {ev_at_primary:+.2f}п. ≤ 0 (отрицательное матожидание "
                 f"на нижней границе WR)"
             )
+        if not calibrated_ok:
+            bits.append(
+                f"calibrated {calibrated:.1f}% < {PREMIUM_CALIBRATED_TARGET:.0f}% "
+                "(премиум-порог не взят)"
+            )
         reason = "Edge не подтверждён: " + "; ".join(bits) + "."
 
     return {
@@ -351,12 +396,15 @@ def compute_edge(
         "windows": windows_serialised,
         "best_wilson": _serialise_wilson(primary_window),
         "primary_window": primary_window_name,
+        "primary_floor_pct": round(primary_floor * 100, 2),
+        "mode": mode,
         "expected_value_pp": round(ev_at_primary, 3),
         "wilson_lower_pct": round(primary_window.lower * 100, 2),
         "lifetime_significant": primary_significant,
         "regime_ok": regime_ok,
         "lifetime_ok": lifetime_ok,
         "ev_positive": ev_positive,
+        "calibrated_ok": calibrated_ok,
     }
 
 

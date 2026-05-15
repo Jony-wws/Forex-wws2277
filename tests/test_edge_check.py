@@ -210,3 +210,79 @@ def test_floors_sensible():
     assert 0.50 <= LIFETIME_LOWER_FLOOR <= 0.60
     assert 0.40 <= REGIME_LOWER_FLOOR <= 0.50
     assert REGIME_LOWER_FLOOR <= LIFETIME_LOWER_FLOOR
+
+
+# ─── Premium mode ──────────────────────────────────────────────────────
+
+
+def test_compute_edge_premium_raises_primary_floor():
+    """In premium mode the primary Wilson lower-bound floor goes from
+    51 % → 55 %.  A pair whose 5d window clears 51 % but not 55 % must
+    pass in standard mode and fail in premium mode."""
+    from app.edge_check import PREMIUM_LOWER_FLOOR
+
+    # 5d sample: 100 trades at 60 % WR → Wilson 95 % lower ≈ 50.3 %.
+    # That clears the standard 51 % bar (barely) but not 55 %.
+    # Use a slightly higher WR so the 5d window clears 51 % cleanly
+    # and still falls short of the 55 % premium bar.
+    history = _hist(
+        wins=300,
+        trades=500,
+        wr_5d=62.0, n5=100,   # Wilson 95 % lower ≈ 52.2 % — passes 51, fails 55
+        wr_30d=60.0, n30=200,
+        avg_win=12.0, avg_loss=10.0,
+    )
+    std_verdict = compute_edge("EURUSD", 85.0, history=history, mode="standard")
+    assert std_verdict["passes"] is True
+    assert std_verdict["primary_floor_pct"] == round(LIFETIME_LOWER_FLOOR * 100, 2)
+
+    premium_verdict = compute_edge("EURUSD", 85.0, history=history, mode="premium")
+    assert premium_verdict["primary_floor_pct"] == round(PREMIUM_LOWER_FLOOR * 100, 2)
+    # 5d Wilson lower is ≈52 %, below the 55 % premium floor.
+    assert premium_verdict["passes"] is False
+    assert "premium" not in premium_verdict["reason"].lower() or "не подтверж" in premium_verdict["reason"].lower()
+
+
+def test_compute_edge_premium_passes_when_both_thresholds_clear():
+    """A genuinely strong pair clears both standard and premium gates."""
+    history = _hist(
+        wins=350,
+        trades=500,
+        wr_5d=78.0, n5=100,   # Wilson 95 % lower ≈ 68.9 % — clears 55 %
+        wr_30d=72.0, n30=200,
+        avg_win=14.0, avg_loss=10.0,
+    )
+    verdict = compute_edge("EURUSD", 90.0, history=history, mode="premium")
+    assert verdict["passes"] is True
+    assert verdict["mode"] == "premium"
+    assert "PREMIUM" in verdict["reason"]
+
+
+def test_compute_edge_standard_mode_unchanged_default():
+    """Default ``mode`` argument is ``\"standard\"`` — back-compat check."""
+    history = _hist(
+        wins=319,
+        trades=450,
+        wr_5d=70.0, n5=80,
+        wr_30d=67.04, n30=179,
+        avg_win=14.8, avg_loss=15.8,
+    )
+    default_verdict = compute_edge("AUDNZD", 85.0, history=history)
+    explicit_std = compute_edge("AUDNZD", 85.0, history=history, mode="standard")
+    assert default_verdict["passes"] == explicit_std["passes"]
+    assert default_verdict["primary_floor_pct"] == explicit_std["primary_floor_pct"]
+
+
+def test_compute_edge_premium_returns_calibrated_ok_flag():
+    """In premium mode the verdict surfaces a ``calibrated_ok`` boolean
+    that downstream UI can render as a green/red tick."""
+    history = _hist(
+        wins=350,
+        trades=500,
+        wr_5d=78.0, n5=100,
+        wr_30d=72.0, n30=200,
+        avg_win=14.0, avg_loss=10.0,
+    )
+    verdict = compute_edge("EURUSD", 90.0, history=history, mode="premium")
+    assert "calibrated_ok" in verdict
+    assert verdict["calibrated_ok"] is True
