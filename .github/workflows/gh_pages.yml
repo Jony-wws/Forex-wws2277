@@ -39,6 +39,20 @@ jobs:
           cp -r site _site
           # Tell Pages to skip Jekyll — we serve raw HTML/CSS/JS.
           touch _site/.nojekyll
+
+          # Cache-busting: stamp the build into the <script src> so a
+          # new deploy always invalidates Android-Chrome's cached app.js.
+          # We use the commit SHA — short, deterministic, and unique per
+          # deploy.  No-op-safe: if the script tag is already stamped it
+          # will simply be re-stamped with the latest SHA.
+          BUILD_STAMP="${GITHUB_SHA::12}"
+          # Match exactly src="./app.js[?v=...]" so we don't rewrite
+          # other unrelated occurrences of the string app.js.
+          sed -i -E "s|src=\"\\./app\\.js(\\?v=[^\"]*)?\"|src=\"./app.js?v=${BUILD_STAMP}\"|g" _site/index.html
+          # Emit a build-info file so the front-end can show the deploy
+          # commit if it wants to (or you can just curl it from prod).
+          printf '{"build_sha":"%s","built_at_utc":"%s"}\n' \
+            "${GITHUB_SHA}" "$(date -u +%FT%TZ)" > _site/build-info.json
           ls -la _site | head
 
       - name: Upload artefact
