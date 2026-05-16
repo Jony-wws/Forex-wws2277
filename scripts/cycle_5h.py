@@ -54,6 +54,7 @@ from backtest_eurusd import (  # noqa: E402
     PREMIUM_MIN_MOVE_PIPS_JPY,
 )
 from backtest_28pairs import fetch_all_tfs  # noqa: E402
+from telegram_progress import TelegramProgress  # noqa: E402
 
 
 # ── CONFIG ─────────────────────────────────────────────────────────────
@@ -1009,17 +1010,23 @@ def compute_24h_aging(current_per_pair: list[dict]) -> list[dict]:
 
 # ── ADAPTIVE SWEEP  (escalates the grid until ≥ MIN_TOP_PAIRS hit WR_TARGET) ─
 def sweep_all_pairs(pairs: list[str], extra_grid: Optional[list[Params]],
-                    cache: dict) -> list[dict]:
+                    cache: dict, progress_cb=None) -> list[dict]:
     out: list[dict] = []
-    for pair in pairs:
+    total = len(pairs)
+    for idx, pair in enumerate(pairs, start=1):
         try:
             best = sweep_pair(pair, extra_grid=extra_grid, cache=cache)
             if "error" in best:
                 print(f"[cycle] skip {pair}: {best['error']}")
-                continue
-            out.append(best)
+            else:
+                out.append(best)
         except Exception as e:
             print(f"[cycle] {pair} failed entirely: {e}")
+        if progress_cb is not None:
+            try:
+                progress_cb(idx, total, pair)
+            except Exception as e:
+                print(f"[cycle] progress callback failed: {e}")
     return out
 
 
@@ -1029,20 +1036,42 @@ def main() -> None:
     cycle_label = now_utc5.strftime("%Y-%m-%d %H:%M UTC+5")
     print(f"[cycle] starting cycle {cycle_label}")
 
+    # ── progress ─ single Telegram message updated through editMessageText.
+    progress = TelegramProgress(title=f"Цикл 5ч · {cycle_label}")
+    progress.start("Подготовка и загрузка данных...")
+
     cache: dict = {}
+
+    # Per-pair tick during the sweep → plays the progress bar between the
+    # "data loaded" (10%) and "pair analysis done" (30%) checkpoints.
+    def _sweep_tick(done: int, total: int, pair: str) -> None:
+        if total <= 0:
+            return
+        pct = 10.0 + (done / total) * 20.0
+        progress.update(pct, f"Анализ пар: {done}/{total} · {pair}")
+
+    # 10% — данные готовы к загрузке, стартуем sweep по всем парам.
+    progress.update(10, "Данные загружены, запуск анализа пар...")
+
     # Pass 1 — base grid.
-    per_pair = sweep_all_pairs(PAIRS, extra_grid=None, cache=cache)
+    per_pair = sweep_all_pairs(PAIRS, extra_grid=None, cache=cache,
+                               progress_cb=_sweep_tick)
     on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
     sweep_attempts = 1
     print(f"[cycle] pass 1: {len(on_target)} pair(s) on target (≥{WR_TARGET}% WR)")
 
+    # 30% — первый проход анализа завершён.
+    progress.update(30, f"Проход 1 готов: {len(on_target)}/{len(per_pair)} пар на цели")
+
     # Pass 2 — if we don't have ≥ MIN_TOP_PAIRS on target, expand grid.
     if len(on_target) < MIN_TOP_PAIRS:
         sweep_attempts = 2
-        print(f"[cycle] expanding grid (aggressive) ...")
+        print("[cycle] expanding grid (aggressive) ...")
+        progress.update(35, "Расширяем сетку (aggressive)...")
         per_pair = sweep_all_pairs(PAIRS,
                                    extra_grid=param_grid_aggressive(),
-                                   cache=cache)
+                                   cache=cache,
+                                   progress_cb=_sweep_tick)
         on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
         print(f"[cycle] pass 2: {len(on_target)} pair(s) on target")
 
@@ -1059,6 +1088,7 @@ def main() -> None:
     if len(stable) < MIN_TOP_PAIRS:
         sweep_attempts = 3
         print(f"[cycle] pass 3: frequency-focused grid (≥{MIN_TRADES_PER_DAY} trades/day) ...")
+        progress.update(45, "Частотная сетка (≥ 3 сделок/день)...")
         freq_grid: list[Params] = []
         for hor in (4, 8, 12, 16, 20):
             for adxmin in (12, 15, 18, 22):
@@ -1072,7 +1102,8 @@ def main() -> None:
                             horizon_bars=hor, adx_min=adxmin, adx_max=50.0,
                             require_mtf=False, min_conf=mc, min_trend_q=tq,
                         ))
-        per_pair = sweep_all_pairs(PAIRS, extra_grid=freq_grid, cache=cache)
+        per_pair = sweep_all_pairs(PAIRS, extra_grid=freq_grid, cache=cache,
+                                   progress_cb=_sweep_tick)
         on_target = [r for r in per_pair if r.get("wr", 0) >= WR_TARGET]
         stable = [
             r for r in per_pair
@@ -1087,6 +1118,12 @@ def main() -> None:
           f"365d-on-target ≥{WR_TARGET}%: {len(on_target)} · "
           f"stable (5d+30d+365d): {len(stable)}")
 
+    # 60% — бэктест на всех проходах завершён.
+    progress.update(
+        60,
+        f"Бэктест готов · стабильных пар: {len(stable)} / цель ≥{WR_TARGET}%: {len(on_target)}",
+    )
+
     # Pick top-3.
     strict = pick_top3_strict(per_pair)
     if len(strict) < MIN_TOP_PAIRS:
@@ -1095,6 +1132,10 @@ def main() -> None:
         top3 = best_effort_top3(per_pair)
     else:
         top3 = strict
+
+    # 80% — топ-3 выбран.
+    top3_names = ", ".join(r["pair"] for r in top3) if top3 else "—"
+    progress.update(80, f"Топ-3 выбран: {top3_names}")
 
     indicator_attr = compute_indicator_attribution(per_pair)
 
@@ -1157,9 +1198,13 @@ def main() -> None:
         f.write(f"# 5-hour adaptive cycle — {cycle_label}\n\n")
         f.write(report_md)
 
-    # Send to Telegram.
+    # 90% — отчёт готов, отправляем в Telegram.
+    progress.update(90, "Готовим финальный отчёт...")
+
+    # Send to Telegram — 100%: заменить progress-бар на "завершено"
+    # и отправить полный отчёт отдельными сообщениями.
     text = format_report(payload)
-    sent = send_telegram(text)
+    sent = progress.complete(full_report=text)
     print(f"[cycle] telegram sent: {sent}")
     print(f"[cycle] cycle complete · top3: {[r['pair'] for r in top3]}")
 
