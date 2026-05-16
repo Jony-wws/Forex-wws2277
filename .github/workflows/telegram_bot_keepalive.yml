@@ -1,11 +1,14 @@
 name: Telegram bot keepalive
 
-# Cheapest free-tier way to keep a Telegram Mini App bot reachable: run
-# the long-poll loop for a few minutes every 30 minutes from GitHub
-# Actions.  This is enough for an interactive user — when they press
-# the bot's /start button we usually answer within seconds.  If the
-# TELEGRAM_BOT_TOKEN secret is missing the job still runs but exits
-# cleanly so unconfigured forks don't see red builds.
+# Cheapest free-tier way to keep the Telegram bot reachable: run the
+# long-poll loop for a few minutes every 30 minutes from GitHub Actions.
+# Slash commands (/start, /forex) reply with the Mini App button.
+# Free-text messages go through scripts/telegram_agent.py which uses
+# GitHub Models (free) to parse intent and dispatches one of the
+# whitelisted workflows in this repo via the REST API.
+#
+# If TELEGRAM_BOT_TOKEN is missing the job still runs but exits cleanly
+# so unconfigured forks don't see red builds.
 
 on:
   workflow_dispatch: {}
@@ -13,7 +16,12 @@ on:
     - cron: "*/30 * * * *"   # every 30 minutes
 
 permissions:
+  # GITHUB_TOKEN needs `models: read` for the GitHub Models inference
+  # endpoint used by telegram_agent.parse_intent. `contents: read` keeps
+  # the rest of the job safe — the bot dispatches workflows via the
+  # separate GH_DISPATCH_TOKEN PAT, NOT via GITHUB_TOKEN.
   contents: read
+  models: read
 
 concurrency:
   group: telegram-bot-keepalive
@@ -56,5 +64,15 @@ jobs:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
           RUN_SECONDS: "300"
           POLL_TIMEOUT: "25"
+          # GitHub Models (free) — intent parsing for free-text messages.
+          # Uses the workflow-scoped GITHUB_TOKEN; no extra secret needed.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with `actions:write` to dispatch other workflows.  When
+          # missing the bot still replies but cannot launch anything.
+          GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          # Comma-separated whitelist of chat ids allowed to drive the
+          # agent.  Leave unset to allow every chat (NOT recommended for
+          # public bots).
+          TELEGRAM_ALLOWED_CHATS: ${{ secrets.TELEGRAM_ALLOWED_CHATS }}
         run: |
           python scripts/telegram_bot.py
