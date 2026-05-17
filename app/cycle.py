@@ -6,11 +6,11 @@ Every 5 hours (UTC boundaries 00, 05, 10, 15, 20) the system:
    pass the hard `is_strong_trend` gate from ``analyzer.py`` to qualify
    for the STRONG / PREMIUM tier:
 
-       confidence ≥ 88
-       score / max_score ≥ 0.55
+       confidence ≥ 92
+       score / max_score ≥ 0.65
        all 4 senior timeframes aligned (D1 + H4 + H1 + M15)
-       ADX H1 ≥ 25 AND ADX H4 ≥ 20
-       trend_persistence_5h ≥ 80 % (≥ 4 of 5 H1 bars in direction)
+       ADX H1 ≥ 30 AND ADX H4 ≥ 25
+       trend_persistence_5h ≥ 90 % (≥ 4.5 of 5 H1 bars in direction)
 
    The cycle ALWAYS publishes between ``MIN_PICKS = 3`` and
    ``MAX_PICKS = 5`` forecasts so the user is guaranteed at least three
@@ -63,12 +63,13 @@ WIN_MOVE_PCT = 0.10            # binary-options win threshold (in %)
 
 # Hard gate for the STRONG tier (matches analyzer.is_strong_trend) — the
 # strict 5-hour cycle promotes a forecast only when every one of these
-# holds simultaneously.
-STRONG_CONFIDENCE = 88
-STRONG_RATIO = 0.55
-STRONG_ADX_H1 = 25.0
-STRONG_ADX_H4 = 20.0
-STRONG_PERSISTENCE = 80.0
+# holds simultaneously. Tightened 2026-05-17 per AI recommendations in
+# reports/ai_review_latest.md to filter out weak-trend false positives.
+STRONG_CONFIDENCE = 92
+STRONG_RATIO = 0.65
+STRONG_ADX_H1 = 30.0
+STRONG_ADX_H4 = 25.0
+STRONG_PERSISTENCE = 90.0
 
 # PREMIUM is a strict subset of STRONG with even tighter ADX/persistence.
 PREMIUM_ADX_H1 = 28.0
@@ -158,28 +159,50 @@ def _eligible(forecast: dict) -> bool:
     return forecast.get("side") in ("BUY", "SELL")
 
 
-def _quality_score(f: dict, wr_by_pair: dict[str, float] | None = None) -> tuple:
+def _quality_score(
+    f: dict,
+    wr_by_pair: dict[str, float] | None = None,
+    wr_short_by_pair: dict[str, float] | None = None,
+) -> tuple:
     """Sort key — higher is better.
 
-    Order of precedence:
+    Order of precedence (after the historical-WR weighting bump):
       1. Passes the strong sustained-trend gate (hard yes/no).
-      2. Trend persistence over last 5 H1 bars (more bars = better).
-      3. ADX H1 (stronger trend = better).
-      4. ADX H4 (confirmation on the higher timeframe).
-      5. High historical win-rate (≥ 70 % over 30d/365d) — preference,
-         not a hard gate; never lowers the slate below MIN_PICKS.
+      2. Historical-WR weighted score (weight = 3, vs. 1 previously).
+         Bonus when the pair held WR ≥ 75 % on both 30d AND 365d; a
+         penalty when the pair fell below 65 % on the 5d window.
+      3. Trend persistence over last 5 H1 bars (more bars = better).
+      4. ADX H1 (stronger trend = better).
+      5. ADX H4 (confirmation on the higher timeframe).
       6. |score| (raw indicator agreement).
       7. confidence.
+
+    ``wr_by_pair`` carries the long-horizon WR (max of 30d/365d) and
+    ``wr_short_by_pair`` carries the 5d WR.  Both come from the
+    backtest snapshot in ``state/cycle_latest.json``; missing values
+    are treated as 0 % so we don't reward absence of data.
     """
     pair = f.get("pair") or ""
-    wr = (wr_by_pair or {}).get(pair, 0.0)
-    high_wr = 1 if wr >= 70.0 else 0
+    wr_long = (wr_by_pair or {}).get(pair, 0.0)
+    wr_short = (wr_short_by_pair or {}).get(pair, 0.0)
+
+    # Weighted historical-WR component (weight 3 — three times the
+    # previous flat boolean).  Bonus for pairs that held ≥ 75 % WR on
+    # both 30d AND 365d windows; penalty for pairs that fell below
+    # 65 % on the recent 5d window.
+    wr_weight = 0
+    if wr_long >= 70.0:
+        wr_weight += 1
+    if wr_long >= 75.0:
+        wr_weight += 2  # extra weight when both 30d and 365d look strong
+    if wr_short and wr_short < 65.0:
+        wr_weight -= 2  # short-window degradation pushes pair down
     return (
         1 if _passes_strong_gate(f) else 0,
+        wr_weight,
         float(f.get("trend_persistence_5h") or 0.0),
         float(f.get("adx_h1") or f.get("adx") or 0.0),
         float(f.get("adx_h4") or 0.0),
-        high_wr,
         abs(int(f.get("score") or 0)),
         int(f.get("confidence") or 0),
     )
@@ -225,9 +248,49 @@ def _load_wr_by_pair() -> dict[str, float]:
     return out
 
 
+def _load_wr_short_by_pair() -> dict[str, float]:
+    """Best-effort read of the latest 5-day backtest WR per pair.
+
+    Mirrors ``_load_wr_by_pair`` but reads ``wr_5d`` so the selector can
+    penalise pairs that recently degraded.  Only pairs with at least 5
+    trades on the 5d window are kept — anything sparser is too noisy to
+    use as a penalty signal.
+    """
+    path = STATE_DIR / "cycle_latest.json"
+    out: dict[str, float] = {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return out
+    rows: list[dict] = []
+    try:
+        rows.extend(data.get("top3") or [])
+        rows.extend(data.get("per_pair") or [])
+    except Exception:
+        return out
+    for row in rows:
+        try:
+            pair = row.get("pair")
+            if not pair:
+                continue
+            n5 = int(row.get("wr_5d_trades") or 0)
+            if n5 < 5:
+                continue
+            wr = float(row.get("wr_5d") or 0.0)
+            # Lowest 5d WR wins when duplicates appear (top3 ∪ per_pair) —
+            # we want the most-pessimistic recent reading.
+            prev = out.get(pair)
+            if prev is None or wr < prev:
+                out[pair] = wr
+        except Exception:
+            continue
+    return out
+
+
 def _select_strict(
     forecasts_by_pair: dict[str, dict],
     wr_by_pair: dict[str, float] | None = None,
+    wr_short_by_pair: dict[str, float] | None = None,
 ) -> tuple[list[dict], bool]:
     """Pick up to ``MAX_PICKS`` forecasts, preferring strong sustained trends.
 
@@ -241,7 +304,10 @@ def _select_strict(
     stays True in that case so the UI banner warns honestly.
     """
     candidates = [f for f in forecasts_by_pair.values() if _eligible(f)]
-    candidates.sort(key=lambda f: _quality_score(f, wr_by_pair), reverse=True)
+    candidates.sort(
+        key=lambda f: _quality_score(f, wr_by_pair, wr_short_by_pair),
+        reverse=True,
+    )
 
     strong = [f for f in candidates if _passes_strong_gate(f)]
     weak_market = len(strong) < MIN_PICKS
@@ -459,7 +525,10 @@ def tick(forecasts_by_pair: dict[str, dict], now: datetime | None = None) -> Non
             # win-rates from the previous GitHub-Actions cycle bias the
             # selector toward historically-winning pairs as a tie-breaker.
             wr_by_pair = _load_wr_by_pair()
-            top, weak_market = _select_strict(forecasts_by_pair, wr_by_pair)
+            wr_short_by_pair = _load_wr_short_by_pair()
+            top, weak_market = _select_strict(
+                forecasts_by_pair, wr_by_pair, wr_short_by_pair
+            )
             session = detect_session(active_start)
             selected: list[dict] = []
             for f in top:
