@@ -3,8 +3,11 @@ name: AI brain (Top-1 cycle)
 # Runs the multi-layer AI brain that selects the Top-1 currency pair.
 # - Full brain (28-pair breakdown) every 5 hours, aligned to UTC+5
 #   trading cycles (00:00, 05:00, 10:00, 15:00, 20:00 UTC+5).
-# - "Quick" refresh every 5 minutes (still real data, just skips the
-#   per-pair breakdown JSON to keep the data branch small).
+# - "Quick" refresh every 5 minutes via cron — and inside each quick
+#   run we loop 5 × 60 s, so the published top1.json on the `data`
+#   branch is at most ~60 s stale.  GitHub Actions cron itself
+#   refuses anything finer than 5 minutes, so the inner loop is the
+#   only way to hit a 1-minute cadence.
 #
 # Output: data/top1.json + data/brain_full.json on the `data` branch.
 
@@ -12,7 +15,8 @@ on:
   schedule:
     # 5-hour cycle boundaries (UTC).
     - cron: "0 19,0,5,10,15 * * *"
-    # 5-minute quick refresh.  GitHub's minimum cron granularity.
+    # 5-minute "outer" cron — actual data writes happen every minute
+    # via the inner loop below.
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
@@ -33,6 +37,7 @@ on:
       - "app/news_brain.py"
       - "app/big_players.py"
       - "scripts/ai_brain.py"
+      - "scripts/ci/data_publish.sh"
       - ".github/workflows/ai_brain.yml"
 
 permissions:
@@ -45,7 +50,9 @@ concurrency:
 jobs:
   brain:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Quick mode: 5 inner iterations × ~60 s each ≈ 5–6 min.  Full mode
+    # is a one-shot run.  Bumped from 15 → 20 min to leave head-room.
+    timeout-minutes: 20
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -80,17 +87,14 @@ jobs:
             echo "mode=full" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run AI brain (${{ steps.mode.outputs.mode }})
+      - name: Full brain run (5-hour cycle)
+        if: steps.mode.outputs.mode == 'full'
         env:
           YFINANCE_TIMEOUT: "20"
-        run: |
-          if [ "${{ steps.mode.outputs.mode }}" = "quick" ]; then
-            python scripts/ai_brain.py --quick
-          else
-            python scripts/ai_brain.py
-          fi
+        run: python scripts/ai_brain.py
 
-      - name: Publish to the `data` branch (retry on conflict)
+      - name: Publish full snapshot
+        if: steps.mode.outputs.mode == 'full'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -99,46 +103,50 @@ jobs:
             echo "::error::data/top1.json missing — brain produced no output"
             exit 1
           fi
+          FILES=("data/top1.json")
+          [ -f data/brain_full.json ] && FILES+=("data/brain_full.json")
+          bash scripts/ci/data_publish.sh "brain-full" "${FILES[@]}"
 
-          mkdir -p /tmp/ai-brain-out
-          cp data/top1.json /tmp/ai-brain-out/
-          [ -f data/brain_full.json ] && cp data/brain_full.json /tmp/ai-brain-out/
+      - name: Quick brain loop (5 × 60 s — minute-level refresh)
+        if: steps.mode.outputs.mode == 'quick'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          YFINANCE_TIMEOUT: "20"
+        run: |
+          set -euo pipefail
+          for iter in 1 2 3 4 5; do
+            start=$(date +%s)
+            echo "::group::brain iter $iter / 5  ($(date -u +%H:%M:%SZ))"
 
-          git config user.name  "forex-data-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            # Quick mode skips the per-pair breakdown JSON to keep the
+            # per-iteration time well under 60 s.
+            python scripts/ai_brain.py --quick
 
-          push() {
-            if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
-              git fetch origin data --depth=1
-              git checkout -B data origin/data
+            if [ ! -f data/top1.json ]; then
+              echo "::warning::iter $iter produced no top1.json — skipping push"
             else
-              git checkout --orphan data
-              git rm -rf . >/dev/null 2>&1 || true
+              bash scripts/ci/data_publish.sh "brain-quick" data/top1.json
             fi
 
-            mkdir -p data
-            cp /tmp/ai-brain-out/top1.json data/top1.json
-            [ -f /tmp/ai-brain-out/brain_full.json ] \
-              && cp /tmp/ai-brain-out/brain_full.json data/brain_full.json
+            echo "::endgroup::"
 
-            git add data/top1.json
-            [ -f data/brain_full.json ] && git add data/brain_full.json
-            if git diff --cached --quiet; then
-              echo "No top1.json delta — nothing to publish."
-              return 0
-            fi
-            git commit -m "brain: top1 refresh $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push origin data
-          }
-
-          # refresh_data.yml may push to the same branch on the same
-          # minute — retry up to 3× with a rebase-style refetch so we
-          # never lose a forecast to a race.
-          for attempt in 1 2 3; do
-            if push; then
-              break
-            else
-              echo "push attempt $attempt failed, retrying after 6s…"
-              sleep 6
+            # Sleep until the start of the next minute boundary, but
+            # not after the final iteration.
+            if [ "$iter" -lt 5 ]; then
+              elapsed=$(( $(date +%s) - start ))
+              remaining=$(( 60 - elapsed ))
+              if [ "$remaining" -gt 0 ]; then
+                echo "iter $iter took ${elapsed}s — sleeping ${remaining}s"
+                sleep "$remaining"
+              else
+                echo "iter $iter took ${elapsed}s — no sleep, going straight to next iter"
+              fi
             fi
           done
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "Mode: \`${{ steps.mode.outputs.mode }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "See [data branch](https://github.com/${{ github.repository }}/tree/data/data) for the latest snapshot." >> "$GITHUB_STEP_SUMMARY"

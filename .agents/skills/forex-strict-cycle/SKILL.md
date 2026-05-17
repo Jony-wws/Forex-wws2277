@@ -161,6 +161,28 @@ Hard gates promoted to `veto` so the pair is excluded from Top-1:
 on the slow path) with `top1`, `top5`, `big_players`, `favorite_check`
 plus the layer-by-layer breakdown for transparency.
 
+The two GitHub Actions workflows that keep the `data` branch fresh
+are now **minute-level** (despite GitHub cron's 5-min floor):
+
+- `.github/workflows/ai_brain.yml` — outer cron `*/5 * * * *` (quick
+  mode).  Each run loops **5 × 60 s**, calling
+  `python scripts/ai_brain.py --quick` and publishing `top1.json` via
+  `scripts/ci/data_publish.sh`.  The 5-hour boundary cron still runs
+  the FULL brain (writes both `top1.json` and `brain_full.json`).
+- `.github/workflows/refresh_data.yml` — outer cron `*/5 * * * *`.
+  Each run loops **5 × 60 s**, calling
+  `python scripts/build_static_data.py`.  Iter #1 includes the heavy
+  `data/bars/*` regeneration (≈ 3–5 min); iters #2–5 pass
+  `--no-bars` so only the small JSONs (`signals.json`, `cycle.json`,
+  `orderbooks.json`, `health.json`) refresh at the 1-minute cadence.
+
+`scripts/ci/data_publish.sh` is the single push helper used by both
+workflows.  It clones the `data` branch into `$RUNNER_TEMP/data-clone`
+(so the workspace stays on `main`), overlays the supplied files, and
+retries push up to 5× with `git fetch + git reset --hard` between
+attempts to absorb race conditions when both workflows push in the
+same minute.
+
 **Critical invariants — never break:**
 - `MIN_PICKS = 3` — user explicitly requires ≥ 3 forecasts every 5 h.
 - 28 pairs in `app/config.py::PAIRS` — never reduce.
