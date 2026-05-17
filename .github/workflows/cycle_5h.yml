@@ -1,7 +1,9 @@
 name: 5-hour adaptive cycle
 
 # Runs every 5 hours: per-pair param sweep + adaptive strategy + Telegram report.
-# Telegram delivery requires repo secrets:
+# Simplified 2026-05-17: removed Pine script / heatmap / degradation side-steps
+# so this is now the ONLY GitHub Action in the repo.  Telegram delivery
+# requires repo secrets:
 #   TELEGRAM_BOT_TOKEN  — bot API token
 #   TELEGRAM_CHAT_ID    — destination chat id
 on:
@@ -20,6 +22,7 @@ on:
       - "devin/**"
     paths:
       - "scripts/cycle_5h.py"
+      - "app/**.py"
       - ".github/workflows/cycle_5h.yml"
 
 permissions:
@@ -30,7 +33,7 @@ jobs:
   cycle:
     name: 5h adaptive cycle on 28 pairs
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,24 +55,6 @@ jobs:
         run: |
           python scripts/cycle_5h.py 2>&1 | tee cycle_log.txt
 
-      - name: Generate TradingView Pine script (auto-strategy)
-        if: always()
-        run: |
-          python scripts/generate_pine.py || true
-
-      - name: Currency strength heatmap + convergence alert
-        if: always()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python scripts/currency_strength.py || true
-
-      - name: Detect strategy degradation (3 cycles in a row)
-        if: always()
-        run: |
-          python scripts/auto_fix_degraded.py || true
-
       - name: Append report to job summary
         if: always()
         run: |
@@ -86,6 +71,7 @@ jobs:
             reports/cycle_5h_latest.md
             state/cycle_*.json
             state/baseline_7d.json
+            state/auto_optimizer_log.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -101,11 +87,9 @@ jobs:
             state/cycle_latest.json \
             state/baseline_7d.json \
             state/strategy_memory.json \
+            state/auto_optimizer_log.json \
             state/cycle_*.json 2>/dev/null || true
-          git add -f reports/cycle_5h_latest.md \
-                     reports/currency_strength_latest.md \
-                     reports/degradation_fix.md \
-                     tradingview/auto_best_strategy.pine 2>/dev/null || true
+          git add -f reports/cycle_5h_latest.md 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no state changes to commit"
           else

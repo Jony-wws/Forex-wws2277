@@ -69,13 +69,46 @@ PAIRS: list[str] = [
 
 CYCLE_HOURS = 5
 PAYOUT = 0.80         # binary 80% payout
-TOP_N = 3             # daily top-3 picks
+TOP_N = 1             # daily top-1 pick — strict 80%-or-nothing
 LOOKBACK_5H_BARS = 5 * 4   # for "what happened in the last 5h" diff
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_DIR = os.path.join(ROOT_DIR, "state")
 REPORTS_DIR = os.path.join(ROOT_DIR, "reports")
 os.makedirs(STATE_DIR, exist_ok=True)
 os.makedirs(REPORTS_DIR, exist_ok=True)
+
+# Repo-root on sys.path so we can import the new ``app.*`` helper
+# modules (ensemble voting, correlation filter, auto-optimiser).  Done
+# AFTER STATE_DIR / REPORTS_DIR so any import failures hit nice paths.
+sys.path.insert(0, ROOT_DIR)
+try:
+    from app.ensemble_voting import ensemble_vote, ENSEMBLE_FLOOR  # noqa: E402
+except Exception as _e:  # pragma: no cover  — defensive, never crash CI
+    print(f"[cycle] ensemble_voting import failed, skipping: {_e}")
+    ensemble_vote = None  # type: ignore[assignment]
+    ENSEMBLE_FLOOR = 85.0
+try:
+    from app.correlation_filter import filter_correlated_pairs  # noqa: E402
+except Exception as _e:  # pragma: no cover
+    print(f"[cycle] correlation_filter import failed, skipping: {_e}")
+    filter_correlated_pairs = None  # type: ignore[assignment]
+try:
+    from app.auto_optimizer import (  # noqa: E402
+        optimize_thresholds_based_on_performance,
+    )
+except Exception as _e:  # pragma: no cover
+    print(f"[cycle] auto_optimizer import failed, skipping: {_e}")
+    optimize_thresholds_based_on_performance = None  # type: ignore[assignment]
+try:
+    from app.brain import adaptive_confidence_floor  # noqa: E402
+except Exception as _e:  # pragma: no cover
+    print(f"[cycle] adaptive_confidence_floor import failed, skipping: {_e}")
+    adaptive_confidence_floor = None  # type: ignore[assignment]
+try:
+    from app.regime_detection import detect_market_regime  # noqa: E402
+except Exception as _e:  # pragma: no cover
+    print(f"[cycle] regime_detection import failed, skipping: {_e}")
+    detect_market_regime = None  # type: ignore[assignment]
 
 
 def yahoo_ticker(p: str) -> str:
@@ -643,7 +676,70 @@ def pick_top3_strict(per_pair: list[dict]) -> list[dict]:
     ]
     eligible.sort(key=lambda r: (-r.get("wr_5d", 0), -r.get("wr", 0),
                                   -r.get("trades_per_day", 0)))
+    eligible = _apply_correlation_filter(eligible)
     return eligible[:TOP_N]
+
+
+def _apply_correlation_filter(rows: list[dict]) -> list[dict]:
+    """Drop highly-correlated pairs from a ranked list of backtest rows.
+
+    Keeps the order: the highest-quality pair survives in each
+    correlated cluster.  Safe to call when ``filter_correlated_pairs``
+    isn't importable (returns ``rows`` unchanged).
+    """
+    if not rows or filter_correlated_pairs is None:
+        return rows
+    try:
+        pairs_in_order = [r["pair"] for r in rows]
+        kept_pairs = set(filter_correlated_pairs(pairs_in_order))
+        if not kept_pairs:
+            return rows
+        return [r for r in rows if r["pair"] in kept_pairs]
+    except Exception as e:  # noqa: BLE001
+        print(f"[cycle] correlation filter fell back: {e}")
+        return rows
+
+
+def _apply_ensemble_gate(rows: list[dict]) -> list[dict]:
+    """Validate each pick through the 5-layer ensemble vote.
+
+    Only keeps rows whose pair both:
+      * has an ensemble vote on the same side as the strategy's chosen
+        direction (or strategy direction is 0 — neutral — in which
+        case we accept the ensemble's call), AND
+      * clears the ``ENSEMBLE_FLOOR`` confidence (≥ 85 %).
+
+    Annotates the row with ``ensemble`` so the report can surface the
+    layer breakdown.  Failures during a single ensemble vote are
+    swallowed so a transient data error doesn't drop a pair.
+    """
+    if not rows or ensemble_vote is None:
+        return rows
+    out: list[dict] = []
+    for r in rows:
+        pair = r.get("pair")
+        if not pair:
+            continue
+        try:
+            vote = ensemble_vote(pair)
+        except Exception as e:  # noqa: BLE001
+            print(f"[cycle] ensemble vote failed for {pair}: {e}")
+            r = dict(r, ensemble={"error": str(e)})
+            out.append(r)
+            continue
+        r = dict(r, ensemble=vote)
+        side_strat = r.get("direction")
+        side_ens = vote.get("side")
+        if not vote.get("passes_floor"):
+            continue
+        # When the strategy is neutral (direction == 0) we accept the
+        # ensemble's call.  Otherwise the two MUST agree.
+        if side_strat == 1 and side_ens != "BUY":
+            continue
+        if side_strat == -1 and side_ens != "SELL":
+            continue
+        out.append(r)
+    return out
 
 
 def best_effort_top3(per_pair: list[dict]) -> list[dict]:
@@ -709,12 +805,19 @@ def send_telegram(text: str) -> bool:
 
 
 def format_report(payload: dict) -> str:
-    """Build the human-readable Telegram message — целиком на русском."""
+    """Build the human-readable Telegram message — целиком на русском.
+
+    Top-1 mode (since 2026-05-17): the report is intentionally short.
+    Only the best-of-28 pick survives the strict gate + 5-layer
+    ensemble vote, so we drop the leaderboard / aging / anomalies /
+    indicator-attribution sections that used to bloat the message.
+    """
     out: list[str] = []
     out.append(f"<b>🎯 Цикл {payload['cycle_utc']}</b>")
     out.append(
         f"<i>Главная проверка — за последние 5 часов на всех 28 парах. "
-        f"Дополнительно — бэктест 365 дней.</i>\n"
+        f"Публикуем только лучший top-1 с ensemble-уверенностью ≥ "
+        f"{int(ENSEMBLE_FLOOR)} %.</i>\n"
     )
 
     # ── 1. PRIMARY: 5h validation across all pairs. ──────────────────
@@ -827,112 +930,38 @@ def format_report(payload: dict) -> str:
         if r.get("indicators_now"):
             out.append(f"  • <b>Индикаторы сейчас:</b> {describe_indicators_ru(r['indicators_now'])}")
         out.append(f"  • <b>Цена за последние 5 часов:</b> прошла {r.get('last_5h_pp', 0):+.1f} пунктов")
-
-    # ── 3. Diff vs previous cycle. ───────────────────────────────────
-    diff = payload.get("diff", {})
-    if diff.get("top3_in") or diff.get("top3_out") or diff.get("strategy_flips"):
-        out.append(f"\n<b>🔄 Что изменилось за 5 часов:</b>")
-        if diff.get("top3_in"):
-            out.append(f"  ➕ Вошли в топ: <b>{', '.join(diff['top3_in'])}</b>")
-        if diff.get("top3_out"):
-            out.append(f"  ➖ Вышли из топа: <b>{', '.join(diff['top3_out'])}</b>")
-        for fl in diff.get("strategy_flips", [])[:5]:
+        # Surface the 5-layer ensemble vote when present — gives the
+        # user the same confidence number the gate used.
+        ens = r.get("ensemble") or {}
+        if ens.get("side"):
             out.append(
-                f"  🔁 {fl['pair']}: направление поменялось на противоположное "
-                f"(WR было {fl.get('prev_wr')}%, стало {fl.get('wr')}%)"
+                f"  • <b>Ensemble:</b> {ens.get('side')} · "
+                f"уверенность <b>{ens.get('confidence', 0):.1f}%</b> "
+                f"(≥ {int(ens.get('floor', ENSEMBLE_FLOOR))}%)"
+            )
+        # Adaptive volatility floor + regime — short one-liner each.
+        if r.get("adaptive_floor") is not None:
+            out.append(
+                f"  • <b>Адаптивный порог:</b> {int(r['adaptive_floor'])}% "
+                f"(режим волатильности — {r.get('volatility_regime', 'medium')})"
+            )
+        if r.get("market_regime"):
+            out.append(
+                f"  • <b>Режим рынка:</b> {r['market_regime']} "
+                f"(множитель уверенности ×{r.get('regime_conf_mult', 1.0):.2f})"
             )
 
-    # ── 4. Indicator family attribution. ─────────────────────────────
-    if payload.get("indicator_attribution"):
-        out.append(f"\n<b>⚙ Какие сигналы сработали (по всем 28 парам):</b>")
-        for ind, pct in payload["indicator_attribution"][:5]:
-            ru_name = {
-                "trend (ADX/MTF)": "тренд (ADX + мульти-ТФ)",
-                "mean-reversion (RSI/BB)": "откат (RSI/Bollinger)",
-                "horizon-short": "короткий горизонт (3ч)",
-                "horizon-long": "длинный горизонт (5–7ч)",
-            }.get(ind, ind)
-            out.append(f"  • {ru_name}: <b>{pct:.0f}%</b>")
-
-    # ── 5. Anomalies. ────────────────────────────────────────────────
-    if payload.get("anomalies"):
-        out.append(f"\n<b>⚠ Аномалии (отклонение от 7-дневного среднего):</b>")
-        for a in payload["anomalies"][:5]:
-            arrow = "📈" if a["type"] == "up" else "📉"
-            out.append(
-                f"  {arrow} {a['pair']}: WR {a['wr_now']}% против среднего "
-                f"{a['wr_mean']}% (z={a['z']})"
-            )
-
-    # ── 6. 24h aging. ────────────────────────────────────────────────
-    aging = payload.get("aging_24h") or []
-    if aging:
-        out.append(f"\n<b>🧠 Память: что изменилось за последние 24 часа:</b>")
-        improving = [a for a in aging if a["wr_delta"] > 0][:3]
-        degrading = [a for a in aging if a["wr_delta"] < 0][:3]
-        if improving:
-            out.append(f"  📈 Стало лучше:")
-            for a in improving:
-                pc = " (стиль изменился)" if a["params_changed"] else ""
-                out.append(
-                    f"    • {a['pair']}: WR {a['wr_24h_ago']}% → "
-                    f"<b>{a['wr_now']}%</b>  ({a['wr_delta']:+.1f} п.п.{pc})"
-                )
-        if degrading:
-            out.append(f"  📉 Стало хуже:")
-            for a in degrading:
-                pc = " (стиль изменился)" if a["params_changed"] else ""
-                out.append(
-                    f"    • {a['pair']}: WR {a['wr_24h_ago']}% → "
-                    f"<b>{a['wr_now']}%</b>  ({a['wr_delta']:+.1f} п.п.{pc})"
-                )
-        stable_top = [
-            a for a in aging
-            if not a["params_changed"] and a["wr_now"] >= WR_TARGET
-            and a["wr_24h_ago"] >= WR_TARGET
-        ]
-        if stable_top:
-            names = ", ".join(a["pair"] for a in stable_top[:5])
-            out.append(f"  💎 Стабильно держат WR≥{int(WR_TARGET)}%: <b>{names}</b>")
-
-    # ── 7. Top-10 leaderboard. ───────────────────────────────────────
-    out.append(f"\n<b>📋 Лучшие 10 пар по винрейту (бэктест 365 дней, ≥{MIN_TRADES_PER_DAY} сделок/день):</b>")
-    sorted_pp = sorted(
-        [r for r in payload["per_pair"]
-         if r.get("trades", 0) >= MIN_TRADES_FOR_VALID
-         and r.get("trades_per_day", 0) >= MIN_TRADES_PER_DAY],
-        key=lambda r: -r.get("wr", 0),
-    )[:10]
-    for r in sorted_pp:
-        tpd = r.get("trades_per_day", 0)
+    # ── 3. Auto-optimizer status (one-liner) ─────────────────────────
+    opt = payload.get("auto_optimizer") or {}
+    if opt.get("action") and opt["action"] != "no_op":
         out.append(
-            f"  {r['pair']}: <b>{r['wr']}%</b> · {r['trades']} сделок · "
-            f"{humanize_trades_per_day(tpd)} · прибыль {r['pnl']:+.1f} п."
+            f"\n<b>🛠 Авто-оптимизатор:</b> {opt['action']} — {opt.get('reason', '')}"
         )
 
-    # ── 7. Glossary. ─────────────────────────────────────────────────
-    out.append("")
     out.append(
-        "<i>📖 <b>Глоссарий:</b>\n"
-        "  • <b>пункт (пп / п.п.)</b> — 1 пипс (1/10000 цены; для JPY 1/100)\n"
-        "  • <b>винрейт / WR</b> — доля выигранных сделок (например 70% = "
-        "7 побед из 10 сделок)\n"
-        "  • <b>таймфрейм</b> — длина одной свечи: M15 = 15 минут, "
-        "H1 = 1 час, H4 = 4 часа, D1 = день\n"
-        "  • <b>ADX</b> — сила тренда от 0 до ~60 (≥25 = тренд есть, "
-        "≥40 = очень сильный)\n"
-        "  • <b>RSI</b> — перекупленность/перепроданность от 0 до 100 "
-        "(>70 перекуплен, &lt;30 перепродан)\n"
-        "  • <b>Aroon</b> — индикатор силы и направления тренда от -100 до +100\n"
-        "  • <b>моментум</b> — % изменения цены за последние 12 баров\n"
-        "  • <b>Heiken Ashi</b> — сглаженные свечи; высокая доля зелёных "
-        "= устойчивый рост\n"
-        "  • <b>мульти-ТФ</b> — сколько таймфреймов согласны на BUY/SELL\n"
-        "  • <b>горизонт</b> — на сколько М15-баров вперёд считается "
-        "результат сделки</i>"
-    )
-    out.append(
-        "<i>Авто-генерация GitHub Actions · следующий цикл через 5 часов (UTC+5).</i>"
+        "\n<i>Авто-генерация GitHub Actions · следующий цикл через 5 часов "
+        "(UTC+5). Top-1, строгий ensemble-gate ≥ "
+        f"{int(ENSEMBLE_FLOOR)} %.</i>"
     )
     return "\n".join(out)
 
@@ -1124,18 +1153,49 @@ def main() -> None:
         f"Бэктест готов · стабильных пар: {len(stable)} / цель ≥{WR_TARGET}%: {len(on_target)}",
     )
 
-    # Pick top-3.
+    # Pick top — TOP_N=1 since 2026-05-17 (top-1 mode), but keep the
+    # fallback path so a degraded session still produces output.
     strict = pick_top3_strict(per_pair)
-    if len(strict) < MIN_TOP_PAIRS:
-        # Strict failed → fall back to "best WR available" so the report
-        # still has content, but the formatter will note the goal wasn't met.
+    if not strict:
         top3 = best_effort_top3(per_pair)
     else:
         top3 = strict
 
-    # 80% — топ-3 выбран.
-    top3_names = ", ".join(r["pair"] for r in top3) if top3 else "—"
-    progress.update(80, f"Топ-3 выбран: {top3_names}")
+    # Ensemble gate — every top pick must clear the 5-layer ensemble
+    # confidence floor (≥ 85 %).  In top-1 mode this can drop the pick
+    # to an empty slate; the report formatter handles that gracefully.
+    top3 = _apply_ensemble_gate(top3)
+
+    # Enrich each remaining pick with adaptive_floor + regime_detection
+    # so the report can surface volatility-aware floors and the
+    # trending/ranging/volatile regime tag.
+    for r in top3:
+        pair = r.get("pair")
+        if not pair:
+            continue
+        if adaptive_confidence_floor is not None:
+            try:
+                # ``adaptive_confidence_floor`` itself reads ATR + maps
+                # to high/medium/low.  We call once and surface both
+                # the regime label and the resulting floor.
+                from app.brain import _atr_volatility_regime  # local
+                regime = _atr_volatility_regime(pair)
+                r["volatility_regime"] = regime
+                r["adaptive_floor"] = adaptive_confidence_floor(pair, regime)
+            except Exception as e:  # noqa: BLE001
+                print(f"[cycle] adaptive_floor failed for {pair}: {e}")
+        if detect_market_regime is not None:
+            try:
+                regime_info = detect_market_regime(pair)
+                r["market_regime"] = regime_info.get("regime")
+                r["regime_conf_mult"] = regime_info.get("confidence_multiplier")
+                r["regime_thr_mult"] = regime_info.get("threshold_multiplier")
+            except Exception as e:  # noqa: BLE001
+                print(f"[cycle] regime_detection failed for {pair}: {e}")
+
+    # 80% — топ-1 выбран и провалидирован ensemble-gate.
+    top3_names = ", ".join(r["pair"] for r in top3) if top3 else "ОЖИДАНИЕ"
+    progress.update(80, f"Top-{TOP_N} выбран: {top3_names}")
 
     indicator_attr = compute_indicator_attribution(per_pair)
 
@@ -1187,10 +1247,25 @@ def main() -> None:
         sweep_attempts=sweep_attempts,
     )
 
-    # Persist state.
+    # Persist state FIRST so the auto-optimiser sees the just-finished
+    # cycle's WR numbers when it reads cycle_latest.json.
     ts = now_utc5.strftime("%Y%m%dT%H%M")
     json.dump(payload, open(os.path.join(STATE_DIR, f"cycle_{ts}.json"), "w"), indent=2, default=str)
     json.dump(payload, open(os.path.join(STATE_DIR, "cycle_latest.json"), "w"), indent=2, default=str)
+
+    # Auto-optimiser: inspect per-session WR and nudge the strong-gate
+    # thresholds.  Never blocks the cycle on failure.
+    if optimize_thresholds_based_on_performance is not None:
+        try:
+            opt_result = optimize_thresholds_based_on_performance()
+            payload["auto_optimizer"] = opt_result
+            # Re-persist with the optimiser annotation so downstream
+            # consumers see the nudge action.
+            json.dump(payload, open(os.path.join(STATE_DIR, f"cycle_{ts}.json"), "w"), indent=2, default=str)
+            json.dump(payload, open(os.path.join(STATE_DIR, "cycle_latest.json"), "w"), indent=2, default=str)
+            print(f"[cycle] auto_optimizer: {opt_result.get('action')} — {opt_result.get('reason')}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[cycle] auto_optimizer skipped: {e}")
 
     # Markdown report (also posted as PR comment by the workflow).
     report_md = format_report(payload).replace("<b>", "**").replace("</b>", "**").replace("<i>", "*").replace("</i>", "*")

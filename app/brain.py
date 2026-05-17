@@ -112,6 +112,22 @@ MIN_ADX_H1 = 20
 CLEAR_FAVORITE_LEAD = 5
 CLEAR_FAVORITE_FLOOR = 80
 
+# ── Adaptive volatility-aware confidence floors ─────────────────────
+# The strict 80 % publication floor is the *baseline*.  When the pair
+# is in a high-volatility regime we tighten the requirement to 95 %
+# (false signals are far more expensive when ATR is elevated), and in
+# a low-volatility / quiet regime we relax it to 82 % (price action
+# is cleaner, so a slightly lower confidence still has real edge).
+# ``adaptive_confidence_floor`` exposes the mapping; callers should
+# use ``max(CLEAR_FAVORITE_FLOOR, adaptive_confidence_floor(...))`` so
+# the adaptive floor can only ever be stricter, never lower than the
+# product-spec 80 % minimum the user explicitly set.
+ADAPTIVE_FLOOR_BY_REGIME = {
+    "high": 95,
+    "medium": 88,
+    "low": 82,
+}
+
 # Bonus added to ``composite_raw`` (which lives in [-1, +1]) when a
 # pair shows a "binary-option-perfect" technical setup: ADX≥30 + multi-TF
 # alignment + 5h persistence≥75 + safety projection in profit at the
@@ -147,6 +163,66 @@ POLICY_RATES_PCT = {
     "CAD": 3.25,
     "NZD": 4.25,
 }
+
+
+# ── Volatility regime detection helpers ─────────────────────────────
+# We classify the ATR(14) on H1 against its own 60-bar history.  Above
+# the 75th percentile is "high", below the 25th percentile is "low",
+# everything else is "medium".  Falling back to "medium" on any error
+# is the safe default — the adaptive floor stays at 88 %, which is
+# already 8 pp tighter than the product-spec minimum.
+ATR_HIGH_PERCENTILE = 0.75
+ATR_LOW_PERCENTILE = 0.25
+ATR_REGIME_LOOKBACK_BARS = 60
+
+
+def _atr_volatility_regime(pair: str) -> str:
+    """Classify the pair's current volatility as ``high``/``medium``/``low``.
+
+    Uses the H1 ATR(14) compared to its own 60-bar history.  Designed
+    to be cheap (one fetch_bars + one rolling quantile) and resilient
+    to data errors — any failure returns ``"medium"`` so callers can
+    treat the result as a non-blocking hint, not a hard input.
+    """
+    try:
+        bars = fetch_bars(pair, "1h", "1mo")
+        if bars is None or bars.empty or len(bars) < ATR_REGIME_LOOKBACK_BARS + 14:
+            return "medium"
+        from .indicators import atr as atr_fn  # local import to keep top tidy
+        atr_series_local = atr_fn(bars, period=14).dropna()
+        if len(atr_series_local) < ATR_REGIME_LOOKBACK_BARS:
+            return "medium"
+        window = atr_series_local.tail(ATR_REGIME_LOOKBACK_BARS)
+        current = float(atr_series_local.iloc[-1])
+        high_th = float(window.quantile(ATR_HIGH_PERCENTILE))
+        low_th = float(window.quantile(ATR_LOW_PERCENTILE))
+        if current >= high_th:
+            return "high"
+        if current <= low_th:
+            return "low"
+        return "medium"
+    except Exception as e:  # noqa: BLE001  — never crash the cycle
+        log.debug(f"atr_volatility_regime fallback for {pair}: {e}")
+        return "medium"
+
+
+def adaptive_confidence_floor(pair: str, volatility_regime: Optional[str] = None) -> int:
+    """Return the adaptive 80 %-or-higher confidence floor for ``pair``.
+
+    * ``volatility_regime="high"``  → floor = 95 %
+    * ``volatility_regime="medium"`` → floor = 88 %
+    * ``volatility_regime="low"``    → floor = 82 %
+
+    When ``volatility_regime`` is ``None`` (the normal case) we detect
+    the regime ourselves via :func:`_atr_volatility_regime`.  The result
+    is clamped to ``CLEAR_FAVORITE_FLOOR`` so the adaptive floor can
+    only ever be *stricter* than the product-spec 80 % minimum — the
+    user explicitly set 80 % as the hard publication threshold and we
+    never relax below it.
+    """
+    regime = (volatility_regime or _atr_volatility_regime(pair)).lower()
+    base = ADAPTIVE_FLOOR_BY_REGIME.get(regime, ADAPTIVE_FLOOR_BY_REGIME["medium"])
+    return max(CLEAR_FAVORITE_FLOOR, int(base))
 
 
 def _fundamental_bias(pair: str) -> dict:
