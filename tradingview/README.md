@@ -1,13 +1,22 @@
 # TradingView Pine Script — FOREX-28 v2 (binary options)
 
-Two scripts for TradingView, mirroring the logic of the Python backend
+Three scripts for TradingView, all mirror the logic of the Python backend
 (`app/analyzer.py`).  v2 is **binary-options first** — no TP / no SL — and
 designed to be used from the TradingView Android app (no PC needed).
 
 | File | Purpose |
 |---|---|
-| `forex_signals_indicator.pine` | **Indicator** — BUY / SELL / REVERSE labels on chart **plus** an on-chart live backtest panel (Win Rate, Profit Factor, Net P&L, Daily DD).  Self-contained: tracks every signal it ever fired and updates stats in real time as each trade hits its expiry. Run this on the chart you actively watch. |
-| `forex_signals_strategy.pine`  | **Strategy** for TradingView's Strategy Tester. Same scoring and entry logic as the indicator, wired into the Strategy Tester so you get the official Win Rate / Profit Factor / Max Drawdown reports across multi-year history. Use this for honest per-pair vetting (build your allowlist from it). |
+| **`eurusd_70wr_strategy.pine`** ⭐ | **Single-file EUR/USD-only** trend-pullback strategy targeting honest **≥70% Win Rate** on M15 with 5h binary expiry.  Acts as **both indicator and strategy in one file** — large BUY/SELL labels on chart + official Strategy Tester results + on-chart stats panel.  Uses Supertrend + Hull MA + multi-TF EMA200 + ADX + VWAP (no RSI/MACD as primary signal).  Hard EUR/USD pair-guard. |
+| **`eurusd_mr_pro.pine`** | **Mean-reversion variant** for EUR/USD M15 5h binary.  Uses BB + RSI + Stoch confluence at extremes, with multi-TF + session + ATR + ADX + Hull-slope filters.  Has two modes: **`WR_MAX`** (strict, target ~70% WR, ~1-2 trades/day) and **`FREQ_MAX`** (looser, target 5+ trades/day, ~62-66% WR).  Use this when the trend-pullback variant gives too few signals. |
+| `forex_signals_indicator.pine` | **Indicator** (FOREX-28 universal) — BUY / SELL / REVERSE labels on chart **plus** an on-chart live backtest panel (Win Rate, Profit Factor, Net P&L, Daily DD).  Self-contained: tracks every signal it ever fired and updates stats in real time as each trade hits its expiry. Run this on the chart you actively watch. |
+| `forex_signals_strategy.pine`  | **Strategy** (FOREX-28 universal) for TradingView's Strategy Tester. Same scoring and entry logic as the indicator, wired into the Strategy Tester so you get the official Win Rate / Profit Factor / Max Drawdown reports across multi-year history. Use this for honest per-pair vetting (build your allowlist from it). |
+
+## TL;DR — for EUR/USD only, 5h binary, M15
+
+Use **`eurusd_70wr_strategy.pine`** — it's a single file that does everything.
+Open EUR/USD on M15, paste the file in Pine Editor → Save → Add to chart.
+BUY/SELL labels appear on chart, Strategy Tester gives the WR/PF/Net stats.
+Scroll left to load more history → trade count grows past 500.
 
 ## Trading model (binary options)
 
