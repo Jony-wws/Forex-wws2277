@@ -1,287 +1,251 @@
-# Release notes — неделя до 2026-05-11
+# Release notes — неделя до 2026-05-18
 
-Всего коммитов: **265**
+Всего коммитов: **232**
 
 ## ✨ Новые возможности
 
-- `ea2e3f3` — zero-config standalone dashboard served by jsDelivr/githack
-- `7e5f064` — serverless dashboard on GitHub Pages + Actions cron
-- `9dad047` — new React v2 dashboard at /v2 with live signals, charts, cycle
-- `adcb1d7` — full keyboard + full mouse + clipboard sync + open URL
-- `8c95dbf` — add Pine Script v5 indicator mirroring analyzer logic
-- `0d067df` — permanent Fly.io deployment (free tier, auto-deploy on push)
-- `2e42db6` — historical winning-setup memory
-- `cc06aec` — Llama-3.3-70B as primary model, GitHub Models fallback
-- `ea80dae` — launch dashboard inside Telegram
-- `fdbac60` — trust Yahoo, AI patches code, cross-org SKILL
-- `0e687cd` — always 3+ forecasts + free GitHub Models AI
-- `1227240` — require sustained 5h trend + AI review workflow
-- `1928b3b` — 9 new GitHub Actions workflows + scripts
-- `12a5c3a` — add Ichimoku, VWAP, Price Action blocks for analyzer.py parity
-- `596eac2` — 5-window stability filter + 6 new GitHub Actions workflows
-- `b07b229` — require >=3 trades/day for top picks + frequency-focused pass 3
-- `81c4683` — 5h backtest as primary metric + humanized Russian + 24h aging
-- `3277a52` — adaptive grid + walk-forward + strategy memory + Russian report
-- `86fb19d` — switch schedule + report to UTC+5; tighten top-3 ranker
-- `19b1634` — 5h adaptive per-pair strategy + Telegram report + orderbook fix
-- `3b26a86` — add chart-proof PNG renderer + matplotlib dep + render 4 charts
-- `8e8595b` — full-system backtest on all 28 pairs + MAX Pine + CI
-- `f604f54` — multi-pair MR backtest (4 pairs, JPY pip handling)
-- `6216717` — 3 setup kinds (and / rsi_only / bb_only) + 6750-combo grid
-- `cb709f5` — expand grid (2250 combos) + new targets
-- `db2c798` — mean-reversion backtest hits 76.47% WR + positive PnL
-- `a3a3d0b` — EUR/USD signal indicator + Python backtest + CI workflow
-- `d68370b` — v2 universal binary-options indicator + strategy
-- `d8e7d65` — v2 - order book, price action, improved analysis, table UI
-- `c7c81e5` — new forex signals system - clean rewrite
-- `b175ae3` — институциональный вердикт + минимальный сайт «только стакан»
-- `164b8a8` — 3-section reorg — STAKAN as primary, +5-sec live-price, +news-watch, +system-health
+- `35f949fb` — AI-агент — свободный текст → workflow_dispatch
+- `5c28f1d6` — прогресс-бар с editMessageText для 5h-цикла
+- `5a7e3eaf` — rolling 5h window, GO/WAIT banner, pro-expert blocks
+- `84a053e5` — add 28-pair scanner + macro/strength matrix + Top-5 to Telegram
+- `796a556c` — TOP-1 AI analysis with TradingView screenshots → Telegram
+- `2d22b15f` — always publish top-1 of 28 with tier badge (no more ОЖИДАНИЕ)
+- `65bdad46` — surface leading candidate and always-on TradingView chart
+- `8fd445d0` — dynamic-horizon projection, live forecast in payload, refreshed UI
+- `5ddf391c` — edge-check (Wilson 95% lower-bound) + theme toggle + cache-bust
+- `ba6bfee2` — strict 80% clear-favorite floor (remove lead escape)
+- `5317b1f9` — smart-money composite + W1/M5/5h safety + clear-favorite gate
 
 ## 🐛 Исправления
 
-- `71e162e` — tighter gates — unanimous-13 score, ADX rising 10b, 50-bar breakout, 20-bar cooldown, reversal warning
-- `48ea296` — single-line ternaries to satisfy Pine v5 line-continuation rule
-- `2d0c3e5` — MIN_PICKS=3 hard invariant + 70% backtest-WR preference
-- `67f70d4` — force-track cycle state files (state/ is gitignored)
-- `f08229d` — walk-forward also uses indicators_now.side when no active entry
-- `2e15642` — Pine v5 compatibility — explicit := assignment, no _ discards
-- `659e309` — use sys.path.insert for sibling import (CI runs as script)
-- `0ca3d05` — replace commit-comment with PR comment + job summary
-- `007c1d6` — pine v5 syntax fixes for indicator
-- `4bfd573` — instant loading on mobile - data embedded in HTML
-- `e789eaf` — faster loading - progressive data + retry every 2s
-- `998d428` — sort signals to top of table
-- `0b4e4ae` — bar shows Bayesian fav-balance, not raw VP big-players [skip ci]
-- `144b30a` — integrity-audit checks 1 pair/request (was 28 → 256MB OOM on fly)
-- `b7bba62` — hidden attribute on .so-tp-row blocked by display:flex
-- `4411be8` — no-jump on refresh + UTC+5 clock + 5h trade plan + news-ahead + 24h horizon reason
-- `a984c31` — default-OFF in-process refresh/paper tasks (OOM-killed); rely on 30-min Devin Schedule
-
-## 📚 Документация
-
-- `2b29dcb` — mark new_signals as primary system, update AGENTS.md
-- `03309fe` — update PERMANENT URL to fxinvestment-kwotgqny [skip ci]
+- `351d4db1` — HTML-escape literals and LLM body for Telegram parse_mode=HTML
+- `4fe75702` — use most-recent Wilson window as primary edge gate
+- `52da39d8` — repair sign-flip bug + calibrate scaling so real ≥80% signals publish
+- `3f9709d9` — countdown grid-fallback + raw-github fresh data + 1-min pulse cron
 
 ## 🔧 Поддержка
 
-- `ee7963c` — price comparison snapshot
-- `abb5b3b` — performance report 2026-05-11
-- `bc26b78` — refresh market summary
-- `457b740` — top-1 chart screenshot
-- `ced26aa` — refresh market summary
-- `bcfdfe3` — 5h cycle snapshot 2026-05-11 04:00 UTC
-- `d95a0ae` — price comparison snapshot
-- `3677b05` — price comparison snapshot
-- `c9bb746` — price comparison snapshot
-- `003f829` — price comparison snapshot
-- `7e0ab84` — top-1 chart screenshot
-- `67ffa3c` — price comparison snapshot
-- `bd05532` — refresh market summary
-- `c0f618c` — 2026-05-10 20:02 UTC
-- `dfdc2ce` — 5h cycle snapshot 2026-05-10 20:02 UTC
-- `c17b98c` — price comparison snapshot
-- `29b2332` — price comparison snapshot
-- `46b6c95` — price comparison snapshot
-- `4f02d81` — price comparison snapshot
-- `b4f4d78` — refresh market summary
-- `6b010bc` — 2026-05-10 16:08 UTC
-- `d28cec3` — refresh market summary
-- `2deb440` — 5h cycle snapshot 2026-05-10 16:00 UTC
-- `2f16f7f` — price comparison snapshot
-- `07f1624` — price comparison snapshot
-- `d815e53` — price comparison snapshot
-- `0391bd6` — price comparison snapshot
-- `376f0da` — 2026-05-10 11:13 UTC
-- `43b1cc3` — refresh market summary
-- `afca554` — 5h cycle snapshot 2026-05-10 11:05 UTC
-- `eee7e9a` — price comparison snapshot
-- `61c3983` — price comparison snapshot
-- `eb26dd0` — price comparison snapshot
-- `d1df89f` — refresh market summary
-- `17d6372` — refresh market summary
-- `794de28` — 5h cycle snapshot 2026-05-10 07:30 UTC
-- `472e9e7` — price comparison snapshot
-- `77da926` — refresh market summary
-- `8fa4010` — top-1 chart screenshot
-- `971e972` — refresh market summary
-- `6ff96e3` — 5h cycle snapshot 2026-05-10 03:48 UTC
-- `62e29fa` — price comparison snapshot
-- `77a3737` — price comparison snapshot
-- `52ef973` — price comparison snapshot
-- `59fc13e` — price comparison snapshot
-- `78a53cf` — top-1 chart screenshot
-- `4e05537` — price comparison snapshot
-- `7188719` — 2026-05-09 20:01 UTC
-- `1069f64` — refresh market summary
-- `1c871bf` — 5h cycle snapshot 2026-05-09 20:00 UTC
-- `fc40e68` — price comparison snapshot
-- `1c3a9ef` — price comparison snapshot
-- `eab08f0` — price comparison snapshot
-- `02970a4` — price comparison snapshot
-- `8c92eb9` — refresh market summary
-- `56012cd` — 2026-05-09 16:07 UTC
-- `d9ce44c` — refresh market summary
-- `ac5ab9a` — 5h cycle snapshot 2026-05-09 16:00 UTC
-- `5c34ab4` — price comparison snapshot
-- `6d8e2e3` — price comparison snapshot
-- `7c0fbad` — price comparison snapshot
-- `c23be00` — price comparison snapshot
-- `bf5fa6d` — refresh market summary
-- `a4d0eca` — refresh market summary
-- `6c30cc2` — 5h cycle snapshot 2026-05-09 11:03 UTC
-- `a4bbd24` — price comparison snapshot
-- `5f4efbe` — price comparison snapshot
-- `2fc7b4c` — price comparison snapshot
-- `abcbe00` — 2026-05-09 07:20 UTC
-- `52be120` — refresh market summary
-- `a39fad8` — 5h cycle snapshot 2026-05-09 07:13 UTC
-- `075cbf9` — price comparison snapshot
-- `752f147` — top-1 chart screenshot
-- `c3942ad` — refresh market summary
-- `7f06c96` — 5h cycle snapshot 2026-05-09 03:34 UTC
-- `5240bf2` — price comparison snapshot
-- `6bfd153` — price comparison snapshot
-- `7630c43` — price comparison snapshot
-- `66da558` — price comparison snapshot
-- `2a4fb78` — top-1 chart screenshot
-- `eca96a0` — price comparison snapshot
-- `27b34a3` — refresh market summary
-- `0e37ac2` — refresh market summary
-- `2d9e4c9` — 5h cycle snapshot 2026-05-08 20:11 UTC
-- `774e162` — price comparison snapshot
-- `8eb026c` — price comparison snapshot
-- `a40cea6` — price comparison snapshot
-- `241a405` — top-1 chart screenshot
-- `9fd2d70` — refresh market summary
-- `1283ced` — 5h cycle snapshot 2026-05-08 16:21 UTC
-- `cabf836` — price comparison snapshot
-- `cca4df0` — update seen-events ledger
-- `bbcad36` — price comparison snapshot
-- `cd22a70` — price comparison snapshot
-- `735c99a` — refresh market summary
-- `a405c04` — refresh market summary
-- `7c2edfc` — 5h cycle snapshot 2026-05-08 11:25 UTC
-- `6bf5f37` — price comparison snapshot
-- `a0ddf1d` — price comparison snapshot
-- `d7c4a7d` — price comparison snapshot
-- `af3eb5d` — refresh market summary
-- `b6c3af9` — refresh market summary
-- `7ee2676` — 5h cycle snapshot 2026-05-08 06:56 UTC
-- `425123c` — price comparison snapshot
-- `5e37c6d` — refresh market summary
-- `88cccce` — 2026-05-08 03:52 UTC
-- `4492088` — refresh market summary
-- `8feb50c` — 5h cycle snapshot 2026-05-08 03:34 UTC
-- `dc87902` — price comparison snapshot
-- `46cc6ad` — price comparison snapshot
-- `5e0023c` — price comparison snapshot
-- `10c3583` — top-1 chart screenshot
-- `0738e28` — price comparison snapshot
-- `e48bef1` — refresh market summary
-- `4e6c689` — refresh market summary
-- `3d7df94` — 5h cycle snapshot 2026-05-07 20:20 UTC
-- `4e78ecf` — price comparison snapshot
-- `1393e4b` — price comparison snapshot
-- `3c92914` — 2026-05-07 17:03 UTC
-- `52e409c` — 2026-05-07 16:58 UTC
-- `a86a801` — 5h cycle snapshot 2026-05-07 16:58 UTC
-- `a166f28` — price comparison snapshot
-- `b0a9cf5` — price comparison snapshot
-- `d41ec7a` — refresh market summary
-- `ee9d688` — 2026-05-07 12:05 UTC
-- `795c67d` — 2026-05-07 11:54 UTC
-- `d103a48` — 5h cycle snapshot 2026-05-07 11:54 UTC
-- `f0ebf7a` — price comparison snapshot
-- `813f143` — price comparison snapshot
-- `a6b059e` — refresh market summary
-- `6628311` — 2026-05-07 07:52 UTC
-- `251f7a7` — refresh market summary
-- `941c6bc` — 5h cycle snapshot 2026-05-07 07:47 UTC
-- `40ebc1a` — price comparison snapshot
-- `87e7c79` — refresh neighbours 2026-05-07 04:06 UTC
-- `8a0f1e1` — refresh market summary
-- `0d00008` — top-1 chart screenshot
-- `91373e9` — 2026-05-07 03:39 UTC
-- `f7ee20e` — 5h cycle snapshot 2026-05-07 03:39 UTC
-- `d121d29` — price comparison snapshot
-- `b0baf94` — price comparison snapshot
-- `d3bbd7a` — price comparison snapshot
-- `6f3ccbb` — price comparison snapshot
-- `98e1857` — top-1 chart screenshot
-- `59c83b2` — refresh market summary
-- `21b49f6` — 5h cycle snapshot 2026-05-06 20:29 UTC
-- `9cbda8d` — price comparison snapshot
-- `07da44c` — update seen-events ledger
-- `36234bd` — price comparison snapshot
-- `bdc87e6` — 5h cycle snapshot 2026-05-06 16:37 UTC
-- `cd156b2` — 5h cycle snapshot 2026-05-06 16:29 UTC
-- `488a8ed` — 5h cycle snapshot 2026-05-06 15:57 UTC
-- `6f5af23` — 5h cycle snapshot 2026-05-06 15:46 UTC
-- `935d025` — 5h cycle snapshot 2026-05-06 15:34 UTC
-- `ff4dbd2` — 5h cycle snapshot 2026-05-06 15:14 UTC
-- `97b9c8f` — 5h cycle snapshot 2026-05-06 15:08 UTC
-- `48d5ade` — 5h cycle snapshot 2026-05-06 15:02 UTC
-- `189bdb2` — 5h cycle snapshot 2026-05-06 14:42 UTC
-- `cfa9aad` — 5h cycle snapshot 2026-05-06 14:14 UTC
-- `aa8d2a7` — 5h cycle snapshot 2026-05-06 14:09 UTC
-- `693783c` — mark PR #14 conflict resolution in progress
+- `eb8d7c81` — price comparison snapshot
+- `fd8712b1` — performance report 2026-05-18
+- `a0846f50` — 2026-05-18 04:41 UTC
+- `0751277d` — refresh market summary
+- `f93e9503` — 5h cycle snapshot 2026-05-18 04:09 UTC
+- `cd652e27` — price comparison snapshot
+- `9a855488` — price comparison snapshot
+- `e3afacc2` — price comparison snapshot
+- `4ae32e2c` — price comparison snapshot
+- `38850ddd` — top-1 chart screenshot
+- `ac5ad8f9` — price comparison snapshot
+- `4f77ac12` — refresh market summary
+- `de36b96f` — 5h cycle snapshot 2026-05-17 20:09 UTC
+- `b7318d0f` — price comparison snapshot
+- `d48325a3` — refresh market summary
+- `7a390725` — price comparison snapshot
+- `7cffab3e` — price comparison snapshot
+- `5ddeb949` — refresh market summary
+- `e591ce05` — 2026-05-17 16:09 UTC
+- `15f124a9` — refresh market summary
+- `006dc9df` — 5h cycle snapshot 2026-05-17 16:05 UTC
+- `62f82f91` — price comparison snapshot
+- `2ff9f23f` — price comparison snapshot
+- `7480f07b` — price comparison snapshot
+- `fe6629b1` — refresh market summary
+- `12bc3437` — refresh market summary
+- `adee4782` — 5h cycle snapshot 2026-05-17 11:16 UTC
+- `d0e6995d` — price comparison snapshot
+- `96e587eb` — price comparison snapshot
+- `cd05e82d` — refresh market summary
+- `779b2783` — 2026-05-17 07:43 UTC
+- `1edb02ec` — refresh market summary
+- `5518a73b` — 5h cycle snapshot 2026-05-17 07:37 UTC
+- `b77b6868` — price comparison snapshot
+- `38e8a78f` — price comparison snapshot
+- `3d2b8dd7` — refresh market summary
+- `0e5edbc2` — 2026-05-17 04:21 UTC
+- `17e31f25` — top-1 chart screenshot
+- `3984baf7` — refresh market summary
+- `88707474` — 5h cycle snapshot 2026-05-17 03:57 UTC
+- `81326ff6` — price comparison snapshot
+- `ee4e2b5e` — price comparison snapshot
+- `046d89f1` — price comparison snapshot
+- `9b5cc4a3` — price comparison snapshot
+- `e8e78723` — refresh market summary
+- `9b072d9a` — refresh market summary
+- `cdeb21f9` — 5h cycle snapshot 2026-05-16 20:06 UTC
+- `a6f8d997` — price comparison snapshot
+- `db851f54` — price comparison snapshot
+- `c56d05b8` — refresh market summary
+- `5f8b26c4` — 5h cycle snapshot 2026-05-16 18:41 UTC
+- `eb40f6ea` — refresh market summary
+- `defb1ebb` — 5h cycle snapshot 2026-05-16 18:34 UTC
+- `836dde7a` — price comparison snapshot
+- `5945035c` — price comparison snapshot
+- `438e2b8e` — 2026-05-16 16:08 UTC
+- `f4a87711` — refresh market summary
+- `ad9f3663` — 5h cycle snapshot 2026-05-16 16:03 UTC
+- `786c5910` — price comparison snapshot
+- `3323b93e` — price comparison snapshot
+- `bcf685f2` — price comparison snapshot
+- `67776013` — price comparison snapshot
+- `7cd17868` — refresh market summary
+- `77d1c7ad` — refresh market summary
+- `af2dae91` — 5h cycle snapshot 2026-05-16 11:08 UTC
+- `eeec188f` — price comparison snapshot
+- `31043553` — price comparison snapshot
+- `8c33c583` — refresh market summary
+- `c6b7e84a` — top-1 chart screenshot
+- `67d576cc` — refresh market summary
+- `b59549f4` — 5h cycle snapshot 2026-05-16 07:22 UTC
+- `1ef1c8ee` — price comparison snapshot
+- `41e4bc69` — price comparison snapshot
+- `4b1572fc` — refresh market summary
+- `26266de3` — top-1 chart screenshot
+- `5b4fe287` — refresh market summary
+- `efa7f14f` — 5h cycle snapshot 2026-05-16 03:39 UTC
+- `7ea43cf2` — price comparison snapshot
+- `0794d33b` — price comparison snapshot
+- `1d88d9a1` — price comparison snapshot
+- `fb5b206e` — top-1 chart screenshot
+- `37fd7c54` — price comparison snapshot
+- `8d9797f1` — refresh market summary
+- `5e674d31` — 2026-05-15 20:34 UTC
+- `b4f4db57` — refresh market summary
+- `0862a141` — 5h cycle snapshot 2026-05-15 20:21 UTC
+- `00e3d5b8` — price comparison snapshot
+- `fc2c3ef4` — price comparison snapshot
+- `f81ac582` — refresh market summary
+- `96d7f4de` — refresh market summary
+- `f72bcf1b` — 5h cycle snapshot 2026-05-15 16:56 UTC
+- `a577c418` — price comparison snapshot
+- `191c2201` — update seen-events ledger
+- `ff671b4d` — run every 1 hour instead of every 5 hours
+- `d1f9207f` — price comparison snapshot
+- `d8af6374` — refresh market summary
+- `697306ca` — 2026-05-15 12:06 UTC
+- `010a3479` — refresh market summary
+- `88248cd0` — 5h cycle snapshot 2026-05-15 12:01 UTC
+- `93876241` — price comparison snapshot
+- `1d5c904d` — price comparison snapshot
+- `66deacad` — refresh market summary
+- `4dd7d594` — refresh market summary
+- `e3277c51` — 2026-05-15 08:16 UTC
+- `2112e8ca` — 5h cycle snapshot 2026-05-15 08:11 UTC
+- `adcc0742` — price comparison snapshot
+- `4781bff3` — refresh market summary
+- `f78d5510` — 2026-05-15 04:16 UTC
+- `ef09db37` — refresh market summary
+- `757b12ea` — 5h cycle snapshot 2026-05-15 03:56 UTC
+- `0a1d37b3` — price comparison snapshot
+- `5d84a7ef` — price comparison snapshot
+- `e1471807` — price comparison snapshot
+- `1ec692ad` — top-1 chart screenshot
+- `1e2ccff4` — price comparison snapshot
+- `32bc0d14` — 2026-05-14 20:44 UTC
+- `fc191eb4` — refresh market summary
+- `74cb1925` — 5h cycle snapshot 2026-05-14 20:41 UTC
+- `999c5e0a` — price comparison snapshot
+- `b06abda2` — price comparison snapshot
+- `4e872278` — refresh market summary
+- `5a696f7f` — 2026-05-14 17:09 UTC
+- `19ca65b6` — refresh market summary
+- `12ed9936` — 5h cycle snapshot 2026-05-14 17:06 UTC
+- `b9eb5744` — price comparison snapshot
+- `983d2b27` — update seen-events ledger
+- `604a517d` — price comparison snapshot
+- `28e10a83` — 2026-05-14 12:05 UTC
+- `04d82b3a` — refresh market summary
+- `65b07e90` — 5h cycle snapshot 2026-05-14 11:58 UTC
+- `d2ecf581` — price comparison snapshot
+- `5922d240` — price comparison snapshot
+- `2830339a` — 2026-05-14 08:03 UTC
+- `5cbcd462` — refresh market summary
+- `279ee12d` — 5h cycle snapshot 2026-05-14 07:48 UTC
+- `187a2a35` — price comparison snapshot
+- `bc9bfb67` — refresh market summary
+- `33d56118` — 2026-05-14 04:11 UTC
+- `589580b0` — refresh market summary
+- `59080692` — 5h cycle snapshot 2026-05-14 03:52 UTC
+- `48d58202` — price comparison snapshot
+- `f5bfee3a` — price comparison snapshot
+- `69273a37` — price comparison snapshot
+- `4182023c` — top-1 chart screenshot
+- `57c59a27` — price comparison snapshot
+- `88056f89` — refresh market summary
+- `3f087c59` — refresh market summary
+- `80e4261c` — 5h cycle snapshot 2026-05-13 20:50 UTC
+- `4567fa2e` — price comparison snapshot
+- `a1679bec` — price comparison snapshot
+- `39fbd13a` — refresh market summary
+- `d7f2fd9b` — 5h cycle snapshot 2026-05-13 17:23 UTC
+- `bd86cbd7` — price comparison snapshot
+- `23a0949f` — 2026-05-13 12:23 UTC
+- `aba95ed8` — refresh market summary
+- `714d6b90` — 5h cycle snapshot 2026-05-13 12:11 UTC
+- `8b2ab785` — price comparison snapshot
+- `cde0a458` — price comparison snapshot
+- `f147689e` — top-1 chart screenshot
+- `29fadbc4` — refresh market summary
+- `72e559e0` — 5h cycle snapshot 2026-05-13 07:55 UTC
+- `c0c18a40` — price comparison snapshot
+- `513a775b` — refresh market summary
+- `0f87cd35` — refresh market summary
+- `4ac9f880` — price comparison snapshot
+- `0c46c757` — price comparison snapshot
+- `d5198401` — price comparison snapshot
+- `985a099e` — price comparison snapshot
+- `e0bfbd4b` — top-1 chart screenshot
+- `646411e4` — 2026-05-12 20:49 UTC
+- `d07d4af4` — refresh market summary
+- `43fa5601` — 5h cycle snapshot 2026-05-12 20:45 UTC
+- `4a6ae4e2` — price comparison snapshot
+- `0475ab1c` — price comparison snapshot
+- `742fc992` — 2026-05-12 17:22 UTC
+- `341e4613` — refresh market summary
+- `0361c3cf` — 5h cycle snapshot 2026-05-12 17:18 UTC
+- `ede51d05` — price comparison snapshot
+- `9c5ba234` — price comparison snapshot
+- `24830f07` — refresh market summary
+- `cce9b722` — top-1 chart screenshot
+- `e87e09ee` — refresh market summary
+- `6c18da77` — 5h cycle snapshot 2026-05-12 12:02 UTC
+- `0578d573` — price comparison snapshot
+- `d86acdcb` — price comparison snapshot
+- `37b625a3` — refresh market summary
+- `3cb57aa1` — refresh market summary
+- `182aaeba` — 5h cycle snapshot 2026-05-12 07:48 UTC
+- `f72f181c` — price comparison snapshot
+- `a189101e` — refresh market summary
+- `08282abb` — 2026-05-12 04:04 UTC
+- `5b261a87` — refresh market summary
+- `4579cc89` — 5h cycle snapshot 2026-05-12 03:43 UTC
+- `b8d23be3` — price comparison snapshot
+- `9389f83f` — price comparison snapshot
+- `62c5f2a3` — price comparison snapshot
+- `ff7de47b` — price comparison snapshot
+- `d4b437d7` — top-1 chart screenshot
+- `4b2677c1` — refresh market summary
+- `cd225133` — 2026-05-11 20:53 UTC
+- `65ee401e` — refresh market summary
+- `355113df` — 5h cycle snapshot 2026-05-11 20:51 UTC
+- `f5df7006` — price comparison snapshot
+- `74e401b1` — price comparison snapshot
+- `0538475e` — 2026-05-11 17:30 UTC
+- `abb6deb1` — 2026-05-11 17:30 UTC
+- `46d9a3ca` — 5h cycle snapshot 2026-05-11 17:29 UTC
+- `29f90062` — price comparison snapshot
+- `dff18ca3` — price comparison snapshot
+- `431fdfc5` — refresh market summary
+- `6474d3a2` — refresh market summary
+- `73846ba4` — 5h cycle snapshot 2026-05-11 12:44 UTC
+- `72de54d2` — price comparison snapshot
 
 ## 🤖 CI / GitHub Actions
 
-- `4c40f6a` — GitHub Actions keepalive cron + history note (Bayesian favorite)
+- `cbb0b7d4` — long-loop pulse + offset second cron for sub-5min cadence
+- `06ab0efb` — trigger brain workflows when edge_check / safety / layers change
 
 ## 📝 Прочее
 
-- `c21046d` — combined VNC + typing UI for Android Chrome
-- `f83dd96` — tune defaults for stronger moves and higher win rate
-- `f5f947e` — fix alertcondition compile error (message arg requires const string)
-- `9f5c4d6` — add Pine Script v5 indicator + strategy mirroring app/analyzer.py
-- `ff90e32` — Strict 5h forecast cycle, real M15/H1/H4/D1, caching and rate limits
-- `17f457f` — удалён весь старый код, оставлена только новая система
-- `dabdd98` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `848127a` — smart-money 24h forecast per (pair × session) + UI plates
-- `a5dd2fa` — phase13 deploy to fly (sldppfwz) — Phase 13 live, 27/28 pairs calibration_active
-- `8c79eb6` — probability calibration vs realized WR (Wilson lower bound)
-- `d08db08` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `ce2fdc8` — 24-hour-ahead forecast engine + 5h expiry + 6 free macro-proxy sources
-- `1767d02` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `8f5ec55` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `6d5ac66` — BLOCK O honest math expectation @ user broker payout (70% default)
-- `d81f0e8` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `8d991ea` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `91955b2` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `363726c` — trades=15/W10/L5 WR=67% PnL=+4$ | open=5 [skip ci]
-- `5516508` — trades=15/W10/L5 WR=67% PnL=+4$ | open=2 [skip ci]
-- `95b81c3` — BLOCK N cell-anchor (probability_pct = measured cell WR when guard satisfied)
-- `b89869e` — BLOCK M deeper conviction (hour_bias + historical_wr + currency_strength) [skip ci]
-- `9fdff86` — phase 8 deeper training summary [skip ci]
-- `ec6609e` — deeper training - non-USD events + 17 high-conviction rules + persistent bias + multi-event cluster (BLOCK L)
-- `7bcca1e` — 365d event-attribution + live integration (PR16+PR17) [skip ci]
-- `b4699a7` — phase 7 - live integration into forecast_scanner (event-attribution boost + soft trap filter) [skip ci]
-- `b87618c` — phase 6 - master verdict markdown + meta.json (final report) [skip ci]
-- `6970805` — phase 5 - per-pair behavior profiles (28 markdowns, 112 cells, 11 persistent drivers) [skip ci]
-- `71055d8` — phase 4 - trap detector (79 event patterns, 112 pair-session summaries) [skip ci]
-- `5311d24` — phase 3 - attribution table (639 matches, 17 event-types, 229 cells) [skip ci]
-- `f4971fc` — phase 2 - move detector (28k cells / 2312 significant / 720 traps) [skip ci]
-- `7b24bbb` — phase 1 - 365d archive (667 events: 83 CB + 165 FRED + 399 COT + 20 geo) [skip ci]
-- `05335d9` — finalize 365d backtest report (stopped fresh sweep, used 2026-05-03 365d config) [skip ci]
-- `21dded4` — refresh backtester 365d CSV (28/28 done, WR 51.07%, n=31858, no simulator) [skip ci]
-- `4fa70b4` — real 365-day backtest CSV (28 pairs × 4 sessions, real Yahoo, no simulator) [skip ci]
-- `83134bc` — trades=10/W6/L4 WR=60% PnL=+2$ | open=5 [skip ci]
-- `fe41fe2` — weighted_agreement_pct, raised conf threshold, integrity audit
-- `003b44c` — +5 sources (15m TF + MTF RSI agreement) → 27/28 pairs ≥80%
-- `d32729b` — replace weighted-vote balance with Bayesian per-source confidence
-- `4b9678d` — trades=10/W6/L4 WR=60% PnL=+2$ | open=5 [skip ci]
-- `55def21` — utc5+no-jump+5h-trade-plan+price-freshness [skip ci]
-- `4d6938e` — 30-min refresh [skip ci]
-- `8154d57` — trades=10/W6/L4 WR=60% PnL=+2$ | open=4 [skip ci]
-- `74f729c` — switch schedule ID to sched-5229cad6 (every 30 min) [skip ci]
-- `c06a622` — 2026-05-04 no-ozhidanie + min-70pct + new fly URL [skip ci]
-- `b53f86c` — never ОЖИДАНИЕ; min 70% probability on all 28 pairs
-- `5a4658b` — trades=10/W6/L4 WR=60% PnL=+2$ | open=4 [skip ci]
-- `3f20e62` — trades=10/W6/L4 WR=60% PnL=+2$ | open=4 [skip ci]
-- `3325be5` — trades=10/W6/L4 WR=60% PnL=+2$ | open=4 [skip ci]
-- `423bec7` — institutional-verdict-stakan-only + new fly URL [skip ci]
-- `0a3ec0c` — trades=10/W6/L4 WR=60% PnL=+2$ | open=1 [skip ci]
-- `92c59ea` — 2026-05-04 test plan + report for 3-section reorg PR #12 [skip ci]
+- `986ea977` — новые индикаторы + multi-TF confluence для 80% сигналов
+- `d753bd33` — 6-layer Top-1 + new mobile red site + 5-min refresh
 
