@@ -735,7 +735,8 @@
             const persistBars = Number(f.trend_persistence_bars || 0);
             const adxH1 = Number(f.adx_h1 || 0);
             const adxH4 = Number(f.adx_h4 || 0);
-            const mtf = f.multi_tf_aligned ? '4/4' : '<4/4';
+            const mtfCount = Number(f.multi_tf_count != null ? f.multi_tf_count : (f.multi_tf_aligned ? 3 : 0));
+            const mtf = f.multi_tf_strict ? '4/4' : (f.multi_tf_aligned ? `${mtfCount}/4` : '<3/4');
             return `<div class="cycle-card ${sideCls}">
                 <div class="cycle-card-row">
                     <div>

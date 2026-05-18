@@ -66,12 +66,13 @@ def _trend_persistence_5h(bars_1h, side_hint: str | None) -> tuple[float, int]:
 
 
 def analyze_pair(pair: str) -> dict | None:
-    """Full multi-TF analysis of one pair on M15 / H1 / H4 / D1."""
+    """Full multi-TF analysis of one pair on W1 / D1 / H4 / H1 / M15."""
     # Real timeframes — NOT a 1h proxy for 4h.
     bars_15m = fetch_bars(pair, "15m", "5d")
     bars_1h = fetch_bars(pair, "1h", "1mo")
     bars_4h = fetch_bars(pair, "4h", "3mo")
     bars_1d = fetch_bars(pair, "1d", "1y")
+    bars_1w = fetch_bars(pair, "1wk", "2y")
 
     if any(df.empty or len(df) < 30 for df in (bars_15m, bars_1h, bars_4h, bars_1d)):
         return None
@@ -80,6 +81,9 @@ def analyze_pair(pair: str) -> dict | None:
     ind_1h = indicators.compute_all(bars_1h)
     ind_4h = indicators.compute_all(bars_4h)
     ind_1d = indicators.compute_all(bars_1d)
+    ind_1w = indicators.compute_all(bars_1w) if (
+        bars_1w is not None and not bars_1w.empty and len(bars_1w) >= 30
+    ) else None
 
     if not ind_15m or not ind_1h or not ind_4h or not ind_1d:
         return None
@@ -275,6 +279,52 @@ def analyze_pair(pair: str) -> dict | None:
     elif ind_15m["ema20"] < ind_15m["ema50"]:
         vote("EMA Кросс 15М", -1, "EMA20 < EMA50 на 15М — медвежий кросс", 1)
 
+    # === BLOCK P: 1W Senior Trend (weight: 2) ===
+    # Weekly trend is the longest-horizon agreement signal — it confirms
+    # whether the directional read is aligned with the big-money / swing
+    # bias.  Awarded only when W1 bars are available (≥30 weeks of history).
+    if ind_1w:
+        if ind_1w["close"] > ind_1w["ema20"] > ind_1w["ema50"]:
+            vote("1W Тренд", +2, "Недельный тренд вверх (EMA20>EMA50)", 2)
+        elif ind_1w["close"] < ind_1w["ema20"] < ind_1w["ema50"]:
+            vote("1W Тренд", -2, "Недельный тренд вниз (EMA20<EMA50)", 2)
+        elif ind_1w["close"] > ind_1w["ema50"]:
+            vote("1W Тренд", +1, "Недельный выше EMA50", 2)
+        elif ind_1w["close"] < ind_1w["ema50"]:
+            vote("1W Тренд", -1, "Недельный ниже EMA50", 2)
+
+    # === BLOCK Q: Donchian-20 breakout on H1 (weight: 2) ===
+    # Classic trend-following signal — the textbook Turtle-Trader entry.
+    # When H1 close prints above the prior 20-bar high it's a continuation
+    # signal big players use to size in; below the 20-bar low is the same
+    # for shorts.  Pure price action, no indicator lag.
+    if len(bars_1h) > 21:
+        prior20_high = float(bars_1h["High"].iloc[-21:-1].max())
+        prior20_low = float(bars_1h["Low"].iloc[-21:-1].min())
+        h1_close = float(ind_1h["close"])
+        if h1_close > prior20_high:
+            vote("Дончиан H1", +2, "Пробой 20-период max — институциональное продолжение", 2)
+        elif h1_close < prior20_low:
+            vote("Дончиан H1", -2, "Пробой 20-период min — институциональное продолжение", 2)
+
+    # === BLOCK R: Daily Pivot Points (weight: 1) ===
+    # Classic S/R levels read by every desk trader.  Yesterday's H/L/C
+    # define today's pivot/R1/S1; price closing above R1 on H1 is a
+    # bullish trend confirmation, below S1 a bearish one.
+    if len(bars_1d) >= 2:
+        yest = bars_1d.iloc[-2]
+        yh = float(yest["High"])
+        yl = float(yest["Low"])
+        yc = float(yest["Close"])
+        pivot_p = (yh + yl + yc) / 3.0
+        r1 = 2.0 * pivot_p - yl
+        s1 = 2.0 * pivot_p - yh
+        h1_close = float(ind_1h["close"])
+        if h1_close > r1:
+            vote("Pivot D", +1, "Цена выше R1 — пробой дневного сопротивления", 1)
+        elif h1_close < s1:
+            vote("Pivot D", -1, "Цена ниже S1 — пробой дневной поддержки", 1)
+
     # === Calculate confidence (dynamic max_score) ===
     # max_possible accumulates the |weight| of every block that voted, so it
     # grows automatically when blocks are added/removed. Confidence is derived
@@ -316,11 +366,21 @@ def analyze_pair(pair: str) -> dict | None:
             "strength": f24_str,
         }
 
-    # Multi-TF alignment flag — used by the cycle module to mark «PREMIUM»
-    # forecasts that have all 4 senior timeframes agreeing in one direction.
-    multi_tf_aligned = (bull_count == 4 and side == "BUY") or (
+    # Multi-TF alignment flag — used by the brain veto + cycle module.
+    # The Pine indicators (eurusd_signal_indicator.pine, forex_max_pro.pine)
+    # use the same definition: ≥3 of 4 senior timeframes agreeing with
+    # ``side`` is a strong directional signal.  Requiring all 4 to agree
+    # is too strict — a 3-of-4 setup is 75% TF agreement, mathematically
+    # solid for 5h binary options.  We expose ``multi_tf_strict`` for
+    # telemetry when *all four* agree (the textbook-perfect setup).
+    bear_count = 4 - bull_count
+    multi_tf_aligned = (bull_count >= 3 and side == "BUY") or (
+        bear_count >= 3 and side == "SELL"
+    )
+    multi_tf_strict = (bull_count == 4 and side == "BUY") or (
         bull_count == 0 and side == "SELL"
     )
+    multi_tf_count = bull_count if side == "BUY" else bear_count
 
     # Trend persistence over the last 5 H1 bars — needed by the strict
     # 5-hour cycle to require that the trend has actually been going in
@@ -360,6 +420,8 @@ def analyze_pair(pair: str) -> dict | None:
         "forecast_5h": forecast_5h,
         "forecast_24h": forecast_24h,
         "multi_tf_aligned": multi_tf_aligned,
+        "multi_tf_strict": multi_tf_strict,
+        "multi_tf_count": multi_tf_count,
         "adx": round(adx_h1, 1),
         "adx_h1": round(adx_h1, 1),
         "adx_h4": round(adx_h4, 1),

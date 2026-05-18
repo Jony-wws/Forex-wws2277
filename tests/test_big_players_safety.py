@@ -122,7 +122,11 @@ def _synthetic_h1(seed: int, n: int = 100, drift: float = 0.0):
 
 def test_reversal_risk_short_data():
     from app.safety import reversal_risk_h1
-    df = _synthetic_h1(seed=1, n=2)
+    # With the relaxed REVERSAL_LOOKBACK_BARS=1 (most-recent-bar only)
+    # the function only needs 2 bars to check; passing 1 bar must still
+    # short-circuit to "no reversal" because engulfing requires a prev
+    # bar to compare against.
+    df = _synthetic_h1(seed=1, n=1)
     out = reversal_risk_h1(df, "BUY")
     assert out["reversal"] is False
     assert out["bar_index"] == -1
@@ -200,6 +204,23 @@ def test_m5_momentum_blocks_when_against():
     assert m5_momentum_aligned(df, "SELL") is True
 
 
+def test_m5_momentum_allows_small_pullback():
+    """0.10 % retrace in 30 min is normal noise, must NOT veto either side."""
+    from app.safety import m5_momentum_aligned
+    # 1.10000 → 1.10110 = +0.10 % over 6 bars (small pullback against SELL,
+    # tailwind for BUY).  With the new 0.20 % threshold neither side blocks.
+    df = pd.DataFrame({
+        "Open":  [1.10000, 1.10020, 1.10040, 1.10060, 1.10080, 1.10100],
+        "High":  [1.10010, 1.10030, 1.10050, 1.10070, 1.10090, 1.10115],
+        "Low":   [1.09995, 1.10015, 1.10035, 1.10055, 1.10075, 1.10095],
+        "Close": [1.10000, 1.10022, 1.10044, 1.10066, 1.10088, 1.10110],
+        "Volume": [1, 1, 1, 1, 1, 1],
+    })
+    # Slope is +0.10 %, threshold is 0.20 %, so neither side is vetoed.
+    assert m5_momentum_aligned(df, "BUY") is True
+    assert m5_momentum_aligned(df, "SELL") is True
+
+
 # --------------------------------------------------------------------------- #
 #  app.brain  — clear-favorite gate + new layer plumbing
 # --------------------------------------------------------------------------- #
@@ -209,6 +230,28 @@ def test_brain_weights_sum_to_one():
     from app.brain import WEIGHTS
     assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9
     assert "big_players" in WEIGHTS
+
+
+def test_reversal_lookback_bars_is_one():
+    """Honest-edge regression: the reversal lookback must stay at the most-recent
+    bar only (LOOKBACK=1).  Older bars are noise that the market has already
+    digested when ADX is high — vetoing them silently blocks legitimate strong
+    setups (e.g. the EURUSD-82% case that motivated this change)."""
+    from app.safety import REVERSAL_LOOKBACK_BARS
+    assert REVERSAL_LOOKBACK_BARS == 1
+
+
+def test_brain_strong_trend_bonus_two_paths():
+    """The strong-trend bonus has two equally-valid trigger paths:
+    (a) classic continuation (ADX≥30 + persist≥75% + multi-TF + safety)
+    (b) pullback inside a violent trend (ADX≥50 + persist≥40% + multi-TF + safety).
+    A regression that re-tightens either path silently blocks the 80% gate."""
+    import inspect
+    from app import brain
+    src = inspect.getsource(brain)
+    assert "classic_strong" in src
+    assert "pullback_in_violent_trend" in src
+    assert "adx >= 50.0" in src
 
 
 def test_brain_clear_favorite_constants_sane():
