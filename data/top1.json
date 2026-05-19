@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-19T01:51:19.845293+00:00",
+  "generated_at_utc": "2026-05-19T01:52:05.473329+00:00",
   "next_cycle_utc": "2026-05-19T05:00:00+00:00",
   "cycle_close_utc": "2026-05-19T05:00:00+00:00",
-  "minutes_to_expiry": 188.67,
+  "minutes_to_expiry": 187.91,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -10,14 +10,14 @@
     "name_ru": "Евро / Йена",
     "side": "BUY",
     "veto": null,
-    "confidence": 91,
-    "composite_score": 0.7819,
+    "confidence": 90,
+    "composite_score": 0.7477,
     "layers": {
       "technical": {
-        "score": 22,
-        "max_score": 32,
+        "score": 20,
+        "max_score": 33,
         "side": "BUY",
-        "confidence": 91,
+        "confidence": 90,
         "adx_h1": 35.7,
         "persistence_5h": 20.0,
         "multi_tf_aligned": true,
@@ -59,13 +59,18 @@
           },
           {
             "name": "Стохастик",
-            "value": -1,
-            "reason": "K=80 < D=85 — медвежий"
+            "value": -2,
+            "reason": "K=83 D=86 — перекупленность"
           },
           {
             "name": "ADX",
             "value": 3,
             "reason": "ADX 36 — сильный восходящий тренд"
+          },
+          {
+            "name": "Williams %R",
+            "value": -1,
+            "reason": "W%R -17 — перекупленность"
           },
           {
             "name": "Ишимоку",
@@ -187,7 +192,7 @@
           },
           "score": 0
         },
-        "normalised": 0.962
+        "normalised": 0.848
       },
       "macro": {
         "score": 1,
@@ -284,21 +289,21 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 3.1ч в плюсе: drift=+0.02040/ч, итог +0.06415 ≥ запас 0.06072",
-          "projected_close": 185.18715,
-          "entry": 185.123,
+          "reason": "Проекция на 3.1ч в плюсе: drift=+0.02170/ч, итог +0.06796 ≥ запас 0.06060",
+          "projected_close": 185.20396,
+          "entry": 185.136,
           "atr": 0.15314,
-          "drift_per_bar": 0.0204,
-          "drift_per_minute": 0.00034,
+          "drift_per_bar": 0.0217,
+          "drift_per_minute": 0.0003617,
           "horizon_bars": 5,
-          "horizon_minutes": 188.67,
-          "safety_margin": 0.06072
+          "horizon_minutes": 187.91,
+          "safety_margin": 0.0606
         }
       },
       "edge_check": {
         "passes": false,
-        "calibrated_confidence": 73.9,
-        "brain_confidence": 91,
+        "calibrated_confidence": 73.3,
+        "brain_confidence": 90,
         "reason": "Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
         "windows": {
           "5d": {
@@ -343,16 +348,16 @@
       }
     },
     "levels": {
-      "entry": 185.123,
-      "stop_loss": 184.89329,
-      "take_profit": 185.50586,
+      "entry": 185.136,
+      "stop_loss": 184.90629,
+      "take_profit": 185.51886,
       "atr_h1": 0.15314,
       "rr_target": 1.66
     },
     "edge": {
       "passes": false,
-      "calibrated_confidence": 73.9,
-      "brain_confidence": 91,
+      "calibrated_confidence": 73.3,
+      "brain_confidence": 90,
       "reason": "Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
       "windows": {
         "5d": {
@@ -398,16 +403,16 @@
     "tier": "strong",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 188.67,
-      "entry": 185.123,
-      "projected_close": 185.18715,
-      "drift_per_hour": 0.0204,
-      "drift_per_minute": 0.00034,
+      "horizon_minutes": 187.91,
+      "entry": 185.136,
+      "projected_close": 185.20396,
+      "drift_per_hour": 0.0217,
+      "drift_per_minute": 0.0003617,
       "atr_h1": 0.15314,
-      "safety_margin": 0.06072,
+      "safety_margin": 0.0606,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 3.1ч в плюсе: drift=+0.02040/ч, итог +0.06415 ≥ запас 0.06072"
+      "reason": "Проекция на 3.1ч в плюсе: drift=+0.02170/ч, итог +0.06796 ≥ запас 0.06060"
     }
   },
   "top5": [
@@ -416,14 +421,14 @@
       "name_ru": "Евро / Йена",
       "side": "BUY",
       "veto": null,
-      "confidence": 91,
-      "composite_score": 0.7819,
+      "confidence": 90,
+      "composite_score": 0.7477,
       "layers": {
         "technical": {
-          "score": 22,
-          "max_score": 32,
+          "score": 20,
+          "max_score": 33,
           "side": "BUY",
-          "confidence": 91,
+          "confidence": 90,
           "adx_h1": 35.7,
           "persistence_5h": 20.0,
           "multi_tf_aligned": true,
@@ -465,13 +470,18 @@
             },
             {
               "name": "Стохастик",
-              "value": -1,
-              "reason": "K=80 < D=85 — медвежий"
+              "value": -2,
+              "reason": "K=83 D=86 — перекупленность"
             },
             {
               "name": "ADX",
               "value": 3,
               "reason": "ADX 36 — сильный восходящий тренд"
+            },
+            {
+              "name": "Williams %R",
+              "value": -1,
+              "reason": "W%R -17 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -593,7 +603,7 @@
             },
             "score": 0
           },
-          "normalised": 0.962
+          "normalised": 0.848
         },
         "macro": {
           "score": 1,
@@ -690,21 +700,21 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 3.1ч в плюсе: drift=+0.02040/ч, итог +0.06415 ≥ запас 0.06072",
-            "projected_close": 185.18715,
-            "entry": 185.123,
+            "reason": "Проекция на 3.1ч в плюсе: drift=+0.02170/ч, итог +0.06796 ≥ запас 0.06060",
+            "projected_close": 185.20396,
+            "entry": 185.136,
             "atr": 0.15314,
-            "drift_per_bar": 0.0204,
-            "drift_per_minute": 0.00034,
+            "drift_per_bar": 0.0217,
+            "drift_per_minute": 0.0003617,
             "horizon_bars": 5,
-            "horizon_minutes": 188.67,
-            "safety_margin": 0.06072
+            "horizon_minutes": 187.91,
+            "safety_margin": 0.0606
           }
         },
         "edge_check": {
           "passes": false,
-          "calibrated_confidence": 73.9,
-          "brain_confidence": 91,
+          "calibrated_confidence": 73.3,
+          "brain_confidence": 90,
           "reason": "Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
           "windows": {
             "5d": {
@@ -749,9 +759,9 @@
         }
       },
       "levels": {
-        "entry": 185.123,
-        "stop_loss": 184.89329,
-        "take_profit": 185.50586,
+        "entry": 185.136,
+        "stop_loss": 184.90629,
+        "take_profit": 185.51886,
         "atr_h1": 0.15314,
         "rr_target": 1.66
       }
@@ -811,7 +821,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=91 D=85 — перекупленность"
+              "reason": "K=92 D=85 — перекупленность"
             },
             {
               "name": "ADX",
@@ -821,7 +831,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -9 — перекупленность"
+              "reason": "W%R -8 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -978,7 +988,7 @@
         "news": {
           "score": 0,
           "reason": "Веток новостей нет",
-          "next_event_base_min": 248,
+          "next_event_base_min": 247,
           "next_event_quote_min": 9999
         },
         "sentiment": {
@@ -1031,7 +1041,7 @@
             "MACD(H1) положителен",
             "ADX(H1) 27 с DI+ > DI- — тренд вверх",
             "MFI(H1) 71 — деньги входят (бычий)",
-            "CCI(H1) 177 — сильный бычий импульс"
+            "CCI(H1) 178 — сильный бычий импульс"
           ],
           "normalised": 0.529,
           "bonus_applied": 0.0
@@ -1052,21 +1062,21 @@
           "projection": {
             "passes": true,
             "reason": "Проекция на 3.1ч в плюсе: drift=+0.00064/ч, итог +0.00201 ≥ запас 0.00137",
-            "projected_close": 2.29242,
-            "entry": 2.29041,
+            "projected_close": 2.29246,
+            "entry": 2.29045,
             "atr": 0.00346,
             "drift_per_bar": 0.00064,
             "drift_per_minute": 1.07e-05,
             "horizon_bars": 5,
-            "horizon_minutes": 188.67,
+            "horizon_minutes": 187.91,
             "safety_margin": 0.00137
           }
         }
       },
       "levels": {
-        "entry": 2.29041,
-        "stop_loss": 2.28522,
-        "take_profit": 2.29905,
+        "entry": 2.29045,
+        "stop_loss": 2.28526,
+        "take_profit": 2.29909,
         "atr_h1": 0.00346,
         "rr_target": 1.66
       }
@@ -1074,24 +1084,24 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 188.67,
-    "entry": 185.123,
-    "projected_close": 185.18715,
-    "drift_per_hour": 0.0204,
-    "drift_per_minute": 0.00034,
+    "horizon_minutes": 187.91,
+    "entry": 185.136,
+    "projected_close": 185.20396,
+    "drift_per_hour": 0.0217,
+    "drift_per_minute": 0.0003617,
     "atr_h1": 0.15314,
-    "safety_margin": 0.06072,
+    "safety_margin": 0.0606,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 3.1ч в плюсе: drift=+0.02040/ч, итог +0.06415 ≥ запас 0.06072"
+    "reason": "Проекция на 3.1ч в плюсе: drift=+0.02170/ч, итог +0.06796 ≥ запас 0.06060"
   },
   "leading_candidate": {
     "pair": "EURJPY",
     "name_ru": "Евро / Йена",
     "side": "BUY",
-    "confidence": 91,
+    "confidence": 90,
     "veto": null,
-    "composite_score": 0.7819
+    "composite_score": 0.7477
   },
   "macro_currency_strength": {
     "USD": 3.0,
@@ -1164,13 +1174,13 @@
   "favorite_check": {
     "ok": false,
     "tier": "strong",
-    "reason": "⚡ STRONG: brain 91% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
+    "reason": "⚡ STRONG: brain 90% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
     "lead_required": 5,
     "confidence_floor": 80,
     "edge_check": {
       "passes": false,
-      "calibrated_confidence": 73.9,
-      "brain_confidence": 91,
+      "calibrated_confidence": 73.3,
+      "brain_confidence": 90,
       "reason": "Edge не подтверждён: 5d Wilson lower 48.4% < 51% (статистически не отличается от случайности).",
       "windows": {
         "5d": {
