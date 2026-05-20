@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-20T05:55:40.221858+00:00",
+  "generated_at_utc": "2026-05-20T05:56:08.668747+00:00",
   "next_cycle_utc": "2026-05-20T10:00:00+00:00",
   "cycle_close_utc": "2026-05-20T10:00:00+00:00",
-  "minutes_to_expiry": 244.33,
+  "minutes_to_expiry": 243.86,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -227,7 +227,7 @@
         "score": 0,
         "reason": "Веток новостей нет",
         "next_event_base_min": 9999,
-        "next_event_quote_min": 724
+        "next_event_quote_min": 723
       },
       "sentiment": {
         "score": 0,
@@ -306,7 +306,7 @@
           "drift_per_bar": -0.00012,
           "drift_per_minute": -2e-06,
           "horizon_bars": 5,
-          "horizon_minutes": 244.33,
+          "horizon_minutes": 243.86,
           "safety_margin": 0.00034
         }
       },
@@ -413,7 +413,7 @@
     "tier": "premium",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 244.33,
+      "horizon_minutes": 243.86,
       "entry": 1.15969,
       "projected_close": 1.1592,
       "drift_per_hour": -0.00012,
@@ -648,7 +648,7 @@
           "score": 0,
           "reason": "Веток новостей нет",
           "next_event_base_min": 9999,
-          "next_event_quote_min": 724
+          "next_event_quote_min": 723
         },
         "sentiment": {
           "score": 0,
@@ -727,7 +727,7 @@
             "drift_per_bar": -0.00012,
             "drift_per_minute": -2e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 244.33,
+            "horizon_minutes": 243.86,
             "safety_margin": 0.00034
           }
         },
@@ -791,14 +791,14 @@
       "name_ru": "Доллар США / Франк",
       "side": "BUY",
       "veto": null,
-      "confidence": 86,
-      "composite_score": 0.6222,
+      "confidence": 85,
+      "composite_score": 0.5841,
       "layers": {
         "technical": {
-          "score": 20,
+          "score": 18,
           "max_score": 36,
           "side": "BUY",
-          "confidence": 89,
+          "confidence": 88,
           "adx_h1": 42.1,
           "persistence_5h": 60.0,
           "multi_tf_aligned": true,
@@ -825,8 +825,8 @@
             },
             {
               "name": "RSI",
-              "value": 2,
-              "reason": "RSI 55 — бычья зона"
+              "value": 0,
+              "reason": "RSI 55 — нейтральная зона"
             },
             {
               "name": "MACD",
@@ -841,7 +841,7 @@
             {
               "name": "Стохастик",
               "value": 0,
-              "reason": "K=98 D=79 — нейтральный"
+              "reason": "K=95 D=78 — нейтральный"
             },
             {
               "name": "ADX",
@@ -851,7 +851,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -2 — перекупленность"
+              "reason": "W%R -5 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -861,7 +861,7 @@
             {
               "name": "Моментум",
               "value": 1,
-              "reason": "Моментум +0.12% — рост"
+              "reason": "Моментум +0.11% — рост"
             },
             {
               "name": "VWAP",
@@ -981,7 +981,7 @@
             },
             "score": 6
           },
-          "normalised": 0.978
+          "normalised": 0.9
         },
         "macro": {
           "score": 3,
@@ -1005,7 +1005,7 @@
         "news": {
           "score": 0,
           "reason": "Веток новостей нет",
-          "next_event_base_min": 724,
+          "next_event_base_min": 723,
           "next_event_quote_min": 9999
         },
         "sentiment": {
@@ -1021,9 +1021,9 @@
         "confluence": {
           "pair": "USDCHF",
           "side": "BUY",
-          "score": 8,
+          "score": 6,
           "max_score": 34,
-          "score_pct": 0.235,
+          "score_pct": 0.176,
           "tf_directions": {
             "W1": 0,
             "D1": 0,
@@ -1034,7 +1034,7 @@
           "tf_aligned": false,
           "votes": {
             "ema_stack": 1,
-            "rsi": 1,
+            "rsi": 0,
             "macd": 1,
             "stoch": 0,
             "adx": -1,
@@ -1044,22 +1044,21 @@
             "supertrend": 1,
             "vortex": 0
           },
-          "bull_votes": 5,
+          "bull_votes": 4,
           "bear_votes": 1,
-          "neutral_votes": 4,
-          "leading_count": 5,
+          "neutral_votes": 5,
+          "leading_count": 4,
           "adx_h1": 42.1,
           "squeeze_released": false,
           "squeeze_momentum_aligned": true,
           "super_confluence": false,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 55 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 42 с DI- > DI+ — тренд вниз",
             "Supertrend(H1) бычий"
           ],
-          "normalised": 0.235,
+          "normalised": 0.176,
           "bonus_applied": 0.0
         },
         "senior_alignment": {
@@ -1077,22 +1076,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.1ч в плюсе: drift=+0.00014/ч, итог +0.00057 ≥ запас 0.00039",
-            "projected_close": 0.79085,
-            "entry": 0.79028,
+            "reason": "Проекция на 4.1ч в плюсе: drift=+0.00013/ч, итог +0.00054 ≥ запас 0.00039",
+            "projected_close": 0.79075,
+            "entry": 0.79021,
             "atr": 0.00086,
-            "drift_per_bar": 0.00014,
-            "drift_per_minute": 2.3e-06,
+            "drift_per_bar": 0.00013,
+            "drift_per_minute": 2.2e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 244.33,
+            "horizon_minutes": 243.86,
             "safety_margin": 0.00039
           }
         }
       },
       "levels": {
-        "entry": 0.79028,
-        "stop_loss": 0.78899,
-        "take_profit": 0.79242,
+        "entry": 0.79021,
+        "stop_loss": 0.78892,
+        "take_profit": 0.79235,
         "atr_h1": 0.00086,
         "rr_target": 1.66
       }
@@ -1100,7 +1099,7 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 244.33,
+    "horizon_minutes": 243.86,
     "entry": 1.15969,
     "projected_close": 1.1592,
     "drift_per_hour": -0.00012,
