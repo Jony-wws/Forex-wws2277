@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-25T19:38:54.261407+00:00",
+  "generated_at_utc": "2026-05-25T19:39:42.946882+00:00",
   "next_cycle_utc": "2026-05-26T00:00:00+00:00",
   "cycle_close_utc": "2026-05-26T00:00:00+00:00",
-  "minutes_to_expiry": 261.1,
+  "minutes_to_expiry": 260.28,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -11,13 +11,13 @@
     "side": "BUY",
     "veto": null,
     "confidence": 99,
-    "composite_score": 1.1239,
+    "composite_score": 1.0304,
     "layers": {
       "technical": {
-        "score": 19,
+        "score": 15,
         "max_score": 34,
         "side": "BUY",
-        "confidence": 89,
+        "confidence": 86,
         "adx_h1": 49.9,
         "persistence_5h": 80.0,
         "multi_tf_aligned": true,
@@ -45,12 +45,12 @@
           {
             "name": "RSI",
             "value": -3,
-            "reason": "RSI 82 — перекупленность, ожидается откат"
+            "reason": "RSI 81 — перекупленность, ожидается откат"
           },
           {
             "name": "MACD",
-            "value": 1,
-            "reason": "MACD положительный"
+            "value": -3,
+            "reason": "Пересечение MACD вниз — сильный медвежий сигнал"
           },
           {
             "name": "Боллинджер",
@@ -60,7 +60,7 @@
           {
             "name": "Стохастик",
             "value": -2,
-            "reason": "K=99 D=98 — перекупленность"
+            "reason": "K=94 D=96 — перекупленность"
           },
           {
             "name": "ADX",
@@ -70,7 +70,7 @@
           {
             "name": "Williams %R",
             "value": -1,
-            "reason": "W%R -1 — перекупленность"
+            "reason": "W%R -6 — перекупленность"
           },
           {
             "name": "Ишимоку",
@@ -197,7 +197,7 @@
           },
           "score": 4
         },
-        "normalised": 0.916
+        "normalised": 0.751
       },
       "macro": {
         "score": 3,
@@ -237,9 +237,9 @@
       "confluence": {
         "pair": "GBPJPY",
         "side": "BUY",
-        "score": 28,
+        "score": 22,
         "max_score": 34,
-        "score_pct": 0.824,
+        "score_pct": 0.647,
         "tf_directions": {
           "W1": 1,
           "D1": 1,
@@ -251,8 +251,8 @@
         "votes": {
           "ema_stack": 1,
           "rsi": 1,
-          "macd": 1,
-          "stoch": 0,
+          "macd": -1,
+          "stoch": -1,
           "adx": 1,
           "mfi": 1,
           "cci": 1,
@@ -260,23 +260,23 @@
           "supertrend": 1,
           "vortex": 1
         },
-        "bull_votes": 9,
-        "bear_votes": 0,
-        "neutral_votes": 1,
-        "leading_count": 9,
+        "bull_votes": 8,
+        "bear_votes": 2,
+        "neutral_votes": 0,
+        "leading_count": 8,
         "adx_h1": 49.9,
         "squeeze_released": false,
         "squeeze_momentum_aligned": true,
         "super_confluence": true,
         "reasons": [
           "H1 EMA-стек бычий",
-          "RSI(H1) 82 — в бычьей зоне",
-          "MACD(H1) положителен",
+          "RSI(H1) 81 — в бычьей зоне",
+          "MACD(H1) отрицателен",
           "ADX(H1) 50 с DI+ > DI- — тренд вверх",
           "MFI(H1) 86 — деньги входят (бычий)",
           "OBV растёт — объёмы подтверждают рост"
         ],
-        "normalised": 0.824,
+        "normalised": 0.647,
         "bonus_applied": 0.18
       },
       "senior_alignment": {
@@ -294,15 +294,15 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 4.4ч в плюсе: drift=+0.02190/ч, итог +0.09530 ≥ запас 0.05334",
-          "projected_close": 214.74931,
-          "entry": 214.65401,
+          "reason": "Проекция на 4.3ч в плюсе: drift=+0.01970/ч, итог +0.08546 ≥ запас 0.05326",
+          "projected_close": 214.71747,
+          "entry": 214.632,
           "atr": 0.11435,
-          "drift_per_bar": 0.0219,
-          "drift_per_minute": 0.000365,
+          "drift_per_bar": 0.0197,
+          "drift_per_minute": 0.0003283,
           "horizon_bars": 5,
-          "horizon_minutes": 261.1,
-          "safety_margin": 0.05334
+          "horizon_minutes": 260.28,
+          "safety_margin": 0.05326
         }
       },
       "edge_check": {
@@ -353,9 +353,9 @@
       }
     },
     "levels": {
-      "entry": 214.65401,
-      "stop_loss": 214.48248,
-      "take_profit": 214.93989,
+      "entry": 214.632,
+      "stop_loss": 214.46047,
+      "take_profit": 214.91789,
       "atr_h1": 0.11435,
       "rr_target": 1.66
     },
@@ -408,16 +408,16 @@
     "tier": "strong",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 261.1,
-      "entry": 214.65401,
-      "projected_close": 214.74931,
-      "drift_per_hour": 0.0219,
-      "drift_per_minute": 0.000365,
+      "horizon_minutes": 260.28,
+      "entry": 214.632,
+      "projected_close": 214.71747,
+      "drift_per_hour": 0.0197,
+      "drift_per_minute": 0.0003283,
       "atr_h1": 0.11435,
-      "safety_margin": 0.05334,
+      "safety_margin": 0.05326,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 4.4ч в плюсе: drift=+0.02190/ч, итог +0.09530 ≥ запас 0.05334"
+      "reason": "Проекция на 4.3ч в плюсе: drift=+0.01970/ч, итог +0.08546 ≥ запас 0.05326"
     }
   },
   "top5": [
@@ -427,13 +427,13 @@
       "side": "BUY",
       "veto": null,
       "confidence": 99,
-      "composite_score": 1.1239,
+      "composite_score": 1.0304,
       "layers": {
         "technical": {
-          "score": 19,
+          "score": 15,
           "max_score": 34,
           "side": "BUY",
-          "confidence": 89,
+          "confidence": 86,
           "adx_h1": 49.9,
           "persistence_5h": 80.0,
           "multi_tf_aligned": true,
@@ -461,12 +461,12 @@
             {
               "name": "RSI",
               "value": -3,
-              "reason": "RSI 82 — перекупленность, ожидается откат"
+              "reason": "RSI 81 — перекупленность, ожидается откат"
             },
             {
               "name": "MACD",
-              "value": 1,
-              "reason": "MACD положительный"
+              "value": -3,
+              "reason": "Пересечение MACD вниз — сильный медвежий сигнал"
             },
             {
               "name": "Боллинджер",
@@ -476,7 +476,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=99 D=98 — перекупленность"
+              "reason": "K=94 D=96 — перекупленность"
             },
             {
               "name": "ADX",
@@ -486,7 +486,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -1 — перекупленность"
+              "reason": "W%R -6 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -613,7 +613,7 @@
             },
             "score": 4
           },
-          "normalised": 0.916
+          "normalised": 0.751
         },
         "macro": {
           "score": 3,
@@ -653,9 +653,9 @@
         "confluence": {
           "pair": "GBPJPY",
           "side": "BUY",
-          "score": 28,
+          "score": 22,
           "max_score": 34,
-          "score_pct": 0.824,
+          "score_pct": 0.647,
           "tf_directions": {
             "W1": 1,
             "D1": 1,
@@ -667,8 +667,8 @@
           "votes": {
             "ema_stack": 1,
             "rsi": 1,
-            "macd": 1,
-            "stoch": 0,
+            "macd": -1,
+            "stoch": -1,
             "adx": 1,
             "mfi": 1,
             "cci": 1,
@@ -676,23 +676,23 @@
             "supertrend": 1,
             "vortex": 1
           },
-          "bull_votes": 9,
-          "bear_votes": 0,
-          "neutral_votes": 1,
-          "leading_count": 9,
+          "bull_votes": 8,
+          "bear_votes": 2,
+          "neutral_votes": 0,
+          "leading_count": 8,
           "adx_h1": 49.9,
           "squeeze_released": false,
           "squeeze_momentum_aligned": true,
           "super_confluence": true,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 82 — в бычьей зоне",
-            "MACD(H1) положителен",
+            "RSI(H1) 81 — в бычьей зоне",
+            "MACD(H1) отрицателен",
             "ADX(H1) 50 с DI+ > DI- — тренд вверх",
             "MFI(H1) 86 — деньги входят (бычий)",
             "OBV растёт — объёмы подтверждают рост"
           ],
-          "normalised": 0.824,
+          "normalised": 0.647,
           "bonus_applied": 0.18
         },
         "senior_alignment": {
@@ -710,15 +710,15 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.4ч в плюсе: drift=+0.02190/ч, итог +0.09530 ≥ запас 0.05334",
-            "projected_close": 214.74931,
-            "entry": 214.65401,
+            "reason": "Проекция на 4.3ч в плюсе: drift=+0.01970/ч, итог +0.08546 ≥ запас 0.05326",
+            "projected_close": 214.71747,
+            "entry": 214.632,
             "atr": 0.11435,
-            "drift_per_bar": 0.0219,
-            "drift_per_minute": 0.000365,
+            "drift_per_bar": 0.0197,
+            "drift_per_minute": 0.0003283,
             "horizon_bars": 5,
-            "horizon_minutes": 261.1,
-            "safety_margin": 0.05334
+            "horizon_minutes": 260.28,
+            "safety_margin": 0.05326
           }
         },
         "edge_check": {
@@ -769,9 +769,9 @@
         }
       },
       "levels": {
-        "entry": 214.65401,
-        "stop_loss": 214.48248,
-        "take_profit": 214.93989,
+        "entry": 214.632,
+        "stop_loss": 214.46047,
+        "take_profit": 214.91789,
         "atr_h1": 0.11435,
         "rr_target": 1.66
       }
@@ -831,7 +831,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=88 D=86 — перекупленность"
+              "reason": "K=90 D=87 — перекупленность"
             },
             {
               "name": "ADX",
@@ -841,7 +841,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -12 — перекупленность"
+              "reason": "W%R -10 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -1064,22 +1064,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.4ч в плюсе: drift=+0.00010/ч, итог +0.00043 ≥ запас 0.00042",
-            "projected_close": 1.22222,
-            "entry": 1.22179,
+            "reason": "Проекция на 4.3ч в плюсе: drift=+0.00010/ч, итог +0.00044 ≥ запас 0.00042",
+            "projected_close": 1.22226,
+            "entry": 1.22182,
             "atr": 0.0009,
             "drift_per_bar": 0.0001,
-            "drift_per_minute": 1.6e-06,
+            "drift_per_minute": 1.7e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 261.1,
+            "horizon_minutes": 260.28,
             "safety_margin": 0.00042
           }
         }
       },
       "levels": {
-        "entry": 1.22179,
-        "stop_loss": 1.22043,
-        "take_profit": 1.22405,
+        "entry": 1.22182,
+        "stop_loss": 1.22046,
+        "take_profit": 1.22408,
         "atr_h1": 0.0009,
         "rr_target": 1.66
       }
@@ -1139,7 +1139,7 @@
             {
               "name": "Стохастик",
               "value": 1,
-              "reason": "K=76 > D=73 — бычий"
+              "reason": "K=75 > D=72 — бычий"
             },
             {
               "name": "ADX",
@@ -1368,22 +1368,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.4ч в плюсе: drift=+0.01270/ч, итог +0.05526 ≥ запас 0.04138",
-            "projected_close": 114.08326,
-            "entry": 114.028,
+            "reason": "Проекция на 4.3ч в плюсе: drift=+0.01220/ч, итог +0.05293 ≥ запас 0.04132",
+            "projected_close": 114.07593,
+            "entry": 114.023,
             "atr": 0.08872,
-            "drift_per_bar": 0.0127,
-            "drift_per_minute": 0.0002117,
+            "drift_per_bar": 0.0122,
+            "drift_per_minute": 0.0002033,
             "horizon_bars": 5,
-            "horizon_minutes": 261.1,
-            "safety_margin": 0.04138
+            "horizon_minutes": 260.28,
+            "safety_margin": 0.04132
           }
         }
       },
       "levels": {
-        "entry": 114.028,
-        "stop_loss": 113.89493,
-        "take_profit": 114.24979,
+        "entry": 114.023,
+        "stop_loss": 113.88993,
+        "take_profit": 114.24479,
         "atr_h1": 0.08872,
         "rr_target": 1.66
       }
@@ -1443,7 +1443,7 @@
             {
               "name": "Стохастик",
               "value": 2,
-              "reason": "K=2 D=5 — перепроданность"
+              "reason": "K=3 D=5 — перепроданность"
             },
             {
               "name": "ADX",
@@ -1453,7 +1453,7 @@
             {
               "name": "Williams %R",
               "value": 1,
-              "reason": "W%R -98 — перепроданность"
+              "reason": "W%R -97 — перепроданность"
             },
             {
               "name": "Ишимоку",
@@ -1677,22 +1677,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.4ч в плюсе: drift=-0.00009/ч, итог +0.00037 ≥ запас 0.00018",
-            "projected_close": 0.86152,
-            "entry": 0.86189,
+            "reason": "Проекция на 4.3ч в плюсе: drift=-0.00009/ч, итог +0.00037 ≥ запас 0.00017",
+            "projected_close": 0.86153,
+            "entry": 0.8619,
             "atr": 0.00038,
             "drift_per_bar": -9e-05,
             "drift_per_minute": -1.4e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 261.1,
-            "safety_margin": 0.00018
+            "horizon_minutes": 260.28,
+            "safety_margin": 0.00017
           }
         }
       },
       "levels": {
-        "entry": 0.86189,
-        "stop_loss": 0.86245,
-        "take_profit": 0.86095,
+        "entry": 0.8619,
+        "stop_loss": 0.86246,
+        "take_profit": 0.86096,
         "atr_h1": 0.00038,
         "rr_target": 1.66
       }
@@ -1752,7 +1752,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=99 D=98 — перекупленность"
+              "reason": "K=100 D=98 — перекупленность"
             },
             {
               "name": "ADX",
@@ -1762,7 +1762,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -1 — перекупленность"
+              "reason": "W%R -0 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -1772,7 +1772,7 @@
             {
               "name": "Моментум",
               "value": 1,
-              "reason": "Моментум +0.05% — рост"
+              "reason": "Моментум +0.06% — рост"
             },
             {
               "name": "VWAP",
@@ -1991,22 +1991,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 4.4ч в плюсе: drift=+0.00016/ч, итог +0.00069 ≥ запас 0.00037",
-            "projected_close": 1.3516,
-            "entry": 1.35091,
+            "reason": "Проекция на 4.3ч в плюсе: drift=+0.00016/ч, итог +0.00070 ≥ запас 0.00037",
+            "projected_close": 1.35163,
+            "entry": 1.35093,
             "atr": 0.0008,
             "drift_per_bar": 0.00016,
-            "drift_per_minute": 2.6e-06,
+            "drift_per_minute": 2.7e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 261.1,
+            "horizon_minutes": 260.28,
             "safety_margin": 0.00037
           }
         }
       },
       "levels": {
-        "entry": 1.35091,
-        "stop_loss": 1.34972,
-        "take_profit": 1.35291,
+        "entry": 1.35093,
+        "stop_loss": 1.34974,
+        "take_profit": 1.35292,
         "atr_h1": 0.0008,
         "rr_target": 1.66
       }
@@ -2014,16 +2014,16 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 261.1,
-    "entry": 214.65401,
-    "projected_close": 214.74931,
-    "drift_per_hour": 0.0219,
-    "drift_per_minute": 0.000365,
+    "horizon_minutes": 260.28,
+    "entry": 214.632,
+    "projected_close": 214.71747,
+    "drift_per_hour": 0.0197,
+    "drift_per_minute": 0.0003283,
     "atr_h1": 0.11435,
-    "safety_margin": 0.05334,
+    "safety_margin": 0.05326,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 4.4ч в плюсе: drift=+0.02190/ч, итог +0.09530 ≥ запас 0.05334"
+    "reason": "Проекция на 4.3ч в плюсе: drift=+0.01970/ч, итог +0.08546 ≥ запас 0.05326"
   },
   "leading_candidate": {
     "pair": "GBPJPY",
@@ -2031,7 +2031,7 @@
     "side": "BUY",
     "confidence": 99,
     "veto": null,
-    "composite_score": 1.1239
+    "composite_score": 1.0304
   },
   "macro_currency_strength": {
     "USD": 1.19,
@@ -2065,7 +2065,7 @@
       "JPY": -1.29,
       "CHF": -0.17,
       "AUD": 1.09,
-      "CAD": -0.42,
+      "CAD": -0.44,
       "NZD": -0.75
     },
     "components": {
@@ -2086,7 +2086,7 @@
         "JPY": 1.72,
         "CHF": 2.21,
         "AUD": 3.0,
-        "CAD": -1.37,
+        "CAD": -1.43,
         "NZD": 1.31
       },
       "macro": {
