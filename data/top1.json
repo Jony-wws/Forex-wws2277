@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-27T19:00:35.795765+00:00",
+  "generated_at_utc": "2026-05-27T19:01:19.244528+00:00",
   "next_cycle_utc": "2026-05-28T00:00:00+00:00",
   "cycle_close_utc": "2026-05-28T00:00:00+00:00",
-  "minutes_to_expiry": 299.4,
+  "minutes_to_expiry": 298.68,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -10,16 +10,16 @@
     "name_ru": "Новозел. доллар / Йена",
     "side": "BUY",
     "veto": null,
-    "confidence": 88,
-    "composite_score": 0.6731,
+    "confidence": 89,
+    "composite_score": 0.7173,
     "layers": {
       "technical": {
-        "score": 21,
+        "score": 23,
         "max_score": 33,
         "side": "BUY",
         "confidence": 91,
         "adx_h1": 76.4,
-        "persistence_5h": 40.0,
+        "persistence_5h": 60.0,
         "multi_tf_aligned": true,
         "details": [
           {
@@ -45,7 +45,7 @@
           {
             "name": "RSI",
             "value": -3,
-            "reason": "RSI 74 — перекупленность, ожидается откат"
+            "reason": "RSI 75 — перекупленность, ожидается откат"
           },
           {
             "name": "MACD",
@@ -59,8 +59,8 @@
           },
           {
             "name": "Стохастик",
-            "value": -1,
-            "reason": "K=71 < D=72 — медвежий"
+            "value": 1,
+            "reason": "K=75 > D=73 — бычий"
           },
           {
             "name": "ADX",
@@ -196,7 +196,7 @@
       "macro": {
         "score": -2,
         "base": -3.0,
-        "quote": -0.79,
+        "quote": -0.77,
         "reason": "Макро: NZD ослабевает против JPY",
         "normalised": -0.667
       },
@@ -231,9 +231,9 @@
       "confluence": {
         "pair": "NZDJPY",
         "side": "BUY",
-        "score": 24,
+        "score": 30,
         "max_score": 34,
-        "score_pct": 0.706,
+        "score_pct": 0.882,
         "tf_directions": {
           "W1": 1,
           "D1": 1,
@@ -246,31 +246,31 @@
           "ema_stack": 1,
           "rsi": 1,
           "macd": 1,
-          "stoch": -1,
+          "stoch": 1,
           "adx": 1,
           "mfi": 1,
           "cci": 1,
-          "obv": 0,
+          "obv": 1,
           "supertrend": 1,
           "vortex": 1
         },
-        "bull_votes": 8,
-        "bear_votes": 1,
-        "neutral_votes": 1,
-        "leading_count": 8,
+        "bull_votes": 10,
+        "bear_votes": 0,
+        "neutral_votes": 0,
+        "leading_count": 10,
         "adx_h1": 76.4,
         "squeeze_released": false,
         "squeeze_momentum_aligned": true,
         "super_confluence": true,
         "reasons": [
           "H1 EMA-стек бычий",
-          "RSI(H1) 74 — в бычьей зоне",
+          "RSI(H1) 75 — в бычьей зоне",
           "MACD(H1) положителен",
           "ADX(H1) 76 с DI+ > DI- — тренд вверх",
           "MFI(H1) 82 — деньги входят (бычий)",
-          "Supertrend(H1) бычий"
+          "OBV растёт — объёмы подтверждают рост"
         ],
-        "normalised": 0.706,
+        "normalised": 0.882,
         "bonus_applied": 0.18
       },
       "senior_alignment": {
@@ -288,21 +288,21 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 5.0ч в плюсе: drift=+0.02550/ч, итог +0.12725 ≥ запас 0.07400",
-          "projected_close": 94.13825,
-          "entry": 94.011,
+          "reason": "Проекция на 5.0ч в плюсе: drift=+0.02810/ч, итог +0.13988 ≥ запас 0.07391",
+          "projected_close": 94.17689,
+          "entry": 94.037,
           "atr": 0.14814,
-          "drift_per_bar": 0.0255,
-          "drift_per_minute": 0.000425,
+          "drift_per_bar": 0.0281,
+          "drift_per_minute": 0.0004683,
           "horizon_bars": 5,
-          "horizon_minutes": 299.4,
-          "safety_margin": 0.074
+          "horizon_minutes": 298.68,
+          "safety_margin": 0.07391
         }
       },
       "edge_check": {
         "passes": false,
-        "calibrated_confidence": 72.3,
-        "brain_confidence": 88,
+        "calibrated_confidence": 72.9,
+        "brain_confidence": 89,
         "reason": "Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
         "windows": {
           "5d": {
@@ -347,16 +347,16 @@
       }
     },
     "levels": {
-      "entry": 94.011,
-      "stop_loss": 93.78879,
-      "take_profit": 94.38136,
+      "entry": 94.037,
+      "stop_loss": 93.81479,
+      "take_profit": 94.40736,
       "atr_h1": 0.14814,
       "rr_target": 1.66
     },
     "edge": {
       "passes": false,
-      "calibrated_confidence": 72.3,
-      "brain_confidence": 88,
+      "calibrated_confidence": 72.9,
+      "brain_confidence": 89,
       "reason": "Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
       "windows": {
         "5d": {
@@ -402,16 +402,16 @@
     "tier": "strong",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 299.4,
-      "entry": 94.011,
-      "projected_close": 94.13825,
-      "drift_per_hour": 0.0255,
-      "drift_per_minute": 0.000425,
+      "horizon_minutes": 298.68,
+      "entry": 94.037,
+      "projected_close": 94.17689,
+      "drift_per_hour": 0.0281,
+      "drift_per_minute": 0.0004683,
       "atr_h1": 0.14814,
-      "safety_margin": 0.074,
+      "safety_margin": 0.07391,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 5.0ч в плюсе: drift=+0.02550/ч, итог +0.12725 ≥ запас 0.07400"
+      "reason": "Проекция на 5.0ч в плюсе: drift=+0.02810/ч, итог +0.13988 ≥ запас 0.07391"
     }
   },
   "top5": [
@@ -420,16 +420,16 @@
       "name_ru": "Новозел. доллар / Йена",
       "side": "BUY",
       "veto": null,
-      "confidence": 88,
-      "composite_score": 0.6731,
+      "confidence": 89,
+      "composite_score": 0.7173,
       "layers": {
         "technical": {
-          "score": 21,
+          "score": 23,
           "max_score": 33,
           "side": "BUY",
           "confidence": 91,
           "adx_h1": 76.4,
-          "persistence_5h": 40.0,
+          "persistence_5h": 60.0,
           "multi_tf_aligned": true,
           "details": [
             {
@@ -455,7 +455,7 @@
             {
               "name": "RSI",
               "value": -3,
-              "reason": "RSI 74 — перекупленность, ожидается откат"
+              "reason": "RSI 75 — перекупленность, ожидается откат"
             },
             {
               "name": "MACD",
@@ -469,8 +469,8 @@
             },
             {
               "name": "Стохастик",
-              "value": -1,
-              "reason": "K=71 < D=72 — медвежий"
+              "value": 1,
+              "reason": "K=75 > D=73 — бычий"
             },
             {
               "name": "ADX",
@@ -606,7 +606,7 @@
         "macro": {
           "score": -2,
           "base": -3.0,
-          "quote": -0.79,
+          "quote": -0.77,
           "reason": "Макро: NZD ослабевает против JPY",
           "normalised": -0.667
         },
@@ -641,9 +641,9 @@
         "confluence": {
           "pair": "NZDJPY",
           "side": "BUY",
-          "score": 24,
+          "score": 30,
           "max_score": 34,
-          "score_pct": 0.706,
+          "score_pct": 0.882,
           "tf_directions": {
             "W1": 1,
             "D1": 1,
@@ -656,31 +656,31 @@
             "ema_stack": 1,
             "rsi": 1,
             "macd": 1,
-            "stoch": -1,
+            "stoch": 1,
             "adx": 1,
             "mfi": 1,
             "cci": 1,
-            "obv": 0,
+            "obv": 1,
             "supertrend": 1,
             "vortex": 1
           },
-          "bull_votes": 8,
-          "bear_votes": 1,
-          "neutral_votes": 1,
-          "leading_count": 8,
+          "bull_votes": 10,
+          "bear_votes": 0,
+          "neutral_votes": 0,
+          "leading_count": 10,
           "adx_h1": 76.4,
           "squeeze_released": false,
           "squeeze_momentum_aligned": true,
           "super_confluence": true,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 74 — в бычьей зоне",
+            "RSI(H1) 75 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 76 с DI+ > DI- — тренд вверх",
             "MFI(H1) 82 — деньги входят (бычий)",
-            "Supertrend(H1) бычий"
+            "OBV растёт — объёмы подтверждают рост"
           ],
-          "normalised": 0.706,
+          "normalised": 0.882,
           "bonus_applied": 0.18
         },
         "senior_alignment": {
@@ -698,21 +698,21 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 5.0ч в плюсе: drift=+0.02550/ч, итог +0.12725 ≥ запас 0.07400",
-            "projected_close": 94.13825,
-            "entry": 94.011,
+            "reason": "Проекция на 5.0ч в плюсе: drift=+0.02810/ч, итог +0.13988 ≥ запас 0.07391",
+            "projected_close": 94.17689,
+            "entry": 94.037,
             "atr": 0.14814,
-            "drift_per_bar": 0.0255,
-            "drift_per_minute": 0.000425,
+            "drift_per_bar": 0.0281,
+            "drift_per_minute": 0.0004683,
             "horizon_bars": 5,
-            "horizon_minutes": 299.4,
-            "safety_margin": 0.074
+            "horizon_minutes": 298.68,
+            "safety_margin": 0.07391
           }
         },
         "edge_check": {
           "passes": false,
-          "calibrated_confidence": 72.3,
-          "brain_confidence": 88,
+          "calibrated_confidence": 72.9,
+          "brain_confidence": 89,
           "reason": "Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
           "windows": {
             "5d": {
@@ -757,10 +757,313 @@
         }
       },
       "levels": {
-        "entry": 94.011,
-        "stop_loss": 93.78879,
-        "take_profit": 94.38136,
+        "entry": 94.037,
+        "stop_loss": 93.81479,
+        "take_profit": 94.40736,
         "atr_h1": 0.14814,
+        "rr_target": 1.66
+      }
+    },
+    {
+      "pair": "USDCHF",
+      "name_ru": "Доллар США / Франк",
+      "side": "BUY",
+      "veto": null,
+      "confidence": 82,
+      "composite_score": 0.5119,
+      "layers": {
+        "technical": {
+          "score": 15,
+          "max_score": 33,
+          "side": "BUY",
+          "confidence": 86,
+          "adx_h1": 22.2,
+          "persistence_5h": 40.0,
+          "multi_tf_aligned": true,
+          "details": [
+            {
+              "name": "1D Тренд",
+              "value": 1,
+              "reason": "Умеренный рост (1D)"
+            },
+            {
+              "name": "4H Тренд",
+              "value": 3,
+              "reason": "Сильный восходящий тренд (4H)"
+            },
+            {
+              "name": "1H Тренд",
+              "value": 2,
+              "reason": "Подтверждён рост (1H)"
+            },
+            {
+              "name": "15М Вход",
+              "value": 1,
+              "reason": "Цена выше EMA20 (15М)"
+            },
+            {
+              "name": "RSI",
+              "value": 2,
+              "reason": "RSI 60 — бычья зона"
+            },
+            {
+              "name": "MACD",
+              "value": 1,
+              "reason": "MACD положительный"
+            },
+            {
+              "name": "Боллинджер",
+              "value": 1,
+              "reason": "Цена выше средней полосы"
+            },
+            {
+              "name": "Стохастик",
+              "value": -1,
+              "reason": "K=77 < D=79 — медвежий"
+            },
+            {
+              "name": "ADX",
+              "value": 1,
+              "reason": "ADX 22 — умеренный тренд вверх"
+            },
+            {
+              "name": "Ишимоку",
+              "value": 1,
+              "reason": "Цена выше облака Ишимоку"
+            },
+            {
+              "name": "VWAP",
+              "value": 1,
+              "reason": "Цена выше VWAP — бычий настрой"
+            },
+            {
+              "name": "Мульти-ТФ",
+              "value": 3,
+              "reason": "Все 4 таймфрейма бычьи (D1+H4+H1+M15)"
+            },
+            {
+              "name": "Price Action",
+              "value": -2,
+              "reason": "Медвежье поглощение; Медвежье поглощение; Пин-бар (бычий)"
+            },
+            {
+              "name": "EMA Кросс 15М",
+              "value": 1,
+              "reason": "EMA20 > EMA50 на 15М — бычий кросс"
+            }
+          ],
+          "extras": {
+            "smc": {
+              "score": 4,
+              "structure": {
+                "event": "choch_up",
+                "score": 2,
+                "last_high": 0.7864400148391724,
+                "last_low": 0.7807599902153015,
+                "trend": "down"
+              },
+              "sweep": {
+                "event": "none",
+                "score": 0
+              },
+              "order_blocks": [
+                {
+                  "high": 0.7857999801635742,
+                  "low": 0.7846300005912781,
+                  "side": "bull",
+                  "index": 373
+                },
+                {
+                  "high": 0.7852200269699097,
+                  "low": 0.7842000126838684,
+                  "side": "bear",
+                  "index": 359
+                },
+                {
+                  "high": 0.7904999852180481,
+                  "low": 0.789110004901886,
+                  "side": "bear",
+                  "index": 343
+                },
+                {
+                  "high": 0.7867000102996826,
+                  "low": 0.7838199734687805,
+                  "side": "bull",
+                  "index": 326
+                },
+                {
+                  "high": 0.782039999961853,
+                  "low": 0.7807300090789795,
+                  "side": "bull",
+                  "index": 319
+                }
+              ],
+              "fvgs": [
+                {
+                  "top": 0.7852699756622314,
+                  "bottom": 0.7852100133895874,
+                  "side": "bull",
+                  "index": 369
+                },
+                {
+                  "top": 0.7839400172233582,
+                  "bottom": 0.783840000629425,
+                  "side": "bull",
+                  "index": 367
+                },
+                {
+                  "top": 0.7825000286102295,
+                  "bottom": 0.7823600172996521,
+                  "side": "bull",
+                  "index": 363
+                },
+                {
+                  "top": 0.7842000126838684,
+                  "bottom": 0.7823500037193298,
+                  "side": "bear",
+                  "index": 360
+                },
+                {
+                  "top": 0.7837700247764587,
+                  "bottom": 0.7825000286102295,
+                  "side": "bear",
+                  "index": 359
+                }
+              ],
+              "reasons": [
+                "Смена характера вверх (CHoCH)",
+                "Свежий бычий order block",
+                "Свежий бычий FVG"
+              ]
+            },
+            "wyckoff": {
+              "phase": "range",
+              "score": 0,
+              "reason": "Боковой диапазон — без фазового перевеса"
+            },
+            "vp": {
+              "poc": 0.786947,
+              "vah": 0.787135,
+              "val": 0.784135,
+              "score": 0,
+              "reason": "Цена внутри Value Area — равновесие"
+            },
+            "score": 4
+          },
+          "normalised": 0.77
+        },
+        "macro": {
+          "score": 1,
+          "base": 0.33,
+          "quote": -0.54,
+          "reason": "Макро: USD укрепляется против CHF",
+          "normalised": 0.333
+        },
+        "big_players": {
+          "score": 2,
+          "base": 0.94,
+          "quote": -0.95,
+          "reason": "Smart money сильно лонг USD против CHF (base +0.94, quote -0.95)",
+          "normalised": 0.667
+        },
+        "fundamental": {
+          "score": 3,
+          "reason": "Carry: USD +3.50% vs CHF — сильный плюс",
+          "normalised": 1.0
+        },
+        "news": {
+          "score": 0,
+          "reason": "Веток новостей нет",
+          "next_event_base_min": 1048,
+          "next_event_quote_min": 9999
+        },
+        "sentiment": {
+          "score": 0,
+          "reason": "Sentiment без выраженного перевеса",
+          "normalised": 0.0
+        },
+        "political": {
+          "score": 0,
+          "reason": "Геополитика спокойна",
+          "normalised": 0.0
+        },
+        "confluence": {
+          "pair": "USDCHF",
+          "side": "BUY",
+          "score": 16,
+          "max_score": 34,
+          "score_pct": 0.471,
+          "tf_directions": {
+            "W1": 0,
+            "D1": 0,
+            "H4": 1,
+            "H1": 1,
+            "M15": 1
+          },
+          "tf_aligned": false,
+          "votes": {
+            "ema_stack": 1,
+            "rsi": 1,
+            "macd": 1,
+            "stoch": -1,
+            "adx": 1,
+            "mfi": 1,
+            "cci": 1,
+            "obv": 1,
+            "supertrend": 1,
+            "vortex": 1
+          },
+          "bull_votes": 9,
+          "bear_votes": 1,
+          "neutral_votes": 0,
+          "leading_count": 9,
+          "adx_h1": 22.2,
+          "squeeze_released": false,
+          "squeeze_momentum_aligned": true,
+          "super_confluence": false,
+          "reasons": [
+            "H1 EMA-стек бычий",
+            "RSI(H1) 60 — в бычьей зоне",
+            "MACD(H1) положителен",
+            "ADX(H1) 22 с DI+ > DI- — тренд вверх",
+            "MFI(H1) 67 — деньги входят (бычий)",
+            "CCI(H1) 129 — сильный бычий импульс"
+          ],
+          "normalised": 0.471,
+          "bonus_applied": 0.0
+        },
+        "senior_alignment": {
+          "weekly_aligned": true,
+          "weekly_bias": null,
+          "m5_aligned": true,
+          "reason": "W1 нейтральна, M5 momentum согласован"
+        },
+        "safety_5h": {
+          "passes": true,
+          "reversal": {
+            "reversal": false,
+            "reason": "Разворотных паттернов нет",
+            "bar_index": -1
+          },
+          "projection": {
+            "passes": true,
+            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00011/ч, итог +0.00056 ≥ запас 0.00053",
+            "projected_close": 0.78737,
+            "entry": 0.78681,
+            "atr": 0.00107,
+            "drift_per_bar": 0.00011,
+            "drift_per_minute": 1.9e-06,
+            "horizon_bars": 5,
+            "horizon_minutes": 298.68,
+            "safety_margin": 0.00053
+          }
+        }
+      },
+      "levels": {
+        "entry": 0.78681,
+        "stop_loss": 0.7852,
+        "take_profit": 0.78949,
+        "atr_h1": 0.00107,
         "rr_target": 1.66
       }
     },
@@ -773,10 +1076,10 @@
       "composite_score": 0.4704,
       "layers": {
         "technical": {
-          "score": 20,
-          "max_score": 35,
+          "score": 21,
+          "max_score": 33,
           "side": "BUY",
-          "confidence": 89,
+          "confidence": 91,
           "adx_h1": 65.6,
           "persistence_5h": 20.0,
           "multi_tf_aligned": true,
@@ -804,7 +1107,7 @@
             {
               "name": "RSI",
               "value": -3,
-              "reason": "RSI 80 — перекупленность, ожидается откат"
+              "reason": "RSI 81 — перекупленность, ожидается откат"
             },
             {
               "name": "MACD",
@@ -819,7 +1122,7 @@
             {
               "name": "Стохастик",
               "value": 1,
-              "reason": "K=75 > D=73 — бычий"
+              "reason": "K=77 > D=73 — бычий"
             },
             {
               "name": "ADX",
@@ -830,11 +1133,6 @@
               "name": "Ишимоку",
               "value": 3,
               "reason": "Выше облака + Tenkan > Kijun — сильный бычий"
-            },
-            {
-              "name": "Моментум",
-              "value": -1,
-              "reason": "Моментум -0.06% — падение"
             },
             {
               "name": "VWAP",
@@ -849,7 +1147,7 @@
             {
               "name": "Price Action",
               "value": 3,
-              "reason": "Пин-бар (бычий); Пин-бар (бычий); Бычье поглощение"
+              "reason": "Пин-бар (бычий); Бычье поглощение; Пин-бар (бычий)"
             },
             {
               "name": "EMA Кросс 15М",
@@ -980,7 +1278,7 @@
           "score": 0,
           "reason": "Веток новостей нет",
           "next_event_base_min": 9999,
-          "next_event_quote_min": 2489
+          "next_event_quote_min": 2488
         },
         "sentiment": {
           "score": 0,
@@ -1028,7 +1326,7 @@
           "super_confluence": false,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 80 — в бычьей зоне",
+            "RSI(H1) 81 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 66 с DI+ > DI- — тренд вверх",
             "MFI(H1) 80 — деньги входят (бычий)",
@@ -1052,22 +1350,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00022/ч, итог +0.00111 ≥ запас 0.00077",
-            "projected_close": 0.81662,
-            "entry": 0.81551,
+            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00023/ч, итог +0.00116 ≥ запас 0.00077",
+            "projected_close": 0.81679,
+            "entry": 0.81563,
             "atr": 0.00154,
-            "drift_per_bar": 0.00022,
-            "drift_per_minute": 3.7e-06,
+            "drift_per_bar": 0.00023,
+            "drift_per_minute": 3.9e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 299.4,
+            "horizon_minutes": 298.68,
             "safety_margin": 0.00077
           }
         }
       },
       "levels": {
-        "entry": 0.81551,
-        "stop_loss": 0.81319,
-        "take_profit": 0.81937,
+        "entry": 0.81563,
+        "stop_loss": 0.81331,
+        "take_profit": 0.81949,
         "atr_h1": 0.00154,
         "rr_target": 1.66
       }
@@ -1077,12 +1375,12 @@
       "name_ru": "Новозел. доллар / Франк",
       "side": "BUY",
       "veto": null,
-      "confidence": 75,
-      "composite_score": 0.4096,
+      "confidence": 77,
+      "composite_score": 0.4257,
       "layers": {
         "technical": {
-          "score": 15,
-          "max_score": 34,
+          "score": 16,
+          "max_score": 36,
           "side": "BUY",
           "confidence": 86,
           "adx_h1": 63.2,
@@ -1112,7 +1410,7 @@
             {
               "name": "RSI",
               "value": -3,
-              "reason": "RSI 85 — перекупленность, ожидается откат"
+              "reason": "RSI 88 — перекупленность, ожидается откат"
             },
             {
               "name": "MACD",
@@ -1127,7 +1425,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=90 D=91 — перекупленность"
+              "reason": "K=95 D=93 — перекупленность"
             },
             {
               "name": "ADX",
@@ -1137,12 +1435,17 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -10 — перекупленность"
+              "reason": "W%R -5 — перекупленность"
             },
             {
               "name": "Ишимоку",
               "value": 3,
               "reason": "Выше облака + Tenkan > Kijun — сильный бычий"
+            },
+            {
+              "name": "Моментум",
+              "value": 1,
+              "reason": "Моментум +0.06% — рост"
             },
             {
               "name": "VWAP",
@@ -1157,7 +1460,7 @@
             {
               "name": "Price Action",
               "value": 3,
-              "reason": "Пин-бар (бычий); Бычье поглощение"
+              "reason": "Пин-бар (бычий); Бычье поглощение; Пин-бар (бычий)"
             },
             {
               "name": "EMA Кросс 15М",
@@ -1263,12 +1566,12 @@
             },
             "score": 9
           },
-          "normalised": 0.918
+          "normalised": 0.922
         },
         "macro": {
           "score": -2,
           "base": -3.0,
-          "quote": -0.52,
+          "quote": -0.54,
           "reason": "Макро: NZD ослабевает против CHF",
           "normalised": -0.667
         },
@@ -1303,9 +1606,9 @@
         "confluence": {
           "pair": "NZDCHF",
           "side": "BUY",
-          "score": 16,
+          "score": 18,
           "max_score": 34,
-          "score_pct": 0.471,
+          "score_pct": 0.529,
           "tf_directions": {
             "W1": 0,
             "D1": 1,
@@ -1318,7 +1621,7 @@
             "ema_stack": 1,
             "rsi": 1,
             "macd": 1,
-            "stoch": -1,
+            "stoch": 0,
             "adx": 1,
             "mfi": 1,
             "cci": 1,
@@ -1327,8 +1630,8 @@
             "vortex": 1
           },
           "bull_votes": 9,
-          "bear_votes": 1,
-          "neutral_votes": 0,
+          "bear_votes": 0,
+          "neutral_votes": 1,
           "leading_count": 9,
           "adx_h1": 63.2,
           "squeeze_released": false,
@@ -1336,13 +1639,13 @@
           "super_confluence": false,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 85 — в бычьей зоне",
+            "RSI(H1) 88 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 63 с DI+ > DI- — тренд вверх",
-            "MFI(H1) 87 — деньги входят (бычий)",
+            "MFI(H1) 88 — деньги входят (бычий)",
             "OBV растёт — объёмы подтверждают рост"
           ],
-          "normalised": 0.471,
+          "normalised": 0.529,
           "bonus_applied": 0.0
         },
         "senior_alignment": {
@@ -1360,22 +1663,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00014/ч, итог +0.00069 ≥ запас 0.00036",
-            "projected_close": 0.46436,
-            "entry": 0.46367,
+            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00015/ч, итог +0.00076 ≥ запас 0.00036",
+            "projected_close": 0.46457,
+            "entry": 0.46381,
             "atr": 0.00073,
-            "drift_per_bar": 0.00014,
-            "drift_per_minute": 2.3e-06,
+            "drift_per_bar": 0.00015,
+            "drift_per_minute": 2.5e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 299.4,
+            "horizon_minutes": 298.68,
             "safety_margin": 0.00036
           }
         }
       },
       "levels": {
-        "entry": 0.46367,
-        "stop_loss": 0.46258,
-        "take_profit": 0.46549,
+        "entry": 0.46381,
+        "stop_loss": 0.46272,
+        "take_profit": 0.46563,
         "atr_h1": 0.00073,
         "rr_target": 1.66
       }
@@ -1385,8 +1688,8 @@
       "name_ru": "Евро / Новозел. доллар",
       "side": "SELL",
       "veto": null,
-      "confidence": 62,
-      "composite_score": 0.301,
+      "confidence": 63,
+      "composite_score": 0.311,
       "layers": {
         "technical": {
           "score": -17,
@@ -1420,7 +1723,7 @@
             {
               "name": "RSI",
               "value": 3,
-              "reason": "RSI 19 — перепроданность, ожидается отскок"
+              "reason": "RSI 17 — перепроданность, ожидается отскок"
             },
             {
               "name": "MACD",
@@ -1435,7 +1738,7 @@
             {
               "name": "Стохастик",
               "value": 2,
-              "reason": "K=15 D=16 — перепроданность"
+              "reason": "K=12 D=15 — перепроданность"
             },
             {
               "name": "ADX",
@@ -1445,7 +1748,7 @@
             {
               "name": "Williams %R",
               "value": 1,
-              "reason": "W%R -85 — перепроданность"
+              "reason": "W%R -88 — перепроданность"
             },
             {
               "name": "Ишимоку",
@@ -1566,12 +1869,12 @@
               "poc": 1.981476,
               "vah": 1.984792,
               "val": 1.972475,
-              "score": 0,
-              "reason": "Цена внутри Value Area — равновесие"
+              "score": -1,
+              "reason": "Цена ниже Value Area Low — институциональное предложение"
             },
-            "score": -7
+            "score": -8
           },
-          "normalised": -0.933
+          "normalised": -0.967
         },
         "macro": {
           "score": 3,
@@ -1582,9 +1885,9 @@
         },
         "big_players": {
           "score": 0,
-          "base": -0.46,
+          "base": -0.48,
           "quote": -0.41,
-          "reason": "Smart money нейтрален по EUR/NZD (base -0.46, quote -0.41)",
+          "reason": "Smart money нейтрален по EUR/NZD (base -0.48, quote -0.41)",
           "normalised": 0.0
         },
         "fundamental": {
@@ -1644,10 +1947,10 @@
           "super_confluence": false,
           "reasons": [
             "H1 EMA-стек медвежий",
-            "RSI(H1) 19 — в медвежьей зоне",
+            "RSI(H1) 17 — в медвежьей зоне",
             "MACD(H1) отрицателен",
             "ADX(H1) 74 с DI- > DI+ — тренд вниз",
-            "MFI(H1) 19 — деньги выходят (медвежий)",
+            "MFI(H1) 16 — деньги выходят (медвежий)",
             "Supertrend(H1) медвежий"
           ],
           "normalised": -0.471,
@@ -1668,362 +1971,54 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 5.0ч в плюсе: drift=-0.00061/ч, итог +0.00306 ≥ запас 0.00124",
-            "projected_close": 1.96955,
-            "entry": 1.97261,
-            "atr": 0.00249,
-            "drift_per_bar": -0.00061,
-            "drift_per_minute": -1.02e-05,
+            "reason": "Проекция на 5.0ч в плюсе: drift=-0.00065/ч, итог +0.00326 ≥ запас 0.00128",
+            "projected_close": 1.96894,
+            "entry": 1.9722,
+            "atr": 0.00256,
+            "drift_per_bar": -0.00065,
+            "drift_per_minute": -1.09e-05,
             "horizon_bars": 5,
-            "horizon_minutes": 299.4,
-            "safety_margin": 0.00124
+            "horizon_minutes": 298.68,
+            "safety_margin": 0.00128
           }
         }
       },
       "levels": {
-        "entry": 1.97261,
-        "stop_loss": 1.97634,
-        "take_profit": 1.96639,
-        "atr_h1": 0.00249,
-        "rr_target": 1.66
-      }
-    },
-    {
-      "pair": "NZDUSD",
-      "name_ru": "Новозел. доллар / Доллар США",
-      "side": "BUY",
-      "veto": null,
-      "confidence": 60,
-      "composite_score": 0.2857,
-      "layers": {
-        "technical": {
-          "score": 27,
-          "max_score": 35,
-          "side": "BUY",
-          "confidence": 92,
-          "adx_h1": 67.2,
-          "persistence_5h": 40.0,
-          "multi_tf_aligned": true,
-          "details": [
-            {
-              "name": "1D Тренд",
-              "value": 3,
-              "reason": "Сильный восходящий тренд (1D)"
-            },
-            {
-              "name": "4H Тренд",
-              "value": 1,
-              "reason": "Умеренный рост (4H)"
-            },
-            {
-              "name": "1H Тренд",
-              "value": 2,
-              "reason": "Подтверждён рост (1H)"
-            },
-            {
-              "name": "15М Вход",
-              "value": 1,
-              "reason": "Цена выше EMA20 (15М)"
-            },
-            {
-              "name": "RSI",
-              "value": 2,
-              "reason": "RSI 69 — бычья зона"
-            },
-            {
-              "name": "MACD",
-              "value": 1,
-              "reason": "MACD положительный"
-            },
-            {
-              "name": "Боллинджер",
-              "value": 1,
-              "reason": "Цена выше средней полосы"
-            },
-            {
-              "name": "Стохастик",
-              "value": 1,
-              "reason": "K=68 > D=66 — бычий"
-            },
-            {
-              "name": "ADX",
-              "value": 3,
-              "reason": "ADX 67 — сильный восходящий тренд"
-            },
-            {
-              "name": "Ишимоку",
-              "value": 3,
-              "reason": "Выше облака + Tenkan > Kijun — сильный бычий"
-            },
-            {
-              "name": "Моментум",
-              "value": 1,
-              "reason": "Моментум +0.06% — рост"
-            },
-            {
-              "name": "VWAP",
-              "value": 1,
-              "reason": "Цена выше VWAP — бычий настрой"
-            },
-            {
-              "name": "Мульти-ТФ",
-              "value": 3,
-              "reason": "Все 4 таймфрейма бычьи (D1+H4+H1+M15)"
-            },
-            {
-              "name": "Price Action",
-              "value": 3,
-              "reason": "Пин-бар (медвежий); Пин-бар (бычий); Бычье поглощение"
-            },
-            {
-              "name": "EMA Кросс 15М",
-              "value": 1,
-              "reason": "EMA20 > EMA50 на 15М — бычий кросс"
-            }
-          ],
-          "extras": {
-            "smc": {
-              "score": 4,
-              "structure": {
-                "event": "choch_up",
-                "score": 2,
-                "last_high": 0.5882352590560913,
-                "last_low": 0.5833965539932251,
-                "trend": "down"
-              },
-              "sweep": {
-                "event": "none",
-                "score": 0
-              },
-              "order_blocks": [
-                {
-                  "high": 0.5842827558517456,
-                  "low": 0.5833965539932251,
-                  "side": "bull",
-                  "index": 370
-                },
-                {
-                  "high": 0.586029052734375,
-                  "low": 0.5848979353904724,
-                  "side": "bull",
-                  "index": 359
-                },
-                {
-                  "high": 0.5861321091651917,
-                  "low": 0.5851717591285706,
-                  "side": "bear",
-                  "index": 337
-                },
-                {
-                  "high": 0.5843510627746582,
-                  "low": 0.5825808048248291,
-                  "side": "bull",
-                  "index": 330
-                },
-                {
-                  "high": 0.5870956182479858,
-                  "low": 0.5841804146766663,
-                  "side": "bear",
-                  "index": 326
-                }
-              ],
-              "fvgs": [
-                {
-                  "top": 0.5888240933418274,
-                  "bottom": 0.5887547731399536,
-                  "side": "bull",
-                  "index": 375
-                },
-                {
-                  "top": 0.5867855548858643,
-                  "bottom": 0.5840439200401306,
-                  "side": "bull",
-                  "index": 372
-                },
-                {
-                  "top": 0.5844877362251282,
-                  "bottom": 0.5842827558517456,
-                  "side": "bear",
-                  "index": 369
-                },
-                {
-                  "top": 0.5868200063705444,
-                  "bottom": 0.5859260559082031,
-                  "side": "bear",
-                  "index": 366
-                },
-                {
-                  "top": 0.5870956182479858,
-                  "bottom": 0.586029052734375,
-                  "side": "bull",
-                  "index": 360
-                }
-              ],
-              "reasons": [
-                "Смена характера вверх (CHoCH)",
-                "Свежий бычий order block",
-                "Свежий бычий FVG"
-              ]
-            },
-            "wyckoff": {
-              "phase": "markup",
-              "score": 3,
-              "reason": "Сильный пробой вверх — фаза Markup"
-            },
-            "vp": {
-              "poc": 0.587761,
-              "vah": 0.58857,
-              "val": 0.585013,
-              "score": 1,
-              "reason": "Цена выше Value Area High — институциональный спрос"
-            },
-            "score": 8
-          },
-          "normalised": 1.0
-        },
-        "macro": {
-          "score": -3,
-          "base": -3.0,
-          "quote": 0.3,
-          "reason": "Макро: NZD ослабевает против USD",
-          "normalised": -1.0
-        },
-        "big_players": {
-          "score": -1,
-          "base": -0.41,
-          "quote": 0.92,
-          "reason": "Smart money умеренно шорт NZD против USD (base -0.41, quote +0.92)",
-          "normalised": -0.333
-        },
-        "fundamental": {
-          "score": 0,
-          "reason": "Carry: NZD -0.25% vs USD — нейтрально",
-          "normalised": 0.0
-        },
-        "news": {
-          "score": 0,
-          "reason": "Веток новостей нет",
-          "next_event_base_min": 9999,
-          "next_event_quote_min": 1049
-        },
-        "sentiment": {
-          "score": 0,
-          "reason": "Sentiment без выраженного перевеса",
-          "normalised": 0.0
-        },
-        "political": {
-          "score": 0,
-          "reason": "Геополитика спокойна",
-          "normalised": 0.0
-        },
-        "confluence": {
-          "pair": "NZDUSD",
-          "side": "BUY",
-          "score": 18,
-          "max_score": 34,
-          "score_pct": 0.529,
-          "tf_directions": {
-            "W1": 0,
-            "D1": 1,
-            "H4": 0,
-            "H1": 1,
-            "M15": 1
-          },
-          "tf_aligned": false,
-          "votes": {
-            "ema_stack": 1,
-            "rsi": 1,
-            "macd": 1,
-            "stoch": 1,
-            "adx": 1,
-            "mfi": 1,
-            "cci": 1,
-            "obv": 0,
-            "supertrend": 1,
-            "vortex": 1
-          },
-          "bull_votes": 9,
-          "bear_votes": 0,
-          "neutral_votes": 1,
-          "leading_count": 9,
-          "adx_h1": 67.2,
-          "squeeze_released": false,
-          "squeeze_momentum_aligned": true,
-          "super_confluence": false,
-          "reasons": [
-            "H1 EMA-стек бычий",
-            "RSI(H1) 69 — в бычьей зоне",
-            "MACD(H1) положителен",
-            "ADX(H1) 67 с DI+ > DI- — тренд вверх",
-            "MFI(H1) 72 — деньги входят (бычий)",
-            "Supertrend(H1) бычий"
-          ],
-          "normalised": 0.529,
-          "bonus_applied": 0.0
-        },
-        "senior_alignment": {
-          "weekly_aligned": true,
-          "weekly_bias": "BUY",
-          "m5_aligned": true,
-          "reason": "W1 bias = BUY (согласован), M5 momentum согласован"
-        },
-        "safety_5h": {
-          "passes": true,
-          "reversal": {
-            "reversal": false,
-            "reason": "Разворотных паттернов нет",
-            "bar_index": -1
-          },
-          "projection": {
-            "passes": true,
-            "reason": "Проекция на 5.0ч в плюсе: drift=+0.00011/ч, итог +0.00057 ≥ запас 0.00044",
-            "projected_close": 0.5904,
-            "entry": 0.58983,
-            "atr": 0.00087,
-            "drift_per_bar": 0.00011,
-            "drift_per_minute": 1.9e-06,
-            "horizon_bars": 5,
-            "horizon_minutes": 299.4,
-            "safety_margin": 0.00044
-          }
-        }
-      },
-      "levels": {
-        "entry": 0.58983,
-        "stop_loss": 0.58852,
-        "take_profit": 0.59202,
-        "atr_h1": 0.00087,
+        "entry": 1.9722,
+        "stop_loss": 1.97603,
+        "take_profit": 1.96581,
+        "atr_h1": 0.00256,
         "rr_target": 1.66
       }
     }
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 299.4,
-    "entry": 94.011,
-    "projected_close": 94.13825,
-    "drift_per_hour": 0.0255,
-    "drift_per_minute": 0.000425,
+    "horizon_minutes": 298.68,
+    "entry": 94.037,
+    "projected_close": 94.17689,
+    "drift_per_hour": 0.0281,
+    "drift_per_minute": 0.0004683,
     "atr_h1": 0.14814,
-    "safety_margin": 0.074,
+    "safety_margin": 0.07391,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 5.0ч в плюсе: drift=+0.02550/ч, итог +0.12725 ≥ запас 0.07400"
+    "reason": "Проекция на 5.0ч в плюсе: drift=+0.02810/ч, итог +0.13988 ≥ запас 0.07391"
   },
   "leading_candidate": {
     "pair": "NZDJPY",
     "name_ru": "Новозел. доллар / Йена",
     "side": "BUY",
-    "confidence": 88,
+    "confidence": 89,
     "veto": null,
-    "composite_score": 0.6731
+    "composite_score": 0.7173
   },
   "macro_currency_strength": {
-    "USD": 0.3,
+    "USD": 0.33,
     "EUR": 3.0,
     "GBP": 3.0,
-    "JPY": -0.79,
-    "CHF": -0.52,
+    "JPY": -0.77,
+    "CHF": -0.54,
     "AUD": -3.0,
     "CAD": -3.0,
     "NZD": -3.0
@@ -2044,8 +2039,8 @@
   },
   "big_players": {
     "currency_scores": {
-      "USD": 0.92,
-      "EUR": -0.46,
+      "USD": 0.94,
+      "EUR": -0.48,
       "GBP": -0.23,
       "JPY": -1.79,
       "CHF": -0.95,
@@ -2065,8 +2060,8 @@
         "NZD": -0.68
       },
       "orderbook": {
-        "USD": 0.58,
-        "EUR": -0.58,
+        "USD": 0.64,
+        "EUR": -0.64,
         "GBP": -1.24,
         "JPY": -3.0,
         "CHF": -2.09,
@@ -2075,11 +2070,11 @@
         "NZD": 3.0
       },
       "macro": {
-        "USD": 0.3,
+        "USD": 0.33,
         "EUR": 3.0,
         "GBP": 3.0,
-        "JPY": -0.79,
-        "CHF": -0.52,
+        "JPY": -0.77,
+        "CHF": -0.54,
         "AUD": -3.0,
         "CAD": -3.0,
         "NZD": -3.0
@@ -2089,13 +2084,13 @@
   "favorite_check": {
     "ok": false,
     "tier": "strong",
-    "reason": "⚡ STRONG: brain 88% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
+    "reason": "⚡ STRONG: brain 89% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
     "lead_required": 5,
     "confidence_floor": 80,
     "edge_check": {
       "passes": false,
-      "calibrated_confidence": 72.3,
-      "brain_confidence": 88,
+      "calibrated_confidence": 72.9,
+      "brain_confidence": 89,
       "reason": "Edge не подтверждён: 5d Wilson lower 48.7% < 51% (статистически не отличается от случайности).",
       "windows": {
         "5d": {
