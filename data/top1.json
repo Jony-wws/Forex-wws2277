@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-28T13:08:17.033005+00:00",
+  "generated_at_utc": "2026-05-28T13:08:33.111523+00:00",
   "next_cycle_utc": "2026-05-28T15:00:00+00:00",
   "cycle_close_utc": "2026-05-28T15:00:00+00:00",
-  "minutes_to_expiry": 111.72,
+  "minutes_to_expiry": 111.45,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -105,7 +105,7 @@
         ],
         "extras": {
           "smc": {
-            "score": 2,
+            "score": 1,
             "structure": {
               "event": "choch_up",
               "score": 2,
@@ -114,8 +114,9 @@
               "trend": "down"
             },
             "sweep": {
-              "event": "none",
-              "score": 0
+              "event": "sweep_high",
+              "score": -1,
+              "level": 0.5912261605262756
             },
             "order_blocks": [
               {
@@ -183,6 +184,7 @@
             ],
             "reasons": [
               "Смена характера вверх (CHoCH)",
+              "Снятие верхней ликвидности — давление вниз",
               "Свежий бычий order block",
               "Свежий медвежий FVG"
             ]
@@ -199,22 +201,22 @@
             "score": 1,
             "reason": "Цена выше Value Area High — институциональный спрос"
           },
-          "score": 6
+          "score": 5
         },
         "normalised": 1.0
       },
       "macro": {
         "score": -3,
         "base": -3.0,
-        "quote": 1.75,
+        "quote": 1.77,
         "reason": "Макро: NZD ослабевает против USD",
         "normalised": -1.0
       },
       "big_players": {
         "score": -1,
         "base": -0.41,
-        "quote": 0.71,
-        "reason": "Smart money умеренно шорт NZD против USD (base -0.41, quote +0.71)",
+        "quote": 0.72,
+        "reason": "Smart money умеренно шорт NZD против USD (base -0.41, quote +0.72)",
         "normalised": -0.333
       },
       "fundamental": {
@@ -299,13 +301,13 @@
         "projection": {
           "passes": true,
           "reason": "Проекция на 1.9ч в плюсе: drift=+0.00036/ч, итог +0.00068 ≥ запас 0.00031",
-          "projected_close": 0.59191,
+          "projected_close": 0.5919,
           "entry": 0.59123,
           "atr": 0.00103,
           "drift_per_bar": 0.00036,
           "drift_per_minute": 6.1e-06,
           "horizon_bars": 5,
-          "horizon_minutes": 111.72,
+          "horizon_minutes": 111.45,
           "safety_margin": 0.00031
         }
       },
@@ -412,9 +414,9 @@
     "tier": "normal",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 111.72,
+      "horizon_minutes": 111.45,
       "entry": 0.59123,
-      "projected_close": 0.59191,
+      "projected_close": 0.5919,
       "drift_per_hour": 0.00036,
       "drift_per_minute": 6.1e-06,
       "atr_h1": 0.00103,
@@ -525,7 +527,7 @@
           ],
           "extras": {
             "smc": {
-              "score": 2,
+              "score": 1,
               "structure": {
                 "event": "choch_up",
                 "score": 2,
@@ -534,8 +536,9 @@
                 "trend": "down"
               },
               "sweep": {
-                "event": "none",
-                "score": 0
+                "event": "sweep_high",
+                "score": -1,
+                "level": 0.5912261605262756
               },
               "order_blocks": [
                 {
@@ -603,6 +606,7 @@
               ],
               "reasons": [
                 "Смена характера вверх (CHoCH)",
+                "Снятие верхней ликвидности — давление вниз",
                 "Свежий бычий order block",
                 "Свежий медвежий FVG"
               ]
@@ -619,22 +623,22 @@
               "score": 1,
               "reason": "Цена выше Value Area High — институциональный спрос"
             },
-            "score": 6
+            "score": 5
           },
           "normalised": 1.0
         },
         "macro": {
           "score": -3,
           "base": -3.0,
-          "quote": 1.75,
+          "quote": 1.77,
           "reason": "Макро: NZD ослабевает против USD",
           "normalised": -1.0
         },
         "big_players": {
           "score": -1,
           "base": -0.41,
-          "quote": 0.71,
-          "reason": "Smart money умеренно шорт NZD против USD (base -0.41, quote +0.71)",
+          "quote": 0.72,
+          "reason": "Smart money умеренно шорт NZD против USD (base -0.41, quote +0.72)",
           "normalised": -0.333
         },
         "fundamental": {
@@ -719,13 +723,13 @@
           "projection": {
             "passes": true,
             "reason": "Проекция на 1.9ч в плюсе: drift=+0.00036/ч, итог +0.00068 ≥ запас 0.00031",
-            "projected_close": 0.59191,
+            "projected_close": 0.5919,
             "entry": 0.59123,
             "atr": 0.00103,
             "drift_per_bar": 0.00036,
             "drift_per_minute": 6.1e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 111.72,
+            "horizon_minutes": 111.45,
             "safety_margin": 0.00031
           }
         },
@@ -787,9 +791,9 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 111.72,
+    "horizon_minutes": 111.45,
     "entry": 0.59123,
-    "projected_close": 0.59191,
+    "projected_close": 0.5919,
     "drift_per_hour": 0.00036,
     "drift_per_minute": 6.1e-06,
     "atr_h1": 0.00103,
@@ -807,11 +811,11 @@
     "composite_score": 0.271
   },
   "macro_currency_strength": {
-    "USD": 1.75,
+    "USD": 1.77,
     "EUR": 3.0,
     "GBP": 3.0,
     "JPY": 2.88,
-    "CHF": -1.99,
+    "CHF": -2.0,
     "AUD": -3.0,
     "CAD": -3.0,
     "NZD": -3.0
@@ -832,7 +836,7 @@
   },
   "big_players": {
     "currency_scores": {
-      "USD": 0.71,
+      "USD": 0.72,
       "EUR": 0.03,
       "GBP": -0.36,
       "JPY": -0.73,
@@ -863,11 +867,11 @@
         "NZD": 3.0
       },
       "macro": {
-        "USD": 1.75,
+        "USD": 1.77,
         "EUR": 3.0,
         "GBP": 3.0,
         "JPY": 2.88,
-        "CHF": -1.99,
+        "CHF": -2.0,
         "AUD": -3.0,
         "CAD": -3.0,
         "NZD": -3.0
