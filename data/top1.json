@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-05-29T17:35:11.319704+00:00",
+  "generated_at_utc": "2026-05-29T17:35:51.863005+00:00",
   "next_cycle_utc": "2026-05-29T19:00:00+00:00",
   "cycle_close_utc": "2026-05-29T19:00:00+00:00",
-  "minutes_to_expiry": 84.81,
+  "minutes_to_expiry": 84.14,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -14,10 +14,10 @@
     "composite_score": 0.8178,
     "layers": {
       "technical": {
-        "score": 22,
-        "max_score": 35,
+        "score": 20,
+        "max_score": 36,
         "side": "BUY",
-        "confidence": 90,
+        "confidence": 89,
         "adx_h1": 84.1,
         "persistence_5h": 40.0,
         "multi_tf_aligned": true,
@@ -59,13 +59,18 @@
           },
           {
             "name": "Стохастик",
-            "value": -1,
-            "reason": "K=80 < D=88 — медвежий"
+            "value": -2,
+            "reason": "K=80 D=88 — перекупленность"
           },
           {
             "name": "ADX",
             "value": 3,
             "reason": "ADX 84 — сильный восходящий тренд"
+          },
+          {
+            "name": "Williams %R",
+            "value": -1,
+            "reason": "W%R -20 — перекупленность"
           },
           {
             "name": "Ишимоку",
@@ -75,7 +80,7 @@
           {
             "name": "Моментум",
             "value": 1,
-            "reason": "Моментум +0.08% — рост"
+            "reason": "Моментум +0.09% — рост"
           },
           {
             "name": "VWAP",
@@ -210,8 +215,8 @@
       "big_players": {
         "score": 1,
         "base": -0.41,
-        "quote": -1.38,
-        "reason": "Smart money умеренно лонг NZD против JPY (base -0.41, quote -1.38)",
+        "quote": -1.37,
+        "reason": "Smart money умеренно лонг NZD против JPY (base -0.41, quote -1.37)",
         "normalised": 0.333
       },
       "fundamental": {
@@ -295,15 +300,15 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 1.4ч в плюсе: drift=+0.03650/ч, итог +0.05159 ≥ запас 0.03371",
-          "projected_close": 95.34259,
-          "entry": 95.291,
+          "reason": "Проекция на 1.4ч в плюсе: drift=+0.03680/ч, итог +0.05160 ≥ запас 0.03357",
+          "projected_close": 95.3456,
+          "entry": 95.294,
           "atr": 0.12679,
-          "drift_per_bar": 0.0365,
-          "drift_per_minute": 0.0006083,
+          "drift_per_bar": 0.0368,
+          "drift_per_minute": 0.0006133,
           "horizon_bars": 5,
-          "horizon_minutes": 84.81,
-          "safety_margin": 0.03371
+          "horizon_minutes": 84.14,
+          "safety_margin": 0.03357
         }
       },
       "edge_check": {
@@ -354,9 +359,9 @@
       }
     },
     "levels": {
-      "entry": 95.291,
-      "stop_loss": 95.10082,
-      "take_profit": 95.60797,
+      "entry": 95.294,
+      "stop_loss": 95.10382,
+      "take_profit": 95.61097,
       "atr_h1": 0.12679,
       "rr_target": 1.66
     },
@@ -409,16 +414,16 @@
     "tier": "premium",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 84.81,
-      "entry": 95.291,
-      "projected_close": 95.34259,
-      "drift_per_hour": 0.0365,
-      "drift_per_minute": 0.0006083,
+      "horizon_minutes": 84.14,
+      "entry": 95.294,
+      "projected_close": 95.3456,
+      "drift_per_hour": 0.0368,
+      "drift_per_minute": 0.0006133,
       "atr_h1": 0.12679,
-      "safety_margin": 0.03371,
+      "safety_margin": 0.03357,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 1.4ч в плюсе: drift=+0.03650/ч, итог +0.05159 ≥ запас 0.03371"
+      "reason": "Проекция на 1.4ч в плюсе: drift=+0.03680/ч, итог +0.05160 ≥ запас 0.03357"
     }
   },
   "top5": [
@@ -477,7 +482,7 @@
             {
               "name": "Стохастик",
               "value": -1,
-              "reason": "K=74 < D=83 — медвежий"
+              "reason": "K=73 < D=83 — медвежий"
             },
             {
               "name": "ADX",
@@ -619,7 +624,7 @@
         },
         "macro": {
           "score": 3,
-          "base": 2.6,
+          "base": 2.61,
           "quote": -3.0,
           "reason": "Макро: EUR укрепляется против JPY",
           "normalised": 1.0
@@ -627,8 +632,8 @@
         "big_players": {
           "score": 2,
           "base": 0.14,
-          "quote": -1.38,
-          "reason": "Smart money сильно лонг EUR против JPY (base +0.14, quote -1.38)",
+          "quote": -1.37,
+          "reason": "Smart money сильно лонг EUR против JPY (base +0.14, quote -1.37)",
           "normalised": 0.667
         },
         "fundamental": {
@@ -691,8 +696,8 @@
             "RSI(H1) 62 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 31 с DI+ > DI- — тренд вверх",
-            "MFI(H1) 66 — деньги входят (бычий)",
-            "CCI(H1) 128 — сильный бычий импульс"
+            "MFI(H1) 65 — деньги входят (бычий)",
+            "CCI(H1) 126 — сильный бычий импульс"
           ],
           "normalised": 0.706,
           "bonus_applied": 0.18
@@ -712,15 +717,15 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03630/ч, итог +0.05131 ≥ запас 0.04313",
-            "projected_close": 185.8263,
-            "entry": 185.77499,
-            "atr": 0.16222,
-            "drift_per_bar": 0.0363,
-            "drift_per_minute": 0.000605,
+            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03550/ч, итог +0.04978 ≥ запас 0.04305",
+            "projected_close": 185.81678,
+            "entry": 185.767,
+            "atr": 0.16257,
+            "drift_per_bar": 0.0355,
+            "drift_per_minute": 0.0005917,
             "horizon_bars": 5,
-            "horizon_minutes": 84.81,
-            "safety_margin": 0.04313
+            "horizon_minutes": 84.14,
+            "safety_margin": 0.04305
           }
         },
         "edge_check": {
@@ -771,10 +776,10 @@
         }
       },
       "levels": {
-        "entry": 185.77499,
-        "stop_loss": 185.53167,
-        "take_profit": 186.18053,
-        "atr_h1": 0.16222,
+        "entry": 185.767,
+        "stop_loss": 185.52314,
+        "take_profit": 186.17343,
+        "atr_h1": 0.16257,
         "rr_target": 1.66
       }
     },
@@ -981,8 +986,8 @@
         "big_players": {
           "score": 2,
           "base": 1.06,
-          "quote": -1.38,
-          "reason": "Smart money сильно лонг AUD против JPY (base +1.06, quote -1.38)",
+          "quote": -1.37,
+          "reason": "Smart money сильно лонг AUD против JPY (base +1.06, quote -1.37)",
           "normalised": 0.667
         },
         "fundamental": {
@@ -1066,22 +1071,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03770/ч, итог +0.05329 ≥ запас 0.03785",
-            "projected_close": 114.47329,
-            "entry": 114.42,
+            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03780/ч, итог +0.05301 ≥ запас 0.03769",
+            "projected_close": 114.474,
+            "entry": 114.421,
             "atr": 0.14236,
-            "drift_per_bar": 0.0377,
-            "drift_per_minute": 0.0006283,
+            "drift_per_bar": 0.0378,
+            "drift_per_minute": 0.00063,
             "horizon_bars": 5,
-            "horizon_minutes": 84.81,
-            "safety_margin": 0.03785
+            "horizon_minutes": 84.14,
+            "safety_margin": 0.03769
           }
         }
       },
       "levels": {
-        "entry": 114.42,
-        "stop_loss": 114.20646,
-        "take_profit": 114.77589,
+        "entry": 114.421,
+        "stop_loss": 114.20746,
+        "take_profit": 114.77689,
         "atr_h1": 0.14236,
         "rr_target": 1.66
       }
@@ -1126,7 +1131,7 @@
             {
               "name": "RSI",
               "value": 2,
-              "reason": "RSI 60 — бычья зона"
+              "reason": "RSI 59 — бычья зона"
             },
             {
               "name": "MACD",
@@ -1141,7 +1146,7 @@
             {
               "name": "Стохастик",
               "value": -1,
-              "reason": "K=75 < D=81 — медвежий"
+              "reason": "K=74 < D=81 — медвежий"
             },
             {
               "name": "ADX",
@@ -1281,7 +1286,7 @@
         },
         "macro": {
           "score": 2,
-          "base": -1.07,
+          "base": -1.06,
           "quote": -3.0,
           "reason": "Макро: GBP укрепляется против JPY",
           "normalised": 0.667
@@ -1289,8 +1294,8 @@
         "big_players": {
           "score": 1,
           "base": -0.52,
-          "quote": -1.38,
-          "reason": "Smart money умеренно лонг GBP против JPY (base -0.52, quote -1.38)",
+          "quote": -1.37,
+          "reason": "Smart money умеренно лонг GBP против JPY (base -0.52, quote -1.37)",
           "normalised": 0.333
         },
         "fundamental": {
@@ -1350,7 +1355,7 @@
           "super_confluence": true,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 60 — в бычьей зоне",
+            "RSI(H1) 59 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 31 с DI+ > DI- — тренд вверх",
             "MFI(H1) 61 — деньги входят (бычий)",
@@ -1374,22 +1379,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 1.4ч в плюсе: drift=+0.05480/ч, итог +0.07746 ≥ запас 0.05676",
-            "projected_close": 214.44047,
-            "entry": 214.36301,
+            "reason": "Проекция на 1.4ч в плюсе: drift=+0.05440/ч, итог +0.07628 ≥ запас 0.05653",
+            "projected_close": 214.43528,
+            "entry": 214.35899,
             "atr": 0.2135,
-            "drift_per_bar": 0.0548,
-            "drift_per_minute": 0.0009133,
+            "drift_per_bar": 0.0544,
+            "drift_per_minute": 0.0009067,
             "horizon_bars": 5,
-            "horizon_minutes": 84.81,
-            "safety_margin": 0.05676
+            "horizon_minutes": 84.14,
+            "safety_margin": 0.05653
           }
         }
       },
       "levels": {
-        "entry": 214.36301,
-        "stop_loss": 214.04275,
-        "take_profit": 214.89676,
+        "entry": 214.35899,
+        "stop_loss": 214.03874,
+        "take_profit": 214.89275,
         "atr_h1": 0.2135,
         "rr_target": 1.66
       }
@@ -1403,10 +1408,10 @@
       "composite_score": 0.8178,
       "layers": {
         "technical": {
-          "score": 22,
-          "max_score": 35,
+          "score": 20,
+          "max_score": 36,
           "side": "BUY",
-          "confidence": 90,
+          "confidence": 89,
           "adx_h1": 84.1,
           "persistence_5h": 40.0,
           "multi_tf_aligned": true,
@@ -1448,13 +1453,18 @@
             },
             {
               "name": "Стохастик",
-              "value": -1,
-              "reason": "K=80 < D=88 — медвежий"
+              "value": -2,
+              "reason": "K=80 D=88 — перекупленность"
             },
             {
               "name": "ADX",
               "value": 3,
               "reason": "ADX 84 — сильный восходящий тренд"
+            },
+            {
+              "name": "Williams %R",
+              "value": -1,
+              "reason": "W%R -20 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -1464,7 +1474,7 @@
             {
               "name": "Моментум",
               "value": 1,
-              "reason": "Моментум +0.08% — рост"
+              "reason": "Моментум +0.09% — рост"
             },
             {
               "name": "VWAP",
@@ -1599,8 +1609,8 @@
         "big_players": {
           "score": 1,
           "base": -0.41,
-          "quote": -1.38,
-          "reason": "Smart money умеренно лонг NZD против JPY (base -0.41, quote -1.38)",
+          "quote": -1.37,
+          "reason": "Smart money умеренно лонг NZD против JPY (base -0.41, quote -1.37)",
           "normalised": 0.333
         },
         "fundamental": {
@@ -1684,15 +1694,15 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03650/ч, итог +0.05159 ≥ запас 0.03371",
-            "projected_close": 95.34259,
-            "entry": 95.291,
+            "reason": "Проекция на 1.4ч в плюсе: drift=+0.03680/ч, итог +0.05160 ≥ запас 0.03357",
+            "projected_close": 95.3456,
+            "entry": 95.294,
             "atr": 0.12679,
-            "drift_per_bar": 0.0365,
-            "drift_per_minute": 0.0006083,
+            "drift_per_bar": 0.0368,
+            "drift_per_minute": 0.0006133,
             "horizon_bars": 5,
-            "horizon_minutes": 84.81,
-            "safety_margin": 0.03371
+            "horizon_minutes": 84.14,
+            "safety_margin": 0.03357
           }
         },
         "edge_check": {
@@ -1743,9 +1753,9 @@
         }
       },
       "levels": {
-        "entry": 95.291,
-        "stop_loss": 95.10082,
-        "take_profit": 95.60797,
+        "entry": 95.294,
+        "stop_loss": 95.10382,
+        "take_profit": 95.61097,
         "atr_h1": 0.12679,
         "rr_target": 1.66
       }
@@ -1753,16 +1763,16 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 84.81,
-    "entry": 95.291,
-    "projected_close": 95.34259,
-    "drift_per_hour": 0.0365,
-    "drift_per_minute": 0.0006083,
+    "horizon_minutes": 84.14,
+    "entry": 95.294,
+    "projected_close": 95.3456,
+    "drift_per_hour": 0.0368,
+    "drift_per_minute": 0.0006133,
     "atr_h1": 0.12679,
-    "safety_margin": 0.03371,
+    "safety_margin": 0.03357,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 1.4ч в плюсе: drift=+0.03650/ч, итог +0.05159 ≥ запас 0.03371"
+    "reason": "Проекция на 1.4ч в плюсе: drift=+0.03680/ч, итог +0.05160 ≥ запас 0.03357"
   },
   "leading_candidate": {
     "pair": "EURJPY",
@@ -1773,11 +1783,11 @@
     "composite_score": 0.8998
   },
   "macro_currency_strength": {
-    "USD": -1.83,
-    "EUR": 2.6,
-    "GBP": -1.07,
+    "USD": -1.82,
+    "EUR": 2.61,
+    "GBP": -1.06,
     "JPY": -3.0,
-    "CHF": 1.66,
+    "CHF": 1.63,
     "AUD": -3.0,
     "CAD": -3.0,
     "NZD": -3.0
@@ -1798,11 +1808,11 @@
   },
   "big_players": {
     "currency_scores": {
-      "USD": -0.19,
+      "USD": -0.18,
       "EUR": 0.14,
       "GBP": -0.52,
-      "JPY": -1.38,
-      "CHF": 0.46,
+      "JPY": -1.37,
+      "CHF": 0.45,
       "AUD": 1.06,
       "CAD": 0.23,
       "NZD": -0.41
@@ -1822,18 +1832,18 @@
         "USD": -2.82,
         "EUR": 2.82,
         "GBP": 1.36,
-        "JPY": 1.25,
+        "JPY": 1.31,
         "CHF": 2.76,
         "AUD": 2.88,
         "CAD": 1.91,
         "NZD": 3.0
       },
       "macro": {
-        "USD": -1.83,
-        "EUR": 2.6,
-        "GBP": -1.07,
+        "USD": -1.82,
+        "EUR": 2.61,
+        "GBP": -1.06,
         "JPY": -3.0,
-        "CHF": 1.66,
+        "CHF": 1.63,
         "AUD": -3.0,
         "CAD": -3.0,
         "NZD": -3.0
