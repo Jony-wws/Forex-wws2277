@@ -1,190 +1,189 @@
-# Release notes — неделя до 2026-06-01
+# Release notes — неделя до 2026-06-08
 
-Всего коммитов: **183**
+Всего коммитов: **182**
 
 ## 🔧 Поддержка
 
-- `d90fc8582` — performance report 2026-06-01
-- `f472598a5` — price comparison snapshot
-- `3af3e8e43` — 2026-06-01 05:15 UTC
-- `ade81ee9d` — refresh market summary
-- `b59ac0ae8` — 5h cycle snapshot 2026-06-01 04:48 UTC
-- `514c4adea` — price comparison snapshot
-- `0ef8d1944` — price comparison snapshot
-- `9a0ac7226` — price comparison snapshot
-- `0897c0b5e` — top-1 chart screenshot
-- `4e3959eba` — refresh market summary
-- `3a4695d26` — refresh market summary
-- `5c7a472fc` — 5h cycle snapshot 2026-05-31 20:18 UTC
-- `c16c52b59` — price comparison snapshot
-- `90280c538` — price comparison snapshot
-- `8c823504b` — price comparison snapshot
-- `fcf946725` — refresh market summary
-- `f9215ac5c` — 2026-05-31 16:36 UTC
-- `d0b68376e` — top-1 chart screenshot
-- `9f5335e10` — refresh market summary
-- `65cfef864` — 5h cycle snapshot 2026-05-31 16:17 UTC
-- `d9767ac37` — price comparison snapshot
-- `0637fd7e6` — price comparison snapshot
-- `5372ad5d1` — price comparison snapshot
-- `52da0cc47` — 2026-05-31 11:50 UTC
-- `6ca2b5c7e` — refresh market summary
-- `4114bfae1` — 5h cycle snapshot 2026-05-31 11:45 UTC
-- `0e437b8c9` — price comparison snapshot
-- `9bf1a6b2f` — refresh market summary
-- `06e6e4277` — refresh market summary
-- `79e82e69e` — 5h cycle snapshot 2026-05-31 08:20 UTC
-- `c3da2546d` — price comparison snapshot
-- `9ae816297` — price comparison snapshot
-- `f99623984` — refresh market summary
-- `e57b8be4a` — top-1 chart screenshot
-- `473e37add` — refresh market summary
-- `bc20dcfe8` — 5h cycle snapshot 2026-05-31 04:19 UTC
-- `04a387096` — price comparison snapshot
-- `0a9bd11ae` — price comparison snapshot
-- `c4adf5a4d` — price comparison snapshot
-- `32d07d3a0` — top-1 chart screenshot
-- `a390d6621` — price comparison snapshot
-- `c244acdd7` — refresh market summary
-- `10d6dd0b2` — refresh market summary
-- `51d21c4d5` — 5h cycle snapshot 2026-05-30 20:14 UTC
-- `2f855b2ca` — price comparison snapshot
-- `3b98d1c65` — price comparison snapshot
-- `4ea6735ca` — price comparison snapshot
-- `f0bc7231c` — refresh market summary
-- `8294cea9d` — 2026-05-30 16:14 UTC
-- `aee945b72` — refresh market summary
-- `1129179b7` — 5h cycle snapshot 2026-05-30 16:10 UTC
-- `5c5b76055` — price comparison snapshot
-- `70b466786` — price comparison snapshot
-- `2461d693c` — price comparison snapshot
-- `49db4840d` — refresh market summary
-- `e92fbb2e7` — 2026-05-30 11:44 UTC
-- `82e183a4b` — refresh market summary
-- `4dac5eec3` — 5h cycle snapshot 2026-05-30 11:28 UTC
-- `b0cef3402` — price comparison snapshot
-- `36e46d7bc` — price comparison snapshot
-- `8e9fbfb67` — refresh market summary
-- `20b0dc8c5` — refresh market summary
-- `f0f3b838c` — 5h cycle snapshot 2026-05-30 07:45 UTC
-- `e1341b859` — price comparison snapshot
-- `8bbe628b0` — price comparison snapshot
-- `3ef529a68` — 2026-05-30 04:16 UTC
-- `b35e92fae` — refresh market summary
-- `e4e91f622` — 5h cycle snapshot 2026-05-30 03:54 UTC
-- `554f19a3e` — price comparison snapshot
-- `282fc57b5` — price comparison snapshot
-- `5a9a7f03e` — top-1 chart screenshot
-- `37894bde6` — price comparison snapshot
-- `afd65b64b` — 2026-05-29 21:16 UTC
-- `dbedb52cf` — refresh market summary
-- `41516a40e` — refresh market summary
-- `f13d9d4aa` — 5h cycle snapshot 2026-05-29 21:13 UTC
-- `f894c18a9` — price comparison snapshot
-- `5e8aab563` — refresh market summary
-- `93952ba2c` — 2026-05-29 18:16 UTC
-- `da82b0e35` — price comparison snapshot
-- `0561ba987` — refresh market summary
-- `b5b247e59` — refresh market summary
-- `680adf49a` — 5h cycle snapshot 2026-05-29 12:52 UTC
-- `4470a4ce7` — price comparison snapshot
-- `2248abb63` — refresh market summary
-- `adbc2bc3a` — refresh market summary
-- `06d810b19` — 5h cycle snapshot 2026-05-29 08:48 UTC
-- `c47ae7dee` — price comparison snapshot
-- `044ea6df2` — price comparison snapshot
-- `c2b6eef14` — refresh market summary
-- `64b22fc53` — top-1 chart screenshot
-- `810cd6ec4` — refresh market summary
-- `c95cdcbd7` — 5h cycle snapshot 2026-05-29 04:08 UTC
-- `71efbeca0` — price comparison snapshot
-- `0b563a609` — price comparison snapshot
-- `74b239d8f` — top-1 chart screenshot
-- `8152cc658` — refresh market summary
-- `09f7ad1dd` — 2026-05-28 21:18 UTC
-- `cd34ca106` — refresh market summary
-- `bebcc025b` — 5h cycle snapshot 2026-05-28 21:14 UTC
-- `05a461d97` — price comparison snapshot
-- `c5c26fef5` — 2026-05-28 18:20 UTC
-- `d13a17bf5` — refresh market summary
-- `34cb69124` — 5h cycle snapshot 2026-05-28 18:18 UTC
-- `8e1dc82ce` — price comparison snapshot
-- `3f8cfd1e8` — price comparison snapshot
-- `7728253ce` — refresh market summary
-- `63f6243ce` — refresh market summary
-- `2a4358cc7` — 5h cycle snapshot 2026-05-28 13:59 UTC
-- `c8ea7a63b` — price comparison snapshot
-- `b7c59975d` — refresh market summary
-- `f50fc168d` — refresh market summary
-- `48fea49a5` — 5h cycle snapshot 2026-05-28 08:48 UTC
-- `2216fd8e5` — price comparison snapshot
-- `56afa8502` — update seen-events ledger
-- `0e4b4e6b8` — refresh market summary
-- `c812cd8a1` — top-1 chart screenshot
-- `c37fe24dc` — refresh market summary
-- `afeee08a6` — 5h cycle snapshot 2026-05-28 04:05 UTC
-- `7c78bae00` — price comparison snapshot
-- `bc1a0c835` — price comparison snapshot
-- `6007e4646` — price comparison snapshot
-- `e6d02960f` — top-1 chart screenshot
-- `de15f1c7f` — refresh market summary
-- `66e915066` — 2026-05-27 21:12 UTC
-- `5ca1ead6f` — refresh market summary
-- `360765e86` — 5h cycle snapshot 2026-05-27 21:06 UTC
-- `28f3be202` — price comparison snapshot
-- `4d5e5de16` — refresh market summary
-- `c26be7bbe` — refresh market summary
-- `f563363ee` — 5h cycle snapshot 2026-05-27 18:04 UTC
-- `7de3e8d4e` — price comparison snapshot
-- `0359e09f3` — price comparison snapshot
-- `0f2bfbfcb` — refresh market summary
-- `d3fa18f5c` — refresh market summary
-- `45521cbf3` — 5h cycle snapshot 2026-05-27 12:59 UTC
-- `de57896b0` — price comparison snapshot
-- `abd035a65` — refresh market summary
-- `8ca0f3eb3` — refresh market summary
-- `971bb2009` — 5h cycle snapshot 2026-05-27 08:43 UTC
-- `168ce3d67` — price comparison snapshot
-- `053f2dace` — update seen-events ledger
-- `1953c7bf9` — 2026-05-27 04:47 UTC
-- `a628e2015` — refresh market summary
-- `06ec55703` — 5h cycle snapshot 2026-05-27 04:17 UTC
-- `3494bf5dc` — price comparison snapshot
-- `dc5a05f32` — price comparison snapshot
-- `aad4866b1` — top-1 chart screenshot
-- `cf00ac742` — price comparison snapshot
-- `225a4edb0` — refresh market summary
-- `dc21124b4` — 2026-05-26 21:00 UTC
-- `9374170e2` — price comparison snapshot
-- `a405ca099` — refresh market summary
-- `64009c883` — refresh market summary
-- `da02f28f5` — 5h cycle snapshot 2026-05-26 17:59 UTC
-- `4449736b6` — price comparison snapshot
-- `cc26cda1e` — price comparison snapshot
-- `67d5d97a6` — 2026-05-26 12:49 UTC
-- `a95548c6b` — refresh market summary
-- `a042c5e61` — refresh market summary
-- `7c1996b2d` — 5h cycle snapshot 2026-05-26 08:37 UTC
-- `51510e703` — price comparison snapshot
-- `616fb7f9f` — refresh market summary
-- `1a1941e51` — refresh market summary
-- `72aeb12db` — 5h cycle snapshot 2026-05-26 04:04 UTC
-- `f2aa28d60` — price comparison snapshot
-- `91a9ebb83` — price comparison snapshot
-- `4bc581b31` — price comparison snapshot
-- `d12ad6248` — top-1 chart screenshot
-- `085d6cd10` — price comparison snapshot
-- `c37dfda95` — 2026-05-25 20:43 UTC
-- `a07d105e6` — refresh market summary
-- `04381570c` — 5h cycle snapshot 2026-05-25 20:27 UTC
-- `614456e42` — price comparison snapshot
-- `792e56082` — price comparison snapshot
-- `0e6b150bb` — 2026-05-25 17:16 UTC
-- `4673a449c` — refresh market summary
-- `c918dfd02` — 5h cycle snapshot 2026-05-25 17:13 UTC
-- `cdc840631` — price comparison snapshot
-- `1ad2b13e1` — refresh market summary
-- `9e7475720` — refresh market summary
-- `64cd34b16` — 5h cycle snapshot 2026-05-25 13:35 UTC
-- `f6332fd8a` — price comparison snapshot
+- `02514ec7f` — performance report 2026-06-08
+- `5ecc450de` — price comparison snapshot
+- `07d32ea29` — refresh market summary
+- `8b3c57fe5` — 2026-06-08 05:00 UTC
+- `988bc6ecd` — refresh market summary
+- `2027cf4a2` — 5h cycle snapshot 2026-06-08 04:29 UTC
+- `c08814ed2` — price comparison snapshot
+- `22ad3dea5` — price comparison snapshot
+- `34dad8f70` — top-1 chart screenshot
+- `6240e1b0b` — price comparison snapshot
+- `1f2b7b93d` — refresh market summary
+- `8c4a69aef` — refresh market summary
+- `73d46ecc7` — 5h cycle snapshot 2026-06-07 20:19 UTC
+- `f13d16e11` — price comparison snapshot
+- `f55b6e087` — price comparison snapshot
+- `718e37bac` — price comparison snapshot
+- `d282a90b1` — refresh market summary
+- `d51dcdb49` — 2026-06-07 16:43 UTC
+- `2da114c55` — refresh market summary
+- `38c979137` — 5h cycle snapshot 2026-06-07 16:23 UTC
+- `68704b833` — price comparison snapshot
+- `745c24885` — price comparison snapshot
+- `ec22cff15` — 2026-06-07 12:01 UTC
+- `ee539357f` — refresh market summary
+- `a41788299` — 5h cycle snapshot 2026-06-07 11:55 UTC
+- `b22d489b8` — price comparison snapshot
+- `7ceae5605` — price comparison snapshot
+- `4af3269d2` — refresh market summary
+- `cf5e26db9` — refresh market summary
+- `48ec8d7bd` — 5h cycle snapshot 2026-06-07 08:29 UTC
+- `f053c50e6` — price comparison snapshot
+- `0ce781229` — refresh market summary
+- `bdcfb5096` — 2026-06-07 04:55 UTC
+- `8e4ccef72` — refresh market summary
+- `dc415c095` — 5h cycle snapshot 2026-06-07 04:24 UTC
+- `8e5151c46` — price comparison snapshot
+- `d9fe5c91f` — price comparison snapshot
+- `74ab5b297` — price comparison snapshot
+- `739eeeca9` — top-1 chart screenshot
+- `8ad82d5c9` — price comparison snapshot
+- `185ff4047` — refresh market summary
+- `8ee58d2cd` — 2026-06-06 20:21 UTC
+- `87a7d0ce8` — refresh market summary
+- `82c5431c0` — 5h cycle snapshot 2026-06-06 20:16 UTC
+- `0b9718d29` — price comparison snapshot
+- `9a3c57663` — price comparison snapshot
+- `56b007c70` — 2026-06-06 16:18 UTC
+- `162a0e368` — refresh market summary
+- `8bd694c2f` — 5h cycle snapshot 2026-06-06 16:13 UTC
+- `ab5b51610` — price comparison snapshot
+- `9f1dfb692` — price comparison snapshot
+- `87e86abd4` — price comparison snapshot
+- `4d5db566c` — refresh market summary
+- `9cdd92df0` — refresh market summary
+- `dda492160` — price comparison snapshot
+- `049b046f3` — price comparison snapshot
+- `9ae012da5` — 2026-06-06 08:01 UTC
+- `530477173` — refresh market summary
+- `b84047aaf` — 5h cycle snapshot 2026-06-06 07:51 UTC
+- `c021a8068` — price comparison snapshot
+- `2775ce145` — price comparison snapshot
+- `c46b3757c` — refresh market summary
+- `3b5e917ed` — 2026-06-06 04:19 UTC
+- `8853b1227` — refresh market summary
+- `38d4af9d7` — 5h cycle snapshot 2026-06-06 03:58 UTC
+- `7412ff79c` — price comparison snapshot
+- `5dc81284b` — price comparison snapshot
+- `a77276539` — top-1 chart screenshot
+- `d3b971555` — price comparison snapshot
+- `add0e35da` — 2026-06-05 20:55 UTC
+- `eabb1e087` — refresh market summary
+- `39f2d0cd4` — refresh market summary
+- `9841c1310` — 5h cycle snapshot 2026-06-05 20:52 UTC
+- `b83c10e27` — price comparison snapshot
+- `7d81a948d` — price comparison snapshot
+- `846258188` — refresh market summary
+- `5ae21e10a` — refresh market summary
+- `15d010415` — update seen-events ledger
+- `9aa78539a` — price comparison snapshot
+- `665680690` — refresh market summary
+- `0b10fdeb1` — 2026-06-05 12:50 UTC
+- `6dc22b3b9` — refresh market summary
+- `b17927de6` — 5h cycle snapshot 2026-06-05 12:43 UTC
+- `1f18fdf63` — price comparison snapshot
+- `3f615a01b` — refresh market summary
+- `28a87d8f8` — refresh market summary
+- `79955b92f` — 5h cycle snapshot 2026-06-05 08:49 UTC
+- `7edfb77fd` — price comparison snapshot
+- `c2e5f7b7d` — price comparison snapshot
+- `b407a2216` — refresh market summary
+- `69ed64584` — refresh market summary
+- `f2c165de7` — 5h cycle snapshot 2026-06-05 04:15 UTC
+- `74c777915` — price comparison snapshot
+- `84c650254` — price comparison snapshot
+- `636e0cc2c` — top-1 chart screenshot
+- `4c3196336` — price comparison snapshot
+- `09998c72e` — refresh market summary
+- `0f0a7bd97` — 2026-06-04 21:03 UTC
+- `b52eaa322` — price comparison snapshot
+- `770610599` — update seen-events ledger
+- `5098c7392` — refresh market summary
+- `c92354f39` — 2026-06-04 17:50 UTC
+- `f5646150f` — refresh market summary
+- `18201275d` — price comparison snapshot
+- `72457eddd` — price comparison snapshot
+- `850c8d4db` — refresh market summary
+- `f0aa98ba1` — 2026-06-04 13:30 UTC
+- `b470353c9` — refresh market summary
+- `91f4cb780` — 5h cycle snapshot 2026-06-04 12:49 UTC
+- `7e2294bf9` — price comparison snapshot
+- `cd6e518ea` — 2026-06-04 08:59 UTC
+- `db71c6760` — refresh market summary
+- `b4d13011b` — 5h cycle snapshot 2026-06-04 08:55 UTC
+- `ef5156f2b` — price comparison snapshot
+- `12a34bc74` — 2026-06-04 05:03 UTC
+- `84f886037` — refresh market summary
+- `59c640e46` — 5h cycle snapshot 2026-06-04 04:41 UTC
+- `1c1f2f1e9` — price comparison snapshot
+- `c8cb8a1d3` — price comparison snapshot
+- `104aa2ae9` — top-1 chart screenshot
+- `b44ccfadb` — refresh market summary
+- `86b916716` — refresh market summary
+- `eb874a720` — 5h cycle snapshot 2026-06-03 21:56 UTC
+- `65e20844a` — price comparison snapshot
+- `399ce0d81` — refresh market summary
+- `a19a125a9` — refresh market summary
+- `18da78cb4` — 5h cycle snapshot 2026-06-03 18:52 UTC
+- `34a6eab23` — price comparison snapshot
+- `b99c99a18` — 2026-06-03 15:03 UTC
+- `86adfe0ad` — refresh market summary
+- `574cc8124` — refresh market summary
+- `2af03d1ae` — 5h cycle snapshot 2026-06-03 14:49 UTC
+- `5d9f3d247` — update seen-events ledger
+- `174ccbba7` — price comparison snapshot
+- `c3d9a0bab` — refresh market summary
+- `e9c44d5c4` — 5h cycle snapshot 2026-06-03 09:59 UTC
+- `189cc4325` — update seen-events ledger
+- `b3f01ba7f` — price comparison snapshot
+- `8dae7ec22` — refresh market summary
+- `52467657a` — 2026-06-03 05:15 UTC
+- `40a6c33d2` — 2026-06-03 04:47 UTC
+- `b7a6a4284` — 5h cycle snapshot 2026-06-03 04:47 UTC
+- `f82c210e7` — update seen-events ledger
+- `2261ccd78` — price comparison snapshot
+- `bf23b23cb` — price comparison snapshot
+- `7b1bd584f` — top-1 chart screenshot
+- `e3e13f5bd` — refresh market summary
+- `8737a833b` — refresh market summary
+- `46e2220d8` — 5h cycle snapshot 2026-06-02 21:54 UTC
+- `4a122c04a` — price comparison snapshot
+- `d4fb9e811` — 2026-06-02 18:53 UTC
+- `c33b69bae` — refresh market summary
+- `c656a07f1` — 5h cycle snapshot 2026-06-02 18:46 UTC
+- `26ec97dfc` — price comparison snapshot
+- `a06f6ea70` — refresh market summary
+- `d9c11cfaf` — refresh market summary
+- `c9f2d1aae` — 5h cycle snapshot 2026-06-02 14:12 UTC
+- `e9df36b7d` — price comparison snapshot
+- `58508349e` — price comparison snapshot
+- `d37558bac` — refresh market summary
+- `182864cbc` — refresh market summary
+- `6cd54f417` — 5h cycle snapshot 2026-06-02 09:15 UTC
+- `f4dc84ad4` — price comparison snapshot
+- `3791853c9` — refresh market summary
+- `bed50a22a` — 2026-06-02 04:59 UTC
+- `2c83d04f2` — refresh market summary
+- `b940f4145` — 5h cycle snapshot 2026-06-02 04:26 UTC
+- `7f81a739c` — price comparison snapshot
+- `045d4363a` — price comparison snapshot
+- `5cde7fe28` — top-1 chart screenshot
+- `cba37fda8` — refresh market summary
+- `65101fb02` — price comparison snapshot
+- `8ffe3dc3d` — refresh market summary
+- `26ce92c21` — 5h cycle snapshot 2026-06-01 19:59 UTC
+- `e282bf6ff` — update seen-events ledger
+- `8d6ca8fd2` — price comparison snapshot
+- `701719135` — 2026-06-01 16:19 UTC
+- `771ba8977` — refresh market summary
+- `15e303037` — price comparison snapshot
+- `80eed176e` — refresh market summary
+- `e3b825f29` — 5h cycle snapshot 2026-06-01 10:27 UTC
+- `c704565b8` — weekly release notes
 
