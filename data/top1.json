@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-06-08T20:06:34.007222+00:00",
+  "generated_at_utc": "2026-06-08T20:06:50.690882+00:00",
   "next_cycle_utc": "2026-06-09T00:00:00+00:00",
   "cycle_close_utc": "2026-06-09T00:00:00+00:00",
-  "minutes_to_expiry": 233.43,
+  "minutes_to_expiry": 233.16,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -10,14 +10,14 @@
     "name_ru": "Евро / Франк",
     "side": "BUY",
     "veto": null,
-    "confidence": 81,
-    "composite_score": 0.4694,
+    "confidence": 75,
+    "composite_score": 0.4076,
     "layers": {
       "technical": {
-        "score": 22,
+        "score": 17,
         "max_score": 34,
         "side": "BUY",
-        "confidence": 91,
+        "confidence": 88,
         "adx_h1": 45.7,
         "persistence_5h": 20.0,
         "multi_tf_aligned": true,
@@ -44,8 +44,8 @@
           },
           {
             "name": "RSI",
-            "value": 2,
-            "reason": "RSI 70 — бычья зона"
+            "value": -3,
+            "reason": "RSI 71 — перекупленность, ожидается откат"
           },
           {
             "name": "MACD",
@@ -60,7 +60,7 @@
           {
             "name": "Стохастик",
             "value": -2,
-            "reason": "K=88 D=86 — перекупленность"
+            "reason": "K=90 D=87 — перекупленность"
           },
           {
             "name": "ADX",
@@ -70,7 +70,7 @@
           {
             "name": "Williams %R",
             "value": -1,
-            "reason": "W%R -12 — перекупленность"
+            "reason": "W%R -10 — перекупленность"
           },
           {
             "name": "Ишимоку",
@@ -90,7 +90,7 @@
           {
             "name": "Price Action",
             "value": 3,
-            "reason": "Медвежье поглощение; Бычье поглощение; Пин-бар (бычий)"
+            "reason": "Бычье поглощение; Пин-бар (бычий); Бычье поглощение"
           },
           {
             "name": "EMA Кросс 15М",
@@ -197,7 +197,7 @@
           },
           "score": 1
         },
-        "normalised": 0.939
+        "normalised": 0.733
       },
       "macro": {
         "score": 0,
@@ -270,7 +270,7 @@
         "super_confluence": false,
         "reasons": [
           "H1 EMA-стек бычий",
-          "RSI(H1) 70 — в бычьей зоне",
+          "RSI(H1) 71 — в бычьей зоне",
           "MACD(H1) положителен",
           "ADX(H1) 46 с DI+ > DI- — тренд вверх",
           "MFI(H1) 80 — деньги входят (бычий)",
@@ -294,21 +294,21 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00053 ≥ запас 0.00047",
-          "projected_close": 0.92068,
-          "entry": 0.92015,
+          "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00055 ≥ запас 0.00047",
+          "projected_close": 0.92076,
+          "entry": 0.92021,
           "atr": 0.00107,
           "drift_per_bar": 0.00014,
-          "drift_per_minute": 2.3e-06,
+          "drift_per_minute": 2.4e-06,
           "horizon_bars": 5,
-          "horizon_minutes": 233.43,
+          "horizon_minutes": 233.16,
           "safety_margin": 0.00047
         }
       },
       "edge_check": {
         "passes": false,
-        "calibrated_confidence": 54.7,
-        "brain_confidence": 81,
+        "calibrated_confidence": 51.1,
+        "brain_confidence": 75,
         "reason": "Edge не подтверждён: 5d Wilson lower 15.3% < 51% (статистически не отличается от случайности); EV -2.27п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
         "windows": {
           "5d": {
@@ -353,16 +353,16 @@
       }
     },
     "levels": {
-      "entry": 0.92015,
-      "stop_loss": 0.91854,
-      "take_profit": 0.92282,
+      "entry": 0.92021,
+      "stop_loss": 0.91861,
+      "take_profit": 0.92288,
       "atr_h1": 0.00107,
       "rr_target": 1.66
     },
     "edge": {
       "passes": false,
-      "calibrated_confidence": 54.7,
-      "brain_confidence": 81,
+      "calibrated_confidence": 51.1,
+      "brain_confidence": 75,
       "reason": "Edge не подтверждён: 5d Wilson lower 15.3% < 51% (статистически не отличается от случайности); EV -2.27п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
       "windows": {
         "5d": {
@@ -405,19 +405,19 @@
       "ev_positive": false,
       "calibrated_ok": true
     },
-    "tier": "strong",
+    "tier": "normal",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 233.43,
-      "entry": 0.92015,
-      "projected_close": 0.92068,
+      "horizon_minutes": 233.16,
+      "entry": 0.92021,
+      "projected_close": 0.92076,
       "drift_per_hour": 0.00014,
-      "drift_per_minute": 2.3e-06,
+      "drift_per_minute": 2.4e-06,
       "atr_h1": 0.00107,
       "safety_margin": 0.00047,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00053 ≥ запас 0.00047"
+      "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00055 ≥ запас 0.00047"
     }
   },
   "top5": [
@@ -426,14 +426,14 @@
       "name_ru": "Евро / Франк",
       "side": "BUY",
       "veto": null,
-      "confidence": 81,
-      "composite_score": 0.4694,
+      "confidence": 75,
+      "composite_score": 0.4076,
       "layers": {
         "technical": {
-          "score": 22,
+          "score": 17,
           "max_score": 34,
           "side": "BUY",
-          "confidence": 91,
+          "confidence": 88,
           "adx_h1": 45.7,
           "persistence_5h": 20.0,
           "multi_tf_aligned": true,
@@ -460,8 +460,8 @@
             },
             {
               "name": "RSI",
-              "value": 2,
-              "reason": "RSI 70 — бычья зона"
+              "value": -3,
+              "reason": "RSI 71 — перекупленность, ожидается откат"
             },
             {
               "name": "MACD",
@@ -476,7 +476,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=88 D=86 — перекупленность"
+              "reason": "K=90 D=87 — перекупленность"
             },
             {
               "name": "ADX",
@@ -486,7 +486,7 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -12 — перекупленность"
+              "reason": "W%R -10 — перекупленность"
             },
             {
               "name": "Ишимоку",
@@ -506,7 +506,7 @@
             {
               "name": "Price Action",
               "value": 3,
-              "reason": "Медвежье поглощение; Бычье поглощение; Пин-бар (бычий)"
+              "reason": "Бычье поглощение; Пин-бар (бычий); Бычье поглощение"
             },
             {
               "name": "EMA Кросс 15М",
@@ -613,7 +613,7 @@
             },
             "score": 1
           },
-          "normalised": 0.939
+          "normalised": 0.733
         },
         "macro": {
           "score": 0,
@@ -686,7 +686,7 @@
           "super_confluence": false,
           "reasons": [
             "H1 EMA-стек бычий",
-            "RSI(H1) 70 — в бычьей зоне",
+            "RSI(H1) 71 — в бычьей зоне",
             "MACD(H1) положителен",
             "ADX(H1) 46 с DI+ > DI- — тренд вверх",
             "MFI(H1) 80 — деньги входят (бычий)",
@@ -710,21 +710,21 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00053 ≥ запас 0.00047",
-            "projected_close": 0.92068,
-            "entry": 0.92015,
+            "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00055 ≥ запас 0.00047",
+            "projected_close": 0.92076,
+            "entry": 0.92021,
             "atr": 0.00107,
             "drift_per_bar": 0.00014,
-            "drift_per_minute": 2.3e-06,
+            "drift_per_minute": 2.4e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 233.43,
+            "horizon_minutes": 233.16,
             "safety_margin": 0.00047
           }
         },
         "edge_check": {
           "passes": false,
-          "calibrated_confidence": 54.7,
-          "brain_confidence": 81,
+          "calibrated_confidence": 51.1,
+          "brain_confidence": 75,
           "reason": "Edge не подтверждён: 5d Wilson lower 15.3% < 51% (статистически не отличается от случайности); EV -2.27п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
           "windows": {
             "5d": {
@@ -769,9 +769,9 @@
         }
       },
       "levels": {
-        "entry": 0.92015,
-        "stop_loss": 0.91854,
-        "take_profit": 0.92282,
+        "entry": 0.92021,
+        "stop_loss": 0.91861,
+        "take_profit": 0.92288,
         "atr_h1": 0.00107,
         "rr_target": 1.66
       }
@@ -782,13 +782,13 @@
       "side": "BUY",
       "veto": null,
       "confidence": 56,
-      "composite_score": 0.2491,
+      "composite_score": 0.248,
       "layers": {
         "technical": {
-          "score": 16,
-          "max_score": 35,
+          "score": 15,
+          "max_score": 33,
           "side": "BUY",
-          "confidence": 87,
+          "confidence": 86,
           "adx_h1": 43.7,
           "persistence_5h": 60.0,
           "multi_tf_aligned": true,
@@ -816,7 +816,7 @@
             {
               "name": "RSI",
               "value": 0,
-              "reason": "RSI 46 — нейтральная зона"
+              "reason": "RSI 45 — нейтральная зона"
             },
             {
               "name": "MACD",
@@ -831,7 +831,7 @@
             {
               "name": "Стохастик",
               "value": 0,
-              "reason": "K=85 D=80 — нейтральный"
+              "reason": "K=83 D=79 — нейтральный"
             },
             {
               "name": "ADX",
@@ -841,17 +841,12 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -15 — перекупленность"
+              "reason": "W%R -17 — перекупленность"
             },
             {
               "name": "Ишимоку",
               "value": 1,
               "reason": "Цена выше облака Ишимоку"
-            },
-            {
-              "name": "Моментум",
-              "value": 1,
-              "reason": "Моментум +0.05% — рост"
             },
             {
               "name": "Мульти-ТФ",
@@ -861,7 +856,7 @@
             {
               "name": "Price Action",
               "value": 3,
-              "reason": "Пин-бар (бычий); Бычье поглощение; Пин-бар (бычий)"
+              "reason": "Пин-бар (бычий); Бычье поглощение"
             },
             {
               "name": "EMA Кросс 15М",
@@ -966,7 +961,7 @@
             },
             "score": 1
           },
-          "normalised": 0.673
+          "normalised": 0.67
         },
         "macro": {
           "score": 0,
@@ -1063,22 +1058,22 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 3.9ч в плюсе: drift=+0.02090/ч, итог +0.08131 ≥ запас 0.05797",
-            "projected_close": 160.28631,
-            "entry": 160.205,
+            "reason": "Проекция на 3.9ч в плюсе: drift=+0.02010/ч, итог +0.07811 ≥ запас 0.05793",
+            "projected_close": 160.27511,
+            "entry": 160.19701,
             "atr": 0.13143,
-            "drift_per_bar": 0.0209,
-            "drift_per_minute": 0.0003483,
+            "drift_per_bar": 0.0201,
+            "drift_per_minute": 0.000335,
             "horizon_bars": 5,
-            "horizon_minutes": 233.43,
-            "safety_margin": 0.05797
+            "horizon_minutes": 233.16,
+            "safety_margin": 0.05793
           }
         }
       },
       "levels": {
-        "entry": 160.205,
-        "stop_loss": 160.00786,
-        "take_profit": 160.53358,
+        "entry": 160.19701,
+        "stop_loss": 159.99986,
+        "take_profit": 160.52558,
         "atr_h1": 0.13143,
         "rr_target": 1.66
       }
@@ -1086,24 +1081,24 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 233.43,
-    "entry": 0.92015,
-    "projected_close": 0.92068,
+    "horizon_minutes": 233.16,
+    "entry": 0.92021,
+    "projected_close": 0.92076,
     "drift_per_hour": 0.00014,
-    "drift_per_minute": 2.3e-06,
+    "drift_per_minute": 2.4e-06,
     "atr_h1": 0.00107,
     "safety_margin": 0.00047,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00053 ≥ запас 0.00047"
+    "reason": "Проекция на 3.9ч в плюсе: drift=+0.00014/ч, итог +0.00055 ≥ запас 0.00047"
   },
   "leading_candidate": {
     "pair": "EURCHF",
     "name_ru": "Евро / Франк",
     "side": "BUY",
-    "confidence": 81,
+    "confidence": 75,
     "veto": null,
-    "composite_score": 0.4694
+    "composite_score": 0.4076
   },
   "macro_currency_strength": {
     "USD": 3.0,
@@ -1137,7 +1132,7 @@
       "JPY": -1.04,
       "CHF": -1.25,
       "AUD": -0.52,
-      "CAD": -1.29,
+      "CAD": -1.19,
       "NZD": -0.93
     },
     "components": {
@@ -1158,7 +1153,7 @@
         "JPY": -1.97,
         "CHF": -3.0,
         "AUD": -2.51,
-        "CAD": -3.0,
+        "CAD": -2.51,
         "NZD": -1.73
       },
       "macro": {
@@ -1175,14 +1170,14 @@
   },
   "favorite_check": {
     "ok": false,
-    "tier": "strong",
-    "reason": "⚡ STRONG: brain 81% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 15.3% < 51% (статистически не отличается от случайности); EV -2.27п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
+    "tier": "normal",
+    "reason": "⊙ NORMAL: лидер EURCHF brain 75% < порог 80% — сигнал слабый, торговать только если согласен с уровнем уверенности (Top-2 56%, отрыв 19 п.)",
     "lead_required": 5,
     "confidence_floor": 80,
     "edge_check": {
       "passes": false,
-      "calibrated_confidence": 54.7,
-      "brain_confidence": 81,
+      "calibrated_confidence": 51.1,
+      "brain_confidence": 75,
       "reason": "Edge не подтверждён: 5d Wilson lower 15.3% < 51% (статистически не отличается от случайности); EV -2.27п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
       "windows": {
         "5d": {
