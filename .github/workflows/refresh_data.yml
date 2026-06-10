@@ -1,12 +1,17 @@
 name: Refresh static data
 
-# Runs the analyser + yfinance pipeline every 15 minutes on a fresh
-# ubuntu-latest runner and commits the JSON output to the orphan
-# `data` branch.
+# Runs the analyser + yfinance pipeline on a 5-minute cron schedule
+# and writes JSON snapshots to the orphan `data` branch.  Each cron
+# tick loops 5 × 60 s internally so the published data is at most
+# ~60 s stale — GitHub Actions cron itself refuses anything finer
+# than 5 minutes, so the inner loop is the only way to hit a
+# 1-minute cadence.
 #
-# The SPA on GitHub Pages reads those JSON files directly from raw.
-# githubusercontent.com/.../data so no server is involved — just a
-# static CDN + a cron that keeps the data fresh.
+# Per-pair bar JSONs (data/bars/*) are rebuilt on the **first**
+# iteration of every cron run.  Subsequent iterations skip the bars
+# (with `--no-bars`) so each iter stays well under 60 s — only
+# signals.json / cycle.json / orderbooks.json / health.json get
+# refreshed at the 1-minute cadence.
 #
 # IMPORTANT: we commit to a *dedicated* branch (not main) so that:
 #   1. the main branch history stays clean;
@@ -16,10 +21,8 @@ name: Refresh static data
 
 on:
   schedule:
-    # User asked for fresh data every 5 minutes — that's the smallest
-    # cron granularity GitHub Actions allows.  Yahoo Finance quotes are
-    # delayed ~1–2 minutes anyway, so 5 minutes is the right balance
-    # between freshness and rate-limit friendliness.
+    # 5-minute "outer" cron — actual writes happen every minute via
+    # the inner loop in the build step.
     - cron: "*/5 * * * *"
   # Self-trigger on any push that changes the pipeline — guarantees a
   # fresh data snapshot gets published within minutes of a deploy, even
@@ -29,13 +32,14 @@ on:
     branches: [main]
     paths:
       - "scripts/build_static_data.py"
+      - "scripts/ci/data_publish.sh"
       - "app/**"
       - "requirements.txt"
       - ".github/workflows/refresh_data.yml"
   workflow_dispatch:
     inputs:
       skip_bars:
-        description: "Skip regenerating candle files (faster run)"
+        description: "Skip regenerating candle files on the FIRST iter too (fastest run)"
         required: false
         default: "false"
 
@@ -51,7 +55,10 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 5 inner iterations × ~60 s each ≈ 5–6 min, but the first iter
+    # (with bars) can take 3–5 min on a slow Yahoo day.  30 min gives
+    # plenty of head-room.
+    timeout-minutes: 30
     steps:
       - name: Checkout main (for source code + state)
         uses: actions/checkout@v4
@@ -72,81 +79,52 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build static data snapshot
-        env:
-          # Harden yfinance against intermittent Yahoo 429/5xx — it
-          # already retries internally, but giving it a tighter budget
-          # keeps the job under the 20-min timeout even on bad days.
-          YFINANCE_TIMEOUT: "20"
-        run: |
-          if [ "${{ github.event.inputs.skip_bars }}" = "true" ]; then
-            python scripts/build_static_data.py --no-bars
-          else
-            python scripts/build_static_data.py
-          fi
-
-      - name: Publish to the `data` branch
+      - name: Build + publish (5 × 60 s — minute-level refresh)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Harden yfinance against intermittent Yahoo 429/5xx — it
+          # already retries internally, but giving it a tighter budget
+          # keeps the job under timeout even on bad days.
+          YFINANCE_TIMEOUT: "20"
+          SKIP_BARS_INPUT: ${{ github.event.inputs.skip_bars }}
         run: |
           set -euo pipefail
+          for iter in 1 2 3 4 5; do
+            start=$(date +%s)
+            echo "::group::refresh iter $iter / 5  ($(date -u +%H:%M:%SZ))"
 
-          # Stash freshly built data so we don't lose it during branch
-          # gymnastics.
-          mkdir -p /tmp/fresh-data
-          cp -r data/. /tmp/fresh-data/
+            # First iteration rebuilds the heavy bars/* directory.
+            # The other four iterations skip bars so they stay well
+            # under 60 s and only refresh the small JSON snapshots
+            # the dashboard actually polls every minute.
+            if [ "$iter" = "1" ] && [ "${SKIP_BARS_INPUT:-false}" != "true" ]; then
+              python scripts/build_static_data.py
+            else
+              python scripts/build_static_data.py --no-bars
+            fi
 
-          git config user.name  "forex-data-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            FILES=(data/signals.json data/cycle.json data/orderbooks.json data/health.json)
+            if [ "$iter" = "1" ] && [ -d data/bars ]; then
+              # Add every per-pair bar file produced this run.
+              while IFS= read -r f; do FILES+=("$f"); done < <(find data/bars -type f -name '*.json')
+            fi
+            bash scripts/ci/data_publish.sh "data" "${FILES[@]}"
 
-          # Fetch the orphan `data` branch if it already exists;
-          # otherwise create one from scratch.
-          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
-            git fetch origin data --depth=1
-            git checkout -B data origin/data
-          else
-            echo "::notice::Creating orphan 'data' branch for the first time"
-            git checkout --orphan data
-            git rm -rf . >/dev/null 2>&1 || true
-          fi
+            echo "::endgroup::"
 
-          # Overlay the freshly built snapshot on top of whatever is
-          # on origin/data.  We deliberately *don't* `rm -rf data` here
-          # because the AI brain workflow (`ai_brain.yml`) keeps its
-          # own files (`top1.json`, `brain_full.json`) in the same
-          # directory and we must not clobber them between cron ticks.
-          # Stale per-pair bar files are pruned a few lines below
-          # instead so the branch still stays slim.
-          mkdir -p data data/bars
-          # 1. Remove only the files this workflow owns (signals/cycle/
-          #    orderbooks/health + bars/*) so old, removed pairs don't
-          #    linger on the branch.
-          rm -f data/signals.json data/cycle.json data/orderbooks.json data/health.json
-          rm -rf data/bars
-          # 2. Drop the fresh snapshot in.
-          cp -r /tmp/fresh-data/. data/
-
-          # Humans opening the branch on GitHub should see something.
-          cat > README.md <<'EOF'
-          # `data` branch
-
-          This branch holds JSON snapshots produced every 15 minutes by
-          `.github/workflows/refresh_data.yml`.  The GitHub Pages SPA
-          (built from `main` via `gh_pages.yml`) reads these files at
-          runtime via jsDelivr CDN.
-
-          **Do not edit by hand.**  Changes will be overwritten by the
-          next scheduled run.
-          EOF
-
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes in the data snapshot — nothing to push."
-            exit 0
-          fi
-
-          git commit -m "data: refresh $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push origin data
+            # Pace the loop to the next minute boundary, unless this
+            # was the last iteration.
+            if [ "$iter" -lt 5 ]; then
+              elapsed=$(( $(date +%s) - start ))
+              remaining=$(( 60 - elapsed ))
+              if [ "$remaining" -gt 0 ]; then
+                echo "iter $iter took ${elapsed}s — sleeping ${remaining}s"
+                sleep "$remaining"
+              else
+                echo "iter $iter took ${elapsed}s — no sleep, going straight to next iter"
+              fi
+            fi
+          done
 
       - name: Job summary
         if: always()
