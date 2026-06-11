@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-06-11T06:29:48.315152+00:00",
+  "generated_at_utc": "2026-06-11T06:30:03.149247+00:00",
   "next_cycle_utc": "2026-06-11T10:00:00+00:00",
   "cycle_close_utc": "2026-06-11T10:00:00+00:00",
-  "minutes_to_expiry": 210.19,
+  "minutes_to_expiry": 209.95,
   "binary_option_mode": true,
   "binary_option_horizon_minutes": 300,
   "top1": {
@@ -10,14 +10,14 @@
     "name_ru": "Фунт / Канад. доллар",
     "side": "BUY",
     "veto": null,
-    "confidence": 82,
-    "composite_score": 0.5023,
+    "confidence": 81,
+    "composite_score": 0.4903,
     "layers": {
       "technical": {
-        "score": 13,
+        "score": 12,
         "max_score": 35,
         "side": "BUY",
-        "confidence": 83,
+        "confidence": 82,
         "adx_h1": 44.5,
         "persistence_5h": 80.0,
         "multi_tf_aligned": true,
@@ -45,7 +45,7 @@
           {
             "name": "RSI",
             "value": 0,
-            "reason": "RSI 55 — нейтральная зона"
+            "reason": "RSI 54 — нейтральная зона"
           },
           {
             "name": "MACD",
@@ -60,7 +60,7 @@
           {
             "name": "Стохастик",
             "value": -2,
-            "reason": "K=98 D=87 — перекупленность"
+            "reason": "K=93 D=85 — перекупленность"
           },
           {
             "name": "ADX",
@@ -70,17 +70,17 @@
           {
             "name": "Williams %R",
             "value": -1,
-            "reason": "W%R -2 — перекупленность"
+            "reason": "W%R -7 — перекупленность"
           },
           {
             "name": "Ишимоку",
-            "value": 1,
-            "reason": "Цена выше облака Ишимоку"
+            "value": 0,
+            "reason": "Цена внутри облака — неопределённость"
           },
           {
             "name": "Моментум",
             "value": 1,
-            "reason": "Моментум +0.06% — рост"
+            "reason": "Моментум +0.05% — рост"
           },
           {
             "name": "Мульти-ТФ",
@@ -195,7 +195,7 @@
           },
           "score": 0
         },
-        "normalised": 0.52
+        "normalised": 0.48
       },
       "macro": {
         "score": 0,
@@ -219,7 +219,7 @@
       "news": {
         "score": 0,
         "reason": "Веток новостей нет",
-        "next_event_base_min": 1410,
+        "next_event_base_min": 9999,
         "next_event_quote_min": 9999
       },
       "sentiment": {
@@ -291,21 +291,21 @@
         },
         "projection": {
           "passes": true,
-          "reason": "Проекция на 3.5ч в плюсе: drift=+0.00027/ч, итог +0.00095 ≥ запас 0.00067",
-          "projected_close": 1.86687,
-          "entry": 1.86592,
+          "reason": "Проекция на 3.5ч в плюсе: drift=+0.00025/ч, итог +0.00087 ≥ запас 0.00067",
+          "projected_close": 1.86658,
+          "entry": 1.86571,
           "atr": 0.0016,
-          "drift_per_bar": 0.00027,
-          "drift_per_minute": 4.5e-06,
+          "drift_per_bar": 0.00025,
+          "drift_per_minute": 4.2e-06,
           "horizon_bars": 5,
-          "horizon_minutes": 210.19,
+          "horizon_minutes": 209.95,
           "safety_margin": 0.00067
         }
       },
       "edge_check": {
         "passes": false,
-        "calibrated_confidence": 63.1,
-        "brain_confidence": 82,
+        "calibrated_confidence": 62.5,
+        "brain_confidence": 81,
         "reason": "Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
         "windows": {
           "5d": {
@@ -350,16 +350,16 @@
       }
     },
     "levels": {
-      "entry": 1.86592,
-      "stop_loss": 1.86351,
-      "take_profit": 1.86993,
+      "entry": 1.86571,
+      "stop_loss": 1.8633,
+      "take_profit": 1.86972,
       "atr_h1": 0.0016,
       "rr_target": 1.66
     },
     "edge": {
       "passes": false,
-      "calibrated_confidence": 63.1,
-      "brain_confidence": 82,
+      "calibrated_confidence": 62.5,
+      "brain_confidence": 81,
       "reason": "Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
       "windows": {
         "5d": {
@@ -405,16 +405,16 @@
     "tier": "strong",
     "live_forecast": {
       "binary_option_mode": true,
-      "horizon_minutes": 210.19,
-      "entry": 1.86592,
-      "projected_close": 1.86687,
-      "drift_per_hour": 0.00027,
-      "drift_per_minute": 4.5e-06,
+      "horizon_minutes": 209.95,
+      "entry": 1.86571,
+      "projected_close": 1.86658,
+      "drift_per_hour": 0.00025,
+      "drift_per_minute": 4.2e-06,
       "atr_h1": 0.0016,
       "safety_margin": 0.00067,
       "stays_in_profit_at_expiry": true,
       "status_ru": "В ПЛЮСЕ",
-      "reason": "Проекция на 3.5ч в плюсе: drift=+0.00027/ч, итог +0.00095 ≥ запас 0.00067"
+      "reason": "Проекция на 3.5ч в плюсе: drift=+0.00025/ч, итог +0.00087 ≥ запас 0.00067"
     }
   },
   "top5": [
@@ -423,14 +423,14 @@
       "name_ru": "Фунт / Канад. доллар",
       "side": "BUY",
       "veto": null,
-      "confidence": 82,
-      "composite_score": 0.5023,
+      "confidence": 81,
+      "composite_score": 0.4903,
       "layers": {
         "technical": {
-          "score": 13,
+          "score": 12,
           "max_score": 35,
           "side": "BUY",
-          "confidence": 83,
+          "confidence": 82,
           "adx_h1": 44.5,
           "persistence_5h": 80.0,
           "multi_tf_aligned": true,
@@ -458,7 +458,7 @@
             {
               "name": "RSI",
               "value": 0,
-              "reason": "RSI 55 — нейтральная зона"
+              "reason": "RSI 54 — нейтральная зона"
             },
             {
               "name": "MACD",
@@ -473,7 +473,7 @@
             {
               "name": "Стохастик",
               "value": -2,
-              "reason": "K=98 D=87 — перекупленность"
+              "reason": "K=93 D=85 — перекупленность"
             },
             {
               "name": "ADX",
@@ -483,17 +483,17 @@
             {
               "name": "Williams %R",
               "value": -1,
-              "reason": "W%R -2 — перекупленность"
+              "reason": "W%R -7 — перекупленность"
             },
             {
               "name": "Ишимоку",
-              "value": 1,
-              "reason": "Цена выше облака Ишимоку"
+              "value": 0,
+              "reason": "Цена внутри облака — неопределённость"
             },
             {
               "name": "Моментум",
               "value": 1,
-              "reason": "Моментум +0.06% — рост"
+              "reason": "Моментум +0.05% — рост"
             },
             {
               "name": "Мульти-ТФ",
@@ -608,7 +608,7 @@
             },
             "score": 0
           },
-          "normalised": 0.52
+          "normalised": 0.48
         },
         "macro": {
           "score": 0,
@@ -632,7 +632,7 @@
         "news": {
           "score": 0,
           "reason": "Веток новостей нет",
-          "next_event_base_min": 1410,
+          "next_event_base_min": 9999,
           "next_event_quote_min": 9999
         },
         "sentiment": {
@@ -704,21 +704,21 @@
           },
           "projection": {
             "passes": true,
-            "reason": "Проекция на 3.5ч в плюсе: drift=+0.00027/ч, итог +0.00095 ≥ запас 0.00067",
-            "projected_close": 1.86687,
-            "entry": 1.86592,
+            "reason": "Проекция на 3.5ч в плюсе: drift=+0.00025/ч, итог +0.00087 ≥ запас 0.00067",
+            "projected_close": 1.86658,
+            "entry": 1.86571,
             "atr": 0.0016,
-            "drift_per_bar": 0.00027,
-            "drift_per_minute": 4.5e-06,
+            "drift_per_bar": 0.00025,
+            "drift_per_minute": 4.2e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 210.19,
+            "horizon_minutes": 209.95,
             "safety_margin": 0.00067
           }
         },
         "edge_check": {
           "passes": false,
-          "calibrated_confidence": 63.1,
-          "brain_confidence": 82,
+          "calibrated_confidence": 62.5,
+          "brain_confidence": 81,
           "reason": "Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
           "windows": {
             "5d": {
@@ -763,9 +763,9 @@
         }
       },
       "levels": {
-        "entry": 1.86592,
-        "stop_loss": 1.86351,
-        "take_profit": 1.86993,
+        "entry": 1.86571,
+        "stop_loss": 1.8633,
+        "take_profit": 1.86972,
         "atr_h1": 0.0016,
         "rr_target": 1.66
       }
@@ -979,7 +979,7 @@
         "news": {
           "score": 0,
           "reason": "Веток новостей нет",
-          "next_event_base_min": 345,
+          "next_event_base_min": 9999,
           "next_event_quote_min": 9999
         },
         "sentiment": {
@@ -1053,21 +1053,21 @@
           "projection": {
             "passes": true,
             "reason": "Проекция на 3.5ч в плюсе: drift=+0.00021/ч, итог +0.00074 ≥ запас 0.00052",
-            "projected_close": 1.61086,
-            "entry": 1.61012,
+            "projected_close": 1.61087,
+            "entry": 1.61013,
             "atr": 0.00124,
             "drift_per_bar": 0.00021,
             "drift_per_minute": 3.5e-06,
             "horizon_bars": 5,
-            "horizon_minutes": 210.19,
+            "horizon_minutes": 209.95,
             "safety_margin": 0.00052
           }
         }
       },
       "levels": {
-        "entry": 1.61012,
-        "stop_loss": 1.60826,
-        "take_profit": 1.61321,
+        "entry": 1.61013,
+        "stop_loss": 1.60827,
+        "take_profit": 1.61322,
         "atr_h1": 0.00124,
         "rr_target": 1.66
       }
@@ -1075,24 +1075,24 @@
   ],
   "live_forecast": {
     "binary_option_mode": true,
-    "horizon_minutes": 210.19,
-    "entry": 1.86592,
-    "projected_close": 1.86687,
-    "drift_per_hour": 0.00027,
-    "drift_per_minute": 4.5e-06,
+    "horizon_minutes": 209.95,
+    "entry": 1.86571,
+    "projected_close": 1.86658,
+    "drift_per_hour": 0.00025,
+    "drift_per_minute": 4.2e-06,
     "atr_h1": 0.0016,
     "safety_margin": 0.00067,
     "stays_in_profit_at_expiry": true,
     "status_ru": "В ПЛЮСЕ",
-    "reason": "Проекция на 3.5ч в плюсе: drift=+0.00027/ч, итог +0.00095 ≥ запас 0.00067"
+    "reason": "Проекция на 3.5ч в плюсе: drift=+0.00025/ч, итог +0.00087 ≥ запас 0.00067"
   },
   "leading_candidate": {
     "pair": "GBPCAD",
     "name_ru": "Фунт / Канад. доллар",
     "side": "BUY",
-    "confidence": 82,
+    "confidence": 81,
     "veto": null,
-    "composite_score": 0.5023
+    "composite_score": 0.4903
   },
   "macro_currency_strength": {
     "USD": 3.0,
@@ -1165,13 +1165,13 @@
   "favorite_check": {
     "ok": false,
     "tier": "strong",
-    "reason": "⚡ STRONG: brain 82% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
+    "reason": "⚡ STRONG: brain 81% ≥ 80%, но мат. преимущество на дистанции пока не подтверждено: Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
     "lead_required": 5,
     "confidence_floor": 80,
     "edge_check": {
       "passes": false,
-      "calibrated_confidence": 63.1,
-      "brain_confidence": 82,
+      "calibrated_confidence": 62.5,
+      "brain_confidence": 81,
       "reason": "Edge не подтверждён: 5d Wilson lower 34.8% < 51% (статистически не отличается от случайности); EV -2.79п. ≤ 0 (отрицательное матожидание на нижней границе WR).",
       "windows": {
         "5d": {
