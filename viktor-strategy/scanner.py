@@ -30,6 +30,35 @@ TOKEN = CONFIG["telegram_token"]
 CHAT_ID = CONFIG["chat_id"]
 SYMBOL = CONFIG.get("symbol", "EURUSD=X")
 
+# ---------- sessions (trained on 365 days of EUR/USD H1, see sessions.json) ----------
+def load_sessions():
+    p = os.path.join(HERE, "sessions.json")
+    try:
+        return json.load(open(p))
+    except Exception:
+        return None
+
+SESS_STATS = load_sessions()
+
+def current_session(now):
+    """Return (key, stats) for the session the UTC hour falls into."""
+    if not SESS_STATS:
+        return None, None
+    h = now.hour
+    for key, s in SESS_STATS["sessions"].items():
+        a, b = s["utc_hours"]
+        if a <= h < b:
+            return key, s
+    return None, None
+
+SESS_NOTES = {  # plain-Russian behaviour notes from the 365-day study
+    "asia": "Азия — спокойная сессия, тренд дня соблюдает 50/50. Движения мелкие, часто пила.",
+    "london": "⚠️ Лондон на открытии ЧАСТО идёт ПРОТИВ дневного тренда (по нашей статистике 365 дней — лишь 46% по тренду): крупные сначала снимают ликвидность за уровнями Азии. Входить по тренду тут опаснее обычного.",
+    "overlap": "Лондон+Нью-Йорк — самые сильные движения суток (в среднем ~40 пипсов за сессию). Тренд соблюдается ~51% — лучшая сессия, чтобы цена реально ДОШЛА до цели.",
+    "ny": "Нью-Йорк (вторая половина) — движение затухает после 21:00 по Ташкенту, тренд ~51%.",
+    "late": "Тихие часы — движения маленькие (≈4 пипса), зато направление дня держится лучше всего (59% за 365 дней). Хорошо для аккуратного входа по тренду, но цели близкие.",
+}
+
 # ---------- data ----------
 def fetch_ohlc(interval, rng):
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}"
@@ -318,7 +347,7 @@ def liquidity_traps(h1, d1, now):
     return out
 
 # ---------- forecast (trend-based, every run) ----------
-def forecast(h1, m15, h4, d1, news, traps=None):
+def forecast(h1, m15, h4, d1, news, traps=None, now=None):
     price = float(h1["close"].iloc[-1])
     m15_rsi = float(rsi(m15["close"]).iloc[-1]) if len(m15) > 20 else 50.0
     h1_rsi = float(rsi(h1["close"]).iloc[-1])
@@ -391,11 +420,22 @@ def forecast(h1, m15, h4, d1, news, traps=None):
     elif traps:
         trap_txt = "🪤 Свежих съёмов ликвидности (день/неделя) нет — ловушек не видно."
 
+    # session intelligence (trained on 365 days, sessions.json)
+    sess_key, sess = current_session(now or datetime.now(timezone.utc))
+    sess_adj = 0
+    sess_txt = ""
+    if sess:
+        sess_adj = int(sess.get("conf_adj", 0))
+        sess_txt = (f"🕐 *Сессия:* {sess['ru']} "
+                    f"({sess['tk_hours'][0]:02d}:00–{sess['tk_hours'][1]:02d}:00 Ташкент)\n"
+                    f"   {SESS_NOTES.get(sess_key, '')}")
+
     # confidence (honest)
     conf = 50.0
     conf += 4 if a >= 2.5 else (2 if a >= 0.8 else 0)
     conf += {"🟢": 3, "🟡": 1, "🔴": -2}[eq]
     conf += trap_adj
+    conf += sess_adj
     news_warn = ""
     if news:  # list of upcoming high-impact events
         conf -= 3
@@ -426,6 +466,8 @@ def forecast(h1, m15, h4, d1, news, traps=None):
         "support": round(lo20, 5), "resistance": round(hi20, 5),
         "news_warn": news_warn, "flat": flat,
         "trap_txt": trap_txt,
+        "sess_txt": sess_txt, "sess_key": sess_key, "sess_adj": sess_adj,
+        "score": round(score, 1), "pos": round(pos, 2), "h1_atr": round(h1_atr, 5),
         "pwh": traps.get("pwh") if traps else None,
         "pwl": traps.get("pwl") if traps else None,
         "pdh": traps.get("pdh") if traps else None,
@@ -436,7 +478,7 @@ def forecast(h1, m15, h4, d1, news, traps=None):
 async def _capture_tv():
     from sdk.utils.browser import get_browser, close_browser
     b = await get_browser("tvscan", viewport_width=1600, viewport_height=900)
-    shots = {"M15": "15", "H1": "60", "H4": "240"}
+    shots = {"M15": "15", "H1": "60", "H4": "240", "D1": "D"}
     out = {}
     try:
         for name, iv in shots.items():
@@ -456,13 +498,13 @@ async def _capture_tv():
             await close_browser("tvscan")
         except Exception:
             pass
-    return [out["M15"], out["H1"], out["H4"]]
+    return [out["M15"], out["H1"], out["H4"], out["D1"]]
 
-def capture_charts(m15, h1, h4):
+def capture_charts(m15, h1, h4, d1=None):
     os.makedirs("/tmp/jony_charts", exist_ok=True)
     try:
         async def _runner():
-            return await asyncio.wait_for(_capture_tv(), timeout=90)
+            return await asyncio.wait_for(_capture_tv(), timeout=120)
         paths = asyncio.run(_runner())
         if all(os.path.exists(p) and os.path.getsize(p) > 30000 for p in paths):
             return paths
@@ -473,7 +515,12 @@ def capture_charts(m15, h1, h4):
     plot_candles(m15, "M15", p15)
     plot_candles(h1, "H1", p1)
     plot_candles(h4, "H4", p4)
-    return [p15, p1, p4]
+    paths = [p15, p1, p4]
+    if d1 is not None:
+        pD = f"{tmp}/d1.png"
+        plot_candles(d1, "D1", pD)
+        paths.append(pD)
+    return paths
 
 def plot_candles(df, label, out_path, ema_fast=50, ema_slow=200, nbars=70):
     d = df.tail(nbars).reset_index(drop=True)
@@ -545,7 +592,8 @@ def send_forecast(f, img_paths):
         + f"📉 RSI: M15 {f['m15_rsi']:.0f} · H1 {f['h1_rsi']:.0f} · H4 {f['h4_rsi']:.0f}\n"
         f"{f['news_warn']}\n\n"
         f"⚠️ Не гарантия (~{f['conf']}%). Вход только ПО тренду, на откате. "
-        f"Риск ≤1-2% депозита."
+        f"Риск ≤1-2% депозита.\n"
+        f"👇 Подробный разбор простыми словами — следующим сообщением."
     )
     media, files = [], {}
     for i, p in enumerate(img_paths):
@@ -561,6 +609,56 @@ def send_forecast(f, img_paths):
                       files=files, timeout=60)
     for fp in files.values():
         fp.close()
+    return r.json()
+
+def send_explainer(f):
+    """Second message: every factor of the forecast explained in plain Russian."""
+    act = "ПРОДАВАТЬ (ставить на ПАДЕНИЕ ⬇️)" if f["direction"] == "SELL" else \
+          "ПОКУПАТЬ (ставить на РОСТ ⬆️)"
+    eq_mean = {
+        "🟢": "🟢 = момент входа ХОРОШИЙ, можно открывать сделку сейчас.",
+        "🟡": "🟡 = момент средний: войти можно, но лучше дождаться цены получше.",
+        "🔴": "🔴 = сейчас НЕ ВХОДИТЬ. Это не значит «прогноз неверный» — это значит "
+              "«не открывай сделку в эту минуту», жди следующий прогноз или лучшую цену.",
+    }[f["eq"]]
+    pos_pct = int(f.get("pos", 0.5) * 100)
+    lines = [
+        "📖 *РАЗБОР ПРОГНОЗА ПРОСТЫМИ СЛОВАМИ*",
+        "",
+        f"1️⃣ *Куда смотрим:* рынок в целом идёт "
+        f"{'ВНИЗ' if f['direction']=='SELL' else 'ВВЕРХ'} "
+        f"(дневной график D1: {TREND_RU[f['d1_tr']]}, 4-часовой H4: {TREND_RU[f['h4_tr']]}, "
+        f"часовой H1: {TREND_RU[f['h1_tr']]}; суммарный балл тренда {f['score']:+.1f} из ±4.5). "
+        f"Поэтому если торговать — то {act}.",
+        "",
+        f"2️⃣ *Можно ли входить ПРЯМО СЕЙЧАС:* {eq_mean}",
+        f"   Почему: {f['eq_txt']}. Цена сейчас на {pos_pct}% высоты последнего диапазона "
+        f"(0% = у низа, 100% = у верха).",
+        "",
+    ]
+    if f.get("trap_txt"):
+        lines += [f"3️⃣ *Ловушки крупных игроков:* {f['trap_txt']}",
+                  "   «Съём ликвидности» = цена ложно проколола важный уровень (хай/лоу дня "
+                  "или недели), собрала чужие стопы и вернулась. Сразу после такого прокола "
+                  "крупные часто толкают цену в ОБРАТНУЮ сторону — поэтому против свежего "
+                  "съёма мы не входим.", ""]
+    if f.get("sess_txt"):
+        lines += [f"4️⃣ {f['sess_txt']}", ""]
+    lines += [
+        f"5️⃣ *План сделки:* вход {f['price']:.5f} → цель {f['target']:.5f} "
+        f"(примерно {abs(f['target']-f['price'])/0.0001:.0f} пипсов, это 1.5×ATR — "
+        f"средний ход цены за час × 1.5). Если цена уйдёт за {f['invalid']:.5f} — "
+        f"прогноз сломан, не пересиживать.",
+        "",
+        f"6️⃣ *Новости:* {f['news_warn'] or 'окно чистое.'}",
+        "",
+        f"7️⃣ *Уверенность {f['conf']}%* — это честная оценка: даже хороший сетап на "
+        f"5 часов угадывается чуть лучше монетки. Поэтому риск на сделку ≤1-2% депозита, "
+        f"всегда.",
+    ]
+    r = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                      data={"chat_id": CHAT_ID, "text": "\n".join(lines),
+                            "parse_mode": "Markdown"}, timeout=30)
     return r.json()
 
 # ---------- state ----------
@@ -601,7 +699,7 @@ def main():
         return
 
     traps = liquidity_traps(h1, d1, now)
-    f = forecast(h1, m15, h4, d1, None if news is None else [], traps)
+    f = forecast(h1, m15, h4, d1, None if news is None else [], traps, now=now)
 
     # already-released news (>buffer, <3h ago): allow entry but warn + lower conf
     if news and news["recent"]:
@@ -613,10 +711,15 @@ def main():
     elif news is not None:
         f["news_warn"] = "📰 Важных новостей (USD/EUR) в ближайшие 5ч нет — окно чистое."
 
-    charts = capture_charts(m15, h1, h4)
+    charts = capture_charts(m15, h1, h4, d1)
     resp = send_forecast(f, charts)
     ok = resp.get("ok")
-    print("sent", ok, f["direction"], f["conf"], f["eq"])
+    if ok:
+        try:
+            send_explainer(f)
+        except Exception as e:
+            print("explainer err", e)
+    print("sent", ok, f["direction"], f["conf"], f["eq"], "sess", f.get("sess_key"))
 
     state = load_state()
     today = now.strftime("%Y-%m-%d")
