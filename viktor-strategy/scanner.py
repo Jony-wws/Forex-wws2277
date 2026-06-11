@@ -12,7 +12,7 @@ during forex hours we ASSESS what's happening and send a REAL 5h forecast:
 
 Time shown in Dushanbe/Tashkent (UTC+5). Honest confidence ~48-58%, never a guarantee.
 """
-import os, json, asyncio
+import os, json, asyncio, time
 from datetime import datetime, timezone, timedelta
 
 import numpy as np
@@ -98,14 +98,97 @@ def forex_open(now):
         return h < 22
     return True
 
-# ---------- news / fundamentals ----------
-def fetch_news_risk(now):
-    """High-impact USD/EUR events within the next 5h (Forex Factory free JSON)."""
+# ---------- news / fundamentals (NEWS FILTER, added 2026-06-11 per JONY) ----------
+# Rule: if a high-impact USD/EUR event falls inside the 5h trade window, the
+# scanner does NOT give a forecast. Instead it sends a news brief: what the
+# event is, who speaks, when (UTC+5), and when it's SAFE to enter again.
+
+NEWS_EXPLAIN = [
+    ("CPI", "Индекс потребительских цен (инфляция). Выше прогноза → валюта обычно растёт (рынок ждёт жёсткую ставку), ниже → падает."),
+    ("PPI", "Цены производителей — предвестник инфляции. Сюрприз двигает валюту как мини-CPI."),
+    ("Non-Farm", "Занятость вне с/х США (NFP) — сильнейшая новость месяца, движения 50-100+ пипсов за минуты."),
+    ("Federal Funds Rate", "Решение ФРС по процентной ставке — крупнейшее событие для USD. Реакция = сюрприз + тон Пауэлла."),
+    ("FOMC", "ФРС (Федрезерв США): заявление/протокол/прогнозы по ставке. Рынок реагирует на ТОН, не только цифру."),
+    ("Main Refinancing Rate", "Решение ЕЦБ по ставке — крупнейшее событие для EUR. Само решение часто в цене, решает тон Лагард."),
+    ("Press Conference", "Пресс-конференция главы ЦБ — рынок торгует ТОН выступления; движения резкие и непредсказуемые."),
+    ("GDP", "ВВП — рост экономики. Сильный сюрприз двигает валюту."),
+    ("PMI", "Индекс деловой активности — опережающий индикатор экономики."),
+    ("Retail Sales", "Розничные продажи — здоровье потребительского спроса."),
+    ("Unemployment Claims", "Недельные заявки на пособие по безработице — индикатор рынка труда США."),
+    ("Consumer Sentiment", "Настроения потребителей (Мичиган) — ожидания по расходам и инфляции."),
+    ("Testifies", "Выступление перед парламентом/конгрессом — важен тон: жёстко → валюта растёт, мягко → падает."),
+    ("Speaks", "Публичное выступление — важен тон: намёки на ставку двигают рынок в любую сторону."),
+]
+
+def explain_event(title):
+    for key, txt in NEWS_EXPLAIN:
+        if key.lower() in title.lower():
+            return txt
+    return "Важное макро-событие — возможна высокая волатильность, исход заранее неизвестен."
+
+def event_speaker(title):
+    """Extract who speaks, e.g. 'Fed Chair Powell Speaks' -> 'Fed Chair Powell'."""
+    for suffix in (" Speaks", " Speech", " Testifies"):
+        if suffix.lower() in title.lower():
+            idx = title.lower().find(suffix.lower())
+            return title[:idx].strip()
+    if "Press Conference" in title:
+        if "ECB" in title:
+            return "Кристин Лагард (глава ЕЦБ)"
+        if "FOMC" in title or "Fed" in title:
+            return "Джером Пауэлл (глава ФРС)"
+    return None
+
+def event_buffer_min(title):
+    """How long after the event the market needs to settle (safe re-entry buffer)."""
+    t = title.lower()
+    if any(k in t for k in ("funds rate", "refinancing rate", "fomc", "press conference")):
+        return 120  # rate decisions + pressers: 2h
+    if any(k in t for k in ("speaks", "speech", "testifies")):
+        return 60
+    if "non-farm" in t or "cpi" in t:
+        return 90  # biggest data releases
+    return 60
+
+def fetch_news_risk(now, window_min=300, lookback_min=180):
+    """High-impact USD/EUR events around now (Forex Factory free JSON).
+
+    Returns dict:
+      blocking: events that make entry UNSAFE (upcoming inside 5h window, or
+                already released but still inside their settle buffer)
+      recent:   released >buffer but <3h ago — market may still be digesting
+      safe_after: UTC datetime when entry becomes safe again (or None)
+    Returns None if the calendar couldn't be fetched.
+    """
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    cache_path = os.path.join(HERE, "news_cache.json")
     try:
-        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json",
-                         headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-        data = r.json()
-        soon = []
+        data = None
+        for attempt in range(3):  # endpoint rate-limits (429); retry with backoff
+            try:
+                r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+                                 headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+                r.raise_for_status()
+                data = r.json()
+                json.dump({"ts": now.isoformat(), "data": data}, open(cache_path, "w"))
+                break
+            except Exception as e:
+                print(f"news fetch attempt {attempt+1} failed:", e)
+                time.sleep(10 * (attempt + 1))
+        if data is None and os.path.exists(cache_path):
+            # fall back to cached weekly calendar (< 12h old)
+            try:
+                c = json.load(open(cache_path))
+                age_h = (now - datetime.fromisoformat(c["ts"])).total_seconds() / 3600
+                if age_h < 12:
+                    data = c["data"]
+                    print(f"using cached calendar ({age_h:.1f}h old)")
+            except Exception as e:
+                print("cache read err", e)
+        if data is None:
+            return None
+        blocking, recent = [], []
         for ev in data:
             if ev.get("impact") != "High":
                 continue
@@ -117,15 +200,71 @@ def fetch_news_risk(now):
             except Exception:
                 continue
             mins = (dt - now).total_seconds() / 60.0
-            if 0 <= mins <= 300:
-                tk = dt + timedelta(hours=5)
-                soon.append({"title": ev.get("title", "?"), "cur": ev.get("country"),
-                             "tk": tk.strftime("%H:%M"), "mins": int(mins)})
-        soon.sort(key=lambda x: x["mins"])
-        return soon
+            buf = event_buffer_min(ev.get("title", ""))
+            item = {
+                "title": ev.get("title", "?"), "cur": ev.get("country"),
+                "dt": dt, "tk": (dt + timedelta(hours=5)).strftime("%H:%M"),
+                "mins": int(mins), "buffer": buf,
+                "safe_dt": dt + timedelta(minutes=buf),
+                "speaker": event_speaker(ev.get("title", "")),
+                "explain": explain_event(ev.get("title", "")),
+                "forecast": str(ev.get("forecast") or "").strip(),
+                "previous": str(ev.get("previous") or "").strip(),
+            }
+            if 0 <= mins <= window_min:
+                blocking.append(item)          # upcoming inside trade window
+            elif -buf <= mins < 0:
+                blocking.append(item)          # just released, still settling
+            elif -lookback_min <= mins < -buf:
+                recent.append(item)            # released, mostly digested
+        blocking.sort(key=lambda x: x["mins"])
+        recent.sort(key=lambda x: x["mins"])
+        safe_after = max((e["safe_dt"] for e in blocking), default=None)
+        return {"blocking": blocking, "recent": recent, "safe_after": safe_after}
     except Exception as e:
         print("news fetch err", e)
         return None  # None = couldn't check
+
+def send_news_block(news, now):
+    """Send the NO-FORECAST news brief to Telegram instead of a forecast."""
+    now_tk = now + timedelta(hours=5)
+    lines = [
+        "🚫 *ПРОГНОЗ НЕ ВЫДАН — впереди важные новости*",
+        f"🕐 {now_tk.strftime('%H:%M')} Душанбе (UTC+5)",
+        "",
+        "В 5-часовом окне сделки есть новости, исход которых заранее неизвестен. "
+        "Входить сейчас ОПАСНО — график решать не будет, решат новости.",
+        "",
+    ]
+    for i, ev in enumerate(news["blocking"], 1):
+        flag = "🇺🇸" if ev["cur"] == "USD" else "🇪🇺"
+        when = (f"в {ev['tk']} (через {ev['mins']}м)" if ev["mins"] >= 0
+                else f"вышла в {ev['tk']} ({-ev['mins']}м назад, рынок ещё трясёт)")
+        lines.append(f"📰 *{i}. {flag} {ev['cur']} — {ev['title']}*")
+        lines.append(f"   🕐 {when}")
+        if ev["speaker"]:
+            lines.append(f"   👤 Выступает: {ev['speaker']}")
+        if ev["forecast"] or ev["previous"]:
+            fp = []
+            if ev["forecast"]:
+                fp.append(f"прогноз {ev['forecast']}")
+            if ev["previous"]:
+                fp.append(f"пред. {ev['previous']}")
+            lines.append(f"   📊 {' · '.join(fp)}")
+        lines.append(f"   ℹ️ {ev['explain']}")
+        lines.append("")
+    if news["safe_after"]:
+        safe_tk = news["safe_after"] + timedelta(hours=5)
+        day = "" if safe_tk.date() == now_tk.date() else f" ({safe_tk.strftime('%d.%m')})"
+        lines.append(f"✅ *Безопасно заходить: после {safe_tk.strftime('%H:%M')}{day} (UTC+5)*")
+        lines.append("(последняя новость + время, чтобы рынок переварил реакцию)")
+        lines.append("")
+    lines.append("Следующий прогноз пришлю автоматически, когда окно будет чистым.")
+    text = "\n".join(lines)
+    r = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                      data={"chat_id": CHAT_ID, "text": text,
+                            "parse_mode": "Markdown"}, timeout=30)
+    return r.json()
 
 # ---------- liquidity traps (smart money) ----------
 def liquidity_traps(h1, d1, now):
@@ -264,7 +403,10 @@ def forecast(h1, m15, h4, d1, news, traps=None):
         news_warn = (f"⚠️ Скоро ВАЖНАЯ новость: {ev['cur']} {ev['title']} в "
                      f"{ev['tk']} (через {ev['mins']}м) — высокая волатильность.")
     elif news is None:
-        news_warn = "📰 Календарь недоступен — проверь новости вручную."
+        conf -= 2
+        news_warn = ("⚠️ НЕ СМОГ проверить календарь новостей! ПЕРЕД входом сам "
+                     "проверь forexfactory.com — если в ближайшие 5ч есть красные "
+                     "новости USD/EUR, НЕ заходи.")
     conf = int(max(48, min(58, conf)))
 
     # target / invalidation (5h horizon, with-trend)
@@ -449,8 +591,27 @@ def main():
     h4 = resample_4h(h1)
 
     news = fetch_news_risk(now)
+
+    # NEWS FILTER (per JONY 2026-06-11): unsafe window -> news brief, NO forecast
+    if news and news["blocking"]:
+        resp = send_news_block(news, now)
+        print("news-block", resp.get("ok"),
+              [e["title"] for e in news["blocking"]],
+              "safe_after", news["safe_after"])
+        return
+
     traps = liquidity_traps(h1, d1, now)
-    f = forecast(h1, m15, h4, d1, news, traps)
+    f = forecast(h1, m15, h4, d1, None if news is None else [], traps)
+
+    # already-released news (>buffer, <3h ago): allow entry but warn + lower conf
+    if news and news["recent"]:
+        ev = news["recent"][-1]  # most recent
+        f["news_warn"] = (f"📰 Уже вышла новость: {ev['cur']} {ev['title']} в {ev['tk']} "
+                          f"({-ev['mins']}м назад) — рынок может ещё отыгрывать её. "
+                          + (f.get("news_warn") or ""))
+        f["conf"] = max(48, f["conf"] - 2)
+    elif news is not None:
+        f["news_warn"] = "📰 Важных новостей (USD/EUR) в ближайшие 5ч нет — окно чистое."
 
     charts = capture_charts(m15, h1, h4)
     resp = send_forecast(f, charts)
