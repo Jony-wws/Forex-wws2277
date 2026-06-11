@@ -12,7 +12,7 @@ during forex hours we ASSESS what's happening and send a REAL 5h forecast:
 
 Time shown in Dushanbe/Tashkent (UTC+5). Honest confidence ~48-58%, never a guarantee.
 """
-import os, json, asyncio, time
+import os, sys, json, asyncio, time
 from datetime import datetime, timezone, timedelta
 
 import numpy as np
@@ -24,6 +24,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from smart_money import analyze_smart_money  # ОСНОВА системы (иерархия №1)
+
 CONFIG = json.load(open(os.path.join(HERE, "config.json")))
 STATE_PATH = os.path.join(HERE, "state.json")
 TOKEN = CONFIG["telegram_token"]
@@ -346,8 +349,13 @@ def liquidity_traps(h1, d1, now):
         print("trap calc err", e)
     return out
 
-# ---------- forecast (trend-based, every run) ----------
-def forecast(h1, m15, h4, d1, news, traps=None, now=None):
+# ---------- forecast ----------
+# ИЕРАРХИЯ АНАЛИЗА (зафиксирована 12.06.2026 по решению JONY):
+#   1. КРУПНЫЕ ИГРОКИ (smart_money.py) — ОСНОВА: при сильном вердикте задают направление
+#   2. Технический анализ (RSI, ATR, уровни, позиция в диапазоне)
+#   3. Тренд (EMA50/200 на D1/H4/H1)
+#   4. Фундаментал  5. Новости (жёсткий фильтр)  6. Макро  7. Прочие факторы
+def forecast(h1, m15, h4, d1, news, traps=None, now=None, sm=None):
     price = float(h1["close"].iloc[-1])
     m15_rsi = float(rsi(m15["close"]).iloc[-1]) if len(m15) > 20 else 50.0
     h1_rsi = float(rsi(h1["close"]).iloc[-1])
@@ -360,15 +368,26 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
         return 1 if t == "up" else (-1 if t == "down" else 0)
     score = 2.0*sc(d1_tr) + 1.5*sc(h4_tr) + 1.0*sc(h1_tr)  # range -4.5..4.5
 
-    # direction = WITH dominant trend
-    if score > 0.3:
+    # --- УРОВЕНЬ 1: КРУПНЫЕ ИГРОКИ (основа системы) ---
+    sm_basis = False        # направление задали крупные игроки?
+    sm_conflict = False     # крупные против тренда?
+    if sm and sm.get("strong") and sm.get("bias"):
+        direction = sm["bias"]                     # основа: идём ЗА крупными
+        sm_basis = True
+        trend_dir = "BUY" if score > 0.3 else ("SELL" if score < -0.3 else None)
+        sm_conflict = trend_dir is not None and trend_dir != direction
+    # --- УРОВЕНЬ 3: тренд (если крупные не дали сильного вердикта) ---
+    elif score > 0.3:
         direction = "BUY"
     elif score < -0.3:
         direction = "SELL"
     else:
-        # flat / conflicting -> lean by H1 EMA50 slope, mark as no-trend
-        slope = float(ema(h1["close"], 50).diff().iloc[-1])
-        direction = "BUY" if slope >= 0 else "SELL"
+        # flat / conflicting -> lean by smart-money moderate bias, then H1 slope
+        if sm and sm.get("bias"):
+            direction = sm["bias"]
+        else:
+            slope = float(ema(h1["close"], 50).diff().iloc[-1])
+            direction = "BUY" if slope >= 0 else "SELL"
 
     a = abs(score)
     if a >= 2.5:
@@ -384,7 +403,8 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
     pos = (price - lo20) / rng  # 0 = at lows, 1 = at highs
 
     # ENTRY QUALITY — enter on a pullback WITH the trend, skip flat / chasing
-    flat = strength.startswith("флэт")
+    # (если направление задали КРУПНЫЕ, флэт по EMA не повод пропускать)
+    flat = strength.startswith("флэт") and not sm_basis
     if flat:
         eq, eq_txt = "🔴", "флэт/нет тренда — лучше ПРОПУСТИТЬ или мин. размер"
     elif direction == "SELL":
@@ -420,6 +440,20 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
     elif traps:
         trap_txt = "🪤 Свежих съёмов ликвидности (день/неделя) нет — ловушек не видно."
 
+    # smart money verdict text + conflict handling (hierarchy level 1)
+    sm_txt = ""
+    sm_adj = 0
+    if sm:
+        if sm.get("bias") == direction:
+            sm_adj = 3 if sm.get("strong") else 2
+        elif sm.get("bias") and sm["bias"] != direction:
+            sm_adj = -3
+            if eq == "🟢":
+                eq, eq_txt = "🟡", ("крупные игроки смотрят в другую сторону — "
+                                    "момент хуже, чем кажется по тренду")
+        if sm_conflict:
+            sm_txt = ("⚔️ Крупные идут ПРОТИВ тренда EMA — это контртренд-сделка за "
+                      "крупными. Основа системы — они, но цель держим ближе.")
     # session intelligence (trained on 365 days, sessions.json)
     sess_key, sess = current_session(now or datetime.now(timezone.utc))
     sess_adj = 0
@@ -436,6 +470,7 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
     conf += {"🟢": 3, "🟡": 1, "🔴": -2}[eq]
     conf += trap_adj
     conf += sess_adj
+    conf += sm_adj  # крупные игроки — самый тяжёлый голос
     news_warn = ""
     if news:  # list of upcoming high-impact events
         conf -= 3
@@ -449,13 +484,24 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
                      "новости USD/EUR, НЕ заходи.")
     conf = int(max(48, min(58, conf)))
 
-    # target / invalidation (5h horizon, with-trend)
+    # target / invalidation (5h horizon)
+    tgt_mult = 1.0 if sm_conflict else 1.5  # контртренд за крупными → цель ближе
     if direction == "SELL":
-        target = round(price - 1.5*h1_atr, 5)
+        target = round(price - tgt_mult*h1_atr, 5)
         invalid = round(max(hi20, price + 1.5*h1_atr), 5)
     else:
-        target = round(price + 1.5*h1_atr, 5)
+        target = round(price + tgt_mult*h1_atr, 5)
         invalid = round(min(lo20, price - 1.5*h1_atr), 5)
+    # если крупные тянут цену к пулу ликвидности в НАШУ сторону и он в разумном
+    # радиусе (0.5–2.5 ATR) — цель = этот пул ("куда поведут цену")
+    sm_target_used = False
+    if sm and sm.get("target"):
+        t = float(sm["target"])
+        dist = abs(t - price)
+        if 0.5*h1_atr <= dist <= 2.5*h1_atr and (
+                (direction == "BUY" and t > price) or (direction == "SELL" and t < price)):
+            target = round(t, 5)
+            sm_target_used = True
 
     return {
         "direction": direction, "price": round(price, 5),
@@ -466,6 +512,12 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None):
         "support": round(lo20, 5), "resistance": round(hi20, 5),
         "news_warn": news_warn, "flat": flat,
         "trap_txt": trap_txt,
+        "sm_score": sm.get("score") if sm else None,
+        "sm_bias": sm.get("bias") if sm else None,
+        "sm_verdict": sm.get("verdict") if sm else None,
+        "sm_lines": sm.get("lines") if sm else [],
+        "sm_basis": sm_basis, "sm_conflict": sm_conflict, "sm_txt": sm_txt,
+        "sm_target_used": sm_target_used,
         "sess_txt": sess_txt, "sess_key": sess_key, "sess_adj": sess_adj,
         "score": round(score, 1), "pos": round(pos, 2), "h1_atr": round(h1_atr, 5),
         "pwh": traps.get("pwh") if traps else None,
@@ -571,16 +623,26 @@ def send_forecast(f, img_paths):
     dom = ("НИСХОДЯЩИЙ ⬇️" if f["direction"] == "SELL" else "ВОСХОДЯЩИЙ ⬆️")
     if f["flat"]:
         dom = "НЕТ ТРЕНДА ↔️"
+    sm_block = ""
+    if f.get("sm_verdict"):
+        basis = " — ОНИ задают направление" if f.get("sm_basis") else ""
+        sm_block = (f"🏦 *КРУПНЫЕ ИГРОКИ (основа):* {f['sm_verdict']} "
+                    f"(балл {f['sm_score']:+.1f}){basis}\n"
+                    + (f"{f['sm_txt']}\n" if f.get("sm_txt") else "") + "\n")
+    dir_label = ("Направление ЗА крупными игроками" if f.get("sm_basis")
+                 else "Направление по тренду")
     caption = (
         f"📡 *EUR/USD — ПРОГНОЗ на 5 часов*\n"
         f"🕐 {now_tk.strftime('%H:%M')} Душанбе (UTC+5)\n\n"
+        f"{sm_block}"
         f"📈 *Тренд:* D1 {TREND_RU[f['d1_tr']]} · H4 {TREND_RU[f['h4_tr']]} · "
         f"H1 {TREND_RU[f['h1_tr']]}\n"
         f"➡️ Доминирующий: *{dom}* ({f['strength']})\n\n"
-        f"🎯 *Направление по тренду: {arrow}*\n"
+        f"🎯 *{dir_label}: {arrow}*\n"
         f"💵 Цена сейчас: *{f['price']:.5f}*\n"
         f"{f['eq']} *Момент входа:* {f['eq_txt']}\n"
-        f"🎯 Цель (5ч): {f['target']:.5f}\n"
+        f"🎯 Цель (5ч): {f['target']:.5f}"
+        + (" ← пул ликвидности, куда крупные поведут цену" if f.get("sm_target_used") else "") + "\n"
         f"🛑 Инвалидация: {f['invalid']:.5f}\n"
         f"📊 Уверенность: *{f['conf']}%*\n\n"
         f"🧠 *Smart money:* поддержка {f['support']:.5f} / "
@@ -624,35 +686,54 @@ def send_explainer(f):
     pos_pct = int(f.get("pos", 0.5) * 100)
     lines = [
         "📖 *РАЗБОР ПРОГНОЗА ПРОСТЫМИ СЛОВАМИ*",
+        "(порядок = наша иерархия: 1 крупные игроки → 2 теханализ → 3 тренд → новости)",
         "",
-        f"1️⃣ *Куда смотрим:* рынок в целом идёт "
-        f"{'ВНИЗ' if f['direction']=='SELL' else 'ВВЕРХ'} "
-        f"(дневной график D1: {TREND_RU[f['d1_tr']]}, 4-часовой H4: {TREND_RU[f['h4_tr']]}, "
-        f"часовой H1: {TREND_RU[f['h1_tr']]}; суммарный балл тренда {f['score']:+.1f} из ±4.5). "
-        f"Поэтому если торговать — то {act}.",
-        "",
-        f"2️⃣ *Можно ли входить ПРЯМО СЕЙЧАС:* {eq_mean}",
+    ]
+    # 1. КРУПНЫЕ ИГРОКИ — основа системы
+    if f.get("sm_verdict"):
+        basis = (" Сегодня направление прогноза задают именно ОНИ."
+                 if f.get("sm_basis") else
+                 " Сильного вердикта нет — направление взяли у тренда, крупные = поправка.")
+        lines += [f"1️⃣ *КРУПНЫЕ ИГРОКИ (основа):* {f['sm_verdict']} "
+                  f"(суммарный балл {f['sm_score']:+.1f}).{basis}",
+                  "   Что видно на графике их глазами:"]
+        for ln in (f.get("sm_lines") or [])[:7]:
+            lines.append(f"   • {ln}")
+        if f.get("sm_txt"):
+            lines.append(f"   {f['sm_txt']}")
+        lines.append("")
+    # 2. Теханализ: можно ли входить сейчас
+    lines += [
+        f"2️⃣ *Теханализ — можно ли входить ПРЯМО СЕЙЧАС:* {eq_mean}",
         f"   Почему: {f['eq_txt']}. Цена сейчас на {pos_pct}% высоты последнего диапазона "
         f"(0% = у низа, 100% = у верха).",
         "",
+        f"3️⃣ *Тренд:* рынок в целом идёт "
+        f"{'ВНИЗ' if f['direction']=='SELL' else 'ВВЕРХ'} "
+        f"(D1: {TREND_RU[f['d1_tr']]}, H4: {TREND_RU[f['h4_tr']]}, "
+        f"H1: {TREND_RU[f['h1_tr']]}; балл тренда {f['score']:+.1f} из ±4.5). "
+        f"Итог: {act}.",
+        "",
     ]
     if f.get("trap_txt"):
-        lines += [f"3️⃣ *Ловушки крупных игроков:* {f['trap_txt']}",
+        lines += [f"4️⃣ *Ловушки/свипы:* {f['trap_txt']}",
                   "   «Съём ликвидности» = цена ложно проколола важный уровень (хай/лоу дня "
                   "или недели), собрала чужие стопы и вернулась. Сразу после такого прокола "
                   "крупные часто толкают цену в ОБРАТНУЮ сторону — поэтому против свежего "
                   "съёма мы не входим.", ""]
     if f.get("sess_txt"):
-        lines += [f"4️⃣ {f['sess_txt']}", ""]
+        lines += [f"5️⃣ {f['sess_txt']}", ""]
+    tgt_note = ("ближайший пул ликвидности — туда крупным выгодно довести цену"
+                if f.get("sm_target_used") else
+                "≈1.5×ATR — средний ход цены за час × 1.5")
     lines += [
-        f"5️⃣ *План сделки:* вход {f['price']:.5f} → цель {f['target']:.5f} "
-        f"(примерно {abs(f['target']-f['price'])/0.0001:.0f} пипсов, это 1.5×ATR — "
-        f"средний ход цены за час × 1.5). Если цена уйдёт за {f['invalid']:.5f} — "
-        f"прогноз сломан, не пересиживать.",
+        f"6️⃣ *План сделки:* вход {f['price']:.5f} → цель {f['target']:.5f} "
+        f"(примерно {abs(f['target']-f['price'])/0.0001:.0f} пипсов; {tgt_note}). "
+        f"Если цена уйдёт за {f['invalid']:.5f} — прогноз сломан, не пересиживать.",
         "",
-        f"6️⃣ *Новости:* {f['news_warn'] or 'окно чистое.'}",
+        f"7️⃣ *Новости:* {f['news_warn'] or 'окно чистое.'}",
         "",
-        f"7️⃣ *Уверенность {f['conf']}%* — это честная оценка: даже хороший сетап на "
+        f"8️⃣ *Уверенность {f['conf']}%* — это честная оценка: даже хороший сетап на "
         f"5 часов угадывается чуть лучше монетки. Поэтому риск на сделку ≤1-2% депозита, "
         f"всегда.",
     ]
@@ -699,7 +780,8 @@ def main():
         return
 
     traps = liquidity_traps(h1, d1, now)
-    f = forecast(h1, m15, h4, d1, None if news is None else [], traps, now=now)
+    sm = analyze_smart_money(m15, h1, h4, d1, traps, now)   # ОСНОВА (уровень 1)
+    f = forecast(h1, m15, h4, d1, None if news is None else [], traps, now=now, sm=sm)
 
     # already-released news (>buffer, <3h ago): allow entry but warn + lower conf
     if news and news["recent"]:
@@ -719,7 +801,8 @@ def main():
             send_explainer(f)
         except Exception as e:
             print("explainer err", e)
-    print("sent", ok, f["direction"], f["conf"], f["eq"], "sess", f.get("sess_key"))
+    print("sent", ok, f["direction"], f["conf"], f["eq"], "sess", f.get("sess_key"),
+          "sm", f.get("sm_score"), f.get("sm_bias"), "basis", f.get("sm_basis"))
 
     state = load_state()
     today = now.strftime("%Y-%m-%d")
