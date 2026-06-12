@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
 """
-JONY EUR/USD SIGNAL scanner — РЕЖИМ «ТОЛЬКО ВХОД» (rebuilt 2026-06-13 per JONY).
+JONY EUR/USD scanner — ПРОГНОЗ КАЖДЫЕ 5 ЧАСОВ, КАЖДОЕ СООБЩЕНИЕ = ВХОД СРАЗУ.
+(rebuilt 2026-06-12 по голосовому JONY: вернуть расписание раз в 5 часов,
+минимум 3 прогноза в день, если нет новостей; «не заходить» не пишем никогда.)
 
-Новое поведение (голосовое JONY 12.06.2026): каждый присланный прогноз = вход
-СРАЗУ. Никаких «не заходить сейчас» в сообщениях. Для этого сканер перевёрнут:
+Что делает КАЖДЫЙ запуск (cron `0 */5 * * *` UTC):
+  1. ПОЛНОЕ чтение графика: M15 / H1 / H4 / D1 (свечи, EMA50/200, RSI, ATR).
+  2. КРУПНЫЕ ИГРОКИ (smart_money.py) — ОСНОВА: структура BOS/CHoCH,
+     дисплейсмент, ордер-блоки, FVG, пулы ликвидности, премиум/дискаунт, свипы.
+  3. ТРЕНД на каждом ТФ (D1 / H4 / H1, EMA50/200) — вторая основа.
+  4. Confluence+ (фундаментал/макро): COT CFTC (реальные позиции крупных),
+     DXY, доходность US10Y, RSI-эдж, круглые уровни, свечные паттерны.
+  5. Новости/политика: календарь ForexFactory (ставки ФРС/ЕЦБ, NFP, CPI,
+     выступления, выборы). Красная новость в окне 5ч → прогноз НЕ даём,
+     шлём новостную сводку (1 раз за окно) и заходим после новости.
+  6. Прогноз уходит КАЖДЫЙ запуск (вход СРАЗУ) с оценкой качества A+/A/B,
+     списком подтверждений и списком рисков «что против нас».
 
-  - Сканируем рынок каждые 30 минут (вместо прогноза раз в 5ч).
-  - Сообщение уходит ТОЛЬКО когда сложился A+ сетап: качество входа 🟢,
-    подтверждение минимум N независимых групп (крупные игроки, тренд,
-    confluence+ [COT/DXY/US10Y/RSI-эдж/круглые/свечи], свип в нашу сторону).
-  - Если сетапа нет — молчим (раз в ~5ч короткий статус «жив, ищу момент»).
-  - После сигнала пауза 5ч (сделка JONY ещё идёт — экспирация 5 часов).
-  - Новостной фильтр остался жёстким: красная новость в окне → сигналов нет,
-    шлём новостную сводку (один раз за окно, без спама).
-
-Это и есть путь к максимальному winrate: НЕ больше сделок, а только лучшие.
-Время в сообщениях — Душанбе/Ташкент (UTC+5). Гарантий нет и не бывает.
+Правило JONY: каждый день минимум 3 прогноза (если нет новостей).
+Время в сообщениях — Душанбе/Ташкент (UTC+5). Вероятность, не гарантия.
 """
 import os, sys, json, asyncio, time
 from datetime import datetime, timezone, timedelta
@@ -374,26 +377,49 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None, sm=None):
         return 1 if t == "up" else (-1 if t == "down" else 0)
     score = 2.0*sc(d1_tr) + 1.5*sc(h4_tr) + 1.0*sc(h1_tr)  # range -4.5..4.5
 
-    # --- УРОВЕНЬ 1: КРУПНЫЕ ИГРОКИ (основа системы) ---
+    # позиция цены в 20-барном диапазоне H1 (нужна ДО выбора направления — правило V2)
+    lo20 = float(h1["low"].tail(20).min()); hi20 = float(h1["high"].tail(20).max())
+    pos = (price - lo20) / max(hi20 - lo20, 1e-6)  # 0 = у низа, 1 = у верха
+
+    # --- ПРАВИЛО V2 (бэктест 365 дней / 1197 сделок, 12.06.2026): ---
+    # 54.3% против 49.8% у старой иерархии; ни одного месяца ниже 49%.
+    # Главный урок данных: на горизонте 5ч ВХОД ВДОГОНКУ проигрывает (43.8%),
+    # а вход у края диапазона / на откате выигрывает (52-61%).
     sm_basis = False        # направление задали крупные игроки?
     sm_conflict = False     # крупные против тренда?
-    if sm and sm.get("strong") and sm.get("bias"):
-        direction = sm["bias"]                     # основа: идём ЗА крупными
+    trend_dir = "BUY" if score > 0.3 else ("SELL" if score < -0.3 else None)
+    if pos <= 0.15:
+        # 1. цена у самого НИЗА диапазона: стопы внизу уже сняты — статистика 60.6%
+        direction, dir_reason = "BUY", ("цена у самого низа 20-барного диапазона — "
+                                        "стопы внизу собраны, статистика за рост (61% на 365д)")
+    elif h1_rsi <= 25:
+        direction, dir_reason = "BUY", "RSI H1 ≤25 — перепроданность, наш бэктест-эдж (56%)"
+    elif h1_rsi >= 75:
+        direction, dir_reason = "SELL", "RSI H1 ≥75 — перекупленность, наш бэктест-эдж (56%)"
+    elif sm and sm.get("strong") and sm.get("bias"):
+        # 3. КРУПНЫЕ ИГРОКИ с сильным вердиктом — идём ЗА ними (52-54% даже против тренда)
+        direction, dir_reason = sm["bias"], "сильный вердикт крупных игроков — идём ЗА ними"
         sm_basis = True
-        trend_dir = "BUY" if score > 0.3 else ("SELL" if score < -0.3 else None)
         sm_conflict = trend_dir is not None and trend_dir != direction
-    # --- УРОВЕНЬ 3: тренд (если крупные не дали сильного вердикта) ---
-    elif score > 0.3:
-        direction = "BUY"
-    elif score < -0.3:
-        direction = "SELL"
-    else:
-        # flat / conflicting -> lean by smart-money moderate bias, then H1 slope
-        if sm and sm.get("bias"):
-            direction = sm["bias"]
+    elif trend_dir == "BUY":
+        if pos <= 0.5:
+            direction, dir_reason = "BUY", "тренд ВВЕРХ + цена на откате — входим ЗА трендом"
         else:
-            slope = float(ema(h1["close"], 50).diff().iloc[-1])
-            direction = "BUY" if slope >= 0 else "SELL"
+            direction, dir_reason = "SELL", ("тренд вверх, но цена уже у ВЕРХА диапазона — "
+                                             "вдогонку покупать нельзя (44% на 365д), "
+                                             "статистика за откат вниз")
+    elif trend_dir == "SELL":
+        if pos >= 0.5:
+            direction, dir_reason = "SELL", "тренд ВНИЗ + цена на отскоке — входим ЗА трендом"
+        else:
+            direction, dir_reason = "BUY", ("тренд вниз, но цена уже у НИЗА диапазона — "
+                                            "вдогонку продавать нельзя, статистика за отскок вверх")
+    elif sm and sm.get("bias"):
+        direction, dir_reason = sm["bias"], "флэт — берём сторону крупных игроков (умеренный вердикт)"
+    else:
+        slope = float(ema(h1["close"], 50).diff().iloc[-1])
+        direction = "BUY" if slope >= 0 else "SELL"
+        dir_reason = "флэт — берём наклон EMA50 H1"
 
     a = abs(score)
     if a >= 2.5:
@@ -403,30 +429,25 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None, sm=None):
     else:
         strength = "флэт/нет тренда"
 
-    # position in recent H1 range (smart-money liquidity context)
-    lo20 = float(h1["low"].tail(20).min()); hi20 = float(h1["high"].tail(20).max())
-    rng = max(hi20 - lo20, 1e-6)
-    pos = (price - lo20) / rng  # 0 = at lows, 1 = at highs
-
     # ENTRY QUALITY — enter on a pullback WITH the trend, skip flat / chasing
     # (если направление задали КРУПНЫЕ, флэт по EMA не повод пропускать)
     flat = strength.startswith("флэт") and not sm_basis
     if flat:
-        eq, eq_txt = "🔴", "флэт/нет тренда — лучше ПРОПУСТИТЬ или мин. размер"
+        eq, eq_txt = "🔴", "флэт/нет тренда — слабый момент, ставь МИНИМАЛЬНЫЙ риск"
     elif direction == "SELL":
         if pos >= 0.6 or m15_rsi >= 55:
             eq, eq_txt = "🟢", "цена на отскоке вверх — хороший момент ПРОДАВАТЬ по тренду"
         elif pos >= 0.4:
             eq, eq_txt = "🟡", "средний — можно, но лучше отскок повыше"
         else:
-            eq, eq_txt = "🔴", "цена уже внизу — НЕ гнаться, жди отскок к сопротивлению"
+            eq, eq_txt = "🔴", "цена уже внизу — вход вдогонку, ставь минимальный риск"
     else:  # BUY
         if pos <= 0.4 or m15_rsi <= 45:
             eq, eq_txt = "🟢", "цена на откате вниз — хороший момент ПОКУПАТЬ по тренду"
         elif pos <= 0.6:
             eq, eq_txt = "🟡", "средний — можно, но лучше откат пониже"
         else:
-            eq, eq_txt = "🔴", "цена уже вверху — НЕ гнаться, жди откат к поддержке"
+            eq, eq_txt = "🔴", "цена уже вверху — вход вдогонку, ставь минимальный риск"
 
     # liquidity traps (smart money): never go AGAINST a fresh sweep
     trap_txt = ""
@@ -435,10 +456,11 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None, sm=None):
         s = traps["sweeps"][0]
         if s["bias"] != direction:
             eq, eq_txt = "🔴", (f"свежий съём ликвидности ({s['name']} "
-                                f"{s['level']:.5f}) ПРОТИВ направления — ПРОПУСТИТЬ")
+                                f"{s['level']:.5f}) ПРОТИВ направления — главный риск сделки")
             trap_adj = -3
-            trap_txt = (f"🪤 *Ловушка:* крупные сняли стопы за {s['name']} "
-                        f"({s['level']:.5f}) — толкают ПРОТИВ тренда, не входить.")
+            trap_txt = (f"🪤 *Ловушка ПРОТИВ нас:* крупные сняли стопы за {s['name']} "
+                        f"({s['level']:.5f}) и могут толкнуть цену в обратную сторону — "
+                        f"ставь минимальный риск, при уходе за инвалидацию не пересиживать.")
         else:
             trap_adj = 2
             trap_txt = (f"🪤 *Ловушка в нашу пользу:* ложный пробой {s['name']} "
@@ -516,7 +538,7 @@ def forecast(h1, m15, h4, d1, news, traps=None, now=None, sm=None):
         "strength": strength, "eq": eq, "eq_txt": eq_txt,
         "m15_rsi": round(m15_rsi, 0), "h1_rsi": round(h1_rsi, 0), "h4_rsi": round(h4_rsi, 0),
         "support": round(lo20, 5), "resistance": round(hi20, 5),
-        "news_warn": news_warn, "flat": flat,
+        "news_warn": news_warn, "flat": flat, "dir_reason": dir_reason,
         "trap_txt": trap_txt,
         "sm_score": sm.get("score") if sm else None,
         "sm_bias": sm.get("bias") if sm else None,
@@ -643,15 +665,26 @@ def send_forecast(f, img_paths):
                     + (" · 🎯 RSI-эдж активен!" if f.get("cp_rsi_edge") else "") + "\n")
     groups_block = ""
     if f.get("signal_groups"):
-        groups_block = "✅ Подтвердили вход: " + " + ".join(f["signal_groups"]) + "\n\n"
+        groups_block = "✅ Подтвердили вход: " + " + ".join(f["signal_groups"]) + "\n"
+    risk_block = ""
+    if f.get("signal_risks"):
+        risk_block = "⚠️ Что против нас: " + "; ".join(f["signal_risks"]) + "\n"
+    if groups_block or risk_block:
+        risk_block += "\n"
+    grade = f.get("grade", "A")
+    grade_txt = {"A+": "A+ сетап — всё сошлось",
+                 "A": "сильный сетап",
+                 "B": "плановый прогноз по расписанию"}.get(grade, grade)
     caption = (
-        f"🚀 *EUR/USD — СИГНАЛ НА ВХОД (A+ сетап)*\n"
+        f"🚀 *EUR/USD — ПРОГНОЗ: ВХОД СЕЙЧАС* ({grade} · {grade_txt})\n"
         f"🕐 {now_tk.strftime('%H:%M')} Душанбе (UTC+5)\n\n"
         f"🎯 *{arrow} — ЗАХОДИ СЕЙЧАС*\n"
+        + (f"💡 Почему: {f['dir_reason']}\n" if f.get("dir_reason") else "") +
         f"💵 Цена входа: *{f['price']:.5f}*\n"
         f"⏳ Экспирация: 5 часов → *{exp_tk.strftime('%H:%M')}* (UTC+5)\n"
         f"📊 Уверенность: *{f['conf']}%*\n\n"
         f"{groups_block}"
+        f"{risk_block}"
         f"{sm_block}"
         f"{cp_block}"
         f"📈 *Тренд:* D1 {TREND_RU[f['d1_tr']]} · H4 {TREND_RU[f['h4_tr']]} · "
@@ -670,6 +703,14 @@ def send_forecast(f, img_paths):
         f"⚠️ Вероятность, не гарантия (~{f['conf']}%). Риск ≤1-2% депозита, всегда.\n"
         f"👇 Подробный разбор простыми словами — следующим сообщением."
     )
+    # Telegram caption limit = 1024 chars: длинную часть шлём отдельным сообщением
+    overflow = None
+    if len(caption) > 1000:
+        head, tail = caption[:1000], caption[1000:]
+        cut = head.rfind("\n")
+        if cut > 400:
+            head, tail = caption[:cut], caption[cut + 1:]
+        caption, overflow = head, tail
     media, files = [], {}
     for i, p in enumerate(img_paths):
         key = f"photo{i}"
@@ -684,7 +725,23 @@ def send_forecast(f, img_paths):
                       files=files, timeout=60)
     for fp in files.values():
         fp.close()
-    return r.json()
+    out = r.json()
+    if not out.get("ok"):
+        print("tg sendMediaGroup error:", out)
+        # fallback: хотя бы текст прогноза без Markdown (чтобы вход точно дошёл)
+        r2 = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                           data={"chat_id": CHAT_ID,
+                                 "text": caption + ("\n" + overflow if overflow else "")},
+                           timeout=30)
+        out = r2.json()
+        if not out.get("ok"):
+            print("tg sendMessage fallback error:", out)
+        return out
+    if overflow:
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                      data={"chat_id": CHAT_ID, "text": overflow,
+                            "parse_mode": "Markdown"}, timeout=30)
+    return out
 
 def send_explainer(f):
     """Second message: every factor of the forecast explained in plain Russian."""
@@ -694,7 +751,9 @@ def send_explainer(f):
         "🟢": "🟢 = момент входа ХОРОШИЙ — сигнал и пришёл именно потому, что цена удобная.",
         "🟡": "🟡 = цена средняя, но подтверждений столько, что вход всё равно разрешён "
               "(крупные игроки + confluence перевесили).",
-        "🔴": "🔴 = такой сигнал тебе больше НЕ приходит: сканер отсеивает эти моменты сам.",
+        "🔴": "🔴 = момент входа неудобный (цена уже убежала, вход вдогонку). Прогноз "
+              "всё равно пришёл, потому что прогнозы идут по расписанию — но на таких "
+              "входах ставь МИНИМАЛЬНЫЙ риск.",
     }[f["eq"]]
     pos_pct = int(f.get("pos", 0.5) * 100)
     lines = [
@@ -702,6 +761,9 @@ def send_explainer(f):
         "(сигнал пришёл = вход СЕЙЧАС; всё ниже — почему система решила войти)",
         "",
     ]
+    if f.get("dir_reason"):
+        lines += [f"0️⃣ *Главная причина направления (правило V2, бэктест 365 дней):* "
+                  f"{f['dir_reason']}", ""]
     # 1. КРУПНЫЕ ИГРОКИ — основа системы
     if f.get("sm_verdict"):
         basis = (" Сегодня направление прогноза задают именно ОНИ."
@@ -773,20 +835,19 @@ def load_state():
 def save_state(s):
     json.dump(s, open(STATE_PATH, "w"), indent=2)
 
-# ---------- signal gate (A+ filter, добавлено 13.06.2026 по голосовому JONY) ----------
+# ---------- оценка качества сетапа (бывший A+ гейт; с 12.06.2026 прогноз идёт ВСЕГДА) ----------
 SIG = CONFIG.get("signal", {})
-MIN_GROUPS = int(SIG.get("min_groups", 2))      # мин. независимых подтверждений
-COOLDOWN_H = float(SIG.get("cooldown_h", 5))    # пауза после сигнала (сделка идёт)
-STATUS_EVERY_H = float(SIG.get("status_every_h", 5))  # «жив, ищу момент» не чаще
+MIN_GROUPS = int(SIG.get("min_groups", 2))      # мин. независимых подтверждений для оценки A
+COOLDOWN_H = float(SIG.get("cooldown_h", 4.5))  # пауза после прогноза (сделка идёт 5ч; 4.5 чтобы не пропустить тик крона)
 
 
 def signal_gate(f, traps, cp):
-    """Решает, является ли текущий прогноз A+ сетапом для НЕМЕДЛЕННОГО входа.
+    """Оценивает качество сетапа. Прогноз отправляется КАЖДЫЙ запуск (правило
+    JONY: минимум 3 прогноза в день), эта функция даёт честную метку качества.
 
-    Возвращает (ok, groups: list[str], missing: list[str]).
-    Правило: каждый отправленный сигнал = вход сразу. Поэтому отправляем только
-    когда сошлись минимум MIN_GROUPS независимых подтверждений + момент входа
-    хороший + нет блокеров (флэт, свип против, толпа факторов против).
+    Возвращает (ok_Aplus, groups: list[str], risks: list[str]).
+    A+ = минимум MIN_GROUPS независимых подтверждений + хороший момент входа +
+    нет рисков (флэт, свип против, толпа факторов против).
     """
     d = f["direction"]
     groups, missing = [], []
@@ -818,25 +879,10 @@ def signal_gate(f, traps, cp):
     if cp.get("against", 0) >= 3:
         blockers.append("3+ confluence-фактора против")
     if not eq_ok:
-        blockers.append(f"момент входа {f['eq']} (нужен 🟢)")
+        blockers.append(f"момент входа {f['eq']} — цена неудобная, вход вдогонку")
 
     ok = (len(groups) >= MIN_GROUPS) and eq_ok and not blockers
     return ok, groups, (blockers + [f"не хватает: {', '.join(missing)}"] if missing else blockers)
-
-
-def send_status(now, f, groups, missing):
-    """Короткий статус «жив, ищу момент» — не чаще STATUS_EVERY_H часов."""
-    now_tk = now + timedelta(hours=5)
-    lean = "ВВЕРХ ⬆️" if f["direction"] == "BUY" else "ВНИЗ ⬇️"
-    txt = (f"🔎 {now_tk.strftime('%H:%M')} (UTC+5) — сканирую рынок каждые 30 минут.\n"
-           f"A+ сетапа сейчас НЕТ, поэтому сигнала нет — берём только лучшие моменты.\n"
-           f"Склонность рынка: {lean}. Подтверждений {len(groups)} из минимум {MIN_GROUPS} "
-           f"({', '.join(groups) if groups else 'пока ни одного'}).\n"
-           f"⛔ Что мешает: {'; '.join(missing[:3]) if missing else '—'}\n"
-           f"Как только сетап сложится — пришлю 🚀 сигнал, и его можно брать СРАЗУ.")
-    r = requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                      data={"chat_id": CHAT_ID, "text": txt}, timeout=30)
-    return r.json()
 
 
 def _hours_since(state, key, now):
@@ -901,9 +947,19 @@ def main(dry=False):
 
     ok_signal, groups, missing = signal_gate(f, traps, cp)
     f["signal_groups"] = groups
+    f["signal_risks"] = [m for m in missing if not m.startswith("не хватает")]
 
-    # уверенность: базовый расчёт + бонус за каждое подтверждение сверх минимума
-    f["conf"] = int(max(50, min(62, f["conf"] + 2 * max(0, len(groups) - MIN_GROUPS) + 2)))
+    # оценка качества сетапа (прогноз уходит ВСЕГДА, оценка — честная метка)
+    if ok_signal:
+        f["grade"] = "A+"
+    elif len(groups) >= MIN_GROUPS and not f["signal_risks"]:
+        f["grade"] = "A"
+    else:
+        f["grade"] = "B"
+
+    # уверенность: базовый расчёт + бонус за подтверждения, штраф за риски
+    f["conf"] = int(max(48, min(62, f["conf"] + 2 * max(0, len(groups) - MIN_GROUPS)
+                                + {"A+": 3, "A": 1, "B": -2}[f["grade"]])))
 
     if news and news["recent"]:
         ev = news["recent"][-1]
@@ -916,37 +972,27 @@ def main(dry=False):
 
     print("scan:", f["direction"], "eq", f["eq"], "trend", f["score"],
           "sm", f.get("sm_score"), f.get("sm_bias"), "basis", f.get("sm_basis"),
-          "cp", cp["score"], "groups", groups, "missing", missing,
-          "-> SIGNAL" if ok_signal else "-> no signal")
+          "cp", cp["score"], "grade", f["grade"], "groups", groups, "risks", f["signal_risks"])
 
     if dry:
         print("DRY RUN — ничего не отправляем")
         return
 
-    if ok_signal:
-        charts = capture_charts(m15, h1, h4, d1)
-        resp = send_forecast(f, charts)
-        sent = resp.get("ok")
-        if sent:
-            try:
-                send_explainer(f)
-            except Exception as e:
-                print("explainer err", e)
-            state["last_signal"] = now.isoformat()
-            state["last_status"] = now.isoformat()
-            state["count"] = state.get("count", 0) + 1
-            state["news_key"] = ""
-            save_state(state)
-        print("signal sent:", sent, f["direction"], f["conf"])
-        return
-
-    # сетапа нет: раз в STATUS_EVERY_H часов короткий статус, чтобы было видно, что бот жив
-    if _hours_since(state, "last_status", now) >= STATUS_EVERY_H:
-        resp = send_status(now, f, groups, missing)
-        if resp.get("ok"):
-            state["last_status"] = now.isoformat()
-            save_state(state)
-        print("status sent:", resp.get("ok"))
+    # ПРОГНОЗ УХОДИТ КАЖДЫЙ ЗАПУСК (правило JONY: минимум 3 прогноза в день).
+    charts = capture_charts(m15, h1, h4, d1)
+    resp = send_forecast(f, charts)
+    sent = resp.get("ok")
+    if sent:
+        try:
+            send_explainer(f)
+        except Exception as e:
+            print("explainer err", e)
+        state["last_signal"] = now.isoformat()
+        state["last_status"] = now.isoformat()
+        state["count"] = state.get("count", 0) + 1
+        state["news_key"] = ""
+        save_state(state)
+    print("forecast sent:", sent, f["direction"], f["conf"], f["grade"])
 
 
 if __name__ == "__main__":
