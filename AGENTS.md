@@ -3,6 +3,12 @@
 This file is read automatically by AI assistants when they work in this repo.
 Read it BEFORE doing anything else.
 
+> ## 🧠 MANDATORY FIRST READ: [`DEEP_WORK_PROTOCOL.md`](DEEP_WORK_PROTOCOL.md)
+> Before strategies, backtests or code — read the Deep Work Protocol.
+> It defines HOW to work on ANY task here: autonomous iterative research
+> (goal with measurable criterion → hypothesis → test → report → repeat;
+> honest validation, no look-ahead bias), NOT chatbot-style single answers.
+
 ## Project: FOREX Сигналы 2026
 
 Real-time forex signal system for **28 currency pairs**.
