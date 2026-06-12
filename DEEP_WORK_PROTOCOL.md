@@ -80,6 +80,9 @@
 
 ## Правила выполнения (технические)
 
+- **Часовой пояс: UTC+5 (Ташкент).** Мы работаем ТОЛЬКО по UTC+5. Все времена в
+  отчётах, расписаниях, сигналах и коде указывай в UTC+5 (если источник данных в UTC —
+  переводи: например, торговые слоты 12:00/16:00/20:00 UTC = **17:00/21:00/01:00 UTC+5**)
 - Сохраняй результаты КАЖДОГО эксперимента (файлы/таблицы), ничего не теряй
 - Длинные расчёты запускай в фоне, проверяй прогресс, не блокируйся
 - Все скрипты экспериментов храни в репозитории, чтобы любой мог воспроизвести
@@ -96,6 +99,7 @@
 3. **Interim reports**: regularly show current best numbers (per-month breakdown), what is running now, what is next.
 4. **Honesty**: no look-ahead bias, walk-forward validation only, no fitting on the test period, real data only, disclose multiple-testing risk.
 5. **Stop only when** the goal is reached honestly OR you can mathematically prove it is unreachable (then say so plainly, with the math).
+6. **Timezone**: all times in reports/schedules/signals must be **UTC+5 (Tashkent)**.
 
 This protocol applies to ANY task in this repo (and beyond), not just trading.
 

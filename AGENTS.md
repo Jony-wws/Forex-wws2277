@@ -8,6 +8,7 @@ Read it BEFORE doing anything else.
 > It defines HOW to work on ANY task here: autonomous iterative research
 > (goal with measurable criterion → hypothesis → test → report → repeat;
 > honest validation, no look-ahead bias), NOT chatbot-style single answers.
+> **All times in UTC+5 (Tashkent)** — the only working timezone for this project.
 
 ## Project: FOREX Сигналы 2026
 
