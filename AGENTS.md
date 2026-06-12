@@ -101,3 +101,20 @@ pyproject.toml        # Dependencies
 - O. EMA Cross 15M (±1)
 
 Score → Confidence mapping: 0→50%, 5→65%, 8→75%, 10→80%, 15→87%, 20→92%, 25→95%
+
+
+## Deep Work Protocol — English summary
+
+**Do not behave like a chatbot. Behave like a researcher.**
+
+1. **Goal first**: define a measurable success criterion and hard constraints before working.
+2. **Iterate**: hypothesis → test (full backtest, real data) → compare on the PRIMARY metric → next hypothesis. Keep results of every variant.
+3. **Interim reports**: regularly show current best numbers (per-month breakdown), what is running now, what is next.
+4. **Honesty**: no look-ahead bias, walk-forward validation only, no fitting on the test period, real data only, disclose multiple-testing risk.
+5. **Stop only when** the goal is reached honestly OR you can mathematically prove it is unreachable (then say so plainly, with the math).
+6. **Timezone**: all times in reports/schedules/signals must be **UTC+5 (Tashkent)**.
+
+This protocol applies to ANY task in this repo (and beyond), not just trading.
+
+---
+
