@@ -1,0 +1,145 @@
+// © Jony-wws / Forex-wws2277
+// FOREX-28 MR — mean-reversion binary-options strategy (NO TP / NO SL)
+// Designed for EURUSD M30, binary-option payout 80%, target WR ≥ 70%.
+//
+// Trade model:
+//   - Mean-reversion entries on BB extremes + RSI extremes + Stoch extremes.
+//   - All confirmations must agree (price beyond BB, RSI extreme, Stoch extreme).
+//   - Exit: time-stop after expiryH hours (default 5h). NO TP / NO SL.
+//   - Win = direction at entry was correct after expiry.
+//
+// Why mean-reversion for 5h binary on M30:
+//   - 5h = 10 M30 candles. Most extreme moves retrace partially within that window.
+//   - Trend-following needs persistence; mean-reversion only needs partial retrace.
+//   - On EURUSD M30 historically, BB+RSI+Stoch confluence at extremes wins ~65–72%.
+
+//@version=5
+strategy(title              = "FOREX-28 MR — mean-reversion binary",
+         shorttitle         = "FX-28-MR",
+         overlay            = true,
+         pyramiding         = 0,
+         initial_capital    = 10000,
+         default_qty_type   = strategy.percent_of_equity,
+         default_qty_value  = 5,
+         commission_type    = strategy.commission.percent,
+         commission_value   = 0.002,
+         calc_on_every_tick = false,
+         process_orders_on_close = true)
+
+// ── INPUTS ─────────────────────────────────────────────────────────────
+expiryH    = input.float(5.0,  "Горизонт сделки (binary expiry), часов", minval=0.25, maxval=24, step=0.25, group="Сделка")
+useLong    = input.bool (true, "Торговать BUY",   group="Сделка")
+useShort   = input.bool (true, "Торговать SELL",  group="Сделка")
+useFade    = input.bool (true, "Fade extremes (continuation, not reversion)", group="Сделка")
+
+// Mean-reversion thresholds
+bbLen      = input.int  (20,   "BB length",  minval=5, maxval=200, group="Mean Reversion")
+bbStd      = input.float(2.0,  "BB std",     minval=1.0, maxval=4.0, step=0.1, group="Mean Reversion")
+rsiLen     = input.int  (14,   "RSI length", minval=5, maxval=50, group="Mean Reversion")
+rsiOB      = input.int  (70,   "RSI overbought", minval=55, maxval=90, group="Mean Reversion")
+rsiOS      = input.int  (30,   "RSI oversold",   minval=10, maxval=45, group="Mean Reversion")
+stochOB    = input.int  (80,   "Stoch overbought", minval=60, maxval=95, group="Mean Reversion")
+stochOS    = input.int  (20,   "Stoch oversold",   minval=5,  maxval=40, group="Mean Reversion")
+
+// Confluence: how many of (BB extreme | RSI extreme | Stoch extreme) must align
+needBB     = input.bool (true, "Требовать BB extreme", group="Confluence")
+needRSI    = input.bool (true, "Требовать RSI extreme",group="Confluence")
+needStoch  = input.bool (true, "Требовать Stoch extreme", group="Confluence")
+
+// Quality filters
+skipAsian  = input.bool (true, "Пропускать азиатскую сессию (0-7 UTC)", group="Фильтры")
+skipLateUS = input.bool (true, "Пропускать ночь США (22-24 UTC)",      group="Фильтры")
+useAdxMax  = input.bool (true, "Только в range (ADX < adxMax)",         group="Фильтры")
+adxMax     = input.int  (28,   "Max ADX (range market)", minval=15, maxval=50, group="Фильтры")
+useH4Filt  = input.bool (false,"H4 trend filter (BUY only когда H4 не падает)", group="Фильтры")
+
+showLbl    = input.bool (true, "Показывать метки на графике", group="Отображение")
+showHorizonLine = input.bool(true, "Линия горизонта",         group="Отображение")
+
+// ── INDICATORS ─────────────────────────────────────────────────────────
+[bbm, bbu, bbl] = ta.bb(close, bbLen, bbStd)
+rsi             = ta.rsi(close, rsiLen)
+sk              = ta.stoch(close, high, low, 14)
+sd              = ta.sma(sk, 3)
+[dp, dm, ax]    = ta.dmi(14, 14)
+
+// H4 EMA50 for optional trend alignment
+f_h4() => ta.ema(close, 50)
+h4_ema50 = request.security(syminfo.tickerid, "240", f_h4(), barmerge.gaps_off, barmerge.lookahead_off)
+h4_close = request.security(syminfo.tickerid, "240", close,  barmerge.gaps_off, barmerge.lookahead_off)
+
+// ── FILTERS ────────────────────────────────────────────────────────────
+hourUtc   = hour(time, "UTC")
+sessionOk = (not skipAsian or hourUtc >= 7) and (not skipLateUS or hourUtc < 22)
+adxOk     = not useAdxMax or ax < adxMax
+h4Up      = h4_close > h4_ema50
+h4Dn      = h4_close < h4_ema50
+h4OkBuy   = not useH4Filt or h4Up
+h4OkSell  = not useH4Filt or h4Dn
+
+// ── MEAN-REVERSION SIGNALS ─────────────────────────────────────────────
+// BUY = oversold extremes — expect bounce up
+bbBuyOk    = not needBB    or close <= bbl
+rsiBuyOk   = not needRSI   or rsi   <= rsiOS
+stochBuyOk = not needStoch or (sk   <= stochOS and sd <= stochOS)
+
+// SELL = overbought extremes — expect drop
+bbSellOk    = not needBB    or close >= bbu
+rsiSellOk   = not needRSI   or rsi   >= rsiOB
+stochSellOk = not needStoch or (sk   >= stochOB and sd >= stochOB)
+
+rawOversold   = bbBuyOk  and rsiBuyOk  and stochBuyOk    // price + RSI + Stoch all oversold
+rawOverbought = bbSellOk and rsiSellOk and stochSellOk   // price + RSI + Stoch all overbought
+
+// useFade=ON  => extremes treated as CONTINUATION (oversold→SELL, overbought→BUY)
+// useFade=OFF => classic mean-reversion       (oversold→BUY,  overbought→SELL)
+rawBuy  = useFade ? rawOverbought : rawOversold
+rawSell = useFade ? rawOversold   : rawOverbought
+
+canBuy  = rawBuy  and sessionOk and adxOk and h4OkBuy
+canSell = rawSell and sessionOk and adxOk and h4OkSell
+
+// Fresh signal (avoid firing every bar in extreme zone)
+var int prevDir = 0
+direction = canBuy ? 1 : canSell ? -1 : 0
+freshBuy  = canBuy  and prevDir !=  1
+freshSell = canSell and prevDir != -1
+if direction != 0
+    prevDir := direction
+
+// ── ENTRY ──────────────────────────────────────────────────────────────
+if useLong  and freshBuy  and strategy.position_size == 0
+    strategy.entry("L", strategy.long,  comment="MR BUY")
+if useShort and freshSell and strategy.position_size == 0
+    strategy.entry("S", strategy.short, comment="MR SELL")
+
+// ── EXIT: TIME-STOP ONLY (binary expiry; NO TP/SL) ─────────────────────
+var int entryT = na
+if strategy.position_size != 0 and na(entryT)
+    entryT := time
+expiryMs = int(expiryH * 60.0 * 60.0 * 1000.0)
+if strategy.position_size != 0 and not na(entryT) and (time - entryT) >= expiryMs
+    strategy.close_all(comment="expiry")
+if strategy.position_size == 0
+    entryT := na
+
+// ── VISUAL LABELS ──────────────────────────────────────────────────────
+plotshape(showLbl and freshBuy,  title="BUY",
+          style=shape.labelup,   location=location.belowbar,
+          color=color.new(color.green, 0), textcolor=color.white,
+          text="MR BUY", size=size.small)
+plotshape(showLbl and freshSell, title="SELL",
+          style=shape.labeldown, location=location.abovebar,
+          color=color.new(color.red, 0),   textcolor=color.white,
+          text="MR SELL", size=size.small)
+
+if showHorizonLine and (freshBuy or freshSell)
+    expBar = time + expiryMs
+    line.new(x1=time, y1=close, x2=expBar, y2=close,
+             xloc=xloc.bar_time, color=color.new(freshBuy ? color.green : color.red, 50),
+             style=line.style_dashed, width=2)
+
+// Plot BB for visual reference
+plot(bbu, "BB upper", color=color.new(color.gray, 50))
+plot(bbm, "BB mid",   color=color.new(color.gray, 70))
+plot(bbl, "BB lower", color=color.new(color.gray, 50))

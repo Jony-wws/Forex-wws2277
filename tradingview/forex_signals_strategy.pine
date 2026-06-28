@@ -1,7 +1,14 @@
 // © Jony-wws / Forex-wws2277 — mirrored from app/analyzer.py + app/cycle.py
-// FOREX-28 v2 — binary-options strategy (no TP / no SL)
-// For TradingView Strategy Tester. Mirrors the indicator file's logic exactly
-// so backtest stats match what the indicator's on-chart panel shows.
+// FOREX-28 v3 — STRICT binary-options strategy (no TP / no SL)
+// Tuned for EURUSD M30, binary-option payout 80%, target WR ≥ 70%.
+//
+// v3 adds strict entry filters on top of the v2 voting score:
+//   - confidence_pct ≥ strictGate  (default 90)
+//   - h1_adx ≥ adxMin              (default 25 — must be a real trend)
+//   - skip Asian session           (only fire 07:00–21:59 UTC)
+//   - require multi-TF unanimity   (all 4 of D1/H4/H1/M15 must agree on dir)
+// All four filters are exposed as inputs but DEFAULT to ON so the chart
+// instance picks them up automatically after a fresh save.
 //
 // Trade model:
 //   - Enter long  on freshBuy  (conf >= gateConf, valid pair, no DD-halt).
@@ -15,8 +22,8 @@
 //
 // Universal: works on any chart TF, internally pulls D1+H4+H1+M15.
 //@version=5
-strategy(title              = "FOREX-28 v2 — binary-options strategy",
-         shorttitle         = "FX-28-S v2",
+strategy(title              = "FOREX-28 v3 — strict binary-options strategy",
+         shorttitle         = "FX-28-S v3",
          overlay            = true,
          pyramiding         = 0,
          initial_capital    = 10000,
@@ -36,6 +43,14 @@ useLong       = input.bool (true, "Торговать BUY",                     
 useShort      = input.bool (true, "Торговать SELL",                           group="Сигнал")
 showLbl       = input.bool (true, "Показывать метки на графике",              group="Отображение")
 showHorizonLine = input.bool(true,"Линия горизонта",                         group="Отображение")
+
+// ── STRICT FILTERS (v3) ────────────────────────────────────────────────
+strictGate    = input.int  (90,   "v3: жёсткий gate уверенности, %",          minval=50, maxval=95, group="Strict v3")
+useAdxFilter  = input.bool (true, "v3: фильтр ADX (мин. сила тренда)",         group="Strict v3")
+adxMin        = input.int  (25,   "v3: минимум ADX",                          minval=10, maxval=50, group="Strict v3")
+skipAsian     = input.bool (true, "v3: пропускать азиатскую сессию (0-7 UTC)", group="Strict v3")
+skipLateUS    = input.bool (true, "v3: пропускать ночь США (22-24 UTC)",      group="Strict v3")
+requireMtfUnan= input.bool (true, "v3: требовать единогласие D1/H4/H1/M15",   group="Strict v3")
 
 // ── PER-TF AGGREGATORS ─────────────────────────────────────────────────
 f_h1_pack() =>
@@ -264,18 +279,29 @@ freshSell = isStrong and direction == -1 and prevDir != -1
 if isStrong
     prevDir := direction
 
+// ── STRICT FILTERS (v3) ────────────────────────────────────────────────
+// Note: bull4 is already computed by the M Multi-TF voting block above.
+hourUtc   = hour(time, "UTC")
+sessionOk = (not skipAsian or hourUtc >= 7) and (not skipLateUS or hourUtc < 22)
+adxOk     = not useAdxFilter or h1_adx >= adxMin
+mtfBull   = bull4 == 4
+mtfBear   = bull4 == 0
+gateOk    = confidence_pct >= strictGate
+canBuy    = freshBuy  and sessionOk and adxOk and gateOk and (not requireMtfUnan or mtfBull)
+canSell   = freshSell and sessionOk and adxOk and gateOk and (not requireMtfUnan or mtfBear)
+
 // ── ENTRY ──────────────────────────────────────────────────────────────
-if useLong  and freshBuy  and strategy.position_size == 0
+if useLong  and canBuy  and strategy.position_size == 0
     strategy.entry("L", strategy.long,  comment="BUY "  + str.tostring(confidence_pct) + "%")
-if useShort and freshSell and strategy.position_size == 0
+if useShort and canSell and strategy.position_size == 0
     strategy.entry("S", strategy.short, comment="SELL " + str.tostring(confidence_pct) + "%")
 
-// Reversal entry: close current and open opposite if conf >= revGate
-if allowReverse and strategy.position_size > 0 and freshSell and confidence_pct >= revGate
+// Reversal entry: close current and open opposite if conf >= revGate AND filters pass
+if allowReverse and strategy.position_size > 0 and canSell and confidence_pct >= revGate
     strategy.close("L", comment="↻rev SELL")
     if useShort
         strategy.entry("S", strategy.short, comment="SELL " + str.tostring(confidence_pct) + "% (rev)")
-if allowReverse and strategy.position_size < 0 and freshBuy and confidence_pct >= revGate
+if allowReverse and strategy.position_size < 0 and canBuy and confidence_pct >= revGate
     strategy.close("S", comment="↻rev BUY")
     if useLong
         strategy.entry("L", strategy.long, comment="BUY " + str.tostring(confidence_pct) + "% (rev)")
@@ -291,17 +317,17 @@ if strategy.position_size == 0
     entryT := na
 
 // ── VISUAL LABELS ──────────────────────────────────────────────────────
-plotshape(showLbl and freshBuy,  title="BUY",
+plotshape(showLbl and canBuy,  title="BUY",
           style=shape.labelup,   location=location.belowbar,
           color=color.new(color.green, 0), textcolor=color.white,
           text="BUY", size=size.small)
-plotshape(showLbl and freshSell, title="SELL",
+plotshape(showLbl and canSell, title="SELL",
           style=shape.labeldown, location=location.abovebar,
           color=color.new(color.red, 0),   textcolor=color.white,
           text="SELL", size=size.small)
 
-if showHorizonLine and (freshBuy or freshSell)
+if showHorizonLine and (canBuy or canSell)
     expBar = time + expiryMs
     line.new(x1=time, y1=close, x2=expBar, y2=close,
-             xloc=xloc.bar_time, color=color.new(freshBuy ? color.green : color.red, 50),
+             xloc=xloc.bar_time, color=color.new(canBuy ? color.green : color.red, 50),
              style=line.style_dashed, width=2)
