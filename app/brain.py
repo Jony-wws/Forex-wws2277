@@ -598,7 +598,29 @@ def evaluate_pair(
         persistence = float(ta.get("trend_persistence_5h") or 0)
         multi_tf = bool(ta.get("multi_tf_aligned"))
         safety_passes = bool(safety["projection"]["passes"])
-        if adx >= 30 and persistence >= 75 and multi_tf and safety_passes:
+        # Two equally-valid ways a setup can be "binary-option-perfect"
+        # in the user's 5 h window:
+        #
+        # (a) Classic continuation: ADX ≥ 30 strong trend AND ≥75% of
+        #     the last 5 H1 closes already agree with the side (price
+        #     has been moving our way for hours).
+        #
+        # (b) Very-strong-trend pullback: ADX ≥ 50 (Wilder's "very
+        #     strong trend" cut-off) AND multi-TF aligned AND at least
+        #     40 % recent persistence (2 of 5 bars still agree).  A
+        #     short-term retrace inside a violent trend is the textbook
+        #     institutional re-entry zone, not a reversal.
+        #
+        # Both paths still require multi-TF alignment AND a passing
+        # 5 h safety projection, so we never bonus a pair the market
+        # is fighting on the way to expiry.
+        classic_strong = (
+            adx >= 30.0 and persistence >= 75.0 and multi_tf and safety_passes
+        )
+        pullback_in_violent_trend = (
+            adx >= 50.0 and persistence >= 40.0 and multi_tf and safety_passes
+        )
+        if classic_strong or pullback_in_violent_trend:
             strong_tech_bonus = STRONG_TREND_BONUS
     composite_raw += strong_tech_bonus
 

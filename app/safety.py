@@ -28,7 +28,7 @@ import pandas as pd
 log = logging.getLogger("safety")
 
 
-REVERSAL_LOOKBACK_BARS = 3
+REVERSAL_LOOKBACK_BARS = 1
 PROJECTION_HORIZON_BARS = 5     # 5 × H1 = 5 hours
 PROJECTION_HORIZON_MINUTES = PROJECTION_HORIZON_BARS * 60
 SAFETY_MARGIN_FRACTION_OF_ATR = 0.5
@@ -285,11 +285,20 @@ def weekly_bias(bars_1w: pd.DataFrame) -> Optional[str]:
 
 
 def m5_momentum_aligned(bars_5m: pd.DataFrame, side: str) -> bool:
-    """Quick sanity check: last 6 M5 bars should not be moving against ``side``.
+    """Quick sanity check: last 6 M5 bars should not be moving STRONGLY against ``side``.
 
-    Used as a soft filter inside the MTF gate.  Returns False if the last
-    six M5 closes show a 5-bar slope that contradicts ``side`` by more
-    than 0.05% — a tiny but clear short-term momentum mismatch.
+    Used as a sanity filter inside the senior-alignment gate.  Returns
+    False only when the last six M5 closes show a 5-bar slope that
+    contradicts ``side`` by more than 0.20 % — a meaningful short-term
+    momentum reversal, not just noise.
+
+    Why 0.20 %?  For 5 h binary options the entry timing on M5 barely
+    matters compared to where price closes at the 5 h boundary.  A
+    short M5 retracement of <0.2 % against the trade is normal pullback
+    behaviour during a strong H1 trend and is in fact the textbook
+    institutional entry zone (smart money loads on pullbacks).  The
+    previous 0.05 % threshold treated normal noise as a reversal and
+    silently vetoed legitimate strong setups.
     """
     if bars_5m is None or bars_5m.empty or side not in ("BUY", "SELL"):
         return True   # no opinion = don't block
@@ -297,8 +306,8 @@ def m5_momentum_aligned(bars_5m: pd.DataFrame, side: str) -> bool:
         return True
     closes = bars_5m["Close"].tail(6)
     slope_pct = (float(closes.iloc[-1]) - float(closes.iloc[0])) / float(closes.iloc[0]) * 100.0
-    if side == "BUY" and slope_pct < -0.05:
+    if side == "BUY" and slope_pct < -0.20:
         return False
-    if side == "SELL" and slope_pct > +0.05:
+    if side == "SELL" and slope_pct > +0.20:
         return False
     return True
