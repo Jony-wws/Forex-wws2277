@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 AVEN capture script: grabs live TradingView charts (M15/H1/H4) for a forex pair
-via the public embed widget (no login needed), plus a ForexFactory economic
-calendar snapshot and a ForexLive news snapshot. Saves PNGs under screenshots/.
+via the public embed widget (no login needed), plus an economic-calendar
+snapshot (TradingEconomics, with Investing.com fallback) and a ForexLive news
+snapshot. Saves PNGs under screenshots/.
 
 Usage: python scripts/aven_capture.py AUDUSD
 """
@@ -12,6 +13,14 @@ import asyncio
 from playwright.async_api import async_playwright
 
 TF = {"15M": "15", "1H": "60", "4H": "240"}
+
+# JS to reduce automation fingerprint (hide navigator.webdriver etc.)
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+window.chrome = { runtime: {} };
+"""
 
 
 async def shoot(page, url, path, wait_ms=6000, full_page=False):
@@ -27,22 +36,63 @@ async def shoot(page, url, path, wait_ms=6000, full_page=False):
     print(f"  saved {path}")
 
 
+async def try_calendar(page):
+    """Try a few calendar sources that are less bot-hostile than ForexFactory.
+    Save the first that doesn't look like a Cloudflare/anti-bot page."""
+    sources = [
+        ("https://tradingeconomics.com/calendar", "tradingeconomics"),
+        ("https://www.investing.com/economic-calendar/", "investing"),
+    ]
+    for url, tag in sources:
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_timeout(7000)
+            body_text = (await page.inner_text("body"))[:2000].lower()
+            if ("verify you are human" in body_text
+                    or "performing security verification" in body_text
+                    or "checking your browser" in body_text):
+                print(f"  ! {tag} showed a bot-check page, trying next")
+                continue
+            await page.screenshot(
+                path="screenshots/news/economic_calendar.png", full_page=True
+            )
+            print(f"  saved screenshots/news/economic_calendar.png (from {tag})")
+            return True
+        except Exception as e:
+            print(f"  ! calendar {tag} failed: {e}")
+    print("  ! all calendar sources failed")
+    return False
+
+
 async def main():
     pair = (sys.argv[1] if len(sys.argv) > 1 else "AUDUSD").upper().replace("/", "")
     os.makedirs("screenshots/tv", exist_ok=True)
     os.makedirs("screenshots/news", exist_ok=True)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(args=["--no-sandbox"])
-        ctx = await browser.new_context(
-            viewport={"width": 1280, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-            ),
+        browser = await p.chromium.launch(
+            args=[
+                "--no-sandbox",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+            ]
         )
+        ctx = await browser.new_context(
+            viewport={"width": 1440, "height": 1000},
+            locale="en-US",
+            timezone_id="Europe/London",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        )
+        await ctx.add_init_script(STEALTH_JS)
         page = await ctx.new_page()
 
+        # TradingView charts (public embed) - these work reliably
         for label, iv in TF.items():
             url = (
                 f"https://s.tradingview.com/widgetembed/?symbol=FX:{pair}"
@@ -50,14 +100,10 @@ async def main():
             )
             await shoot(page, url, f"screenshots/tv/{pair}_{label}.png", wait_ms=8000)
 
-        await shoot(
-            page,
-            "https://www.forexfactory.com/calendar",
-            "screenshots/news/forexfactory_calendar.png",
-            wait_ms=7000,
-            full_page=True,
-        )
+        # Economic calendar (TradingEconomics / Investing.com, not ForexFactory)
+        await try_calendar(page)
 
+        # ForexLive news - works fine
         await shoot(
             page,
             "https://www.forexlive.com/",
