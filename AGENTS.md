@@ -46,6 +46,15 @@ First scan takes ~15 sec (downloads data from Yahoo Finance).
 5. Expose: `deploy expose port=8080`.
 6. Send URL to user (Android Chrome): `https://user:<password>@<host>/`.
 
+## Last live deploy
+
+- URL: `https://722c8b2fcd40-tunnel-si8t4mln.devinapps.com`
+- User: `user`
+- Pass: `88240604f10889be0f8b64acf722f694`
+- One-click (Android Chrome): `https://user:88240604f10889be0f8b64acf722f694@722c8b2fcd40-tunnel-si8t4mln.devinapps.com`
+- Started: 2026-05-06 04:45 UTC, session `722c8b2fcd40469a8ebe356d72586d60`
+- NOTE: this URL is tied to the running Devin VM. When the session ends the tunnel goes down. Re-run "How to start a session for the user" steps and replace this block.
+
 ## Layout
 
 ```
